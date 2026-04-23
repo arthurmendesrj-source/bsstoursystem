@@ -305,7 +305,8 @@ export const emailAnalyze = createServerFn({ method: "POST" })
     }
     const aiJson = await aiRes.json();
     const toolCall = aiJson?.choices?.[0]?.message?.tool_calls?.[0];
-    let suggestion: Record<string, unknown> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let suggestion: any = {};
     try {
       suggestion = toolCall?.function?.arguments ? JSON.parse(toolCall.function.arguments) : {};
     } catch {
@@ -315,5 +316,5 @@ export const emailAnalyze = createServerFn({ method: "POST" })
     // Cache suggestion in db (best effort)
     await supabase.from("emails").update({ ai_suggestion: suggestion }).eq("gmail_id", data.gmail_id);
 
-    return { suggestion, from, subject };
+    return { suggestion, from, subject } as { suggestion: Record<string, unknown>; from: { name: string; email: string }; subject: string };
   });

@@ -89,6 +89,18 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={openWorkspace}
+            className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+              path.startsWith("/leads/")
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+            }`}
+          >
+            <Briefcase className="h-4 w-4" />
+            {t("workspace")}
+          </button>
           {isAdmin && (
             <>
               <div className="mt-4 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">

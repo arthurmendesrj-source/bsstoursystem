@@ -538,7 +538,7 @@ function EmailPage() {
             </DialogTitle>
           </DialogHeader>
           {aiNote && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700">
+            <div className="rounded-md border border-muted bg-muted p-3 text-sm text-muted-foreground">
               {aiNote}
             </div>
           )}

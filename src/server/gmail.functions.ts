@@ -316,5 +316,5 @@ export const emailAnalyze = createServerFn({ method: "POST" })
     // Cache suggestion in db (best effort)
     await supabase.from("emails").update({ ai_suggestion: suggestion }).eq("gmail_id", data.gmail_id);
 
-    return { suggestion, from, subject } as { suggestion: { [k: string]: unknown }; from: { name: string; email: string }; subject: string };
+    return { suggestion: suggestion as { [k: string]: unknown & {} }, from, subject };
   });

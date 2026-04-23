@@ -46,6 +46,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/login" });
   };
 
+  const openWorkspace = async () => {
+    const { data } = await supabase
+      .from("leads")
+      .select("id")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data?.id) {
+      navigate({ to: "/leads/$leadId", params: { leadId: data.id } });
+    } else {
+      toast.info(t("noData"));
+      navigate({ to: "/leads" });
+    }
+  };
+
   return (
     <div className="flex h-screen w-full bg-background">
       <aside className="hidden w-64 flex-col border-r border-border bg-sidebar md:flex">

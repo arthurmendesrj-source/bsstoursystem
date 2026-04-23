@@ -1,83 +1,59 @@
 
-# Reestruturação: Bancos de Dados de Clientes e Fornecedores
 
-Antes de continuar com Email/Leads/Bookings, vamos consolidar os cadastros mestres (Clientes e Fornecedores) que serão a base de todo o fluxo. Hoje temos `customers` básico e **não existe** tabela de fornecedores.
+# Adicionar datas em itens da proposta
 
-## 1. Expandir o cadastro de Clientes (`customers`)
+Adicionar campos de **data** nos itens da proposta para registrar quando cada serviço/diária acontece, igual ao Excel base (colunas Date / Check-out em Hotels, Date em Services).
 
-A tabela atual tem só dados pessoais soltos. Vou ampliar para suportar PF/PJ, endereço completo, documentos e relacionamento com bookings/leads/emails.
+## Como vai funcionar
 
-**Novos campos em `customers`:**
-- `type` (enum `customer_type`: `pf` | `pj`) — default `pf`
-- `company_name`, `trade_name`, `tax_id` (CNPJ/EIN para PJ)
-- `address_street`, `address_number`, `address_complement`, `address_district`, `address_city`, `address_state`, `address_country`, `address_zip`
-- `whatsapp` (separado do `phone`)
-- `secondary_email`
-- `gender`, `marital_status`
-- `emergency_contact_name`, `emergency_contact_phone`
-- `tags` (text[]) — segmentação livre (VIP, recorrente, etc.)
-- `status` (enum `customer_status`: `ativo` | `inativo` | `bloqueado`) — default `ativo`
-- `origin` (text) — de onde veio (indicação, site, instagram, email…)
+**Hotels** (cada linha vira uma estadia com período):
+- Coluna **Check-in** (data) e **Check-out** (data)
+- Campo `nights` é calculado automaticamente a partir das duas datas (mas continua editável caso o usuário queira sobrescrever)
 
-**Aba Clientes (`/customers`):** rebuild com:
-- Tabela com filtros (tipo, status, tag, busca por nome/email/CNPJ).
-- Drawer de detalhes mostrando: dados, histórico de **leads**, **bookings**, **emails** vinculados, **interações** e **tarefas** — tudo já cruzando as tabelas existentes.
-- Botão **"Incluir manualmente"** abre formulário completo (PF/PJ condicional).
-- Quando vier de Email/Lead, mesmo formulário pré-preenchido.
+**Services** (cada linha tem a data do serviço):
+- Coluna **Data** (data única)
 
-## 2. Criar cadastro de Fornecedores (`suppliers`) — novo
+Datas são opcionais (linhas antigas continuam funcionando), mas ao preencher aparecem formatadas em PT-BR (`dd/MM/yyyy`) tanto no editor quanto na visão Invoice.
 
-Fornecedores são quem entrega o serviço (hotéis, cias aéreas, receptivos, transfers, seguros, operadoras parceiras).
+No modo **Invoice** (read-only), as datas viram parte do layout final, espelhando o Excel:
+```text
+Check-in   Check-out  Hotel               City   USD   Rms  N  Subtotal
+12/02/26   15/02/26   Hotel Copacabana    RIO    250   2    3  $1,500
+```
 
-**Tabela `suppliers`:**
-- `id`, `created_at`, `updated_at`, `created_by`
-- `name`, `trade_name`, `tax_id`
-- `category` (enum `supplier_category`: `hotel` | `aerea` | `receptivo` | `transfer` | `seguro` | `operadora` | `passeio` | `aluguel_carro` | `outro`)
-- `status` (enum `supplier_status`: `ativo` | `inativo` | `homologacao`)
-- `contact_name`, `email`, `phone`, `whatsapp`, `website`
-- Endereço completo (mesmos campos de customers)
-- `payment_terms` (text — ex: "30/60/90"), `default_currency` (currency_code)
-- `commission_pct` (numeric) — comissão padrão recebida
-- `iata_code` (para aéreas), `cadastur` (para operadoras BR)
-- `notes`, `tags` (text[])
-- `rating` (smallint 1–5)
+## Mudanças no banco
 
-**Tabela `supplier_contacts`** (vários contatos por fornecedor):
-- `id`, `supplier_id`, `name`, `role`, `email`, `phone`, `whatsapp`, `is_primary`
+Migration adicionando 3 colunas em `quote_items`:
+- `item_date date` — usada para Services (data única) e como Check-in para Hotels
+- `check_out date` — usada apenas em Hotels
+- (a coluna `nights` que será adicionada agora se ainda não existir; senão, mantida)
 
-**Aba Fornecedores (`/suppliers`):** nova rota
-- Tabela com filtros (categoria, status, país/cidade, tag).
-- Drawer de detalhes: dados, contatos, **bookings** que usaram esse fornecedor (futuro), histórico de e-mails trocados.
-- Botão **"Incluir manualmente"** + futuro fluxo via Email.
+Como hoje a tabela `quote_items` não tem campos estruturados de hotel/serviço (só `description`, `quantity`, `unit_cost`, `markup_pct`), aproveito a migration para também garantir os campos que faltam para o layout: `kind` ('hotel'|'service'), `city`, `category`, `meal_plan`, `rooms`, `nights`, `pax`, `ways`. Isso destrava o layout completo do Excel sem nova migration depois.
 
-## 3. Vínculos entre tabelas (preparando o fluxo integrado)
+## Componentes
 
-Para o "tudo interligado" funcionar bem:
-- `bookings.supplier_id` (uuid, nullable) — fornecedor principal do booking.
-- `booking_suppliers` (tabela N:N) — vários fornecedores por booking, cada um com `service_type`, `confirmation_code`, `cost`, `currency`, `status`.
-- `emails.supplier_id` (uuid, nullable) — vincular email a fornecedor (já temos `lead_id` e `customer_id`).
-- `interactions.supplier_id` (uuid, nullable) — registrar contatos com fornecedor.
-- `tasks.supplier_id` (uuid, nullable) — tarefas vinculadas a fornecedor.
+- **`src/components/proposal/ProposalEditor.tsx`** — adicionar:
+  - Em linhas Hotel: 2 inputs `type="date"` (Check-in, Check-out) + auto-cálculo de `nights = diffDays(checkOut, checkIn)` quando ambas preenchidas; usuário ainda pode editar `nights` manualmente.
+  - Em linhas Service: 1 input `type="date"` (Data).
+  - Persistir `item_date` / `check_out` no upsert de `quote_items`.
+  - Modo `invoice`: exibir datas formatadas (date-fns `format(d, "dd/MM/yyyy")`).
+- **`src/lib/proposal-totals.ts`** — pequeno helper `diffNights(checkIn, checkOut)` para o auto-cálculo.
 
-## 4. RLS
+## i18n
 
-Mesmo padrão das tabelas existentes:
-- **SELECT**: qualquer `authenticated`.
-- **INSERT**: `auth.uid() = created_by`.
-- **UPDATE**: dono ou `is_admin` ou `has_role('operacional')`.
-- **DELETE**: apenas `is_admin`.
+Novas chaves PT/EN/ES em `src/lib/i18n.tsx`: `checkIn`, `checkOut`, `serviceDate`, `nightsAuto`.
 
-## 5. Navegação e i18n
+## Arquivos afetados
 
-- AppShell: novo item **Fornecedores** (ícone `Building2`).
-- `i18n.tsx`: chaves PT/EN/ES para todos os novos campos, categorias e status.
+| Ação | Arquivo |
+|---|---|
+| Migration | `supabase/migrations/<timestamp>_quote_items_dates.sql` |
+| Editar | `src/components/proposal/ProposalEditor.tsx` |
+| Editar | `src/lib/proposal-totals.ts` |
+| Editar | `src/lib/i18n.tsx` |
 
-## 6. Arquivos afetados
+## Fora de escopo (próximo passo, se quiser)
 
-- **Migração SQL** (1 arquivo): novos enums, novas colunas em `customers`, tabelas `suppliers` + `supplier_contacts` + `booking_suppliers`, novas FKs/colunas em `bookings`/`emails`/`interactions`/`tasks`, RLS de tudo.
-- `src/routes/customers.tsx` — rebuild com filtros, drawer 360°, formulário PF/PJ.
-- `src/routes/suppliers.tsx` — **novo**.
-- `src/components/AppShell.tsx` — item Fornecedores.
-- `src/lib/i18n.tsx` — novas chaves.
+- Validar que `check_out > check_in` com mensagem de erro inline.
+- Ordenar linhas da proposta automaticamente por data.
 
-## 7. Perguntas rápidas antes de executar

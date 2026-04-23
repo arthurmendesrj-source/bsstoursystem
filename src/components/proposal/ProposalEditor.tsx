@@ -431,7 +431,7 @@ function ItemTable({
               ) : (
                 <th className="text-left p-2 w-32">{t("serviceDate")}</th>
               )}
-              <th className="text-left p-2">{t("name")}</th>
+              <th className="text-left p-2 min-w-[280px]">{t("name")}</th>
               {!readOnly && <th className="text-right p-2 w-28">{t("unitCost")} ({ccy})</th>}
               {!readOnly && <th className="text-right p-2 w-20">{t("markup")} %</th>}
               <th className="text-right p-2 w-28">{t("price")} ({ccy})</th>
@@ -487,13 +487,13 @@ function ItemTable({
                       )}
                     </td>
                   )}
-                  <td className="p-2">
+                  <td className="p-2 min-w-[280px]">
                     <Input
                       value={it.description}
                       onChange={(e) => onChange(i, { description: e.target.value })}
                       disabled={readOnly}
                       placeholder={isHotel ? "Hotel / City / Meal" : "Service / City / Way"}
-                      className="h-8"
+                      className="h-8 w-full min-w-[260px]"
                     />
                   </td>
                   {!readOnly && (

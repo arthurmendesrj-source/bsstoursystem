@@ -15,8 +15,6 @@ import {
   Building2,
   Briefcase,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
@@ -46,20 +44,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/login" });
   };
 
-  const openWorkspace = async () => {
-    const { data } = await supabase
-      .from("leads")
-      .select("id")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (data?.id) {
-      navigate({ to: "/leads/$leadId", params: { leadId: data.id } });
-    } else {
-      toast.info(t("noData"));
-      navigate({ to: "/leads" });
-    }
-  };
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -89,18 +73,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          <button
-            type="button"
-            onClick={openWorkspace}
-            className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-              path.startsWith("/leads/")
+          <Link
+            to="/workspace"
+            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+              path === "/workspace" || path.startsWith("/leads/")
                 ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
             }`}
           >
             <Briefcase className="h-4 w-4" />
             {t("workspace")}
-          </button>
+          </Link>
           {isAdmin && (
             <>
               <div className="mt-4 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">

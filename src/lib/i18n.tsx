@@ -180,6 +180,12 @@ const dict = {
     past: "Passados",
     pending: "Pendente",
     done: "Concluído",
+    workspaceIntro: "Selecione um lead ou crie um novo para iniciar o atendimento.",
+    workspaceEmpty: "Nenhum lead cadastrado ainda.",
+    workspaceEmptyHint: "Crie o primeiro lead na aba ao lado para abrir a janela de atendimento.",
+    selectLead: "Selecionar lead",
+    createNewLead: "Criar novo lead",
+    recentLeads: "Leads recentes",
   },
   en: {
     appName: "TourismCRM",
@@ -356,6 +362,12 @@ const dict = {
     past: "Past",
     pending: "Pending",
     done: "Done",
+    workspaceIntro: "Select a lead or create a new one to start working.",
+    workspaceEmpty: "No leads yet.",
+    workspaceEmptyHint: "Create your first lead in the tab next to this one to open the workspace.",
+    selectLead: "Select lead",
+    createNewLead: "Create new lead",
+    recentLeads: "Recent leads",
   },
   es: {
     appName: "TurismoCRM",
@@ -532,6 +544,12 @@ const dict = {
     past: "Pasados",
     pending: "Pendiente",
     done: "Hecho",
+    workspaceIntro: "Selecciona un lead o crea uno nuevo para empezar la atención.",
+    workspaceEmpty: "Aún no hay leads.",
+    workspaceEmptyHint: "Crea el primer lead en la pestaña de al lado para abrir la ventana de atención.",
+    selectLead: "Seleccionar lead",
+    createNewLead: "Crear nuevo lead",
+    recentLeads: "Leads recientes",
   },
 } as const;
 

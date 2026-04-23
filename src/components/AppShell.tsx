@@ -12,6 +12,7 @@ import {
   Plane,
   Shield,
   Mail,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/leads", label: t("leads"), icon: UserPlus },
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
     { to: "/customers", label: t("customers"), icon: Users },
+    { to: "/suppliers", label: t("suppliers"), icon: Building2 },
     { to: "/packages", label: t("packages"), icon: Package },
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },
     { to: "/email", label: t("email"), icon: Mail },

@@ -53,6 +53,60 @@ export type Database = {
           },
         ]
       }
+      booking_suppliers: {
+        Row: {
+          booking_id: string
+          confirmation_code: string | null
+          cost: number | null
+          created_at: string
+          currency: Database["public"]["Enums"]["currency_code"]
+          id: string
+          notes: string | null
+          service_type: string | null
+          status: string | null
+          supplier_id: string
+        }
+        Insert: {
+          booking_id: string
+          confirmation_code?: string | null
+          cost?: number | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          id?: string
+          notes?: string | null
+          service_type?: string | null
+          status?: string | null
+          supplier_id: string
+        }
+        Update: {
+          booking_id?: string
+          confirmation_code?: string | null
+          cost?: number | null
+          created_at?: string
+          currency?: Database["public"]["Enums"]["currency_code"]
+          id?: string
+          notes?: string | null
+          service_type?: string | null
+          status?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_suppliers_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_suppliers_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bookings: {
         Row: {
           created_at: string
@@ -67,6 +121,7 @@ export type Database = {
           quote_id: string | null
           return_date: string | null
           status: Database["public"]["Enums"]["booking_status"]
+          supplier_id: string | null
           total_amount: number
           updated_at: string
         }
@@ -83,6 +138,7 @@ export type Database = {
           quote_id?: string | null
           return_date?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
+          supplier_id?: string | null
           total_amount?: number
           updated_at?: string
         }
@@ -99,6 +155,7 @@ export type Database = {
           quote_id?: string | null
           return_date?: string | null
           status?: Database["public"]["Enums"]["booking_status"]
+          supplier_id?: string | null
           total_amount?: number
           updated_at?: string
         }
@@ -131,56 +188,126 @@ export type Database = {
             referencedRelation: "quotes"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "bookings_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
         ]
       }
       customers: {
         Row: {
+          address_city: string | null
+          address_complement: string | null
+          address_country: string | null
+          address_district: string | null
+          address_number: string | null
+          address_state: string | null
+          address_street: string | null
+          address_zip: string | null
           birth_date: string | null
+          company_name: string | null
           created_at: string
           created_by: string | null
           document_number: string | null
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
           full_name: string
+          gender: string | null
           id: string
+          marital_status: string | null
           nationality: string | null
           notes: string | null
+          origin: string | null
           passport_expiry: string | null
           passport_number: string | null
           phone: string | null
           preferences: string | null
+          secondary_email: string | null
+          status: Database["public"]["Enums"]["customer_status"]
+          tags: string[] | null
+          tax_id: string | null
+          trade_name: string | null
+          type: Database["public"]["Enums"]["customer_type"]
           updated_at: string
+          whatsapp: string | null
         }
         Insert: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_country?: string | null
+          address_district?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
           birth_date?: string | null
+          company_name?: string | null
           created_at?: string
           created_by?: string | null
           document_number?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
           full_name: string
+          gender?: string | null
           id?: string
+          marital_status?: string | null
           nationality?: string | null
           notes?: string | null
+          origin?: string | null
           passport_expiry?: string | null
           passport_number?: string | null
           phone?: string | null
           preferences?: string | null
+          secondary_email?: string | null
+          status?: Database["public"]["Enums"]["customer_status"]
+          tags?: string[] | null
+          tax_id?: string | null
+          trade_name?: string | null
+          type?: Database["public"]["Enums"]["customer_type"]
           updated_at?: string
+          whatsapp?: string | null
         }
         Update: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_country?: string | null
+          address_district?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
           birth_date?: string | null
+          company_name?: string | null
           created_at?: string
           created_by?: string | null
           document_number?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
           full_name?: string
+          gender?: string | null
           id?: string
+          marital_status?: string | null
           nationality?: string | null
           notes?: string | null
+          origin?: string | null
           passport_expiry?: string | null
           passport_number?: string | null
           phone?: string | null
           preferences?: string | null
+          secondary_email?: string | null
+          status?: Database["public"]["Enums"]["customer_status"]
+          tags?: string[] | null
+          tax_id?: string | null
+          trade_name?: string | null
+          type?: Database["public"]["Enums"]["customer_type"]
           updated_at?: string
+          whatsapp?: string | null
         }
         Relationships: []
       }
@@ -202,6 +329,7 @@ export type Database = {
           received_at: string | null
           snippet: string | null
           subject: string | null
+          supplier_id: string | null
           thread_id: string | null
           to_emails: string[] | null
           updated_at: string
@@ -223,6 +351,7 @@ export type Database = {
           received_at?: string | null
           snippet?: string | null
           subject?: string | null
+          supplier_id?: string | null
           thread_id?: string | null
           to_emails?: string[] | null
           updated_at?: string
@@ -244,6 +373,7 @@ export type Database = {
           received_at?: string | null
           snippet?: string | null
           subject?: string | null
+          supplier_id?: string | null
           thread_id?: string | null
           to_emails?: string[] | null
           updated_at?: string
@@ -261,6 +391,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -302,6 +439,7 @@ export type Database = {
           lead_id: string | null
           occurred_at: string
           subject: string | null
+          supplier_id: string | null
           type: Database["public"]["Enums"]["interaction_type"]
         }
         Insert: {
@@ -313,6 +451,7 @@ export type Database = {
           lead_id?: string | null
           occurred_at?: string
           subject?: string | null
+          supplier_id?: string | null
           type: Database["public"]["Enums"]["interaction_type"]
         }
         Update: {
@@ -324,6 +463,7 @@ export type Database = {
           lead_id?: string | null
           occurred_at?: string
           subject?: string | null
+          supplier_id?: string | null
           type?: Database["public"]["Enums"]["interaction_type"]
         }
         Relationships: [
@@ -339,6 +479,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interactions_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -659,6 +806,149 @@ export type Database = {
           },
         ]
       }
+      supplier_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          is_primary: boolean
+          name: string
+          phone: string | null
+          role: string | null
+          supplier_id: string
+          whatsapp: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          name: string
+          phone?: string | null
+          role?: string | null
+          supplier_id: string
+          whatsapp?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_primary?: boolean
+          name?: string
+          phone?: string | null
+          role?: string | null
+          supplier_id?: string
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_contacts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          address_city: string | null
+          address_complement: string | null
+          address_country: string | null
+          address_district: string | null
+          address_number: string | null
+          address_state: string | null
+          address_street: string | null
+          address_zip: string | null
+          cadastur: string | null
+          category: Database["public"]["Enums"]["supplier_category"]
+          commission_pct: number | null
+          contact_name: string | null
+          created_at: string
+          created_by: string | null
+          default_currency: Database["public"]["Enums"]["currency_code"]
+          email: string | null
+          iata_code: string | null
+          id: string
+          name: string
+          notes: string | null
+          payment_terms: string | null
+          phone: string | null
+          rating: number | null
+          status: Database["public"]["Enums"]["supplier_status"]
+          tags: string[] | null
+          tax_id: string | null
+          trade_name: string | null
+          updated_at: string
+          website: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_country?: string | null
+          address_district?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          cadastur?: string | null
+          category?: Database["public"]["Enums"]["supplier_category"]
+          commission_pct?: number | null
+          contact_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_currency?: Database["public"]["Enums"]["currency_code"]
+          email?: string | null
+          iata_code?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          rating?: number | null
+          status?: Database["public"]["Enums"]["supplier_status"]
+          tags?: string[] | null
+          tax_id?: string | null
+          trade_name?: string | null
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address_city?: string | null
+          address_complement?: string | null
+          address_country?: string | null
+          address_district?: string | null
+          address_number?: string | null
+          address_state?: string | null
+          address_street?: string | null
+          address_zip?: string | null
+          cadastur?: string | null
+          category?: Database["public"]["Enums"]["supplier_category"]
+          commission_pct?: number | null
+          contact_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_currency?: Database["public"]["Enums"]["currency_code"]
+          email?: string | null
+          iata_code?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          payment_terms?: string | null
+          phone?: string | null
+          rating?: number | null
+          status?: Database["public"]["Enums"]["supplier_status"]
+          tags?: string[] | null
+          tax_id?: string | null
+          trade_name?: string | null
+          updated_at?: string
+          website?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: []
+      }
       tasks: {
         Row: {
           assigned_to: string | null
@@ -670,6 +960,7 @@ export type Database = {
           due_date: string | null
           id: string
           lead_id: string | null
+          supplier_id: string | null
           title: string
           updated_at: string
         }
@@ -683,6 +974,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           lead_id?: string | null
+          supplier_id?: string | null
           title: string
           updated_at?: string
         }
@@ -696,6 +988,7 @@ export type Database = {
           due_date?: string | null
           id?: string
           lead_id?: string | null
+          supplier_id?: string | null
           title?: string
           updated_at?: string
         }
@@ -712,6 +1005,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
         ]
@@ -795,6 +1095,8 @@ export type Database = {
         | "concluida"
         | "cancelada"
       currency_code: "BRL" | "USD" | "EUR"
+      customer_status: "ativo" | "inativo" | "bloqueado"
+      customer_type: "pf" | "pj"
       interaction_type: "ligacao" | "email" | "reuniao" | "nota" | "whatsapp"
       lead_status:
         | "novo"
@@ -804,6 +1106,17 @@ export type Database = {
         | "fechado"
         | "perdido"
       quote_status: "rascunho" | "enviada" | "aprovada" | "rejeitada"
+      supplier_category:
+        | "hotel"
+        | "aerea"
+        | "receptivo"
+        | "transfer"
+        | "seguro"
+        | "operadora"
+        | "passeio"
+        | "aluguel_carro"
+        | "outro"
+      supplier_status: "ativo" | "inativo" | "homologacao"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -940,6 +1253,8 @@ export const Constants = {
         "cancelada",
       ],
       currency_code: ["BRL", "USD", "EUR"],
+      customer_status: ["ativo", "inativo", "bloqueado"],
+      customer_type: ["pf", "pj"],
       interaction_type: ["ligacao", "email", "reuniao", "nota", "whatsapp"],
       lead_status: [
         "novo",
@@ -950,6 +1265,18 @@ export const Constants = {
         "perdido",
       ],
       quote_status: ["rascunho", "enviada", "aprovada", "rejeitada"],
+      supplier_category: [
+        "hotel",
+        "aerea",
+        "receptivo",
+        "transfer",
+        "seguro",
+        "operadora",
+        "passeio",
+        "aluguel_carro",
+        "outro",
+      ],
+      supplier_status: ["ativo", "inativo", "homologacao"],
     },
   },
 } as const

@@ -477,7 +477,7 @@ function WorkspacePage() {
                 ) : (
                   <div className="space-y-2">
                     {emails.map((em) => (
-                      <div key={em.id} className={cn("p-3 rounded-md border", em.is_unread && "bg-primary/5 border-primary/30")}>
+                      <div key={em.id} className={cn("p-3 rounded-md border", em.is_unread && "bg-accent border-primary/30")}>
                         <div className="flex items-baseline justify-between gap-2">
                           <div className="font-medium text-sm truncate">{em.from_name ?? em.from_email}</div>
                           <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM HH:mm") : ""}</div>

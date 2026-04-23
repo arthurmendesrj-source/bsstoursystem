@@ -29,6 +29,7 @@ export const Route = createFileRoute("/leads")({
 
 type Lead = {
   id: string;
+  code: string | null;
   name: string;
   email: string | null;
   phone: string | null;
@@ -105,6 +106,10 @@ function LeadsPage() {
           <DialogContent>
             <DialogHeader><DialogTitle>{t("new")} {t("leads")}</DialogTitle></DialogHeader>
             <form onSubmit={create} className="space-y-3">
+              <div>
+                <Label>Código</Label>
+                <Input disabled placeholder="Gerado automaticamente (ex: AM010426)" />
+              </div>
               <div><Label>{t("name")}</Label><Input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label>{t("email")}</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
@@ -129,6 +134,7 @@ function LeadsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Código</TableHead>
               <TableHead>{t("name")}</TableHead>
               <TableHead>{t("destination")}</TableHead>
               <TableHead>{t("estimatedValue")}</TableHead>
@@ -137,9 +143,10 @@ function LeadsPage() {
           </TableHeader>
           <TableBody>
             {leads.length === 0 ? (
-              <TableRow><TableCell colSpan={4} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : leads.map((l) => (
               <TableRow key={l.id}>
+                <TableCell><span className="font-mono text-xs">{l.code ?? "—"}</span></TableCell>
                 <TableCell>
                   <div className="font-medium">{l.name}</div>
                   <div className="text-xs text-muted-foreground">{l.email ?? l.phone}</div>

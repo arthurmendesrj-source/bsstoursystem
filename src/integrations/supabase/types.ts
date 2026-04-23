@@ -208,6 +208,7 @@ export type Database = {
           address_street: string | null
           address_zip: string | null
           birth_date: string | null
+          code: string | null
           company_name: string | null
           created_at: string
           created_by: string | null
@@ -245,6 +246,7 @@ export type Database = {
           address_street?: string | null
           address_zip?: string | null
           birth_date?: string | null
+          code?: string | null
           company_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -282,6 +284,7 @@ export type Database = {
           address_street?: string | null
           address_zip?: string | null
           birth_date?: string | null
+          code?: string | null
           company_name?: string | null
           created_at?: string
           created_by?: string | null
@@ -493,6 +496,7 @@ export type Database = {
       leads: {
         Row: {
           assigned_to: string | null
+          code: string | null
           created_at: string
           created_by: string | null
           currency: Database["public"]["Enums"]["currency_code"] | null
@@ -513,6 +517,7 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          code?: string | null
           created_at?: string
           created_by?: string | null
           currency?: Database["public"]["Enums"]["currency_code"] | null
@@ -533,6 +538,7 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          code?: string | null
           created_at?: string
           created_by?: string | null
           currency?: Database["public"]["Enums"]["currency_code"] | null
@@ -862,6 +868,7 @@ export type Database = {
           address_zip: string | null
           cadastur: string | null
           category: Database["public"]["Enums"]["supplier_category"]
+          code: string | null
           commission_pct: number | null
           contact_name: string | null
           created_at: string
@@ -894,6 +901,7 @@ export type Database = {
           address_zip?: string | null
           cadastur?: string | null
           category?: Database["public"]["Enums"]["supplier_category"]
+          code?: string | null
           commission_pct?: number | null
           contact_name?: string | null
           created_at?: string
@@ -926,6 +934,7 @@ export type Database = {
           address_zip?: string | null
           cadastur?: string | null
           category?: Database["public"]["Enums"]["supplier_category"]
+          code?: string | null
           commission_pct?: number | null
           contact_name?: string | null
           created_at?: string
@@ -1077,6 +1086,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      extract_initials: { Args: { _full_name: string }; Returns: string }
+      generate_entity_code: {
+        Args: { _entity: string; _user_id: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

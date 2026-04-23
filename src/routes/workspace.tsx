@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EmailPanel } from "@/components/email/EmailPanel";
+import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 
 type WorkspaceSearch = { lead?: string };
 
@@ -473,33 +474,30 @@ function WorkspacePage() {
               </TabsContent>
 
               <TabsContent value="proposals" className="mt-4">
-                {!hasLead ? (
+                {!hasLead || !lead ? (
                   <EmptyTab text={t("selectLeadToView")} />
-                ) : quotes.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("noProposals")}</div>
                 ) : (
-                  <div className="space-y-2">
-                    {quotes.map((q) => (
-                      <div key={q.id} className="p-3 rounded-md border flex items-center justify-between">
-                        <div>
-                          <Badge variant="outline" className="capitalize">{q.status}</Badge>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(q.created_at), "dd/MM/yyyy")}
-                            {q.valid_until && ` · ${t("upcoming")}: ${format(new Date(q.valid_until), "dd/MM/yyyy")}`}
-                          </div>
-                        </div>
-                        <div className="font-semibold">{fmtCurrency(Number(q.total_amount), q.currency as "BRL")}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <ProposalsTab
+                    leadId={lead.id}
+                    customerId={lead.customer_id}
+                    quotes={quotes.filter((q) => q.status !== "aprovada")}
+                    onChanged={() => loadLead(lead.id)}
+                    mode="proposal"
+                  />
                 )}
               </TabsContent>
 
               <TabsContent value="invoice" className="mt-4">
-                {!hasLead ? (
+                {!hasLead || !lead ? (
                   <EmptyTab text={t("selectLeadToView")} />
                 ) : (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("invoiceComingSoon")}</div>
+                  <ProposalsTab
+                    leadId={lead.id}
+                    customerId={lead.customer_id}
+                    quotes={quotes.filter((q) => q.status === "aprovada")}
+                    onChanged={() => loadLead(lead.id)}
+                    mode="invoice"
+                  />
                 )}
               </TabsContent>
 

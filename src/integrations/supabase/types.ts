@@ -184,6 +184,87 @@ export type Database = {
         }
         Relationships: []
       }
+      emails: {
+        Row: {
+          ai_suggestion: Json | null
+          body_html: string | null
+          body_text: string | null
+          created_at: string
+          customer_id: string | null
+          from_email: string | null
+          from_name: string | null
+          gmail_id: string
+          has_attachments: boolean
+          id: string
+          is_unread: boolean
+          labels: string[] | null
+          lead_id: string | null
+          received_at: string | null
+          snippet: string | null
+          subject: string | null
+          thread_id: string | null
+          to_emails: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          ai_suggestion?: Json | null
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          customer_id?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          gmail_id: string
+          has_attachments?: boolean
+          id?: string
+          is_unread?: boolean
+          labels?: string[] | null
+          lead_id?: string | null
+          received_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_emails?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          ai_suggestion?: Json | null
+          body_html?: string | null
+          body_text?: string | null
+          created_at?: string
+          customer_id?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          gmail_id?: string
+          has_attachments?: boolean
+          id?: string
+          is_unread?: boolean
+          labels?: string[] | null
+          lead_id?: string | null
+          received_at?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_emails?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rates: {
         Row: {
           base_currency: Database["public"]["Enums"]["currency_code"]

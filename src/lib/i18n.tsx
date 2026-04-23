@@ -216,6 +216,11 @@ const dict = {
     editProposal: "Editar",
     viewInvoice: "Visualizar invoice",
     noInvoices: "Nenhum invoice ainda.",
+    checkIn: "Check-in",
+    checkOut: "Check-out",
+    serviceDate: "Data",
+    nightsAuto: "Noites (auto)",
+    nights: "Noites",
   },
   en: {
     appName: "TourismCRM",
@@ -427,6 +432,11 @@ const dict = {
     editProposal: "Edit",
     viewInvoice: "View invoice",
     noInvoices: "No invoices yet.",
+    checkIn: "Check-in",
+    checkOut: "Check-out",
+    serviceDate: "Date",
+    nightsAuto: "Nights (auto)",
+    nights: "Nights",
   },
   es: {
     appName: "TurismoCRM",
@@ -638,6 +648,11 @@ const dict = {
     editProposal: "Editar",
     viewInvoice: "Ver invoice",
     noInvoices: "Aún no hay invoices.",
+    checkIn: "Check-in",
+    checkOut: "Check-out",
+    serviceDate: "Fecha",
+    nightsAuto: "Noches (auto)",
+    nights: "Noches",
   },
 } as const;
 

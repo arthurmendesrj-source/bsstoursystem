@@ -26,7 +26,8 @@ async function gw(path: string, init?: RequestInit) {
   if (!res.ok) {
     throw new Error(`Gmail API ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
   }
-  return data as Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return data as any;
 }
 
 function decodeB64Url(s: string) {
@@ -85,7 +86,7 @@ export const gmailList = createServerFn({ method: "POST" })
     if (data.q) params.set("q", data.q);
     if (data.pageToken) params.set("pageToken", data.pageToken);
     const res = await gw(`/users/me/messages?${params.toString()}`);
-    return res;
+    return res as { messages?: { id: string; threadId: string }[]; nextPageToken?: string };
   });
 
 // ---------------- get full message ----------------

@@ -719,27 +719,33 @@ export type Database = {
           created_at: string
           description: string
           id: string
+          markup_pct: number
           quantity: number
           quote_id: string
           total: number
+          unit_cost: number
           unit_price: number
         }
         Insert: {
           created_at?: string
           description: string
           id?: string
+          markup_pct?: number
           quantity?: number
           quote_id: string
           total?: number
+          unit_cost?: number
           unit_price?: number
         }
         Update: {
           created_at?: string
           description?: string
           id?: string
+          markup_pct?: number
           quantity?: number
           quote_id?: string
           total?: number
+          unit_cost?: number
           unit_price?: number
         }
         Relationships: [
@@ -758,6 +764,7 @@ export type Database = {
           created_by: string | null
           currency: Database["public"]["Enums"]["currency_code"]
           customer_id: string | null
+          default_markup_pct: number
           discount: number | null
           id: string
           lead_id: string | null
@@ -773,6 +780,7 @@ export type Database = {
           created_by?: string | null
           currency?: Database["public"]["Enums"]["currency_code"]
           customer_id?: string | null
+          default_markup_pct?: number
           discount?: number | null
           id?: string
           lead_id?: string | null
@@ -788,6 +796,7 @@ export type Database = {
           created_by?: string | null
           currency?: Database["public"]["Enums"]["currency_code"]
           customer_id?: string | null
+          default_markup_pct?: number
           discount?: number | null
           id?: string
           lead_id?: string | null

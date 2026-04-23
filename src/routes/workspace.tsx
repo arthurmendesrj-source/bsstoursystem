@@ -32,6 +32,7 @@ import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { EmailPanel } from "@/components/email/EmailPanel";
 
 type WorkspaceSearch = { lead?: string };
 
@@ -71,10 +72,10 @@ type Lead = {
   currency: string;
   status: LeadStatus;
   notes: string | null;
+  customer_id: string | null;
 };
 type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean };
 type Interaction = { id: string; type: string; subject: string | null; content: string | null; occurred_at: string };
-type Email = { id: string; subject: string | null; from_name: string | null; from_email: string | null; snippet: string | null; received_at: string | null; is_unread: boolean };
 type Quote = { id: string; status: string; total_amount: number; currency: string; valid_until: string | null; created_at: string };
 type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null };
 
@@ -98,7 +99,7 @@ function WorkspacePage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
-  const [emails, setEmails] = useState<Email[]>([]);
+  // emails removed: Email tab uses EmailPanel which loads its own data
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loadingLead, setLoadingLead] = useState(false);
@@ -132,18 +133,16 @@ function WorkspacePage() {
   // Load active lead data
   const loadLead = async (id: string) => {
     setLoadingLead(true);
-    const [leadRes, tasksRes, intRes, emailsRes, quotesRes, bookingsRes] = await Promise.all([
+    const [leadRes, tasksRes, intRes, quotesRes, bookingsRes] = await Promise.all([
       supabase.from("leads").select("*").eq("id", id).maybeSingle(),
       supabase.from("tasks").select("id,title,description,due_date,completed").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", id).order("occurred_at", { ascending: false }),
-      supabase.from("emails").select("id,subject,from_name,from_email,snippet,received_at,is_unread").eq("lead_id", id).order("received_at", { ascending: false }).limit(50),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", id).order("created_at", { ascending: false }),
     ]);
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
-    setEmails((emailsRes.data as Email[]) ?? []);
     setQuotes((quotesRes.data as Quote[]) ?? []);
     setBookings((bookingsRes.data as Booking[]) ?? []);
     setLoadingLead(false);
@@ -153,7 +152,7 @@ function WorkspacePage() {
     if (leadId) loadLead(leadId);
     else {
       setLead(null);
-      setTasks([]); setInteractions([]); setEmails([]); setQuotes([]); setBookings([]);
+      setTasks([]); setInteractions([]); setQuotes([]); setBookings([]);
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [leadId]);
@@ -466,25 +465,10 @@ function WorkspacePage() {
               </TabsList>
 
               <TabsContent value="email" className="mt-4">
-                {!hasLead ? (
+                {!hasLead || !lead ? (
                   <EmptyTab text={t("selectLeadToView")} />
-                ) : loadingLead ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("loading")}</div>
-                ) : emails.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("noEmailsYet")}</div>
                 ) : (
-                  <div className="space-y-2">
-                    {emails.map((em) => (
-                      <div key={em.id} className={cn("p-3 rounded-md border", em.is_unread && "bg-accent border-primary/30")}>
-                        <div className="flex items-baseline justify-between gap-2">
-                          <div className="font-medium text-sm truncate">{em.from_name ?? em.from_email}</div>
-                          <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM HH:mm") : ""}</div>
-                        </div>
-                        <div className="text-sm font-semibold truncate">{em.subject ?? "(sem assunto)"}</div>
-                        {em.snippet && <div className="text-xs text-muted-foreground line-clamp-2 mt-1">{em.snippet}</div>}
-                      </div>
-                    ))}
-                  </div>
+                  <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} />
                 )}
               </TabsContent>
 

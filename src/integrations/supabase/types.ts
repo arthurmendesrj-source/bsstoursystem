@@ -115,6 +115,7 @@ export type Database = {
           customer_id: string | null
           departure_date: string | null
           id: string
+          lead_id: string | null
           notes: string | null
           package_date_id: string | null
           package_id: string | null
@@ -132,6 +133,7 @@ export type Database = {
           customer_id?: string | null
           departure_date?: string | null
           id?: string
+          lead_id?: string | null
           notes?: string | null
           package_date_id?: string | null
           package_id?: string | null
@@ -149,6 +151,7 @@ export type Database = {
           customer_id?: string | null
           departure_date?: string | null
           id?: string
+          lead_id?: string | null
           notes?: string | null
           package_date_id?: string | null
           package_id?: string | null
@@ -165,6 +168,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
             referencedColumns: ["id"]
           },
           {

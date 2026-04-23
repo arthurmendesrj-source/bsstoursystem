@@ -151,7 +151,7 @@ function WorkspacePage() {
     if (leadId) loadLead(leadId);
     else {
       setLead(null);
-      setTasks([]); setInteractions([]); setEmails([]); setQuotes([]); setBookings([]);
+      setTasks([]); setInteractions([]); setQuotes([]); setBookings([]);
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [leadId]);
@@ -464,25 +464,10 @@ function WorkspacePage() {
               </TabsList>
 
               <TabsContent value="email" className="mt-4">
-                {!hasLead ? (
+                {!hasLead || !lead ? (
                   <EmptyTab text={t("selectLeadToView")} />
-                ) : loadingLead ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("loading")}</div>
-                ) : emails.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("noEmailsYet")}</div>
                 ) : (
-                  <div className="space-y-2">
-                    {emails.map((em) => (
-                      <div key={em.id} className={cn("p-3 rounded-md border", em.is_unread && "bg-accent border-primary/30")}>
-                        <div className="flex items-baseline justify-between gap-2">
-                          <div className="font-medium text-sm truncate">{em.from_name ?? em.from_email}</div>
-                          <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM HH:mm") : ""}</div>
-                        </div>
-                        <div className="text-sm font-semibold truncate">{em.subject ?? "(sem assunto)"}</div>
-                        {em.snippet && <div className="text-xs text-muted-foreground line-clamp-2 mt-1">{em.snippet}</div>}
-                      </div>
-                    ))}
-                  </div>
+                  <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} />
                 )}
               </TabsContent>
 

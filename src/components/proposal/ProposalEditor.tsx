@@ -203,7 +203,7 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           {mode === "invoice" ? (
-            <Badge className="bg-emerald-600 hover:bg-emerald-600">{t("invoice")}</Badge>
+            <Badge className="bg-primary text-primary-foreground">{t("invoice")}</Badge>
           ) : (
             <Badge variant="outline" className="capitalize">{quote.status}</Badge>
           )}
@@ -222,7 +222,7 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
                 <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
               </Button>
               {quote.status !== "aprovada" && (
-                <Button size="sm" variant="default" onClick={approve} className="bg-emerald-600 hover:bg-emerald-700">
+                <Button size="sm" variant="default" onClick={approve}>
                   <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
                 </Button>
               )}

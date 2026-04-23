@@ -145,7 +145,7 @@ function LeadsPage() {
             {leads.length === 0 ? (
               <TableRow><TableCell colSpan={5} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : leads.map((l) => (
-              <TableRow key={l.id}>
+              <TableRow key={l.id} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.assign(`/leads/${l.id}`)}>
                 <TableCell><span className="font-mono text-xs">{l.code ?? "—"}</span></TableCell>
                 <TableCell>
                   <div className="font-medium">{l.name}</div>
@@ -153,7 +153,7 @@ function LeadsPage() {
                 </TableCell>
                 <TableCell>{l.destination ?? "—"}</TableCell>
                 <TableCell>{l.estimated_value ? format(Number(l.estimated_value), l.currency as "BRL") : "—"}</TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <Select value={l.status} onValueChange={(v) => updateStatus(l.id, v)}>
                     <SelectTrigger className="h-8 w-36">
                       <Badge variant="outline" className={statusColor(l.status)}>{l.status}</Badge>

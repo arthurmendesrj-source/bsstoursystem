@@ -15,8 +15,6 @@ import {
   Building2,
   Briefcase,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";

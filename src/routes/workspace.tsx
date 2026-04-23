@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { z } from "zod";
-import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import {
   Calendar as CalendarIcon,
   Phone,
@@ -35,12 +33,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const searchSchema = z.object({
-  lead: fallback(z.string().optional(), undefined),
-});
+type WorkspaceSearch = { lead?: string };
 
 export const Route = createFileRoute("/workspace")({
-  validateSearch: zodValidator(searchSchema),
+  validateSearch: (search: Record<string, unknown>): WorkspaceSearch => ({
+    lead: typeof search.lead === "string" ? search.lead : undefined,
+  }),
   component: () => (
     <AuthGate>
       <AppShell>

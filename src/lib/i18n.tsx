@@ -186,6 +186,10 @@ const dict = {
     selectLead: "Selecionar lead",
     createNewLead: "Criar novo lead",
     recentLeads: "Leads recentes",
+    noLeadSelected: "Nenhum lead selecionado",
+    selectLeadToView: "Selecione um lead para visualizar",
+    selectLeadPlaceholder: "Buscar / selecionar lead...",
+    newLead: "Novo lead",
   },
   en: {
     appName: "TourismCRM",
@@ -368,6 +372,10 @@ const dict = {
     selectLead: "Select lead",
     createNewLead: "Create new lead",
     recentLeads: "Recent leads",
+    noLeadSelected: "No lead selected",
+    selectLeadToView: "Select a lead to view",
+    selectLeadPlaceholder: "Search / select lead...",
+    newLead: "New lead",
   },
   es: {
     appName: "TurismoCRM",
@@ -550,6 +558,10 @@ const dict = {
     selectLead: "Seleccionar lead",
     createNewLead: "Crear nuevo lead",
     recentLeads: "Leads recientes",
+    noLeadSelected: "Ningún lead seleccionado",
+    selectLeadToView: "Selecciona un lead para visualizar",
+    selectLeadPlaceholder: "Buscar / seleccionar lead...",
+    newLead: "Nuevo lead",
   },
 } as const;
 

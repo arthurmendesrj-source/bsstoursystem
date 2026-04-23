@@ -716,37 +716,67 @@ export type Database = {
       }
       quote_items: {
         Row: {
+          category: string | null
+          check_out: string | null
+          city: string | null
           created_at: string
           description: string
           id: string
+          item_date: string | null
+          kind: string
           markup_pct: number
+          meal_plan: string | null
+          nights: number | null
+          pax: number | null
           quantity: number
           quote_id: string
+          rooms: number | null
           total: number
           unit_cost: number
           unit_price: number
+          ways: number | null
         }
         Insert: {
+          category?: string | null
+          check_out?: string | null
+          city?: string | null
           created_at?: string
           description: string
           id?: string
+          item_date?: string | null
+          kind?: string
           markup_pct?: number
+          meal_plan?: string | null
+          nights?: number | null
+          pax?: number | null
           quantity?: number
           quote_id: string
+          rooms?: number | null
           total?: number
           unit_cost?: number
           unit_price?: number
+          ways?: number | null
         }
         Update: {
+          category?: string | null
+          check_out?: string | null
+          city?: string | null
           created_at?: string
           description?: string
           id?: string
+          item_date?: string | null
+          kind?: string
           markup_pct?: number
+          meal_plan?: string | null
+          nights?: number | null
+          pax?: number | null
           quantity?: number
           quote_id?: string
+          rooms?: number | null
           total?: number
           unit_cost?: number
           unit_price?: number
+          ways?: number | null
         }
         Relationships: [
           {

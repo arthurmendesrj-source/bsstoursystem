@@ -13,6 +13,16 @@ export type ProposalItem = {
   total?: number;
 };
 
+export function diffNights(checkIn?: string | null, checkOut?: string | null): number {
+  if (!checkIn || !checkOut) return 0;
+  const a = new Date(checkIn);
+  const b = new Date(checkOut);
+  if (isNaN(a.getTime()) || isNaN(b.getTime())) return 0;
+  const ms = b.getTime() - a.getTime();
+  const n = Math.round(ms / (1000 * 60 * 60 * 24));
+  return n > 0 ? n : 0;
+}
+
 export function lineUnitPrice(unit_cost: number, markup_pct: number): number {
   const cost = Number(unit_cost) || 0;
   const m = Number(markup_pct) || 0;

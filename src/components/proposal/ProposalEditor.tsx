@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   computeTotals,
+  diffNights,
   lineSubtotal,
   lineUnitPrice,
   type ProposalItem,
@@ -39,7 +41,12 @@ type QuoteRow = {
   default_markup_pct: number;
 };
 
-type ItemRow = ProposalItem & { id: string; quote_id: string };
+type ItemRow = ProposalItem & {
+  id: string;
+  quote_id: string;
+  item_date?: string | null;
+  check_out?: string | null;
+};
 
 const CURRENCIES = ["USD", "BRL", "EUR"] as const;
 
@@ -48,6 +55,15 @@ function fmt(n: number, ccy: string) {
     return new Intl.NumberFormat("en-US", { style: "currency", currency: ccy, maximumFractionDigits: 2 }).format(n);
   } catch {
     return `${ccy} ${n.toFixed(2)}`;
+  }
+}
+
+function fmtDate(d?: string | null) {
+  if (!d) return "—";
+  try {
+    return format(parseISO(d), "dd/MM/yyyy");
+  } catch {
+    return d;
   }
 }
 
@@ -77,18 +93,29 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
       unit_price: number;
       unit_cost: number;
       markup_pct: number;
+      kind?: string | null;
+      item_date?: string | null;
+      check_out?: string | null;
     }>;
     setItems(
-      rows.map((r) => ({
-        id: r.id,
-        quote_id: r.quote_id,
-        kind: (r.description.startsWith("[HOTEL]") ? "hotel" : "service") as ProposalItemKind,
-        description: r.description.replace(/^\[(HOTEL|SERVICE)\]\s*/, ""),
-        quantity: r.quantity,
-        unit_cost: Number(r.unit_cost),
-        markup_pct: Number(r.markup_pct),
-        unit_price: Number(r.unit_price),
-      })),
+      rows.map((r) => {
+        const inferredKind: ProposalItemKind =
+          (r.kind === "hotel" || r.kind === "service")
+            ? r.kind
+            : (r.description.startsWith("[HOTEL]") ? "hotel" : "service");
+        return {
+          id: r.id,
+          quote_id: r.quote_id,
+          kind: inferredKind,
+          description: r.description.replace(/^\[(HOTEL|SERVICE)\]\s*/, ""),
+          quantity: r.quantity,
+          unit_cost: Number(r.unit_cost),
+          markup_pct: Number(r.markup_pct),
+          unit_price: Number(r.unit_price),
+          item_date: r.item_date ?? null,
+          check_out: r.check_out ?? null,
+        };
+      }),
     );
     setLoading(false);
   };
@@ -102,7 +129,23 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
   const ccy = quote?.currency ?? "USD";
 
   const updateItem = (idx: number, patch: Partial<ItemRow>) => {
-    setItems((arr) => arr.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+    setItems((arr) =>
+      arr.map((it, i) => {
+        if (i !== idx) return it;
+        const next = { ...it, ...patch };
+        // Auto compute nights for hotel rows when both dates present.
+        // We use `quantity` as nights × rooms? In current model `quantity` IS the multiplier.
+        // For hotels we treat quantity = nights (rooms can be added later via separate field).
+        if (next.kind === "hotel") {
+          const datesTouched = "item_date" in patch || "check_out" in patch;
+          if (datesTouched) {
+            const n = diffNights(next.item_date, next.check_out);
+            if (n > 0) next.quantity = n;
+          }
+        }
+        return next;
+      }),
+    );
   };
 
   const addItem = (kind: ProposalItemKind) => {
@@ -117,6 +160,8 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
         quantity: 1,
         unit_cost: 0,
         markup_pct: Number(quote?.default_markup_pct ?? 0),
+        item_date: null,
+        check_out: null,
       },
     ]);
   };
@@ -166,6 +211,9 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
         markup_pct: Number(it.markup_pct) || 0,
         unit_price: lineUnitPrice(it.unit_cost, it.markup_pct),
         total: lineSubtotal(it.unit_cost, it.markup_pct, it.quantity),
+        kind: it.kind,
+        item_date: it.item_date || null,
+        check_out: it.kind === "hotel" ? (it.check_out || null) : null,
       };
       if (it.id.startsWith("new-")) {
         const { data, error } = await supabase.from("quote_items").insert(payload).select("id").single();
@@ -291,6 +339,7 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
 
       <ItemTable
         title={t("hotels")}
+        kind="hotel"
         rows={hotels}
         ccy={ccy}
         readOnly={readOnly}
@@ -300,6 +349,7 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
 
       <ItemTable
         title={t("services")}
+        kind="service"
         rows={services}
         ccy={ccy}
         readOnly={readOnly}
@@ -341,6 +391,7 @@ function Row({ label, value, bold, muted }: { label: string; value: string; bold
 
 function ItemTable({
   title,
+  kind,
   rows,
   ccy,
   readOnly,
@@ -348,6 +399,7 @@ function ItemTable({
   onRemove,
 }: {
   title: string;
+  kind: ProposalItemKind;
   rows: { it: ItemRow; i: number }[];
   ccy: string;
   readOnly: boolean;
@@ -355,6 +407,7 @@ function ItemTable({
   onRemove: (idx: number) => void;
 }) {
   const { t } = useI18n();
+  const isHotel = kind === "hotel";
   if (rows.length === 0) {
     return (
       <div>
@@ -370,11 +423,19 @@ function ItemTable({
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs">
             <tr>
+              {isHotel ? (
+                <>
+                  <th className="text-left p-2 w-32">{t("checkIn")}</th>
+                  <th className="text-left p-2 w-32">{t("checkOut")}</th>
+                </>
+              ) : (
+                <th className="text-left p-2 w-32">{t("serviceDate")}</th>
+              )}
               <th className="text-left p-2">{t("name")}</th>
               {!readOnly && <th className="text-right p-2 w-28">{t("unitCost")} ({ccy})</th>}
               {!readOnly && <th className="text-right p-2 w-20">{t("markup")} %</th>}
-              <th className="text-right p-2 w-28">{readOnly ? `${t("price")} (${ccy})` : `${t("price")} (${ccy})`}</th>
-              <th className="text-right p-2 w-16">{t("quantity")}</th>
+              <th className="text-right p-2 w-28">{t("price")} ({ccy})</th>
+              <th className="text-right p-2 w-20">{isHotel ? t("nights") : t("quantity")}</th>
               <th className="text-right p-2 w-32">{t("subtotal")} ({ccy})</th>
               {!readOnly && <th className="w-10" />}
             </tr>
@@ -385,12 +446,53 @@ function ItemTable({
               const sub = lineSubtotal(it.unit_cost, it.markup_pct, it.quantity);
               return (
                 <tr key={it.id} className="border-t">
+                  {isHotel ? (
+                    <>
+                      <td className="p-2">
+                        {readOnly ? (
+                          <span className="tabular-nums">{fmtDate(it.item_date)}</span>
+                        ) : (
+                          <Input
+                            type="date"
+                            value={it.item_date ?? ""}
+                            onChange={(e) => onChange(i, { item_date: e.target.value || null })}
+                            className="h-8"
+                          />
+                        )}
+                      </td>
+                      <td className="p-2">
+                        {readOnly ? (
+                          <span className="tabular-nums">{fmtDate(it.check_out)}</span>
+                        ) : (
+                          <Input
+                            type="date"
+                            value={it.check_out ?? ""}
+                            onChange={(e) => onChange(i, { check_out: e.target.value || null })}
+                            className="h-8"
+                          />
+                        )}
+                      </td>
+                    </>
+                  ) : (
+                    <td className="p-2">
+                      {readOnly ? (
+                        <span className="tabular-nums">{fmtDate(it.item_date)}</span>
+                      ) : (
+                        <Input
+                          type="date"
+                          value={it.item_date ?? ""}
+                          onChange={(e) => onChange(i, { item_date: e.target.value || null })}
+                          className="h-8"
+                        />
+                      )}
+                    </td>
+                  )}
                   <td className="p-2">
                     <Input
                       value={it.description}
                       onChange={(e) => onChange(i, { description: e.target.value })}
                       disabled={readOnly}
-                      placeholder={it.kind === "hotel" ? "Hotel / Date / City / Meal" : "Service / City / Way"}
+                      placeholder={isHotel ? "Hotel / City / Meal" : "Service / City / Way"}
                       className="h-8"
                     />
                   </td>

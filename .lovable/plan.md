@@ -1,52 +1,70 @@
 
-# CRM + ERP — Operadora de Turismo (MVP)
+# Aba Email — Gmail + IA (criação manual de Leads)
 
-Sistema interno autenticado, multilíngue (PT/EN/ES) e multimoeda (BRL/USD/EUR), com dois módulos principais — **CRM** e **Reservas/Pacotes** — e quatro perfis de usuário. Vou usar o app do AI Studio (link enviado) e o zip como referência visual/estrutural durante a implementação.
+Nova aba **Email** no menu lateral, conectada ao Gmail da operadora (uma única caixa compartilhada via conector Lovable). O usuário lê e responde e-mails dentro do CRM e, quando quiser, usa a IA para extrair dados do e-mail e **abrir o formulário de novo Lead pré-preenchido** — a criação só acontece após confirmação humana.
 
-## 1. Autenticação e perfis
-- Login por e-mail/senha (Lovable Cloud).
-- Perfis: **Admin**, **Vendedor**, **Operacional**, **Financeiro** — armazenados em tabela `user_roles` separada com RLS (sem role no profile).
-- Tela de gestão de usuários (apenas Admin) para convidar e atribuir papéis.
-- Cada perfil enxerga apenas o que faz sentido; Admin vê tudo.
+## 1. Conexão com Gmail
+- Usar o **Gmail Connector da Lovable** (OAuth gerenciado, sem armazenar senha).
+- A conta conectada é a da operadora (caixa de atendimento), não dos clientes finais.
+- Tela mostra "Conectar Gmail" enquanto o conector não estiver ativo; depois exibe a inbox.
+- Escopos necessários: `gmail.readonly`, `gmail.send`, `gmail.modify`.
 
-## 2. Layout geral
-- Shell autenticado com sidebar fixa: Dashboard, CRM (Leads, Clientes, Funil), Reservas, Pacotes, Usuários (admin), Configurações.
-- Topbar com seletor de **idioma** (PT/EN/ES) e **moeda de exibição** (BRL/USD/EUR).
-- Tema claro/escuro, visual SaaS moderno e limpo. Vou usar o app do AI Studio como referência de cores e organização.
+## 2. Tela `/email` (3 colunas)
+- **Esquerda — Pastas/Filtros**: Caixa de entrada, Não lidos, Enviados, Lixeira, "Com Lead vinculado".
+- **Centro — Lista**: remetente, assunto, snippet, data, badge "Lead vinculado", busca, paginação, botão "Sincronizar".
+- **Direita — Visualização**: cabeçalho, corpo HTML sanitizado, anexos (lista), barra de ações.
 
-## 3. Módulo CRM
-- **Clientes/PAX**: dados pessoais, documento, passaporte (número/validade), nacionalidade, contatos, preferências, histórico de viagens.
-- **Leads**: origem, status, vendedor responsável, próxima ação, anotações.
-- **Funil de vendas (Kanban)**: colunas Novo → Qualificado → Cotação → Proposta → Fechado/Perdido, com drag-and-drop.
-- **Oportunidades**: vinculadas a lead/cliente, com valor estimado, moeda, destino, datas previstas.
-- **Timeline de interações** por cliente (ligações, e-mails, reuniões, notas).
-- **Tarefas e lembretes** por vendedor.
+Ações no e-mail:
+- **Responder / Encaminhar** (compositor inline, envia via Gmail, mantém threading).
+- **Marcar lido/não lido**, **Arquivar**, **Mover para lixeira**.
+- **Analisar com IA → Criar Lead** (abre dialog pré-preenchido — ver seção 4).
+- **Vincular a lead/cliente existente** (busca em `leads`/`customers`).
 
-## 4. Módulo Reservas e Pacotes
-- **Catálogo de Pacotes**: nome, destino, duração, descrição multilíngue, fotos, valor por pessoa em múltiplas moedas, datas de saída, vagas, inclusos/não inclusos.
-- **Cotações**: criar a partir de um lead, escolher pacote ou montar sob medida (hospedagem, transporte, passeios), aplicar descontos, gerar PDF da proposta.
-- **Reservas**: converter cotação aprovada, vincular PAX, status (pré-reserva, confirmada, em viagem, concluída, cancelada).
-- **Vouchers/Itinerário**: documento por reserva com dados de viagem, fornecedores e contatos de emergência.
-- **Calendário de embarques**: visão mensal das próximas saídas.
+## 3. Sincronização
+- Server function puxa últimos 50 e-mails da Inbox via Gmail API e armazena metadados na tabela `emails`.
+- Sincronização sob demanda (botão) e ao abrir a aba; corpo completo carregado ao abrir cada e-mail (cacheado).
+- Sem auto-processamento por IA em background — a análise só roda quando o usuário clicar.
 
-## 5. Dashboard inicial
-- KPIs por perfil: leads no funil, cotações abertas, reservas confirmadas no mês, receita prevista (na moeda selecionada).
-- Gráficos: vendas por período, top destinos, conversão por vendedor.
+## 4. IA — assistente para criação **manual** de Leads
+Fluxo 100% controlado pelo usuário:
+1. Usuário abre um e-mail e clica em **"Analisar com IA → Criar Lead"**.
+2. Server function `email.analyze` chama **Lovable AI (google/gemini-3-flash-preview)** com tool calling, extraindo:
+   - nome, e-mail, telefone do remetente
+   - destino, datas previstas, número de pax, orçamento, moeda
+   - resumo / próxima ação sugerida
+3. Abre o **dialog de Novo Lead já pré-preenchido** com os campos extraídos + link para o e-mail original.
+4. Usuário revisa, edita e clica em **Salvar Lead**. Só nesse momento são criados:
+   - `customers` (se não existir cliente com o mesmo e-mail — opcional, marcado por checkbox no dialog)
+   - `leads` (origem `email`)
+   - `interactions` tipo `email` referenciando o e-mail
+   - `emails.lead_id` é atualizado com o vínculo
+5. Botão alternativo **"Criar Lead manualmente"** abre o mesmo dialog vazio (sem IA), com o e-mail já vinculado.
 
-## 6. IA (Lovable AI Gateway — Gemini)
-- Geração de descrição de pacote multilíngue.
-- Sugestão de resposta para leads e resumo automático da timeline do cliente.
-- Rascunho de proposta a partir da cotação.
-- Gmail e WhatsApp ficam para fases seguintes (não entram no MVP).
+Nada é gravado em `leads` automaticamente; a IA é apenas um assistente de preenchimento.
 
-## 7. Internacionalização e moeda
-- i18n PT-BR (padrão), EN, ES — toda a UI traduzida.
-- Cada registro guarda valor em moeda base + tabela `exchange_rates` configurável; UI converte para a moeda escolhida pelo usuário.
+## 5. Banco de dados (nova migração)
+- Tabela `emails`: `id`, `gmail_id` (unique), `thread_id`, `from_email`, `from_name`, `to_emails text[]`, `subject`, `snippet`, `body_html`, `body_text`, `received_at`, `labels text[]`, `has_attachments`, `lead_id` (fk leads, null), `customer_id` (fk customers, null), `ai_suggestion jsonb` (último resultado da IA, opcional), `created_at`.
+- Adicionar valor `email` ao enum de origem de leads (se ainda não existir).
+- RLS: leitura/escrita restrita a usuários autenticados com papel Admin/Vendedor/Operacional.
 
-## 8. Banco de dados (Lovable Cloud)
-Tabelas com RLS: `profiles`, `user_roles`, `customers`, `leads`, `opportunities`, `interactions`, `tasks`, `packages`, `package_dates`, `quotes`, `quote_items`, `bookings`, `booking_pax`, `vouchers`, `currencies`, `exchange_rates`.
+## 6. Server functions (TanStack Start)
+- `gmail.list` — lista mensagens via gateway (`users/me/messages?q=...`).
+- `gmail.get` — busca uma mensagem completa.
+- `gmail.send` — envia resposta/encaminhamento (RFC 2822 + base64url, mantém In-Reply-To/References).
+- `gmail.modify` — marca lido/arquivar/lixeira.
+- `gmail.sync` — sincroniza últimos N para a tabela `emails`.
+- `email.analyze` — chama Lovable AI Gateway e devolve sugestão estruturada (não escreve no banco).
+- Todas validam sessão Supabase e usam `LOVABLE_API_KEY` + `GOOGLE_MAIL_API_KEY`.
 
-## 9. Fora do MVP (próximas fases)
-Fornecedores/contratos, Operacional (ordens de serviço), Financeiro (contas a pagar/receber, comissões), integrações Gmail e WhatsApp, relatórios avançados.
+## 7. Internacionalização
+- Strings da nova aba (Email, Caixa de entrada, Responder, Encaminhar, Analisar com IA, Criar Lead, Vincular a Lead, etc.) adicionadas em PT/EN/ES no `src/lib/i18n.tsx`.
 
-> Na implementação eu descompacto o zip do AI Studio e o app público para alinhar telas, nomenclatura e fluxo ao que você já começou antes de gerar o código.
+## 8. Pré-requisitos / passos do usuário
+- Aprovar a conexão do **Gmail Connector** (uma vez).
+- `LOVABLE_API_KEY` já está configurado.
+
+## 9. Fora deste escopo
+- Caixas Gmail por vendedor (multi-conta).
+- Download/preview e envio de anexos no compositor (apenas listagem agora).
+- Templates de resposta com IA ("sugerir resposta").
+- Webhooks/push do Gmail (ficamos com polling/sync manual).

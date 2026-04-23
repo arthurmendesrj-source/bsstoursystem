@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -23,6 +24,11 @@ import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 
+const WorkspaceRoute = WorkspaceRouteImport.update({
+  id: '/workspace',
+  path: '/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsersRoute = UsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -102,6 +108,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
+  '/workspace': typeof WorkspaceRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRoutesByTo {
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
+  '/workspace': typeof WorkspaceRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRoutesById {
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
+  '/workspace': typeof WorkspaceRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/workspace'
     | '/leads/$leadId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -165,6 +175,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/workspace'
     | '/leads/$leadId'
   id:
     | '__root__'
@@ -180,6 +191,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/workspace'
     | '/leads/$leadId'
   fileRoutesById: FileRoutesById
 }
@@ -196,10 +208,18 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SuppliersRoute: typeof SuppliersRoute
   UsersRoute: typeof UsersRoute
+  WorkspaceRoute: typeof WorkspaceRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/workspace': {
+      id: '/workspace'
+      path: '/workspace'
+      fullPath: '/workspace'
+      preLoaderRoute: typeof WorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/users': {
       id: '/users'
       path: '/users'
@@ -317,6 +337,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SuppliersRoute: SuppliersRoute,
   UsersRoute: UsersRoute,
+  WorkspaceRoute: WorkspaceRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

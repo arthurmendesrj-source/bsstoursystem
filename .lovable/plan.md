@@ -1,70 +1,83 @@
 
-# Aba Email — Gmail + IA (criação manual de Leads)
+# Reestruturação: Bancos de Dados de Clientes e Fornecedores
 
-Nova aba **Email** no menu lateral, conectada ao Gmail da operadora (uma única caixa compartilhada via conector Lovable). O usuário lê e responde e-mails dentro do CRM e, quando quiser, usa a IA para extrair dados do e-mail e **abrir o formulário de novo Lead pré-preenchido** — a criação só acontece após confirmação humana.
+Antes de continuar com Email/Leads/Bookings, vamos consolidar os cadastros mestres (Clientes e Fornecedores) que serão a base de todo o fluxo. Hoje temos `customers` básico e **não existe** tabela de fornecedores.
 
-## 1. Conexão com Gmail
-- Usar o **Gmail Connector da Lovable** (OAuth gerenciado, sem armazenar senha).
-- A conta conectada é a da operadora (caixa de atendimento), não dos clientes finais.
-- Tela mostra "Conectar Gmail" enquanto o conector não estiver ativo; depois exibe a inbox.
-- Escopos necessários: `gmail.readonly`, `gmail.send`, `gmail.modify`.
+## 1. Expandir o cadastro de Clientes (`customers`)
 
-## 2. Tela `/email` (3 colunas)
-- **Esquerda — Pastas/Filtros**: Caixa de entrada, Não lidos, Enviados, Lixeira, "Com Lead vinculado".
-- **Centro — Lista**: remetente, assunto, snippet, data, badge "Lead vinculado", busca, paginação, botão "Sincronizar".
-- **Direita — Visualização**: cabeçalho, corpo HTML sanitizado, anexos (lista), barra de ações.
+A tabela atual tem só dados pessoais soltos. Vou ampliar para suportar PF/PJ, endereço completo, documentos e relacionamento com bookings/leads/emails.
 
-Ações no e-mail:
-- **Responder / Encaminhar** (compositor inline, envia via Gmail, mantém threading).
-- **Marcar lido/não lido**, **Arquivar**, **Mover para lixeira**.
-- **Analisar com IA → Criar Lead** (abre dialog pré-preenchido — ver seção 4).
-- **Vincular a lead/cliente existente** (busca em `leads`/`customers`).
+**Novos campos em `customers`:**
+- `type` (enum `customer_type`: `pf` | `pj`) — default `pf`
+- `company_name`, `trade_name`, `tax_id` (CNPJ/EIN para PJ)
+- `address_street`, `address_number`, `address_complement`, `address_district`, `address_city`, `address_state`, `address_country`, `address_zip`
+- `whatsapp` (separado do `phone`)
+- `secondary_email`
+- `gender`, `marital_status`
+- `emergency_contact_name`, `emergency_contact_phone`
+- `tags` (text[]) — segmentação livre (VIP, recorrente, etc.)
+- `status` (enum `customer_status`: `ativo` | `inativo` | `bloqueado`) — default `ativo`
+- `origin` (text) — de onde veio (indicação, site, instagram, email…)
 
-## 3. Sincronização
-- Server function puxa últimos 50 e-mails da Inbox via Gmail API e armazena metadados na tabela `emails`.
-- Sincronização sob demanda (botão) e ao abrir a aba; corpo completo carregado ao abrir cada e-mail (cacheado).
-- Sem auto-processamento por IA em background — a análise só roda quando o usuário clicar.
+**Aba Clientes (`/customers`):** rebuild com:
+- Tabela com filtros (tipo, status, tag, busca por nome/email/CNPJ).
+- Drawer de detalhes mostrando: dados, histórico de **leads**, **bookings**, **emails** vinculados, **interações** e **tarefas** — tudo já cruzando as tabelas existentes.
+- Botão **"Incluir manualmente"** abre formulário completo (PF/PJ condicional).
+- Quando vier de Email/Lead, mesmo formulário pré-preenchido.
 
-## 4. IA — assistente para criação **manual** de Leads
-Fluxo 100% controlado pelo usuário:
-1. Usuário abre um e-mail e clica em **"Analisar com IA → Criar Lead"**.
-2. Server function `email.analyze` chama **Lovable AI (google/gemini-3-flash-preview)** com tool calling, extraindo:
-   - nome, e-mail, telefone do remetente
-   - destino, datas previstas, número de pax, orçamento, moeda
-   - resumo / próxima ação sugerida
-3. Abre o **dialog de Novo Lead já pré-preenchido** com os campos extraídos + link para o e-mail original.
-4. Usuário revisa, edita e clica em **Salvar Lead**. Só nesse momento são criados:
-   - `customers` (se não existir cliente com o mesmo e-mail — opcional, marcado por checkbox no dialog)
-   - `leads` (origem `email`)
-   - `interactions` tipo `email` referenciando o e-mail
-   - `emails.lead_id` é atualizado com o vínculo
-5. Botão alternativo **"Criar Lead manualmente"** abre o mesmo dialog vazio (sem IA), com o e-mail já vinculado.
+## 2. Criar cadastro de Fornecedores (`suppliers`) — novo
 
-Nada é gravado em `leads` automaticamente; a IA é apenas um assistente de preenchimento.
+Fornecedores são quem entrega o serviço (hotéis, cias aéreas, receptivos, transfers, seguros, operadoras parceiras).
 
-## 5. Banco de dados (nova migração)
-- Tabela `emails`: `id`, `gmail_id` (unique), `thread_id`, `from_email`, `from_name`, `to_emails text[]`, `subject`, `snippet`, `body_html`, `body_text`, `received_at`, `labels text[]`, `has_attachments`, `lead_id` (fk leads, null), `customer_id` (fk customers, null), `ai_suggestion jsonb` (último resultado da IA, opcional), `created_at`.
-- Adicionar valor `email` ao enum de origem de leads (se ainda não existir).
-- RLS: leitura/escrita restrita a usuários autenticados com papel Admin/Vendedor/Operacional.
+**Tabela `suppliers`:**
+- `id`, `created_at`, `updated_at`, `created_by`
+- `name`, `trade_name`, `tax_id`
+- `category` (enum `supplier_category`: `hotel` | `aerea` | `receptivo` | `transfer` | `seguro` | `operadora` | `passeio` | `aluguel_carro` | `outro`)
+- `status` (enum `supplier_status`: `ativo` | `inativo` | `homologacao`)
+- `contact_name`, `email`, `phone`, `whatsapp`, `website`
+- Endereço completo (mesmos campos de customers)
+- `payment_terms` (text — ex: "30/60/90"), `default_currency` (currency_code)
+- `commission_pct` (numeric) — comissão padrão recebida
+- `iata_code` (para aéreas), `cadastur` (para operadoras BR)
+- `notes`, `tags` (text[])
+- `rating` (smallint 1–5)
 
-## 6. Server functions (TanStack Start)
-- `gmail.list` — lista mensagens via gateway (`users/me/messages?q=...`).
-- `gmail.get` — busca uma mensagem completa.
-- `gmail.send` — envia resposta/encaminhamento (RFC 2822 + base64url, mantém In-Reply-To/References).
-- `gmail.modify` — marca lido/arquivar/lixeira.
-- `gmail.sync` — sincroniza últimos N para a tabela `emails`.
-- `email.analyze` — chama Lovable AI Gateway e devolve sugestão estruturada (não escreve no banco).
-- Todas validam sessão Supabase e usam `LOVABLE_API_KEY` + `GOOGLE_MAIL_API_KEY`.
+**Tabela `supplier_contacts`** (vários contatos por fornecedor):
+- `id`, `supplier_id`, `name`, `role`, `email`, `phone`, `whatsapp`, `is_primary`
 
-## 7. Internacionalização
-- Strings da nova aba (Email, Caixa de entrada, Responder, Encaminhar, Analisar com IA, Criar Lead, Vincular a Lead, etc.) adicionadas em PT/EN/ES no `src/lib/i18n.tsx`.
+**Aba Fornecedores (`/suppliers`):** nova rota
+- Tabela com filtros (categoria, status, país/cidade, tag).
+- Drawer de detalhes: dados, contatos, **bookings** que usaram esse fornecedor (futuro), histórico de e-mails trocados.
+- Botão **"Incluir manualmente"** + futuro fluxo via Email.
 
-## 8. Pré-requisitos / passos do usuário
-- Aprovar a conexão do **Gmail Connector** (uma vez).
-- `LOVABLE_API_KEY` já está configurado.
+## 3. Vínculos entre tabelas (preparando o fluxo integrado)
 
-## 9. Fora deste escopo
-- Caixas Gmail por vendedor (multi-conta).
-- Download/preview e envio de anexos no compositor (apenas listagem agora).
-- Templates de resposta com IA ("sugerir resposta").
-- Webhooks/push do Gmail (ficamos com polling/sync manual).
+Para o "tudo interligado" funcionar bem:
+- `bookings.supplier_id` (uuid, nullable) — fornecedor principal do booking.
+- `booking_suppliers` (tabela N:N) — vários fornecedores por booking, cada um com `service_type`, `confirmation_code`, `cost`, `currency`, `status`.
+- `emails.supplier_id` (uuid, nullable) — vincular email a fornecedor (já temos `lead_id` e `customer_id`).
+- `interactions.supplier_id` (uuid, nullable) — registrar contatos com fornecedor.
+- `tasks.supplier_id` (uuid, nullable) — tarefas vinculadas a fornecedor.
+
+## 4. RLS
+
+Mesmo padrão das tabelas existentes:
+- **SELECT**: qualquer `authenticated`.
+- **INSERT**: `auth.uid() = created_by`.
+- **UPDATE**: dono ou `is_admin` ou `has_role('operacional')`.
+- **DELETE**: apenas `is_admin`.
+
+## 5. Navegação e i18n
+
+- AppShell: novo item **Fornecedores** (ícone `Building2`).
+- `i18n.tsx`: chaves PT/EN/ES para todos os novos campos, categorias e status.
+
+## 6. Arquivos afetados
+
+- **Migração SQL** (1 arquivo): novos enums, novas colunas em `customers`, tabelas `suppliers` + `supplier_contacts` + `booking_suppliers`, novas FKs/colunas em `bookings`/`emails`/`interactions`/`tasks`, RLS de tudo.
+- `src/routes/customers.tsx` — rebuild com filtros, drawer 360°, formulário PF/PJ.
+- `src/routes/suppliers.tsx` — **novo**.
+- `src/components/AppShell.tsx` — item Fornecedores.
+- `src/lib/i18n.tsx` — novas chaves.
+
+## 7. Perguntas rápidas antes de executar

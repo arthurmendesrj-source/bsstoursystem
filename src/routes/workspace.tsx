@@ -98,7 +98,7 @@ function WorkspacePage() {
   const [lead, setLead] = useState<Lead | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
-  const [emails, setEmails] = useState<Email[]>([]);
+  // emails removed: Email tab uses EmailPanel which loads its own data
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loadingLead, setLoadingLead] = useState(false);
@@ -132,18 +132,16 @@ function WorkspacePage() {
   // Load active lead data
   const loadLead = async (id: string) => {
     setLoadingLead(true);
-    const [leadRes, tasksRes, intRes, emailsRes, quotesRes, bookingsRes] = await Promise.all([
+    const [leadRes, tasksRes, intRes, quotesRes, bookingsRes] = await Promise.all([
       supabase.from("leads").select("*").eq("id", id).maybeSingle(),
       supabase.from("tasks").select("id,title,description,due_date,completed").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", id).order("occurred_at", { ascending: false }),
-      supabase.from("emails").select("id,subject,from_name,from_email,snippet,received_at,is_unread").eq("lead_id", id).order("received_at", { ascending: false }).limit(50),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", id).order("created_at", { ascending: false }),
     ]);
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
-    setEmails((emailsRes.data as Email[]) ?? []);
     setQuotes((quotesRes.data as Quote[]) ?? []);
     setBookings((bookingsRes.data as Booking[]) ?? []);
     setLoadingLead(false);

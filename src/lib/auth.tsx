@@ -2,6 +2,35 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+// Install a one-time global fetch interceptor (browser only) so that every
+// TanStack Start server function call carries the current Supabase access token.
+// Without this, server functions guarded by `requireSupabaseAuth` always 401.
+if (typeof window !== "undefined" && !(window as unknown as { __serverFnAuthPatched?: boolean }).__serverFnAuthPatched) {
+  (window as unknown as { __serverFnAuthPatched?: boolean }).__serverFnAuthPatched = true;
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    try {
+      const url = typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+      if (url && url.includes("/_serverFn/")) {
+        const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        if (!headers.has("authorization")) {
+          const { data } = await supabase.auth.getSession();
+          const token = data.session?.access_token;
+          if (token) headers.set("authorization", `Bearer ${token}`);
+        }
+        return originalFetch(input, { ...init, headers });
+      }
+    } catch {
+      // fall through to original fetch
+    }
+    return originalFetch(input, init);
+  };
+}
+
 export type AppRole = "admin" | "vendedor" | "operacional" | "financeiro";
 
 type AuthCtx = {

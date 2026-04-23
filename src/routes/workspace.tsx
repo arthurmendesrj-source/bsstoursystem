@@ -33,6 +33,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EmailPanel } from "@/components/email/EmailPanel";
+import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 
 type WorkspaceSearch = { lead?: string };
 
@@ -473,33 +474,30 @@ function WorkspacePage() {
               </TabsContent>
 
               <TabsContent value="proposals" className="mt-4">
-                {!hasLead ? (
+                {!hasLead || !lead ? (
                   <EmptyTab text={t("selectLeadToView")} />
-                ) : quotes.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("noProposals")}</div>
                 ) : (
-                  <div className="space-y-2">
-                    {quotes.map((q) => (
-                      <div key={q.id} className="p-3 rounded-md border flex items-center justify-between">
-                        <div>
-                          <Badge variant="outline" className="capitalize">{q.status}</Badge>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(q.created_at), "dd/MM/yyyy")}
-                            {q.valid_until && ` · ${t("upcoming")}: ${format(new Date(q.valid_until), "dd/MM/yyyy")}`}
-                          </div>
-                        </div>
-                        <div className="font-semibold">{fmtCurrency(Number(q.total_amount), q.currency as "BRL")}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <ProposalsTab
+                    leadId={lead.id}
+                    customerId={lead.customer_id}
+                    quotes={quotes.filter((q) => q.status !== "aprovada")}
+                    onChanged={() => loadLead(lead.id)}
+                    mode="proposal"
+                  />
                 )}
               </TabsContent>
 
               <TabsContent value="invoice" className="mt-4">
-                {!hasLead ? (
+                {!hasLead || !lead ? (
                   <EmptyTab text={t("selectLeadToView")} />
                 ) : (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("invoiceComingSoon")}</div>
+                  <ProposalsTab
+                    leadId={lead.id}
+                    customerId={lead.customer_id}
+                    quotes={quotes.filter((q) => q.status === "aprovada")}
+                    onChanged={() => loadLead(lead.id)}
+                    mode="invoice"
+                  />
                 )}
               </TabsContent>
 
@@ -538,6 +536,101 @@ function EmptyTab({ text }: { text: string }) {
     <div className="py-16 text-center">
       <Briefcase className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
       <p className="text-sm text-muted-foreground">{text}</p>
+    </div>
+  );
+}
+
+function ProposalsTab({
+  leadId,
+  customerId,
+  quotes,
+  onChanged,
+  mode,
+}: {
+  leadId: string;
+  customerId: string | null;
+  quotes: Quote[];
+  onChanged: () => void;
+  mode: "proposal" | "invoice";
+}) {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const { format: fmtCurrency } = useCurrency();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+
+  const createNew = async () => {
+    if (!user) return;
+    setCreating(true);
+    const { data, error } = await supabase
+      .from("quotes")
+      .insert({
+        lead_id: leadId,
+        customer_id: customerId,
+        created_by: user.id,
+        status: "rascunho",
+        currency: "USD",
+        total_amount: 0,
+      })
+      .select("id")
+      .single();
+    setCreating(false);
+    if (error) return toast.error(error.message);
+    onChanged();
+    setOpenId(data.id);
+  };
+
+  return (
+    <div className="space-y-3">
+      {mode === "proposal" && (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={createNew} disabled={creating}>
+            <Plus className="h-4 w-4 mr-1" /> {t("newProposal")}
+          </Button>
+        </div>
+      )}
+      {quotes.length === 0 ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">
+          {mode === "proposal" ? t("noProposals") : t("noInvoices")}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {quotes.map((q) => (
+            <button
+              key={q.id}
+              onClick={() => setOpenId(q.id)}
+              className="w-full text-left p-3 rounded-md border hover:bg-muted/40 flex items-center justify-between"
+            >
+              <div>
+                <Badge variant="outline" className="capitalize">{q.status}</Badge>
+                <div className="text-xs text-muted-foreground mt-1">
+                  #{q.id.slice(0, 8)} · {format(new Date(q.created_at), "dd/MM/yyyy")}
+                  {q.valid_until && ` · ${t("validUntil")}: ${format(new Date(q.valid_until), "dd/MM/yyyy")}`}
+                </div>
+              </div>
+              <div className="font-semibold">{fmtCurrency(Number(q.total_amount), q.currency as "BRL")}</div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={!!openId} onOpenChange={(o) => !o && setOpenId(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{mode === "invoice" ? t("invoice") : t("proposals")}</DialogTitle>
+          </DialogHeader>
+          {openId && (
+            <ProposalEditor
+              quoteId={openId}
+              leadId={leadId}
+              customerId={customerId}
+              mode={mode}
+              onSaved={onChanged}
+              onClose={() => setOpenId(null)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

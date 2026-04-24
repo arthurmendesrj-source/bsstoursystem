@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,9 @@ import {
   type ProposalItem,
   type ProposalItemKind,
 } from "@/lib/proposal-totals";
+import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
+import { GenerateDocDialog } from "./GenerateDocDialog";
+import { ProposalDocumentsList } from "./ProposalDocumentsList";
 
 type Mode = "proposal" | "invoice";
 
@@ -75,6 +78,9 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
   const [quote, setQuote] = useState<QuoteRow | null>(null);
   const [items, setItems] = useState<ItemRow[]>([]);
   const [bankFee, setBankFee] = useState(0);
+  const [dictating, setDictating] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [docsRefresh, setDocsRefresh] = useState(0);
 
   const load = async () => {
     setLoading(true);

@@ -279,7 +279,7 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
   }
 
   const isClosed = quote.status === "aprovada";
-  const readOnly = mode === "invoice" || isClosed;
+  const readOnly = false; // invoice and approved proposals are now fully editable
   const invoiceCode = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
 
   const hotels = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "hotel");
@@ -306,33 +306,25 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
           <span className="text-sm text-muted-foreground">#{quote.id.slice(0, 8)}</span>
         </div>
         <div className="flex gap-2 flex-wrap">
-          {!readOnly && mode === "proposal" && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
-                <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-                <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
-              </Button>
-            </>
-          )}
-          {!readOnly && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
-                <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => addItem("service")}>
-                <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
-              </Button>
-              <Button size="sm" onClick={save} disabled={saving}>
-                <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
-              </Button>
-              {quote.status !== "aprovada" && (
-                <Button size="sm" variant="default" onClick={approve}>
-                  <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
-                </Button>
-              )}
-            </>
+          <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
+            <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
+            <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
+            <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => addItem("service")}>
+            <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
+          </Button>
+          <Button size="sm" onClick={save} disabled={saving}>
+            <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
+          </Button>
+          {mode === "proposal" && quote.status !== "aprovada" && (
+            <Button size="sm" variant="default" onClick={approve}>
+              <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
+            </Button>
           )}
           {onClose && (
             <Button size="sm" variant="ghost" onClick={onClose}>{t("close")}</Button>
@@ -340,7 +332,7 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
         </div>
       </div>
 
-      {dictating && !readOnly && mode === "proposal" && (
+      {dictating && (
         <DictateItemsPanel
           defaultMarkupPct={Number(quote.default_markup_pct ?? 0)}
           onItems={appendDictated}
@@ -348,14 +340,12 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
         />
       )}
 
-      {mode === "proposal" && (
-        <GenerateDocDialog
-          quoteId={quoteId}
-          open={genOpen}
-          onOpenChange={setGenOpen}
-          onGenerated={() => setDocsRefresh((n) => n + 1)}
-        />
-      )}
+      <GenerateDocDialog
+        quoteId={quoteId}
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        onGenerated={() => setDocsRefresh((n) => n + 1)}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border bg-muted/30">
         <div>
@@ -450,9 +440,9 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
         <ProposalDocumentsList quoteId={quoteId} refreshKey={docsRefresh} />
       )}
 
-      {readOnly && (
+      {mode === "invoice" && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <FileCheck className="h-4 w-4" /> {t("invoiceReadOnly")}
+          <FileCheck className="h-4 w-4" /> {t("invoiceEditable")}
         </div>
       )}
     </div>

@@ -73,7 +73,6 @@ function fmtDate(d?: string | null) {
 
 export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
-  const isClosed = false; // placeholder, real value below after quote loads
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<QuoteRow | null>(null);

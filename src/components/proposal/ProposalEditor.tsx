@@ -292,7 +292,17 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
           )}
           <span className="text-sm text-muted-foreground">#{quote.id.slice(0, 8)}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {!readOnly && mode === "proposal" && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
+                <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
+                <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
+              </Button>
+            </>
+          )}
           {!readOnly && (
             <>
               <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
@@ -316,6 +326,23 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {dictating && !readOnly && mode === "proposal" && (
+        <DictateItemsPanel
+          defaultMarkupPct={Number(quote.default_markup_pct ?? 0)}
+          onItems={appendDictated}
+          onClose={() => setDictating(false)}
+        />
+      )}
+
+      {mode === "proposal" && (
+        <GenerateDocDialog
+          quoteId={quoteId}
+          open={genOpen}
+          onOpenChange={setGenOpen}
+          onGenerated={() => setDocsRefresh((n) => n + 1)}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border bg-muted/30">
         <div>

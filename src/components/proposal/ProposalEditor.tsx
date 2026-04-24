@@ -200,6 +200,8 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
       }),
     ]);
   };
+
+  const removeItem = async (idx: number) => {
     const it = items[idx];
     if (it.id && !it.id.startsWith("new-")) {
       await supabase.from("quote_items").delete().eq("id", it.id);

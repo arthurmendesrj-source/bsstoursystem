@@ -735,6 +735,38 @@ NEVER mention internal costs, markup, or supplier names. Speak as the operator d
         );
       }
     }
+
+    // Practical information
+    const pi = content.practical_info;
+    if (pi && typeof pi === "object") {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(P(L.practicalInfo, { bold: true, size: 32, heading: HeadingLevel.HEADING_1 }));
+      labeledLine(L.bestTime, pi.best_time_to_visit);
+      labeledLine(L.weather, pi.weather);
+      labeledLine(L.currency, pi.currency);
+      labeledLine(L.languageLabel, pi.language);
+      labeledLine(L.plugType, pi.plug_type);
+      labeledLine(L.tipping, pi.tipping);
+      labeledList(L.documents, pi.documents);
+      labeledList(L.whatToPack, pi.what_to_pack);
+      labeledList(L.healthSafety, pi.health_safety);
+      labeledList(L.emergencyContacts, pi.emergency_contacts);
+    }
+
+    // Trip management
+    const tm = content.trip_management;
+    if (tm && typeof tm === "object") {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(P(L.tripManagement, { bold: true, size: 32, heading: HeadingLevel.HEADING_1 }));
+      labeledLine(L.arrivalInstructions, tm.arrival_instructions);
+      labeledLine(L.checkinPolicy, tm.checkin_checkout_policy);
+      labeledLine(L.transfersOverview, tm.transfers_overview);
+      labeledLine(L.guideLanguage, tm.guide_language);
+      labeledLine(L.support247, tm.support_24_7);
+      labeledLine(L.cancellationPolicy, tm.cancellation_policy);
+      labeledLine(L.paymentTerms, tm.payment_terms);
+    }
+
     if (quote.valid_until) {
       children.push(P(""));
       children.push(P(`${L.validUntil}: ${quote.valid_until}`, { size: 20, bold: true }));

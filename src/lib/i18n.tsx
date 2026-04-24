@@ -209,6 +209,7 @@ const dict = {
     totalPrice: "Preço total",
     totalToPay: "Total a pagar",
     invoiceReadOnly: "Invoice em modo somente leitura.",
+    invoiceEditable: "Invoice editável — alterações refletem no booking.",
     unitCost: "Custo unit.",
     markup: "Markup",
     quantity: "Qtd",

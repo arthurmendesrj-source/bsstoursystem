@@ -237,6 +237,9 @@ const dict = {
     inspirational: "Inspiracional",
     documentGenerated: "Documento gerado",
     previousDocuments: "Documentos gerados",
+    aiBriefing: "Briefing para a IA",
+    aiBriefingPlaceholder: "Ex.: Casal em lua de mel, estilo luxo, evitar passeios muito longos, interesse em gastronomia local, restrição alimentar (sem frutos do mar)...",
+    aiBriefingHelp: "Opcional. Oriente a IA sobre público, estilo, ritmo, restrições e pedidos especiais.",
   },
   en: {
     appName: "TourismCRM",
@@ -469,6 +472,9 @@ const dict = {
     inspirational: "Inspirational",
     documentGenerated: "Document generated",
     previousDocuments: "Generated documents",
+    aiBriefing: "Briefing for the AI",
+    aiBriefingPlaceholder: "E.g.: Honeymoon couple, luxury style, avoid long tours, interested in local gastronomy, food restriction (no seafood)...",
+    aiBriefingHelp: "Optional. Guide the AI on audience, style, pace, restrictions and special requests.",
   },
   es: {
     appName: "TurismoCRM",
@@ -701,6 +707,9 @@ const dict = {
     inspirational: "Inspiracional",
     documentGenerated: "Documento generado",
     previousDocuments: "Documentos generados",
+    aiBriefing: "Briefing para la IA",
+    aiBriefingPlaceholder: "Ej.: Pareja en luna de miel, estilo lujo, evitar paseos largos, interés en gastronomía local, restricción alimentaria (sin mariscos)...",
+    aiBriefingHelp: "Opcional. Orienta a la IA sobre público, estilo, ritmo, restricciones y pedidos especiales.",
   },
 } as const;
 

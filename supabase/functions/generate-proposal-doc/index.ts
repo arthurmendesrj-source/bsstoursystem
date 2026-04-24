@@ -370,6 +370,7 @@ Deno.serve(async (req) => {
     const lang: Lang = (body.language ?? "en") as Lang;
     const tone: string = body.tone ?? "inspirational";
     const includeItinerary: boolean = body.include_itinerary !== false;
+    const briefing: string = String(body.briefing ?? "").slice(0, 2000).trim();
     const L = LABELS[lang] ?? LABELS.en;
 
     // Load quote, items, lead, customer
@@ -457,11 +458,17 @@ Provide a 'trip_management' block covering: how the client will be received at t
 
 Inclusions/exclusions must reflect what was quoted (hotels with meal plan, transfers, tours) plus standard exclusions (international flights unless quoted, visas, tips, personal expenses, optional tours).
 
-NEVER mention internal costs, markup, or supplier names. Speak as the operator delivering the trip.`,
+NEVER mention internal costs, markup, or supplier names. Speak as the operator delivering the trip.
+
+If an "Operator briefing" is provided in the user message, treat it as the HIGHEST-PRIORITY guidance: it overrides generic assumptions about audience, style, pace, focus, dietary or mobility restrictions and special requests. Tailor every day, tip and recommendation to it.`,
           },
           {
             role: "user",
             content: `Quote brief (JSON):\n${JSON.stringify(userBrief, null, 2)}\n\n${
+              briefing
+                ? `**Operator briefing (follow strictly):**\n${briefing}\n\n`
+                : ""
+            }${
               includeItinerary
                 ? "Include a detailed day-by-day narrative."
                 : "Skip the day-by-day; only return title, subtitle, intro, inclusions, exclusions, notes."

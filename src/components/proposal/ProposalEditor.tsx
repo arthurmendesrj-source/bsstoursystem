@@ -278,17 +278,30 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
     return <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>;
   }
 
+  const isClosed = quote.status === "aprovada";
+  const readOnly = mode === "invoice" || isClosed;
+  const invoiceCode = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
+
   const hotels = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "hotel");
   const services = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "service");
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {mode === "invoice" ? (
             <Badge className="bg-primary text-primary-foreground">{t("invoice")}</Badge>
+          ) : isClosed ? (
+            <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white border-transparent">
+              {t("proposalClosed")}
+            </Badge>
           ) : (
             <Badge variant="outline" className="capitalize">{quote.status}</Badge>
+          )}
+          {isClosed && (
+            <Badge variant="outline" className="font-mono border-emerald-500/40 text-emerald-700">
+              {invoiceCode}
+            </Badge>
           )}
           <span className="text-sm text-muted-foreground">#{quote.id.slice(0, 8)}</span>
         </div>

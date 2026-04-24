@@ -714,6 +714,56 @@ export type Database = {
         }
         Relationships: []
       }
+      quote_documents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          format: string
+          id: string
+          include_itinerary: boolean
+          language: string
+          price_mode: string
+          quote_id: string
+          storage_path: string
+          title: string | null
+          tone: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          format?: string
+          id?: string
+          include_itinerary?: boolean
+          language?: string
+          price_mode?: string
+          quote_id: string
+          storage_path: string
+          title?: string | null
+          tone?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          format?: string
+          id?: string
+          include_itinerary?: boolean
+          language?: string
+          price_mode?: string
+          quote_id?: string
+          storage_path?: string
+          title?: string | null
+          tone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_documents_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           category: string | null

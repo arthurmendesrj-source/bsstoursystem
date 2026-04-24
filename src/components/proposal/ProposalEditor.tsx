@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,9 @@ import {
   type ProposalItem,
   type ProposalItemKind,
 } from "@/lib/proposal-totals";
+import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
+import { GenerateDocDialog } from "./GenerateDocDialog";
+import { ProposalDocumentsList } from "./ProposalDocumentsList";
 
 type Mode = "proposal" | "invoice";
 
@@ -75,6 +78,9 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
   const [quote, setQuote] = useState<QuoteRow | null>(null);
   const [items, setItems] = useState<ItemRow[]>([]);
   const [bankFee, setBankFee] = useState(0);
+  const [dictating, setDictating] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [docsRefresh, setDocsRefresh] = useState(0);
 
   const load = async () => {
     setLoading(true);
@@ -163,6 +169,35 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
         item_date: null,
         check_out: null,
       },
+    ]);
+  };
+
+  const appendDictated = (dictated: DictatedItem[]) => {
+    const dm = Number(quote?.default_markup_pct ?? 0);
+    setItems((arr) => [
+      ...arr,
+      ...dictated.map((d) => {
+        const tempId = `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const isHotel = d.kind === "hotel";
+        const item_date = isHotel ? d.check_in ?? null : d.item_date ?? null;
+        const check_out = isHotel ? d.check_out ?? null : null;
+        let qty = Number(d.quantity) > 0 ? Number(d.quantity) : 1;
+        if (isHotel && item_date && check_out) {
+          const n = diffNights(item_date, check_out);
+          if (n > 0) qty = n;
+        }
+        return {
+          id: tempId,
+          quote_id: quoteId,
+          kind: d.kind,
+          description: [d.description, d.city ? `(${d.city})` : ""].filter(Boolean).join(" "),
+          quantity: qty,
+          unit_cost: Number(d.unit_cost) || 0,
+          markup_pct: d.markup_pct != null ? Number(d.markup_pct) : dm,
+          item_date,
+          check_out,
+        } as ItemRow;
+      }),
     ]);
   };
 
@@ -257,7 +292,17 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
           )}
           <span className="text-sm text-muted-foreground">#{quote.id.slice(0, 8)}</span>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {!readOnly && mode === "proposal" && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
+                <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
+                <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
+              </Button>
+            </>
+          )}
           {!readOnly && (
             <>
               <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
@@ -281,6 +326,23 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {dictating && !readOnly && mode === "proposal" && (
+        <DictateItemsPanel
+          defaultMarkupPct={Number(quote.default_markup_pct ?? 0)}
+          onItems={appendDictated}
+          onClose={() => setDictating(false)}
+        />
+      )}
+
+      {mode === "proposal" && (
+        <GenerateDocDialog
+          quoteId={quoteId}
+          open={genOpen}
+          onOpenChange={setGenOpen}
+          onGenerated={() => setDocsRefresh((n) => n + 1)}
+        />
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border bg-muted/30">
         <div>
@@ -370,6 +432,10 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
         <Separator className="my-1" />
         <Row label={t("totalToPay")} value={fmt(totals.total, ccy)} bold />
       </div>
+
+      {mode === "proposal" && (
+        <ProposalDocumentsList quoteId={quoteId} refreshKey={docsRefresh} />
+      )}
 
       {readOnly && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">

@@ -240,6 +240,8 @@ const dict = {
     aiBriefing: "Briefing para a IA",
     aiBriefingPlaceholder: "Ex.: Casal em lua de mel, estilo luxo, evitar passeios muito longos, interesse em gastronomia local, restrição alimentar (sem frutos do mar)...",
     aiBriefingHelp: "Opcional. Oriente a IA sobre público, estilo, ritmo, restrições e pedidos especiais.",
+    proposalClosed: "Proposta fechada",
+    invoiceCode: "Código do invoice",
   },
   en: {
     appName: "TourismCRM",
@@ -475,6 +477,8 @@ const dict = {
     aiBriefing: "Briefing for the AI",
     aiBriefingPlaceholder: "E.g.: Honeymoon couple, luxury style, avoid long tours, interested in local gastronomy, food restriction (no seafood)...",
     aiBriefingHelp: "Optional. Guide the AI on audience, style, pace, restrictions and special requests.",
+    proposalClosed: "Proposal closed",
+    invoiceCode: "Invoice code",
   },
   es: {
     appName: "TurismoCRM",
@@ -710,6 +714,8 @@ const dict = {
     aiBriefing: "Briefing para la IA",
     aiBriefingPlaceholder: "Ej.: Pareja en luna de miel, estilo lujo, evitar paseos largos, interés en gastronomía local, restricción alimentaria (sin mariscos)...",
     aiBriefingHelp: "Opcional. Orienta a la IA sobre público, estilo, ritmo, restricciones y pedidos especiales.",
+    proposalClosed: "Propuesta cerrada",
+    invoiceCode: "Código de invoice",
   },
 } as const;
 

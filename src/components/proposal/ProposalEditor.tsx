@@ -440,9 +440,9 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
         <ProposalDocumentsList quoteId={quoteId} refreshKey={docsRefresh} />
       )}
 
-      {readOnly && (
+      {mode === "invoice" && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <FileCheck className="h-4 w-4" /> {t("invoiceReadOnly")}
+          <FileCheck className="h-4 w-4" /> {t("invoiceEditable")}
         </div>
       )}
     </div>

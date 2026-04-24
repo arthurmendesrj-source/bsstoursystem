@@ -1,111 +1,78 @@
 
 
-# Duas funções de IA na Proposta
+# IA como Operadora de Turismo — Itinerário e gestão completa
 
-Adicionar dois recursos de IA no **ProposalEditor**:
+Reforçar a edge function `generate-proposal-doc` para que a IA atue como uma **operadora de turismo sênior** — não só descrevendo dias, mas entregando um **itinerário completo e gestão da viagem** (logística, transfers, horários, recomendações práticas, contatos úteis, dicas culturais, contingências).
 
-1. **Ditar itens por voz** — botão de microfone que grava áudio, transcreve com IA e pré-preenche linhas de Hotel/Service.
-2. **Gerar documento da proposta (`.docx`)** — botão que gera um documento comercial no estilo dos exemplos enviados (capa + tabela de preços + roteiro dia-a-dia + inclusões/exclusões), com escolha de modo de preço, idioma e tom.
+## Mudanças no system prompt + tool schema
 
-## 1. Ditar itens (voz → linhas)
+Em `supabase/functions/generate-proposal-doc/index.ts`:
 
-**Fluxo:**
-- Botão 🎙 "Ditar itens" no header do editor.
-- `MediaRecorder` do navegador grava (webm/opus) até o usuário parar.
-- Áudio enviado em base64 para edge function `transcribe-proposal-items`.
-- Edge function chama Lovable AI (`google/gemini-2.5-pro`, multimodal — aceita áudio inline) com **tool calling estruturado** que retorna:
-  ```json
-  { "items": [
-    { "kind": "hotel", "description": "Hotel Copacabana Palace 5*",
-      "city": "Rio", "check_in": "2026-02-12", "check_out": "2026-02-15",
-      "rooms": 2, "unit_cost": 250, "markup_pct": 20 },
-    { "kind": "service", "description": "City Tour + Cristo Redentor",
-      "item_date": "2026-02-13", "quantity": 4, "unit_cost": 80, "markup_pct": 20 }
-  ]}
-  ```
-- Frontend acrescenta cada item à lista (não substitui), aplicando `default_markup_pct` quando ausente. Usuário revisa antes de salvar.
-- Idioma da fala detectado automaticamente (PT/EN/ES/RU).
-- Erros 402 (créditos) e 429 (rate limit) viram toasts amigáveis.
+**1. Novo system prompt** (persona + escopo):
+> "Você é uma operadora de turismo sênior, com 20+ anos montando viagens sob medida na América do Sul. Sua tarefa é entregar não apenas um texto descritivo, mas um **itinerário operacional completo** que cubra logística (transfers, horários sugeridos de check-in/out, deslocamentos entre cidades), experiência (atrações, gastronomia local, dicas culturais), e gestão prática (documentos, moeda, clima na época, vacinas/visto se aplicável, o que levar, contatos de emergência genéricos, política de cancelamento padrão). Tom ${tone}, idioma ${langName}. Nunca cite custos ou markup interno."
 
-## 2. Gerar documento da proposta (`.docx`)
+**2. Tool `build_proposal_content` ampliada** com novos campos para a operadora:
 
-**Disparo:** botão 📄 "Gerar Documento" abre diálogo com:
-- **Modo de preço:** Valor final único · Detalhado por item · Tabela por categoria de hotel
-- **Idioma:** PT · EN · ES · RU
-- **Incluir programa descritivo dia-a-dia:** ☑ (default ligado)
-- **Tom:** Formal · Inspiracional (default Inspiracional)
+```ts
+days[]: {
+  day_number, date, city, title, narrative,
+  schedule: [{ time, activity }],          // NOVO — cronograma do dia
+  transfers: [string],                      // NOVO — "Aeroporto GIG → Hotel Copacabana, ~45min"
+  meals_included: [string],                 // NOVO — café/almoço/jantar
+  highlights: [string],                     // NOVO — pontos altos
+  tips: [string]                            // NOVO — dicas práticas
+}
 
-**Pipeline:**
-1. Frontend envia para edge function `generate-proposal-doc`: dados do quote (itens com datas, custos, markup, totais), lead/customer, preferências.
-2. Edge function chama Lovable AI (`google/gemini-2.5-pro`) com **tool calling** para retornar conteúdo estruturado:
-   - `title`, `subtitle` (ex.: "Carnival in Rio de Janeiro 2026 — 5d/4n")
-   - `intro` (boas-vindas no estilo dos exemplos)
-   - `days[]`: `{ day_number, city, title, narrative, services[] }` derivado das datas das linhas
-   - `inclusions[]`, `exclusions[]`, `notes[]`
-3. Edge function monta o `.docx` com a biblioteca **`docx`** (pure-JS, compatível com Worker SSR) — layout fiel aos exemplos:
-   - Página 1: Título + subtítulo + tabela de preços (formato escolhido)
-   - Páginas seguintes: "Day N | Cidade" + parágrafo descritivo + serviços do dia
-   - Final: "The price includes / does not include" + notas
-4. Documento retornado como base64 → frontend força download e salva registro em `quote_documents`.
+practical_info: {                           // NOVO bloco — gestão da viagem
+  best_time_to_visit, weather, currency,
+  language, plug_type, tipping,
+  documents: [string],                      // passaporte, visto, vacinas
+  what_to_pack: [string],
+  health_safety: [string],
+  emergency_contacts: [string]              // genéricos: 190 polícia BR, etc.
+}
 
-**Modos de preço:**
-- *Valor final*: única linha "Total: USD X".
-- *Detalhado por item*: tabela com cada hotel/serviço, datas, qty, subtotal — usando `unit_price` (já com markup).
-- *Tabela por categoria*: agrupa hotéis 4★/5★ em colunas SGL/DBL/TRP usando `category` de `quote_items`; cai para "Detalhado" se não houver categorias.
+trip_management: {                          // NOVO bloco — operacional
+  arrival_instructions: string,             // como será recebido no aeroporto
+  checkin_checkout_policy: string,
+  transfers_overview: string,
+  guide_language: string,
+  support_24_7: string,                     // ex: "Coordenador local disponível 24/7 via WhatsApp"
+  cancellation_policy: string,
+  payment_terms: string
+}
 
-Markup interno **nunca** aparece no documento — apenas `unit_price` final.
+inclusions, exclusions, notes  // já existem
+```
 
-## Backend / Banco
+**3. Renderização no `.docx`** — adicionar seções novas após o itinerário:
 
-**Nova tabela `quote_documents`:**
-- `id`, `quote_id` (FK), `created_at`, `created_by`
-- `format` ('docx'), `price_mode` ('final'|'detailed'|'category_table')
-- `language` ('pt'|'en'|'es'|'ru'), `tone`, `storage_path`
-- RLS: usuários autenticados leem; criador/admin gerencia.
+- **Cronograma do dia**: para cada dia, se `schedule[]` existe, renderizar tabela compacta `Hora | Atividade` abaixo da narrativa.
+- **Transfers / Refeições / Dicas**: blocos curtos rotulados dentro de cada dia.
+- **Página "Informações Práticas"** (`practical_info`): seções com clima, moeda, documentos, o que levar, saúde & segurança, contatos de emergência.
+- **Página "Gestão da Viagem"** (`trip_management`): instruções de chegada, política de check-in/out, suporte 24/7, política de cancelamento, condições de pagamento.
 
-**Novo bucket privado `proposal-docs`** com policies para download via signed URL (1h).
+**4. Labels novos** em `LABELS` (PT/EN/ES/RU) para: `schedule`, `transfers`, `mealsIncluded`, `highlights`, `tips`, `practicalInfo`, `weather`, `currency`, `documents`, `whatToPack`, `healthSafety`, `emergencyContacts`, `tripManagement`, `arrivalInstructions`, `support247`, `cancellationPolicy`, `paymentTerms`.
 
-**Duas edge functions novas** (ambas usam `LOVABLE_API_KEY`, `verify_jwt = true`, tratam 402/429 e CORS):
-- `supabase/functions/transcribe-proposal-items/index.ts`
-- `supabase/functions/generate-proposal-doc/index.ts`
-
-## Frontend
-
-**Editar `src/components/proposal/ProposalEditor.tsx`:**
-- Botão "🎙 Ditar itens" (painel inline com Stop/Cancelar + indicador de transcrição).
-- Botão "📄 Gerar Documento" (abre `GenerateDocDialog`).
-- Botões só em `mode === "proposal"`.
-
-**Novos componentes:**
-- `src/components/proposal/DictateItemsPanel.tsx` — gravação + chamada à edge function + preview dos itens transcritos.
-- `src/components/proposal/GenerateDocDialog.tsx` — diálogo com escolhas + botão "Gerar e baixar" (idiomas: PT/EN/ES/RU já incluídos).
-- `src/components/proposal/ProposalDocumentsList.tsx` — lista documentos gerados com link de download.
-
-**i18n** (`src/lib/i18n.tsx`): novas chaves PT/EN/ES — `dictateItems`, `recording`, `stopRecording`, `transcribing`, `generateDocument`, `priceMode`, `priceModeFinal`, `priceModeDetailed`, `priceModeCategory`, `includeItinerary`, `tone`, `formal`, `inspirational`, `documentGenerated`, `previousDocuments`. (`languageRussian` já existe.)
-
-## Privacidade / Segurança
-
-- Áudio enviado direto à edge function, não armazenado.
-- `.docx` em bucket privado, signed URL de 1h.
-- Documento omite custos e markup; apenas preço final ao cliente.
+**5. Modelo**: continuar `google/gemini-2.5-pro` (o tool schema cresce, então precisa do modelo mais robusto). Manter tratamento de 402/429.
 
 ## Arquivos afetados
 
 | Ação | Arquivo |
 |---|---|
-| Migration | `supabase/migrations/<ts>_quote_documents.sql` (+ bucket + policies) |
-| Criar | `supabase/functions/transcribe-proposal-items/index.ts` |
-| Criar | `supabase/functions/generate-proposal-doc/index.ts` |
-| Criar | `src/components/proposal/DictateItemsPanel.tsx` |
-| Criar | `src/components/proposal/GenerateDocDialog.tsx` |
-| Criar | `src/components/proposal/ProposalDocumentsList.tsx` |
-| Editar | `src/components/proposal/ProposalEditor.tsx` |
-| Editar | `src/lib/i18n.tsx` |
+| Editar | `supabase/functions/generate-proposal-doc/index.ts` |
+
+## Bônus (também corrige o build atual)
+
+Há um erro de sintaxe ativo em `src/components/proposal/ProposalEditor.tsx` (linha 205, `await` em função não-`async`, e `}` inválido no JSX em 442). Vou corrigir junto — tornar `removeItem` `async` e fechar o JSX corretamente — para o preview voltar a compilar.
+
+| Ação | Arquivo |
+|---|---|
+| Corrigir | `src/components/proposal/ProposalEditor.tsx` (regressões de build) |
 
 ## Fora de escopo
 
-- Versão PDF (hoje só `.docx`).
-- Imagens automáticas das cidades no documento.
-- Editor visual do programa descritivo antes de exportar.
-- Re-gerar documento mantendo edições manuais.
+- Buscar dados reais de clima/câmbio em tempo real (a IA usa conhecimento geral).
+- Gerar PDF (continua `.docx`).
+- Inserir imagens automáticas das cidades.
 

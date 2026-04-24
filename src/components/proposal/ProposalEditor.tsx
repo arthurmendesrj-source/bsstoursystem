@@ -279,7 +279,7 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
   }
 
   const isClosed = quote.status === "aprovada";
-  const readOnly = mode === "invoice" || isClosed;
+  const readOnly = false; // invoice and approved proposals are now fully editable
   const invoiceCode = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
 
   const hotels = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "hotel");

@@ -479,8 +479,9 @@ function WorkspacePage() {
                 ) : (
                   <ProposalsTab
                     leadId={lead.id}
+                    leadCode={lead.code}
                     customerId={lead.customer_id}
-                    quotes={quotes.filter((q) => q.status !== "aprovada")}
+                    quotes={quotes}
                     onChanged={() => loadLead(lead.id)}
                     mode="proposal"
                   />
@@ -493,6 +494,7 @@ function WorkspacePage() {
                 ) : (
                   <ProposalsTab
                     leadId={lead.id}
+                    leadCode={lead.code}
                     customerId={lead.customer_id}
                     quotes={quotes.filter((q) => q.status === "aprovada")}
                     onChanged={() => loadLead(lead.id)}
@@ -542,12 +544,14 @@ function EmptyTab({ text }: { text: string }) {
 
 function ProposalsTab({
   leadId,
+  leadCode,
   customerId,
   quotes,
   onChanged,
   mode,
 }: {
   leadId: string;
+  leadCode: string | null;
   customerId: string | null;
   quotes: Quote[];
   onChanged: () => void;
@@ -558,6 +562,9 @@ function ProposalsTab({
   const { format: fmtCurrency } = useCurrency();
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  const invoiceCodeFor = (q: Quote) =>
+    leadCode ? `IN${leadCode}` : `IN${q.id.slice(0, 8).toUpperCase()}`;
 
   const createNew = async () => {
     if (!user) return;
@@ -595,22 +602,41 @@ function ProposalsTab({
         </div>
       ) : (
         <div className="space-y-2">
-          {quotes.map((q) => (
-            <button
-              key={q.id}
-              onClick={() => setOpenId(q.id)}
-              className="w-full text-left p-3 rounded-md border hover:bg-muted/40 flex items-center justify-between"
-            >
-              <div>
-                <Badge variant="outline" className="capitalize">{q.status}</Badge>
-                <div className="text-xs text-muted-foreground mt-1">
-                  #{q.id.slice(0, 8)} · {format(new Date(q.created_at), "dd/MM/yyyy")}
-                  {q.valid_until && ` · ${t("validUntil")}: ${format(new Date(q.valid_until), "dd/MM/yyyy")}`}
+          {quotes.map((q) => {
+            const closed = q.status === "aprovada";
+            return (
+              <button
+                key={q.id}
+                onClick={() => setOpenId(q.id)}
+                className={cn(
+                  "w-full text-left p-3 rounded-md border hover:bg-muted/40 flex items-center justify-between",
+                  closed && "border-emerald-500/40 bg-emerald-500/5",
+                )}
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {closed ? (
+                      <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white border-transparent">
+                        {t("proposalClosed")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="capitalize">{q.status}</Badge>
+                    )}
+                    {closed && (
+                      <Badge variant="outline" className="font-mono border-emerald-500/40 text-emerald-700">
+                        {invoiceCodeFor(q)}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    #{q.id.slice(0, 8)} · {format(new Date(q.created_at), "dd/MM/yyyy")}
+                    {q.valid_until && ` · ${t("validUntil")}: ${format(new Date(q.valid_until), "dd/MM/yyyy")}`}
+                  </div>
                 </div>
-              </div>
-              <div className="font-semibold">{fmtCurrency(Number(q.total_amount), q.currency as "BRL")}</div>
-            </button>
-          ))}
+                <div className="font-semibold">{fmtCurrency(Number(q.total_amount), q.currency as "BRL")}</div>
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -623,6 +649,7 @@ function ProposalsTab({
             <ProposalEditor
               quoteId={openId}
               leadId={leadId}
+              leadCode={leadCode}
               customerId={customerId}
               mode={mode}
               onSaved={onChanged}

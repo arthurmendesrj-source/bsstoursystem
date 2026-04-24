@@ -1,23 +1,26 @@
 
 
-# Aumentar campo de nome do Hotel na Proposta
+# Adicionar Russo aos programas gerados por IA
 
-O input do nome do hotel hoje é estreito demais e corta o texto durante a digitação. Vamos dar mais espaço a ele no editor.
+Incluir o idioma **Russo (RU)** como opção na geração do documento da proposta, junto de PT/EN/ES já planejados.
 
-## Mudança
+## Mudanças
 
-Em `src/components/proposal/ProposalEditor.tsx`, na linha de Hotel:
-
-- Aumentar a largura mínima do input de **Hotel** (campo `description` quando `kind='hotel'`) — passar de `w-40`/`w-48` (atual) para `min-w-[260px] flex-1`, para que ele cresça e mostre nomes longos como "Hotel Copacabana Palace by Belmond".
-- Reduzir levemente colunas auxiliares pouco usadas (Category, Meal, City) com `min-w-[110px]` cada, para sobrar espaço.
-- Garantir que a linha use `flex-wrap` em telas estreitas (≤1024px) para não espremer demais nenhum campo.
-- Mesmo tratamento no modo `invoice` (read-only): o nome do hotel ocupa o espaço flexível restante.
-
-Sem mudanças no banco, sem mudanças em outros arquivos.
+- **`GenerateDocDialog.tsx`** (a ser criado): adicionar `ru` ao seletor de idioma — opções ficam: Português · English · Español · Русский.
+- **Edge function `generate-proposal-doc`**: aceitar `language: "ru"` no payload; o system prompt passa a instruir o modelo a gerar `title`, `intro`, `days[].narrative`, `inclusions`, `exclusions` e `notes` em russo quando selecionado. Cabeçalhos fixos da tabela (Day, City, Total, etc.) também são traduzidos para russo no template `.docx`.
+- **`src/lib/i18n.tsx`**: adicionar a chave `languageRussian` nos três idiomas existentes da UI (PT/EN/ES) — só rotula o item no seletor; **não** vamos adicionar russo como idioma da própria interface do CRM (fora do escopo).
+- **`quote_documents.language`**: a coluna fica como `text` livre (sem CHECK constraint), então aceita `"ru"` sem migration nova.
 
 ## Arquivos afetados
 
 | Ação | Arquivo |
 |---|---|
-| Editar | `src/components/proposal/ProposalEditor.tsx` |
+| Editar | `src/components/proposal/GenerateDocDialog.tsx` (no momento da implementação) |
+| Editar | `supabase/functions/generate-proposal-doc/index.ts` (no momento da implementação) |
+| Editar | `src/lib/i18n.tsx` |
+
+## Fora de escopo
+
+- Traduzir a interface do CRM para russo.
+- Ditado de itens em russo (já funciona automaticamente — Gemini detecta o idioma falado).
 

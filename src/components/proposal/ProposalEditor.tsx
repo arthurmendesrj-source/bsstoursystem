@@ -27,6 +27,7 @@ type Mode = "proposal" | "invoice";
 type Props = {
   quoteId: string;
   leadId: string;
+  leadCode?: string | null;
   customerId: string | null;
   mode: Mode;
   onSaved?: () => void;
@@ -70,9 +71,9 @@ function fmtDate(d?: string | null) {
   }
 }
 
-export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
+export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
-  const readOnly = mode === "invoice";
+  const isClosed = false; // placeholder, real value below after quote loads
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<QuoteRow | null>(null);

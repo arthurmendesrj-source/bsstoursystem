@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ export function GenerateDocDialog({ quoteId, open, onOpenChange, onGenerated }: 
   const [language, setLanguage] = useState<DocLang>("en");
   const [includeItinerary, setIncludeItinerary] = useState(true);
   const [tone, setTone] = useState<Tone>("inspirational");
+  const [briefing, setBriefing] = useState("");
   const [busy, setBusy] = useState(false);
 
   const generate = async () => {
@@ -50,6 +52,7 @@ export function GenerateDocDialog({ quoteId, open, onOpenChange, onGenerated }: 
           language,
           tone,
           include_itinerary: includeItinerary,
+          briefing: briefing.trim() || undefined,
         },
       });
       if (error) {
@@ -134,6 +137,26 @@ export function GenerateDocDialog({ quoteId, open, onOpenChange, onGenerated }: 
               checked={includeItinerary}
               onCheckedChange={setIncludeItinerary}
             />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="ai-briefing" className="text-xs">
+              {t("aiBriefing")}
+            </Label>
+            <Textarea
+              id="ai-briefing"
+              value={briefing}
+              onChange={(e) => setBriefing(e.target.value.slice(0, 2000))}
+              placeholder={t("aiBriefingPlaceholder")}
+              rows={4}
+              maxLength={2000}
+              className="resize-none text-sm"
+            />
+            <div className="flex items-center justify-between">
+              <p className="text-[11px] text-muted-foreground">{t("aiBriefingHelp")}</p>
+              <p className="text-[11px] text-muted-foreground tabular-nums">
+                {briefing.length}/2000
+              </p>
+            </div>
           </div>
         </div>
         <DialogFooter>

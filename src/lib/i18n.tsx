@@ -685,6 +685,7 @@ const dict = {
     totalPrice: "Precio total",
     totalToPay: "Total a pagar",
     invoiceReadOnly: "Invoice en solo lectura.",
+    invoiceEditable: "Invoice editable — los cambios se reflejan en la reserva.",
     unitCost: "Costo unit.",
     markup: "Markup",
     quantity: "Cant.",

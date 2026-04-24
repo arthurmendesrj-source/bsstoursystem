@@ -628,6 +628,29 @@ NEVER mention internal costs, markup, or supplier names. Speak as the operator d
       );
     }
 
+    // Helpers for sub-blocks
+    const bullet = (text: string) =>
+      new Paragraph({
+        bullet: { level: 0 },
+        children: [new TextRun({ text, font: "Arial", size: 22 })],
+      });
+    const labeledList = (label: string, arr: any) => {
+      if (!Array.isArray(arr) || arr.length === 0) return;
+      children.push(P(label + ":", { bold: true, size: 22 }));
+      for (const v of arr) children.push(bullet(String(v)));
+    };
+    const labeledLine = (label: string, value: any) => {
+      if (!value) return;
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `${label}: `, bold: true, font: "Arial", size: 22 }),
+            new TextRun({ text: String(value), font: "Arial", size: 22 }),
+          ],
+        }),
+      );
+    };
+
     // Itinerary
     if (includeItinerary && Array.isArray(content.days) && content.days.length > 0) {
       children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -635,18 +658,46 @@ NEVER mention internal costs, markup, or supplier names. Speak as the operator d
       for (const d of content.days) {
         const head = `${L.day} ${d.day_number}${d.city ? " | " + d.city : ""}${d.title ? " — " + d.title : ""}`;
         children.push(P(head, { bold: true, size: 26, heading: HeadingLevel.HEADING_2 }));
+        if (d.date) children.push(P(String(d.date), { size: 20 }));
         if (d.narrative) children.push(P(d.narrative, { size: 22 }));
-        if (Array.isArray(d.services) && d.services.length > 0) {
-          children.push(P(L.services + ":", { bold: true, size: 22 }));
-          for (const s of d.services) {
-            children.push(
-              new Paragraph({
-                bullet: { level: 0 },
-                children: [new TextRun({ text: s, font: "Arial", size: 22 })],
-              }),
-            );
-          }
+
+        // Schedule table
+        if (Array.isArray(d.schedule) && d.schedule.length > 0) {
+          children.push(P(L.schedule + ":", { bold: true, size: 22 }));
+          const sw = [1800, 7560];
+          const schedRows: TableRow[] = [
+            new TableRow({
+              tableHeader: true,
+              children: [
+                cell(L.time, { bold: true, bg: "D5E8F0", width: sw[0] }),
+                cell(L.activity, { bold: true, bg: "D5E8F0", width: sw[1] }),
+              ],
+            }),
+            ...d.schedule.map(
+              (s: any) =>
+                new TableRow({
+                  children: [
+                    cell(String(s.time ?? ""), { width: sw[0] }),
+                    cell(String(s.activity ?? ""), { width: sw[1] }),
+                  ],
+                }),
+            ),
+          ];
+          children.push(
+            new Table({
+              width: { size: totalWidth, type: WidthType.DXA },
+              columnWidths: sw,
+              rows: schedRows,
+            }),
+          );
+          children.push(P(""));
         }
+
+        labeledList(L.transfers, d.transfers);
+        labeledList(L.mealsIncluded, d.meals_included);
+        labeledList(L.highlights, d.highlights);
+        labeledList(L.tips, d.tips);
+        labeledList(L.services, d.services);
         children.push(P(""));
       }
     }

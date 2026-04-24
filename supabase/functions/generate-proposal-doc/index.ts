@@ -45,6 +45,32 @@ const LABELS: Record<Lang, Record<string, string>> = {
     services: "Serviços",
     pricing: "Valores",
     validUntil: "Válida até",
+    schedule: "Cronograma",
+    time: "Hora",
+    activity: "Atividade",
+    transfers: "Transfers",
+    mealsIncluded: "Refeições incluídas",
+    highlights: "Destaques",
+    tips: "Dicas",
+    practicalInfo: "Informações Práticas",
+    bestTime: "Melhor época",
+    weather: "Clima",
+    currency: "Moeda",
+    languageLabel: "Idioma",
+    plugType: "Tomadas",
+    tipping: "Gorjetas",
+    documents: "Documentos",
+    whatToPack: "O que levar",
+    healthSafety: "Saúde & Segurança",
+    emergencyContacts: "Contatos de Emergência",
+    tripManagement: "Gestão da Viagem",
+    arrivalInstructions: "Instruções de chegada",
+    checkinPolicy: "Política de check-in / check-out",
+    transfersOverview: "Transfers (visão geral)",
+    guideLanguage: "Idioma do guia",
+    support247: "Suporte 24/7",
+    cancellationPolicy: "Política de cancelamento",
+    paymentTerms: "Condições de pagamento",
   },
   en: {
     proposal: "Commercial Proposal",
@@ -63,6 +89,32 @@ const LABELS: Record<Lang, Record<string, string>> = {
     services: "Services",
     pricing: "Pricing",
     validUntil: "Valid until",
+    schedule: "Schedule",
+    time: "Time",
+    activity: "Activity",
+    transfers: "Transfers",
+    mealsIncluded: "Meals included",
+    highlights: "Highlights",
+    tips: "Tips",
+    practicalInfo: "Practical Information",
+    bestTime: "Best time to visit",
+    weather: "Weather",
+    currency: "Currency",
+    languageLabel: "Language",
+    plugType: "Plug type",
+    tipping: "Tipping",
+    documents: "Documents",
+    whatToPack: "What to pack",
+    healthSafety: "Health & Safety",
+    emergencyContacts: "Emergency Contacts",
+    tripManagement: "Trip Management",
+    arrivalInstructions: "Arrival instructions",
+    checkinPolicy: "Check-in / Check-out policy",
+    transfersOverview: "Transfers overview",
+    guideLanguage: "Guide language",
+    support247: "24/7 Support",
+    cancellationPolicy: "Cancellation policy",
+    paymentTerms: "Payment terms",
   },
   es: {
     proposal: "Propuesta Comercial",
@@ -81,6 +133,32 @@ const LABELS: Record<Lang, Record<string, string>> = {
     services: "Servicios",
     pricing: "Valores",
     validUntil: "Válida hasta",
+    schedule: "Cronograma",
+    time: "Hora",
+    activity: "Actividad",
+    transfers: "Traslados",
+    mealsIncluded: "Comidas incluidas",
+    highlights: "Destacados",
+    tips: "Consejos",
+    practicalInfo: "Información Práctica",
+    bestTime: "Mejor época",
+    weather: "Clima",
+    currency: "Moneda",
+    languageLabel: "Idioma",
+    plugType: "Enchufes",
+    tipping: "Propinas",
+    documents: "Documentos",
+    whatToPack: "Qué llevar",
+    healthSafety: "Salud y Seguridad",
+    emergencyContacts: "Contactos de Emergencia",
+    tripManagement: "Gestión del Viaje",
+    arrivalInstructions: "Instrucciones de llegada",
+    checkinPolicy: "Política de check-in / check-out",
+    transfersOverview: "Traslados (visión general)",
+    guideLanguage: "Idioma del guía",
+    support247: "Soporte 24/7",
+    cancellationPolicy: "Política de cancelación",
+    paymentTerms: "Condiciones de pago",
   },
   ru: {
     proposal: "Коммерческое предложение",
@@ -99,6 +177,32 @@ const LABELS: Record<Lang, Record<string, string>> = {
     services: "Услуги",
     pricing: "Стоимость",
     validUntil: "Действительно до",
+    schedule: "Расписание",
+    time: "Время",
+    activity: "Активность",
+    transfers: "Трансферы",
+    mealsIncluded: "Включённое питание",
+    highlights: "Главное",
+    tips: "Советы",
+    practicalInfo: "Практическая информация",
+    bestTime: "Лучшее время для поездки",
+    weather: "Погода",
+    currency: "Валюта",
+    languageLabel: "Язык",
+    plugType: "Розетки",
+    tipping: "Чаевые",
+    documents: "Документы",
+    whatToPack: "Что взять с собой",
+    healthSafety: "Здоровье и безопасность",
+    emergencyContacts: "Экстренные контакты",
+    tripManagement: "Управление поездкой",
+    arrivalInstructions: "Инструкции по прибытию",
+    checkinPolicy: "Политика заселения / выселения",
+    transfersOverview: "Трансферы (обзор)",
+    guideLanguage: "Язык гида",
+    support247: "Поддержка 24/7",
+    cancellationPolicy: "Политика отмены",
+    paymentTerms: "Условия оплаты",
   },
 };
 
@@ -106,7 +210,8 @@ const CONTENT_TOOL = {
   type: "function",
   function: {
     name: "build_proposal_content",
-    description: "Generate the narrative content for a commercial travel proposal document.",
+    description:
+      "Generate full operational content for a commercial travel proposal: itinerary, logistics, practical info, and trip management.",
     parameters: {
       type: "object",
       properties: {
@@ -119,12 +224,66 @@ const CONTENT_TOOL = {
             type: "object",
             properties: {
               day_number: { type: "number" },
+              date: { type: "string" },
               city: { type: "string" },
               title: { type: "string" },
-              narrative: { type: "string" },
+              narrative: { type: "string", description: "Rich descriptive paragraph for the day." },
+              schedule: {
+                type: "array",
+                description: "Hour-by-hour planned activities for the day.",
+                items: {
+                  type: "object",
+                  properties: {
+                    time: { type: "string", description: "e.g., 09:00" },
+                    activity: { type: "string" },
+                  },
+                  required: ["time", "activity"],
+                },
+              },
+              transfers: {
+                type: "array",
+                description: "Logistical transfers, e.g. 'Airport GIG → Hotel Copacabana, ~45min'.",
+                items: { type: "string" },
+              },
+              meals_included: {
+                type: "array",
+                description: "Meals included on the day (breakfast/lunch/dinner).",
+                items: { type: "string" },
+              },
+              highlights: { type: "array", items: { type: "string" } },
+              tips: { type: "array", items: { type: "string" } },
               services: { type: "array", items: { type: "string" } },
             },
             required: ["day_number", "narrative"],
+          },
+        },
+        practical_info: {
+          type: "object",
+          description: "Practical information for the destination(s).",
+          properties: {
+            best_time_to_visit: { type: "string" },
+            weather: { type: "string" },
+            currency: { type: "string" },
+            language: { type: "string" },
+            plug_type: { type: "string" },
+            tipping: { type: "string" },
+            documents: { type: "array", items: { type: "string" } },
+            what_to_pack: { type: "array", items: { type: "string" } },
+            health_safety: { type: "array", items: { type: "string" } },
+            emergency_contacts: { type: "array", items: { type: "string" } },
+          },
+        },
+        trip_management: {
+          type: "object",
+          description: "Operational trip management details.",
+          properties: {
+            arrival_instructions: { type: "string" },
+            checkin_checkout_policy: { type: "string" },
+            transfers_overview: { type: "string" },
+            guide_language: { type: "string" },
+            support_24_7: { type: "string" },
+            cancellation_policy: { type: "string" },
+            payment_terms: { type: "string" },
           },
         },
         inclusions: { type: "array", items: { type: "string" } },
@@ -280,7 +439,25 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are a senior travel-product copywriter. Write an ${tone} commercial travel proposal in ${langName}. Always reply by calling the tool 'build_proposal_content'. Build a day-by-day itinerary based on the dated items. Inclusions/exclusions should reflect what was quoted (hotels with meal plan, transfers, tours) and standard exclusions (flights, visas, tips, personal expenses). Never mention costs or markup, only the experience.`,
+            content: `You are a SENIOR TOUR OPERATOR with 20+ years designing tailor-made trips in South America. You do not write marketing copy alone — you deliver a COMPLETE OPERATIONAL ITINERARY and full TRIP MANAGEMENT for the client.
+
+Always reply by calling the tool 'build_proposal_content'. Tone: ${tone}. Language: ${langName}.
+
+For EACH day, provide:
+- A vivid descriptive narrative (experience, atmosphere, gastronomy, cultural context).
+- 'schedule': hour-by-hour planned activities (suggested times like 09:00, 12:30, etc.).
+- 'transfers': all logistical movements (e.g. "Airport GIG → Hotel Copacabana, ~45min by private car").
+- 'meals_included': breakfast/lunch/dinner included that day.
+- 'highlights': 2-4 bullet points of the day's highlights.
+- 'tips': 2-4 practical local tips (dress code, money, crowd timing, photo spots).
+
+Provide a 'practical_info' block covering: best time to visit, weather expected for the dates, currency, language, plug type, tipping culture, required documents (passport validity, visa, vaccines if applicable), what to pack, health & safety guidance, and generic emergency contacts (e.g. 190 police BR, 192 ambulance BR, embassy hint).
+
+Provide a 'trip_management' block covering: how the client will be received at the airport, check-in/check-out policy, transfers overview, guide language, 24/7 local coordinator support details, standard cancellation policy, and standard payment terms.
+
+Inclusions/exclusions must reflect what was quoted (hotels with meal plan, transfers, tours) plus standard exclusions (international flights unless quoted, visas, tips, personal expenses, optional tours).
+
+NEVER mention internal costs, markup, or supplier names. Speak as the operator delivering the trip.`,
           },
           {
             role: "user",
@@ -451,6 +628,29 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Helpers for sub-blocks
+    const bullet = (text: string) =>
+      new Paragraph({
+        bullet: { level: 0 },
+        children: [new TextRun({ text, font: "Arial", size: 22 })],
+      });
+    const labeledList = (label: string, arr: any) => {
+      if (!Array.isArray(arr) || arr.length === 0) return;
+      children.push(P(label + ":", { bold: true, size: 22 }));
+      for (const v of arr) children.push(bullet(String(v)));
+    };
+    const labeledLine = (label: string, value: any) => {
+      if (!value) return;
+      children.push(
+        new Paragraph({
+          children: [
+            new TextRun({ text: `${label}: `, bold: true, font: "Arial", size: 22 }),
+            new TextRun({ text: String(value), font: "Arial", size: 22 }),
+          ],
+        }),
+      );
+    };
+
     // Itinerary
     if (includeItinerary && Array.isArray(content.days) && content.days.length > 0) {
       children.push(new Paragraph({ children: [new PageBreak()] }));
@@ -458,18 +658,46 @@ Deno.serve(async (req) => {
       for (const d of content.days) {
         const head = `${L.day} ${d.day_number}${d.city ? " | " + d.city : ""}${d.title ? " — " + d.title : ""}`;
         children.push(P(head, { bold: true, size: 26, heading: HeadingLevel.HEADING_2 }));
+        if (d.date) children.push(P(String(d.date), { size: 20 }));
         if (d.narrative) children.push(P(d.narrative, { size: 22 }));
-        if (Array.isArray(d.services) && d.services.length > 0) {
-          children.push(P(L.services + ":", { bold: true, size: 22 }));
-          for (const s of d.services) {
-            children.push(
-              new Paragraph({
-                bullet: { level: 0 },
-                children: [new TextRun({ text: s, font: "Arial", size: 22 })],
-              }),
-            );
-          }
+
+        // Schedule table
+        if (Array.isArray(d.schedule) && d.schedule.length > 0) {
+          children.push(P(L.schedule + ":", { bold: true, size: 22 }));
+          const sw = [1800, 7560];
+          const schedRows: TableRow[] = [
+            new TableRow({
+              tableHeader: true,
+              children: [
+                cell(L.time, { bold: true, bg: "D5E8F0", width: sw[0] }),
+                cell(L.activity, { bold: true, bg: "D5E8F0", width: sw[1] }),
+              ],
+            }),
+            ...d.schedule.map(
+              (s: any) =>
+                new TableRow({
+                  children: [
+                    cell(String(s.time ?? ""), { width: sw[0] }),
+                    cell(String(s.activity ?? ""), { width: sw[1] }),
+                  ],
+                }),
+            ),
+          ];
+          children.push(
+            new Table({
+              width: { size: totalWidth, type: WidthType.DXA },
+              columnWidths: sw,
+              rows: schedRows,
+            }),
+          );
+          children.push(P(""));
         }
+
+        labeledList(L.transfers, d.transfers);
+        labeledList(L.mealsIncluded, d.meals_included);
+        labeledList(L.highlights, d.highlights);
+        labeledList(L.tips, d.tips);
+        labeledList(L.services, d.services);
         children.push(P(""));
       }
     }
@@ -507,6 +735,38 @@ Deno.serve(async (req) => {
         );
       }
     }
+
+    // Practical information
+    const pi = content.practical_info;
+    if (pi && typeof pi === "object") {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(P(L.practicalInfo, { bold: true, size: 32, heading: HeadingLevel.HEADING_1 }));
+      labeledLine(L.bestTime, pi.best_time_to_visit);
+      labeledLine(L.weather, pi.weather);
+      labeledLine(L.currency, pi.currency);
+      labeledLine(L.languageLabel, pi.language);
+      labeledLine(L.plugType, pi.plug_type);
+      labeledLine(L.tipping, pi.tipping);
+      labeledList(L.documents, pi.documents);
+      labeledList(L.whatToPack, pi.what_to_pack);
+      labeledList(L.healthSafety, pi.health_safety);
+      labeledList(L.emergencyContacts, pi.emergency_contacts);
+    }
+
+    // Trip management
+    const tm = content.trip_management;
+    if (tm && typeof tm === "object") {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(P(L.tripManagement, { bold: true, size: 32, heading: HeadingLevel.HEADING_1 }));
+      labeledLine(L.arrivalInstructions, tm.arrival_instructions);
+      labeledLine(L.checkinPolicy, tm.checkin_checkout_policy);
+      labeledLine(L.transfersOverview, tm.transfers_overview);
+      labeledLine(L.guideLanguage, tm.guide_language);
+      labeledLine(L.support247, tm.support_24_7);
+      labeledLine(L.cancellationPolicy, tm.cancellation_policy);
+      labeledLine(L.paymentTerms, tm.payment_terms);
+    }
+
     if (quote.valid_until) {
       children.push(P(""));
       children.push(P(`${L.validUntil}: ${quote.valid_until}`, { size: 20, bold: true }));

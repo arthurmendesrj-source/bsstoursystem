@@ -1,78 +1,39 @@
 
 
-# IA como Operadora de Turismo — Itinerário e gestão completa
+# Campo de briefing para a IA operadora
 
-Reforçar a edge function `generate-proposal-doc` para que a IA atue como uma **operadora de turismo sênior** — não só descrevendo dias, mas entregando um **itinerário completo e gestão da viagem** (logística, transfers, horários, recomendações práticas, contatos úteis, dicas culturais, contingências).
+Adicionar um campo de texto livre onde o usuário descreve o trabalho que a IA deve desenvolver (público-alvo, estilo da viagem, ocasião, restrições, pedidos especiais do cliente). Esse briefing entra no prompt da edge function e orienta a geração do documento.
 
-## Mudanças no system prompt + tool schema
+## Mudanças
 
-Em `supabase/functions/generate-proposal-doc/index.ts`:
+### 1. `src/components/proposal/GenerateDocDialog.tsx`
+- Adicionar `<Textarea>` rotulado **"Briefing para a IA"** com placeholder explicativo (ex.: *"Casal em lua de mel, estilo luxo, evitar passeios muito longos, interesse em gastronomia local..."*).
+- Estado local `briefing: string` (default `""`), enviado como `briefing` no body de `supabase.functions.invoke("generate-proposal-doc", …)`.
+- Campo opcional — vazio = comportamento atual.
+- Limite de 2000 caracteres com contador discreto.
 
-**1. Novo system prompt** (persona + escopo):
-> "Você é uma operadora de turismo sênior, com 20+ anos montando viagens sob medida na América do Sul. Sua tarefa é entregar não apenas um texto descritivo, mas um **itinerário operacional completo** que cubra logística (transfers, horários sugeridos de check-in/out, deslocamentos entre cidades), experiência (atrações, gastronomia local, dicas culturais), e gestão prática (documentos, moeda, clima na época, vacinas/visto se aplicável, o que levar, contatos de emergência genéricos, política de cancelamento padrão). Tom ${tone}, idioma ${langName}. Nunca cite custos ou markup interno."
+### 2. `supabase/functions/generate-proposal-doc/index.ts`
+- Aceitar `briefing?: string` no payload.
+- Quando presente, anexar ao **user message** enviado ao Gemini, num bloco rotulado:
+  > **Briefing do operador (siga rigorosamente):**
+  > {briefing}
+- Reforçar no system prompt que o briefing tem **prioridade sobre suposições genéricas** (estilo, ritmo, foco, restrições alimentares, mobilidade, etc.).
+- Sanitização: `String(briefing).slice(0, 2000).trim()` antes de injetar.
 
-**2. Tool `build_proposal_content` ampliada** com novos campos para a operadora:
+### 3. `src/lib/i18n.tsx`
+- Novas chaves PT/EN/ES: `aiBriefing`, `aiBriefingPlaceholder`, `aiBriefingHelp`.
 
-```ts
-days[]: {
-  day_number, date, city, title, narrative,
-  schedule: [{ time, activity }],          // NOVO — cronograma do dia
-  transfers: [string],                      // NOVO — "Aeroporto GIG → Hotel Copacabana, ~45min"
-  meals_included: [string],                 // NOVO — café/almoço/jantar
-  highlights: [string],                     // NOVO — pontos altos
-  tips: [string]                            // NOVO — dicas práticas
-}
+## Fora de escopo
 
-practical_info: {                           // NOVO bloco — gestão da viagem
-  best_time_to_visit, weather, currency,
-  language, plug_type, tipping,
-  documents: [string],                      // passaporte, visto, vacinas
-  what_to_pack: [string],
-  health_safety: [string],
-  emergency_contacts: [string]              // genéricos: 190 polícia BR, etc.
-}
-
-trip_management: {                          // NOVO bloco — operacional
-  arrival_instructions: string,             // como será recebido no aeroporto
-  checkin_checkout_policy: string,
-  transfers_overview: string,
-  guide_language: string,
-  support_24_7: string,                     // ex: "Coordenador local disponível 24/7 via WhatsApp"
-  cancellation_policy: string,
-  payment_terms: string
-}
-
-inclusions, exclusions, notes  // já existem
-```
-
-**3. Renderização no `.docx`** — adicionar seções novas após o itinerário:
-
-- **Cronograma do dia**: para cada dia, se `schedule[]` existe, renderizar tabela compacta `Hora | Atividade` abaixo da narrativa.
-- **Transfers / Refeições / Dicas**: blocos curtos rotulados dentro de cada dia.
-- **Página "Informações Práticas"** (`practical_info`): seções com clima, moeda, documentos, o que levar, saúde & segurança, contatos de emergência.
-- **Página "Gestão da Viagem"** (`trip_management`): instruções de chegada, política de check-in/out, suporte 24/7, política de cancelamento, condições de pagamento.
-
-**4. Labels novos** em `LABELS` (PT/EN/ES/RU) para: `schedule`, `transfers`, `mealsIncluded`, `highlights`, `tips`, `practicalInfo`, `weather`, `currency`, `documents`, `whatToPack`, `healthSafety`, `emergencyContacts`, `tripManagement`, `arrivalInstructions`, `support247`, `cancellationPolicy`, `paymentTerms`.
-
-**5. Modelo**: continuar `google/gemini-2.5-pro` (o tool schema cresce, então precisa do modelo mais robusto). Manter tratamento de 402/429.
+- Persistir o briefing por quote (hoje fica só no momento da geração). Pode virar coluna em `quote_documents` num próximo passo se o usuário pedir.
+- Templates de briefing pré-prontos.
+- Anexar arquivos/imagens como referência para a IA.
 
 ## Arquivos afetados
 
 | Ação | Arquivo |
 |---|---|
+| Editar | `src/components/proposal/GenerateDocDialog.tsx` |
 | Editar | `supabase/functions/generate-proposal-doc/index.ts` |
-
-## Bônus (também corrige o build atual)
-
-Há um erro de sintaxe ativo em `src/components/proposal/ProposalEditor.tsx` (linha 205, `await` em função não-`async`, e `}` inválido no JSX em 442). Vou corrigir junto — tornar `removeItem` `async` e fechar o JSX corretamente — para o preview voltar a compilar.
-
-| Ação | Arquivo |
-|---|---|
-| Corrigir | `src/components/proposal/ProposalEditor.tsx` (regressões de build) |
-
-## Fora de escopo
-
-- Buscar dados reais de clima/câmbio em tempo real (a IA usa conhecimento geral).
-- Gerar PDF (continua `.docx`).
-- Inserir imagens automáticas das cidades.
+| Editar | `src/lib/i18n.tsx` |
 

@@ -172,7 +172,34 @@ export function ProposalEditor({ quoteId, mode, onSaved, onClose }: Props) {
     ]);
   };
 
-  const removeItem = async (idx: number) => {
+  const appendDictated = (dictated: DictatedItem[]) => {
+    const dm = Number(quote?.default_markup_pct ?? 0);
+    setItems((arr) => [
+      ...arr,
+      ...dictated.map((d) => {
+        const tempId = `new-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const isHotel = d.kind === "hotel";
+        const item_date = isHotel ? d.check_in ?? null : d.item_date ?? null;
+        const check_out = isHotel ? d.check_out ?? null : null;
+        let qty = Number(d.quantity) > 0 ? Number(d.quantity) : 1;
+        if (isHotel && item_date && check_out) {
+          const n = diffNights(item_date, check_out);
+          if (n > 0) qty = n;
+        }
+        return {
+          id: tempId,
+          quote_id: quoteId,
+          kind: d.kind,
+          description: [d.description, d.city ? `(${d.city})` : ""].filter(Boolean).join(" "),
+          quantity: qty,
+          unit_cost: Number(d.unit_cost) || 0,
+          markup_pct: d.markup_pct != null ? Number(d.markup_pct) : dm,
+          item_date,
+          check_out,
+        } as ItemRow;
+      }),
+    ]);
+  };
     const it = items[idx];
     if (it.id && !it.id.startsWith("new-")) {
       await supabase.from("quote_items").delete().eq("id", it.id);

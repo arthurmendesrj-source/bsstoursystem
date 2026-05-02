@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -93,6 +94,25 @@ function LoginPage() {
           >
             {mode === "signin" ? t("noAccount") : t("haveAccount")}
           </button>
+          {mode === "signin" && (
+            <button
+              type="button"
+              className="mt-2 w-full text-sm text-primary hover:underline"
+              onClick={async () => {
+                if (!email) {
+                  toast.error("Digite seu e-mail acima primeiro");
+                  return;
+                }
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                  redirectTo: `${window.location.origin}/reset-password`,
+                });
+                if (error) toast.error(error.message);
+                else toast.success("Enviamos um link de recuperação para seu e-mail.");
+              }}
+            >
+              Esqueci minha senha
+            </button>
+          )}
         </Card>
       </div>
     </div>

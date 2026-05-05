@@ -100,6 +100,7 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
   const load = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
+    await ensureSlaSettingsLoaded();
     let q = supabase
       .from("leads")
       .select("id,name,status,next_action,next_action_date,updated_at,assigned_to,created_by,phone,email")

@@ -295,26 +295,87 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     try {
       const r = await analyzeFn({ data: { gmail_id: selected.gmail_id } });
       const s = (r.suggestion ?? {}) as Record<string, unknown>;
-      const isLead = (s.is_lead as boolean | undefined) ?? false;
-      if (!isLead) toast.message(t("notALead"));
-      openLeadDialog(
-        {
-          name: (s.customer_name as string) || selected.from_name || "",
-          email: (s.customer_email as string) || selected.from_email || "",
-          phone: (s.customer_phone as string) || "",
-          destination: (s.destination as string) || "",
-          estimated_value: s.estimated_value != null ? String(s.estimated_value) : "",
-          currency: (s.currency as string) || "BRL",
-          expected_travel_date: (s.expected_travel_date as string) || "",
-          notes: (s.notes as string) || selected.subject || "",
-          next_action: (s.next_action as string) || "",
-        },
-        isLead ? null : t("notALead"),
-      );
+      setTriage({
+        summary: (s.summary as string) || (s.notes as string) || selected.snippet || "",
+        suggested_action: ((s.suggested_action as string) as Triage["suggested_action"])
+          || ((s.is_lead as boolean) ? "create_lead" : "create_task"),
+        suggested_task_category: (s.suggested_task_category as Triage["suggested_task_category"]) ?? "suporte",
+        suggested_task_priority: (s.suggested_task_priority as Triage["suggested_task_priority"]) ?? "media",
+        suggested_task_title: (s.suggested_task_title as string) || selected.subject || "",
+        raw: s,
+      });
+      setTriageOpen(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const openLeadFromTriage = () => {
+    if (!selected || !triage) return;
+    const s = triage.raw;
+    setTriageOpen(false);
+    openLeadDialog(
+      {
+        name: (s.customer_name as string) || selected.from_name || "",
+        email: (s.customer_email as string) || selected.from_email || "",
+        phone: (s.customer_phone as string) || "",
+        destination: (s.destination as string) || "",
+        estimated_value: s.estimated_value != null ? String(s.estimated_value) : "",
+        currency: (s.currency as string) || "BRL",
+        expected_travel_date: (s.expected_travel_date as string) || "",
+        notes: triage.summary || (s.notes as string) || selected.subject || "",
+        next_action: (s.next_action as string) || "",
+      },
+      null,
+    );
+  };
+
+  const openTaskDialog = (prefill?: Partial<typeof taskForm>) => {
+    if (!selected) return;
+    setTaskForm({
+      title: prefill?.title ?? selected.subject ?? "",
+      category: prefill?.category ?? "suporte",
+      priority: prefill?.priority ?? "media",
+      description: prefill?.description ?? selected.snippet ?? "",
+      due_date: prefill?.due_date ?? "",
+    });
+    setTriageOpen(false);
+    setTaskOpen(true);
+  };
+
+  const openTaskFromTriage = () => {
+    if (!triage) return;
+    openTaskDialog({
+      title: triage.suggested_task_title || selected?.subject || "",
+      category: triage.suggested_task_category ?? "suporte",
+      priority: triage.suggested_task_priority ?? "media",
+      description: triage.summary,
+    });
+  };
+
+  const saveTask = async () => {
+    if (!selected || !user) return;
+    try {
+      const { error } = await supabase.from("tasks").insert({
+        title: taskForm.title || selected.subject || "(sem assunto)",
+        description: taskForm.description || null,
+        category: taskForm.category,
+        priority: taskForm.priority,
+        source: "email",
+        email_id: selected.id,
+        lead_id: selected.lead_id,
+        customer_id: selected.customer_id,
+        due_date: taskForm.due_date || null,
+        created_by: user.id,
+        assigned_to: user.id,
+      });
+      if (error) throw error;
+      toast.success(t("taskCreated"));
+      setTaskOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
     }
   };
 

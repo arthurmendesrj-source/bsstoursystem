@@ -148,14 +148,19 @@ function AlertList({
               )}
             </div>
           </div>
-          <Button asChild size="sm" variant={a.sla.level === "overdue" ? "destructive" : "default"}>
+          <Button
+            asChild
+            size="sm"
+            variant={a.recent ? "outline" : a.sla.level === "overdue" ? "destructive" : "default"}
+            className={cn(a.recent && "border-emerald-500/40 text-emerald-700 hover:bg-emerald-500/10")}
+          >
             <Link
               to="/leads/$leadId"
               params={{ leadId: a.id }}
               search={{ quickContact: "ligacao" }}
             >
               <Phone className="h-3.5 w-3.5 mr-1.5" />
-              {t("addInteraction")}
+              {a.recent ? t("alertsLogAgain") : t("addInteraction")}
             </Link>
           </Button>
         </li>

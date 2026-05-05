@@ -38,6 +38,10 @@ type PendingBooking = {
 
 export function NotificationBell() {
   const { t } = useI18n();
+  const { user, isAdmin } = useAuth();
+  const { alerts: leadAlerts } = useLeadAlerts(user?.id, isAdmin);
+  const overdueAlerts = leadAlerts.filter((a) => a.sla.level === "overdue");
+  const warningAlerts = leadAlerts.filter((a) => a.sla.level === "warning");
   const [open, setOpen] = useState(false);
   const [quotes, setQuotes] = useState<PendingQuote[]>([]);
   const [bookings, setBookings] = useState<PendingBooking[]>([]);

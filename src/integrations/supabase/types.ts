@@ -1060,43 +1060,64 @@ export type Database = {
       tasks: {
         Row: {
           assigned_to: string | null
+          category: string
           completed: boolean
+          completed_at: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
           description: string | null
           due_date: string | null
+          email_id: string | null
           id: string
           lead_id: string | null
+          priority: string
+          source: string
+          started_at: string | null
           supplier_id: string | null
+          time_spent_minutes: number | null
           title: string
           updated_at: string
         }
         Insert: {
           assigned_to?: string | null
+          category?: string
           completed?: boolean
+          completed_at?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
           description?: string | null
           due_date?: string | null
+          email_id?: string | null
           id?: string
           lead_id?: string | null
+          priority?: string
+          source?: string
+          started_at?: string | null
           supplier_id?: string | null
+          time_spent_minutes?: number | null
           title: string
           updated_at?: string
         }
         Update: {
           assigned_to?: string | null
+          category?: string
           completed?: boolean
+          completed_at?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
           description?: string | null
           due_date?: string | null
+          email_id?: string | null
           id?: string
           lead_id?: string | null
+          priority?: string
+          source?: string
+          started_at?: string | null
           supplier_id?: string | null
+          time_spent_minutes?: number | null
           title?: string
           updated_at?: string
         }

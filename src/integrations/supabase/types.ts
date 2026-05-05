@@ -1398,6 +1398,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _notify_apikey: { Args: never; Returns: string }
+      _notify_endpoint_url: { Args: never; Returns: string }
       can_access_lead: {
         Args: { _lead_id: string; _user_id: string }
         Returns: boolean

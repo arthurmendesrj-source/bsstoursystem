@@ -1,45 +1,52 @@
-## Fase 2.2 — SLA de leads
+## Objetivo
 
-Alertas para leads parados, indicando risco no funil e no dashboard.
+Aprimorar o feed de alertas (`/alerts`) e o fluxo de SLA com 5 melhorias práticas que aumentam visibilidade, agilidade de ação e qualidade do follow-up.
 
-### O que será entregue
+## As 5 melhorias
 
-1. **Regras de SLA (por status)** — config central em `src/lib/leadSla.ts`:
-   - `novo`: 2 dias sem interação
-   - `qualificado`: 5 dias
-   - `cotacao` / `proposta`: 7 dias
-   - `fechado` / `perdido`: ignorados
-   - Lead em risco também quando `next_action_date < hoje`.
-   - Função `computeLeadSla(lead, lastInteractionAt)` retornando `{ level: "ok"|"warning"|"overdue", daysSinceLast, threshold, nextActionOverdue, reason }`.
+### 1. Snooze (adiar alerta) por X horas
+Botão "Adiar" em cada item do feed para ocultar temporariamente um lead (ex: 2h, 24h, até amanhã). Útil quando o vendedor já está tratando offline.
+- Persistência local (localStorage) por `lead_id` + timestamp de expiração.
+- Filtra alertas adiados em `useLeadAlerts` até expirar.
 
-2. **Indicador no funil (`/funnel`)**
-   - Buscar `last_interaction_at` por lead (consulta agregada em `interactions` agrupada por `lead_id`).
-   - Adicionar badge de status no card: ponto âmbar para `warning`, vermelho para `overdue`, com tooltip explicando "X dias sem contato" / "ação atrasada".
-   - Filtro rápido no topo: "Todos | Em risco | Atrasados".
+### 2. Filtros e busca rápida no feed
+Barra superior com:
+- Busca por nome do lead.
+- Filtro por estágio (status do funil).
+- Toggle "apenas meus leads" (atribuídos a mim) — útil para admins.
 
-3. **Bloco "Leads em risco" no Dashboard (`/dashboard`)**
-   - Card adicional com top 5 leads em `overdue`, mostrando nome, status, dias parado e link para `/leads/$id`.
-   - Contador agregado nos KPIs ("X leads em risco").
+### 3. Ações rápidas multi-canal no item
+Além do botão atual de "Registrar contato" (ligação), adicionar menu suspenso com atalhos:
+- WhatsApp (abre `wa.me` se houver telefone + pré-registra interação).
+- E-mail (abre `mailto:` + pré-registra).
+- Cada ação abre o lead com o template do canal correspondente já carregado no diálogo.
 
-4. **i18n PT/EN/ES**
-   - `slaAtRisk`, `slaOverdue`, `slaDaysIdle`, `slaNextActionOverdue`, `slaFilterAll`, `slaFilterRisk`, `slaFilterOverdue`, `dashAtRisk`.
+### 4. Resumo no topo + meta diária
+Cards-resumo no topo de `/alerts` mostrando:
+- Total atrasado / em risco / contatados hoje.
+- Barra de progresso de "meta de follow-ups do dia" (configurável, default 10) com base em interações criadas pelo usuário hoje.
 
-### Detalhes técnicos
+### 5. Notificação sonora/toast em tempo real para novos atrasos
+Quando o realtime detectar que um lead acabou de virar "overdue" (não apenas ao logar contato), disparar um `toast` discreto e atualizar contador no sino. Evita que vendedores percam mudanças enquanto navegam em outras telas.
 
-- **Sem migration necessária**: `leads.updated_at`, `leads.next_action_date` e `interactions.occurred_at` já existem.
-- Carregamento no funil:
-  ```ts
-  const { data } = await supabase
-    .from("interactions")
-    .select("lead_id, occurred_at")
-    .order("occurred_at", { ascending: false });
-  // reduce → { [lead_id]: maxOccurredAt }
-  ```
-  Para volumes grandes futuramente, dá para promover a uma view materializada ou função SQL; nesta fase, agregação client-side basta.
-- Tooltip usando `@/components/ui/tooltip` (já presente no shadcn).
-- Badge: ponto colorido + texto curto, sem alterar layout dos cards.
+## Arquivos afetados
 
-### Fora de escopo
-- Notificação push/e-mail de SLA estourado (futura Fase 2.2.1).
-- Configuração editável dos thresholds por usuário/admin (depois — começamos com config no código).
-- Dashboard com KPIs gerenciais completos (Fase 3).
+- `src/lib/useLeadAlerts.ts` — snooze, detecção de transição p/ overdue, contador de follow-ups do dia.
+- `src/routes/alerts.tsx` — filtros, busca, cards-resumo, menu de ações multi-canal, botão de snooze.
+- `src/routes/leads.$leadId.tsx` — aceitar `quickContact=whatsapp|email` na URL e abrir diálogo com template do canal (parcialmente já existe).
+- `src/components/NotificationBell.tsx` — toast em transição p/ overdue.
+- `src/lib/i18n.tsx` — novas chaves (PT/EN/ES): snooze, filtros, meta diária, canais.
+
+## Detalhes técnicos
+
+- Snooze: `Map<leadId, expiresAtMs>` em `localStorage` chave `lead-alerts-snooze`. Limpeza automática de entradas expiradas no load.
+- Meta diária: `count(interactions where created_by=me and occurred_at >= today)`. Configurável via `localStorage` chave `daily-followup-goal`.
+- Detecção de transição overdue: comparar snapshot anterior de níveis SLA por lead; se passou de `warning|ok` para `overdue`, dispara toast.
+- WhatsApp link: `https://wa.me/{phone limpo}?text={template encodeURIComponent}`.
+- Mantém RLS existente; nada novo no banco.
+
+## Fora de escopo
+
+- Notificações push do navegador (precisa permissão explícita — fica para depois).
+- Configuração de meta diária em página de settings (usar localStorage por enquanto).
+- Snooze sincronizado entre dispositivos (apenas local).

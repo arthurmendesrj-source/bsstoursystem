@@ -131,7 +131,7 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
       .gte("occurred_at", startOfDay.toISOString());
     setFollowupsToday(count ?? 0);
 
-    const snoozed = readSnooze();
+    const snoozed = Object.fromEntries(snoozeCache);
     const now = Date.now();
     const computedAll = (leads ?? []).map((l) => {
       const last = lastByLead.get(l.id) ?? null;

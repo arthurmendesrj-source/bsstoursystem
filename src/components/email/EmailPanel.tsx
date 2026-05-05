@@ -668,6 +668,9 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                 <Button size="sm" variant="outline" onClick={openForward}>
                   <Forward className="mr-2 h-4 w-4" /> {t("forward")}
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => setAssociateOpen(true)}>
+                  <Link2 className="mr-2 h-4 w-4" /> {t("associate")}
+                </Button>
                 {mode === "lead" && leadId && !selected.lead_id && (
                   <Button size="sm" variant="secondary" onClick={linkToLead}>
                     <Link2 className="mr-2 h-4 w-4" /> {t("linkToThisLead")}

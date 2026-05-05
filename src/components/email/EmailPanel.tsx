@@ -92,6 +92,13 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const [triageOpen, setTriageOpen] = useState(false);
   const [triage, setTriage] = useState<Triage | null>(null);
 
+  // Suggested links based on sender email
+  type Suggestion =
+    | { kind: "lead"; id: string; label: string; sub?: string }
+    | { kind: "customer"; id: string; label: string; sub?: string }
+    | { kind: "supplier"; id: string; label: string; sub?: string };
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
   // Diálogo de criação de atividade
   const [taskOpen, setTaskOpen] = useState(false);
   const [taskForm, setTaskForm] = useState({
@@ -166,6 +173,47 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   };
 
   const selected = useMemo(() => emails.find((e) => e.id === selectedId) ?? null, [emails, selectedId]);
+
+  // Load suggestions whenever selected email changes
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!selected?.from_email) { setSuggestions([]); return; }
+      const email = selected.from_email.toLowerCase();
+      const [{ data: leadRows }, { data: custRows }, { data: supRows }] = await Promise.all([
+        supabase.from("leads").select("id,name,email,destination").ilike("email", email).limit(5),
+        supabase.from("customers").select("id,full_name,email,phone").ilike("email", email).limit(5),
+        supabase.from("suppliers").select("id,name,email,category").ilike("email", email).limit(5),
+      ]);
+      if (cancelled) return;
+      const out: Suggestion[] = [
+        ...((leadRows ?? []) as { id: string; name: string; destination: string | null }[]).map(
+          (l) => ({ kind: "lead" as const, id: l.id, label: l.name, sub: l.destination ?? undefined }),
+        ),
+        ...((custRows ?? []) as { id: string; full_name: string; phone: string | null }[]).map(
+          (c) => ({ kind: "customer" as const, id: c.id, label: c.full_name, sub: c.phone ?? undefined }),
+        ),
+        ...((supRows ?? []) as { id: string; name: string; category: string | null }[]).map(
+          (s) => ({ kind: "supplier" as const, id: s.id, label: s.name, sub: s.category ?? undefined }),
+        ),
+      ];
+      setSuggestions(out);
+    })();
+    return () => { cancelled = true; };
+  }, [selected]);
+
+  const linkSuggestion = async (s: Suggestion) => {
+    if (!selected) return;
+    const patch: { lead_id?: string | null; customer_id?: string | null; supplier_id?: string | null } = {};
+    if (s.kind === "lead") patch.lead_id = s.id;
+    if (s.kind === "customer") patch.customer_id = s.id;
+    if (s.kind === "supplier") patch.supplier_id = s.id;
+    const { error } = await supabase.from("emails").update(patch).eq("id", selected.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("emailLinked"));
+    await loadList(folder);
+  };
+
 
   // ---------------- actions ----------------
   const archive = async () => {
@@ -570,6 +618,30 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                       {t("open")} <ExternalLink className="h-3 w-3" />
                     </Link>
                   )}
+                </div>
+              )}
+              {mode === "full" && !selected.lead_id && !selected.customer_id && suggestions.length > 0 && (
+                <div className="mt-3 rounded-md border bg-muted/30 p-2.5">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                    <Link2 className="h-3 w-3" /> {t("suggestedLinks")}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((s) => (
+                      <Button
+                        key={`${s.kind}-${s.id}`}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => linkSuggestion(s)}
+                        title={s.sub ?? ""}
+                      >
+                        <Badge variant="secondary" className="mr-1.5 px-1 text-[10px] uppercase">
+                          {s.kind === "lead" ? "Lead" : s.kind === "customer" ? "Cliente" : "Forn."}
+                        </Badge>
+                        {s.label}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="mt-3 flex flex-wrap gap-2">

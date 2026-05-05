@@ -27,6 +27,7 @@ import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
+import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -118,11 +119,16 @@ const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => LeadsRoute,
 } as any)
+const AlertsSlaRoute = AlertsSlaRouteImport.update({
+  id: '/sla',
+  path: '/sla',
+  getParentRoute: () => AlertsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
-  '/alerts': typeof AlertsRoute
+  '/alerts': typeof AlertsRouteWithChildren
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -137,12 +143,13 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
-  '/alerts': typeof AlertsRoute
+  '/alerts': typeof AlertsRouteWithChildren
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -157,13 +164,14 @@ export interface FileRoutesByTo {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
-  '/alerts': typeof AlertsRoute
+  '/alerts': typeof AlertsRouteWithChildren
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
 }
 export interface FileRouteTypes {
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/sla'
     | '/leads/$leadId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/sla'
     | '/leads/$leadId'
   id:
     | '__root__'
@@ -240,13 +251,14 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/sla'
     | '/leads/$leadId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivitiesRoute: typeof ActivitiesRoute
-  AlertsRoute: typeof AlertsRoute
+  AlertsRoute: typeof AlertsRouteWithChildren
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
@@ -391,8 +403,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadsLeadIdRouteImport
       parentRoute: typeof LeadsRoute
     }
+    '/alerts/sla': {
+      id: '/alerts/sla'
+      path: '/sla'
+      fullPath: '/alerts/sla'
+      preLoaderRoute: typeof AlertsSlaRouteImport
+      parentRoute: typeof AlertsRoute
+    }
   }
 }
+
+interface AlertsRouteChildren {
+  AlertsSlaRoute: typeof AlertsSlaRoute
+}
+
+const AlertsRouteChildren: AlertsRouteChildren = {
+  AlertsSlaRoute: AlertsSlaRoute,
+}
+
+const AlertsRouteWithChildren =
+  AlertsRoute._addFileChildren(AlertsRouteChildren)
 
 interface LeadsRouteChildren {
   LeadsLeadIdRoute: typeof LeadsLeadIdRoute
@@ -407,7 +437,7 @@ const LeadsRouteWithChildren = LeadsRoute._addFileChildren(LeadsRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivitiesRoute: ActivitiesRoute,
-  AlertsRoute: AlertsRoute,
+  AlertsRoute: AlertsRouteWithChildren,
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,

@@ -86,7 +86,24 @@ function NotificationHistoryPage() {
         }
         setProfiles(map);
       }
-    } catch (err) {
+
+      // Carrega nomes/códigos dos leads referenciados
+      const leadIds = Array.from(
+        new Set(list.map((r) => r.lead_id).filter((v): v is string => !!v)),
+      );
+      if (leadIds.length) {
+        const { data: leads } = await supabase
+          .from("leads")
+          .select("id,name,code")
+          .in("id", leadIds);
+        const lmap: Record<string, string> = {};
+        for (const l of (leads ?? []) as { id: string; name: string; code: string | null }[]) {
+          lmap[l.id] = l.code ? `${l.code} · ${l.name}` : l.name;
+        }
+        setLeadNames(lmap);
+      } else {
+        setLeadNames({});
+      }
       console.error("[notif-history] load failed", err);
     } finally {
       setLoading(false);

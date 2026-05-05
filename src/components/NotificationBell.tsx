@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bell, FileCheck, Ticket } from "lucide-react";
+import { Bell, CalendarCheck, FileCheck, Ticket } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ type PendingQuote = {
   currency: string;
   created_at: string;
   lead_id: string | null;
+  customer_id: string | null;
 };
 type PendingBooking = {
   id: string;
@@ -22,6 +24,8 @@ type PendingBooking = {
   currency: string;
   status: string;
   departure_date: string | null;
+  return_date: string | null;
+  package_id: string | null;
 };
 
 export function NotificationBell() {
@@ -36,13 +40,13 @@ export function NotificationBell() {
     // Approved quotes
     const { data: qs } = await supabase
       .from("quotes")
-      .select("id,total_amount,currency,created_at,lead_id")
+      .select("id,total_amount,currency,created_at,lead_id,customer_id")
       .eq("status", "aprovada")
       .order("created_at", { ascending: false });
     // Bookings tied to those quotes
     const { data: bks } = await supabase
       .from("bookings")
-      .select("id,total_amount,currency,status,departure_date,quote_id");
+      .select("id,total_amount,currency,status,departure_date,return_date,package_id,quote_id");
     // Vouchers
     const { data: vs } = await supabase.from("vouchers").select("booking_id");
 
@@ -73,6 +77,47 @@ export function NotificationBell() {
     const id = setInterval(load, 60_000);
     return () => clearInterval(id);
   }, [load]);
+
+  const convertQuote = async (q: PendingQuote) => {
+    if (!confirm(t("convertQuoteConfirm"))) return;
+    const { data: existing } = await supabase
+      .from("bookings").select("id").eq("quote_id", q.id).maybeSingle();
+    if (existing) { toast.info(t("alreadyConverted")); load(); return; }
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) return;
+    const { data: its } = await supabase
+      .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
+    const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
+      .flatMap((it) => [it.item_date, it.check_out])
+      .filter((d): d is string => Boolean(d)).sort();
+    const departure = dates[0] ?? null;
+    const ret = dates[dates.length - 1] ?? departure;
+    const { error } = await supabase.from("bookings").insert({
+      lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
+      total_amount: q.total_amount, currency: q.currency as "BRL",
+      departure_date: departure, return_date: ret,
+      status: "pre_reserva", created_by: uid,
+    });
+    if (error) toast.error(error.message);
+    else { toast.success(t("bookingCreated")); load(); }
+  };
+
+  const generateVoucher = async (b: PendingBooking) => {
+    const dt = new Date();
+    const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+    const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
+    const itinerary = [
+      b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
+      b.return_date ? `Retorno: ${b.return_date}` : null,
+    ].filter(Boolean).join("\n");
+    const { error } = await supabase.from("vouchers").insert({
+      booking_id: b.id, code, itinerary: itinerary || null,
+    });
+    if (error) toast.error(error.message);
+    else { toast.success(t("voucherCreated")); load(); }
+  };
+
 
   const total = quotes.length + bookings.length;
   const fmt = (n: number, c: string) => {
@@ -122,21 +167,25 @@ export function NotificationBell() {
                   </div>
                   <div className="space-y-1.5">
                     {quotes.map((q) => (
-                      <Link
-                        key={q.id}
-                        to="/workspace"
-                        search={q.lead_id ? { lead: q.lead_id } : {}}
-                        onClick={() => setOpen(false)}
-                        className="block p-2 rounded hover:bg-muted text-xs"
-                      >
+                      <div key={q.id} className="p-2 rounded hover:bg-muted text-xs space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-muted-foreground">#{q.id.slice(0, 8)}</span>
-                          <span className="font-semibold">{fmt(Number(q.total_amount), q.currency)}</span>
+                          <Link
+                            to="/workspace"
+                            search={q.lead_id ? { lead: q.lead_id } : {}}
+                            onClick={() => setOpen(false)}
+                            className="flex-1 min-w-0 flex items-center justify-between gap-2"
+                          >
+                            <span className="font-mono text-muted-foreground">#{q.id.slice(0, 8)}</span>
+                            <span className="font-semibold">{fmt(Number(q.total_amount), q.currency)}</span>
+                          </Link>
                         </div>
-                        <div className="text-muted-foreground">
-                          {new Date(q.created_at).toLocaleDateString()}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => convertQuote(q)}>
+                            <CalendarCheck className="h-3 w-3 mr-1" />{t("convertToBooking")}
+                          </Button>
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -149,21 +198,25 @@ export function NotificationBell() {
                   </div>
                   <div className="space-y-1.5">
                     {bookings.map((b) => (
-                      <Link
-                        key={b.id}
-                        to="/bookings"
-                        onClick={() => setOpen(false)}
-                        className="block p-2 rounded hover:bg-muted text-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
+                      <div key={b.id} className="p-2 rounded hover:bg-muted text-xs space-y-1.5">
+                        <Link
+                          to="/bookings"
+                          onClick={() => setOpen(false)}
+                          className="flex items-center justify-between gap-2"
+                        >
                           <span className="font-mono text-muted-foreground">#{b.id.slice(0, 8)}</span>
                           <span className="font-semibold">{fmt(Number(b.total_amount), b.currency)}</span>
+                        </Link>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground capitalize">
+                            {b.status.replace("_", " ")}
+                            {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
+                          </span>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => generateVoucher(b)}>
+                            <Ticket className="h-3 w-3 mr-1" />{t("generateVoucher")}
+                          </Button>
                         </div>
-                        <div className="text-muted-foreground capitalize">
-                          {b.status.replace("_", " ")}
-                          {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
-                        </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>

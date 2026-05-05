@@ -77,6 +77,7 @@ function LeadWorkspace() {
   const { user } = useAuth();
   const { format: fmtCurrency } = useCurrency();
   const navigate = useNavigate();
+  const search = Route.useSearch();
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);

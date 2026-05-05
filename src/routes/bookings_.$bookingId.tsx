@@ -291,10 +291,18 @@ function BookingDetailPage() {
                     />
                     <Button asChild variant="outline" size="sm"><span><Paperclip className="mr-1 h-4 w-4" />{t("attachProof")}</span></Button>
                   </label>
+                  <Button size="sm" variant="outline" onClick={() => setAssociateItem(item)}>
+                    <Link2 className="mr-1 h-4 w-4" />{t("associate")}
+                  </Button>
                   {c?.proof_storage_path && (
                     <Button size="sm" variant="ghost" onClick={() => downloadProof(c.proof_storage_path!)}>
                       <Download className="mr-1 h-4 w-4" />{t("downloadProof")}
                     </Button>
+                  )}
+                  {c?.proof_email_id && (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
+                      <Mail className="mr-1 h-3 w-3" />{t("emailLinkedBadge")}
+                    </Badge>
                   )}
                   <div className="ml-auto flex items-center gap-2">
                     {status !== "confirmado" ? (

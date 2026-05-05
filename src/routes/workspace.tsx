@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { EmailPanel } from "@/components/email/EmailPanel";
 import { ProposalEditor } from "@/components/proposal/ProposalEditor";
+import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 
 type WorkspaceSearch = { lead?: string };
 

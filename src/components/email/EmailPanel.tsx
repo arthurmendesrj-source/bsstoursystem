@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze } from "@/server/gmail.functions";
+import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 import { toast } from "sonner";
 
 type EmailRow = {

@@ -64,6 +64,8 @@ function AlertsPage() {
   const { user, isAdmin } = useAuth();
   const { t } = useI18n();
   const { alerts, loading, reload, snooze, followupsToday } = useLeadAlerts(user?.id, isAdmin);
+  const { templates } = useUserTemplates(user?.id);
+  const [vendorName, setVendorName] = useState<string>("");
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");

@@ -18,6 +18,7 @@ import {
   ListChecks,
   Bell,
   BookOpen,
+  Library,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -57,6 +58,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/packages", label: t("packages"), icon: Package },
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },
     { to: "/biblia", label: t("bibliaMenu"), icon: BookOpen },
+    { to: "/itineraries", label: "Roteiros (IA)", icon: Library },
     { to: "/email", label: t("email"), icon: Mail },
   ];
 

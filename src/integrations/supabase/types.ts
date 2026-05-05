@@ -584,6 +584,131 @@ export type Database = {
           },
         ]
       }
+      itineraries: {
+        Row: {
+          code: string | null
+          created_at: string
+          created_by: string | null
+          currency: Database["public"]["Enums"]["currency_code"] | null
+          customer_id: string | null
+          destinations: string[] | null
+          duration_days: number | null
+          estimated_value: number | null
+          extracted_text: string | null
+          file_format: string
+          file_size_bytes: number | null
+          id: string
+          language: string | null
+          notes: string | null
+          original_filename: string
+          price_range: string | null
+          processing_error: string | null
+          processing_status: string
+          season: string | null
+          storage_path: string
+          summary: string | null
+          suppliers_mentioned: string[] | null
+          tags: string[] | null
+          title: string
+          trip_type: string | null
+          updated_at: string
+          year: number | null
+        }
+        Insert: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"] | null
+          customer_id?: string | null
+          destinations?: string[] | null
+          duration_days?: number | null
+          estimated_value?: number | null
+          extracted_text?: string | null
+          file_format: string
+          file_size_bytes?: number | null
+          id?: string
+          language?: string | null
+          notes?: string | null
+          original_filename: string
+          price_range?: string | null
+          processing_error?: string | null
+          processing_status?: string
+          season?: string | null
+          storage_path: string
+          summary?: string | null
+          suppliers_mentioned?: string[] | null
+          tags?: string[] | null
+          title: string
+          trip_type?: string | null
+          updated_at?: string
+          year?: number | null
+        }
+        Update: {
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"] | null
+          customer_id?: string | null
+          destinations?: string[] | null
+          duration_days?: number | null
+          estimated_value?: number | null
+          extracted_text?: string | null
+          file_format?: string
+          file_size_bytes?: number | null
+          id?: string
+          language?: string | null
+          notes?: string | null
+          original_filename?: string
+          price_range?: string | null
+          processing_error?: string | null
+          processing_status?: string
+          season?: string | null
+          storage_path?: string
+          summary?: string | null
+          suppliers_mentioned?: string[] | null
+          tags?: string[] | null
+          title?: string
+          trip_type?: string | null
+          updated_at?: string
+          year?: number | null
+        }
+        Relationships: []
+      }
+      itinerary_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          itinerary_id: string
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          itinerary_id: string
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          itinerary_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_chunks_itinerary_id_fkey"
+            columns: ["itinerary_id"]
+            isOneToOne: false
+            referencedRelation: "itineraries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_alert_snoozes: {
         Row: {
           created_at: string
@@ -1594,6 +1719,24 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      match_itineraries: {
+        Args: {
+          match_count?: number
+          query_embedding: string
+          similarity_threshold?: number
+        }
+        Returns: {
+          chunk_id: string
+          chunk_index: number
+          content: string
+          destinations: string[]
+          duration_days: number
+          itinerary_id: string
+          similarity: number
+          title: string
+          trip_type: string
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "vendedor" | "operacional" | "financeiro"

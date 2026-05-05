@@ -1,1 +1,7 @@
 project_id = "xyrpsgxqcrzgagpwzbke"
+
+[functions.process-itinerary]
+verify_jwt = true
+
+[functions.itinerary-search]
+verify_jwt = true

@@ -1496,6 +1496,7 @@ export type Database = {
         | "task_overdue"
         | "sla_warning"
         | "sla_overdue"
+        | "lead_escalated"
       notification_status: "success" | "error" | "skipped"
       quote_status: "rascunho" | "enviada" | "aprovada" | "rejeitada"
       supplier_category:
@@ -1664,6 +1665,7 @@ export const Constants = {
         "task_overdue",
         "sla_warning",
         "sla_overdue",
+        "lead_escalated",
       ],
       notification_status: ["success", "error", "skipped"],
       quote_status: ["rascunho", "enviada", "aprovada", "rejeitada"],

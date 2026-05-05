@@ -78,6 +78,47 @@ export function NotificationBell() {
     return () => clearInterval(id);
   }, [load]);
 
+  const convertQuote = async (q: PendingQuote) => {
+    if (!confirm(t("convertQuoteConfirm"))) return;
+    const { data: existing } = await supabase
+      .from("bookings").select("id").eq("quote_id", q.id).maybeSingle();
+    if (existing) { toast.info(t("alreadyConverted")); load(); return; }
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) return;
+    const { data: its } = await supabase
+      .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
+    const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
+      .flatMap((it) => [it.item_date, it.check_out])
+      .filter((d): d is string => Boolean(d)).sort();
+    const departure = dates[0] ?? null;
+    const ret = dates[dates.length - 1] ?? departure;
+    const { error } = await supabase.from("bookings").insert({
+      lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
+      total_amount: q.total_amount, currency: q.currency as "BRL",
+      departure_date: departure, return_date: ret,
+      status: "pre_reserva", created_by: uid,
+    });
+    if (error) toast.error(error.message);
+    else { toast.success(t("bookingCreated")); load(); }
+  };
+
+  const generateVoucher = async (b: PendingBooking) => {
+    const dt = new Date();
+    const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+    const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
+    const itinerary = [
+      b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
+      b.return_date ? `Retorno: ${b.return_date}` : null,
+    ].filter(Boolean).join("\n");
+    const { error } = await supabase.from("vouchers").insert({
+      booking_id: b.id, code, itinerary: itinerary || null,
+    });
+    if (error) toast.error(error.message);
+    else { toast.success(t("voucherCreated")); load(); }
+  };
+
+
   const total = quotes.length + bookings.length;
   const fmt = (n: number, c: string) => {
     try {

@@ -288,7 +288,7 @@ function AlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AlertList items={justContacted} empty="" onSnooze={snooze} />
+            <AlertList items={justContacted} empty="" onSnooze={snooze} templates={templates} vendorName={vendorName} />
           </CardContent>
         </Card>
       )}

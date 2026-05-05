@@ -205,6 +205,8 @@ function ActivitiesPage() {
     if (error) toast.error(error.message);
     else { toast.success(t("saved")); clearSelection(); loadData(); }
   };
+
+  const createActivity = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !form.title.trim()) return;
     const category = form.lead_id ? "negocio" : form.category;

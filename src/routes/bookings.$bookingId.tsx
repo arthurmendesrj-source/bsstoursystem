@@ -97,10 +97,10 @@ function BookingDetailPage() {
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [bookingId]);
 
   const updateLocal = (itemId: string, patch: Partial<Confirmation>) => {
-    setConfs((prev) => ({
-      ...prev,
-      [itemId]: { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null, ...prev[itemId], ...patch },
-    }));
+    setConfs((prev) => {
+      const base: Confirmation = prev[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null };
+      return { ...prev, [itemId]: { ...base, ...patch } };
+    });
   };
 
   const persist = async (itemId: string, patch: Partial<Confirmation>) => {

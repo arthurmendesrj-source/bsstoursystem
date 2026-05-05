@@ -41,7 +41,7 @@ export const Route = createFileRoute("/api/public/hooks/sla-escalations")({
         const { data: leadsData, error: lErr } = await supabaseAdmin
           .from("leads")
           .select("id, name, status, assigned_to, created_by, created_at")
-          .in("status", stages);
+          .in("status", stages as never[]);
         if (lErr) return new Response(lErr.message, { status: 500 });
         const leads = (leadsData ?? []) as Lead[];
         if (leads.length === 0) return Response.json({ ok: true, escalated: 0 });

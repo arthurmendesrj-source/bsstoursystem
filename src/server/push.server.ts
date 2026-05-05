@@ -52,6 +52,11 @@ export async function sendPushToUser(args: SendArgs): Promise<SendResult> {
     throw new Error("VAPID keys not configured");
   }
 
+  if (args.eventType) {
+    const enabled = await isEventEnabledForUser(args.userId, args.eventType);
+    if (!enabled) return { total: 0, sent: 0, failed: 0, errors: [] };
+  }
+
   const { data: subs, error } = await supabaseAdmin
     .from("push_subscriptions")
     .select("id, endpoint, p256dh, auth")

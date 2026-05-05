@@ -123,8 +123,16 @@ function AlertList({
             <div className="text-xs text-muted-foreground flex flex-wrap gap-2 mt-0.5">
               <Badge variant="outline" className="capitalize">{a.status}</Badge>
               {a.recent && a.lastInteractionAt ? (
-                <span className="text-emerald-700">
-                  {t("alertsLastContact")}: {new Date(a.lastInteractionAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                <span className="inline-flex items-center gap-1 text-emerald-700">
+                  {t("alertsLastContact")}:
+                  {a.lastInteractionType && (
+                    <Badge variant="outline" className="capitalize border-emerald-500/40 text-emerald-700 h-5">
+                      {a.lastInteractionType}
+                    </Badge>
+                  )}
+                  <span>
+                    {new Date(a.lastInteractionAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  </span>
                 </span>
               ) : (
                 a.sla.daysSinceLast !== null && (

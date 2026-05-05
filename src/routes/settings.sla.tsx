@@ -70,7 +70,7 @@ function SlaSettingsPage() {
   const save = async () => {
     setSaving(true);
     const payload = Object.values(rows).map((r) => ({
-      stage: r.stage,
+      stage: r.stage as "novo" | "qualificado" | "cotacao" | "proposta",
       warning_hours: r.warning_hours,
       overdue_hours: r.overdue_hours,
     }));

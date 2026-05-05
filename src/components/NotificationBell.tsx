@@ -104,7 +104,7 @@ export function NotificationBell() {
         <div className="px-4 py-3 border-b">
           <div className="font-semibold text-sm">{t("notifications")}</div>
           <div className="text-xs text-muted-foreground">
-            {loading ? t("loading") : t("pendingItems", { count: String(total) })}
+            {loading ? t("loading") : `${total} ${t("pendingItems")}`}
           </div>
         </div>
         <ScrollArea className="max-h-96">

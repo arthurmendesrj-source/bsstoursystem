@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bell, FileCheck, Ticket } from "lucide-react";
+import { Bell, CalendarCheck, FileCheck, Ticket } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +16,7 @@ type PendingQuote = {
   currency: string;
   created_at: string;
   lead_id: string | null;
+  customer_id: string | null;
 };
 type PendingBooking = {
   id: string;
@@ -22,6 +24,8 @@ type PendingBooking = {
   currency: string;
   status: string;
   departure_date: string | null;
+  return_date: string | null;
+  package_id: string | null;
 };
 
 export function NotificationBell() {

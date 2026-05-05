@@ -109,6 +109,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     description: "",
     due_date: "",
   });
+  const [associateOpen, setAssociateOpen] = useState(false);
 
   // ---------------- list loading ----------------
   const loadList = async (f: Folder = folder) => {

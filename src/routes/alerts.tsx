@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertTriangle, AlertCircle, CalendarX, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, AlertCircle, CalendarX, CheckCircle2, Phone } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,6 +148,16 @@ function AlertList({
               )}
             </div>
           </div>
+          <Button asChild size="sm" variant={a.sla.level === "overdue" ? "destructive" : "default"}>
+            <Link
+              to="/leads/$leadId"
+              params={{ leadId: a.id }}
+              search={{ quickContact: "ligacao" }}
+            >
+              <Phone className="h-3.5 w-3.5 mr-1.5" />
+              {t("addInteraction")}
+            </Link>
+          </Button>
         </li>
       ))}
     </ul>

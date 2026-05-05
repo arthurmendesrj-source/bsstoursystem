@@ -1263,6 +1263,8 @@ export type Database = {
           email_id: string | null
           id: string
           lead_id: string | null
+          notified_due_soon_at: string | null
+          notified_overdue_at: string | null
           priority: string
           source: string
           started_at: string | null
@@ -1284,6 +1286,8 @@ export type Database = {
           email_id?: string | null
           id?: string
           lead_id?: string | null
+          notified_due_soon_at?: string | null
+          notified_overdue_at?: string | null
           priority?: string
           source?: string
           started_at?: string | null
@@ -1305,6 +1309,8 @@ export type Database = {
           email_id?: string | null
           id?: string
           lead_id?: string | null
+          notified_due_soon_at?: string | null
+          notified_overdue_at?: string | null
           priority?: string
           source?: string
           started_at?: string | null
@@ -1398,6 +1404,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _notify_apikey: { Args: never; Returns: string }
+      _notify_endpoint_url: { Args: never; Returns: string }
       can_access_lead: {
         Args: { _lead_id: string; _user_id: string }
         Returns: boolean

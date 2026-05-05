@@ -2,6 +2,14 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+export type NotificationEventType =
+  | "lead_assigned"
+  | "lead_status_changed"
+  | "task_due_soon"
+  | "task_overdue"
+  | "sla_warning"
+  | "sla_overdue";
+
 type SendArgs = {
   userId: string;
   title: string;
@@ -9,7 +17,25 @@ type SendArgs = {
   url?: string;
   leadId?: string | null;
   tag?: string;
+  /** Se informado, respeita notification_preferences do usuário. */
+  eventType?: NotificationEventType;
 };
+
+/** Verifica se o usuário aceita receber pushes para um determinado evento. */
+export async function isEventEnabledForUser(
+  userId: string,
+  eventType: NotificationEventType,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("notification_preferences")
+    .select("push_enabled")
+    .eq("user_id", userId)
+    .eq("event_type", eventType)
+    .maybeSingle();
+  if (error) return true; // fail-open: por padrão envia
+  if (!data) return true; // sem registro = padrão ligado
+  return data.push_enabled;
+}
 
 type SendResult = {
   total: number;
@@ -24,6 +50,11 @@ export async function sendPushToUser(args: SendArgs): Promise<SendResult> {
   const subject = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
   if (!publicKey || !privateKey) {
     throw new Error("VAPID keys not configured");
+  }
+
+  if (args.eventType) {
+    const enabled = await isEventEnabledForUser(args.userId, args.eventType);
+    if (!enabled) return { total: 0, sent: 0, failed: 0, errors: [] };
   }
 
   const { data: subs, error } = await supabaseAdmin
@@ -99,13 +130,11 @@ type LeadRecipientArgs = {
   body?: string;
   url?: string;
   tag?: string;
-  /** Quando true, também notifica administradores (default: false). */
+  eventType?: NotificationEventType;
   includeAdmins?: boolean;
-  /** IDs a excluir (ex.: o ator que disparou o evento). */
   excludeUserIds?: string[];
 };
 
-/** Resolve quem deve ser notificado sobre um lead (responsável + criador, opcionalmente admins). */
 export async function resolveLeadRecipients(
   leadId: string,
   opts?: { includeAdmins?: boolean; excludeUserIds?: string[] },
@@ -135,7 +164,6 @@ export async function resolveLeadRecipients(
   return Array.from(recipients);
 }
 
-/** Envia push para todos os destinatários relevantes do lead. */
 export async function sendPushToLeadRecipients(
   args: LeadRecipientArgs,
 ): Promise<{ recipients: string[]; perUser: Record<string, SendResult> }> {
@@ -154,8 +182,10 @@ export async function sendPushToLeadRecipients(
         url: args.url,
         leadId: args.leadId,
         tag: args.tag,
+        eventType: args.eventType,
       });
     }),
   );
   return { recipients, perUser };
 }
+

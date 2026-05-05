@@ -313,7 +313,7 @@ function AlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AlertList items={warning} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoWarning")} onSnooze={snooze} />
+            <AlertList items={warning} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoWarning")} onSnooze={snooze} templates={templates} vendorName={vendorName} />
           </CardContent>
         </Card>
       </div>

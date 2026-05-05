@@ -252,7 +252,7 @@ export function NotificationBell() {
                             {b.status.replace("_", " ")}
                             {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
                           </span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === b.id} onClick={() => openBookingDialog(b)}>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId !== null} onClick={() => openBookingDialog(b)}>
                             {busyId === b.id
                               ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                               : <Ticket className="h-3 w-3 mr-1" />}

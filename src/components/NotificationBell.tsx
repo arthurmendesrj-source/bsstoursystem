@@ -38,6 +38,9 @@ export function NotificationBell() {
   const [quotes, setQuotes] = useState<PendingQuote[]>([]);
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
   const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmQuote, setConfirmQuote] = useState<PendingQuote | null>(null);
+  const [confirmBooking, setConfirmBooking] = useState<PendingBooking | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);

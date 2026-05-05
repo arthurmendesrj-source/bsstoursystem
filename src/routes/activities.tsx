@@ -408,6 +408,9 @@ function ActivitiesPage() {
             <Button size="sm" variant="outline" onClick={() => bulkUpdate({ started_at: null })}>
               <Pause className="h-4 w-4 mr-1" />{t("bulkPause")}
             </Button>
+            <Button size="sm" variant="outline" onClick={() => openLinkDialog(Array.from(selectedIds))}>
+              <Link2 className="h-4 w-4 mr-1" />{t("linkToLead")}
+            </Button>
             <Button size="sm" variant="destructive" onClick={bulkDelete}>
               <Trash2 className="h-4 w-4 mr-1" />{t("bulkDelete")}
             </Button>

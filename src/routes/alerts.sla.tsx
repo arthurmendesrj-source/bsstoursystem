@@ -37,6 +37,17 @@ type LeadRow = {
 };
 type InteractionRow = { lead_id: string | null; created_by: string | null; occurred_at: string };
 type ProfileRow = { user_id: string; full_name: string | null; daily_followup_goal: number | null };
+type EscalationRow = {
+  id: string;
+  lead_id: string;
+  stage: string;
+  hours_since_last_action: number;
+  triggered_at: string;
+  resolved_at: string | null;
+  reassigned_to: string | null;
+  lead_name?: string | null;
+  current_assigned_to?: string | null;
+};
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;

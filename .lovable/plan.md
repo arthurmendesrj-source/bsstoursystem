@@ -1,64 +1,78 @@
-## Página de Reserva: confirmação item-a-item com comprovante
 
-Hoje a `/bookings` é só uma lista plana. A reserva tem `quote_id` ligado à proposta, e a proposta tem `quote_items`. Vamos criar uma **tela de detalhe da reserva** que lista todos os itens da proposta e permite confirmar cada um anexando um comprovante (E-mail, Mensagem WhatsApp ou Outro).
+## Objetivo
 
-### 1. Banco de dados (migração)
+Adicionar associação cruzada entre comprovantes de reserva e e-mails/mensagens, e dar à aba E-mail uma busca rica para vincular qualquer mensagem a leads, clientes, fornecedores, propostas ou reservas — como já existe em Atendimento.
 
-Nova tabela `booking_item_confirmations`:
+---
 
-- `id` uuid pk
-- `booking_id` uuid (referência lógica a `bookings.id`)
-- `quote_item_id` uuid (referência lógica a `quote_items.id`)
-- `status` text default `'pendente'` — `pendente | confirmado | cancelado`
-- `proof_type` text — `email | whatsapp | outro` (nullable)
-- `proof_storage_path` text (nullable) — arquivo (PDF, imagem, .eml, screenshot)
-- `proof_text` text (nullable) — conteúdo colado (texto do e-mail / mensagem)
-- `proof_reference` text (nullable) — código de confirmação / nº de e-mail / link
-- `confirmed_at` timestamptz, `confirmed_by` uuid
-- `notes` text
-- `created_at`, `updated_at`
-- unique (`booking_id`, `quote_item_id`)
+## 1. Página da Reserva (`src/routes/bookings_.$bookingId.tsx`)
 
-RLS: leitura para autenticados; insert/update se for dono da reserva (`bookings.created_by = auth.uid()`) ou admin/operacional — mesmo padrão de `booking_suppliers`.
+Hoje cada item já tem **Anexar comprovante**. Adicionar ao lado um botão **Associar** (ícone `Link2`) que abre um Dialog com duas abas:
 
-Novo bucket de Storage **`booking-proofs`** (privado), com policies por usuário autenticado para upload/leitura.
+### Aba "E-mail" (caixa de entrada)
+- Lista os últimos 50 e-mails da tabela `emails` (mesma fonte da `/email`), com busca por `subject`, `from_name`, `from_email`, `snippet`.
+- Filtros rápidos: "Não lido", "Vinculados a este cliente" (`emails.customer_id = booking.customer_id`).
+- Ao escolher um e-mail: grava em `booking_item_confirmations`:
+  - `proof_type = 'email'`
+  - `proof_reference = "<assunto> — <from>"`
+  - `proof_text = snippet` (ou `body_text` se já carregado)
+  - novo campo `proof_email_id` (FK lógica para `emails.id`)
+- Mostra link "Abrir e-mail" (vai para `/email`).
 
-### 2. Rota nova: `src/routes/bookings.$bookingId.tsx`
+### Aba "WhatsApp"
+- Como ainda não existe tabela de mensagens WhatsApp, oferece um formulário simples:
+  - Nº de telefone, data/hora, conteúdo da mensagem (Textarea), upload opcional de print.
+- Salva como `proof_type = 'whatsapp'`, `proof_reference = telefone`, `proof_text = conteúdo`, e o print (se houver) vai pro storage `booking-proofs/...` em `proof_storage_path`.
 
-Tela de detalhe com:
+### Migração necessária
 
-- Cabeçalho: cliente, pacote, datas, status da reserva, total.
-- **Lista de itens** vinda de `quote_items` (filtrado por `bookings.quote_id`):
-  - Para cada item: descrição, qtd, valor.
-  - Badge de status (`pendente / confirmado / cancelado`).
-  - Linha de comprovante:
-    - Select `Tipo`: `E-mail | WhatsApp | Outro`.
-    - Campo de referência (assunto do e-mail / nº mensagem / código).
-    - Botão **Anexar comprovante** → upload para `booking-proofs/{booking_id}/{item_id}/...` + Textarea opcional para colar conteúdo.
-    - Botões **Confirmar item** (grava `status='confirmado'`, `confirmed_at`, `confirmed_by`) e **Cancelar item**.
-  - Se já existe registro em `booking_item_confirmations`, pré-carrega os campos e mostra link "Baixar comprovante" (signed URL via `supabase.storage.from('booking-proofs').createSignedUrl(...)`).
-- Resumo no topo: `X de Y itens confirmados` + barra de progresso.
-- Quando todos os itens estiverem confirmados, oferecer botão para mudar status da reserva para `confirmada`.
+```sql
+ALTER TABLE public.booking_item_confirmations
+  ADD COLUMN proof_email_id uuid;
+```
 
-Se a reserva não tiver `quote_id`, mostrar aviso "Reserva sem proposta vinculada — adicione uma proposta para listar os itens".
+Sem FK rígida (segue padrão das outras tabelas). Não muda RLS.
 
-### 3. Ajustes em `src/routes/bookings.tsx`
+---
 
-- Linha da reserva vira clicável (Link para `/bookings/$bookingId`) ou botão "Abrir".
-- Coluna nova "Itens": `confirmados / total` (consulta agregada simples por reserva).
+## 2. Página E-mail (`src/components/email/EmailPanel.tsx`)
 
-### 4. i18n (`src/lib/i18n.tsx`) — pt/en/es
+Hoje só existe o painel "Sugestões" baseado no e-mail do remetente. Adicionar um botão **Associar** (`Link2`) ao lado das ações Reply/Forward/Archive do e-mail selecionado, que abre um Dialog de busca com Tabs:
 
-`bookingItems`, `confirmItem`, `cancelItem`, `attachProof`, `proofType`, `proofEmail`, `proofWhatsapp`, `proofOther`, `proofReference`, `proofContent`, `downloadProof`, `itemsConfirmed`, `noQuoteLinked`, `markBookingConfirmed`.
+### Tabs do diálogo de associação
+Mesmo conjunto da aba Atendimento:
 
-### 5. Detalhes técnicos
+1. **Lead** — busca por `name`, `code`, `email`, `phone`, `destination`. Atualiza `emails.lead_id` (e `customer_id` se o lead tiver cliente vinculado).
+2. **Cliente** — busca por `full_name`, `email`, `phone`, `code`. Atualiza `emails.customer_id`.
+3. **Fornecedor** — busca por `name`, `email`, `code`, `category`. Atualiza `emails.supplier_id`.
+4. **Proposta (Invoice)** — busca por `quotes.id` curto, `customer.full_name`, `lead.name`. Ao selecionar, vincula ao `lead_id`/`customer_id` da proposta.
+5. **Reserva** — busca por `bookings.id`, cliente, datas. Vincula a `lead_id`/`customer_id` da reserva.
 
-- Upload usa o cliente browser do Supabase (`supabase.storage.from('booking-proofs').upload(path, file, { upsert: true })`).
-- Upsert em `booking_item_confirmations` por `(booking_id, quote_item_id)`.
-- Reaproveita `Table`, `Select`, `Textarea`, `Input`, `Button`, `Badge`, `Card` já existentes; sem novas libs.
-- Validação client-side: tamanho máximo de upload 10 MB; tipos aceitos: `.pdf .png .jpg .jpeg .eml .txt`.
+### Comportamento
+- Cada Tab mostra um `Input` de busca + lista de até 20 resultados (Card clicável).
+- Ao clicar num resultado: faz `UPDATE` em `emails` com os ids correspondentes, dispara `toast.success(t("emailLinked"))`, fecha o diálogo, recarrega a lista.
+- Mantém a área "Sugestões" atual (linkagem rápida por e-mail do remetente).
 
-### Fora de escopo (pode vir depois)
+---
 
-- Edição inline dos itens da proposta a partir da reserva (continuam sendo editados em `ProposalEditor`).
-- Notificação automática ao confirmar todos os itens.
+## 3. i18n (`src/lib/i18n.tsx`)
+
+Novas chaves (pt/en/es):
+`associate`, `associateProof`, `associateEmailTab`, `associateWhatsappTab`, `searchPlaceholderAssociate`, `linkLead`, `linkCustomer`, `linkSupplier`, `linkQuote`, `linkBooking`, `whatsappPhone`, `whatsappContent`, `noResults`.
+
+---
+
+## 4. Detalhes técnicos
+
+- O Dialog de busca vira componente reutilizável: `src/components/AssociateDialog.tsx`, com prop `mode: "emailToEntity" | "bookingItemToProof"`.
+- Buscas usam `ilike` em colunas indexadas (já é padrão no projeto), `limit(20)`, `order by created_at desc`.
+- Para reservas/propostas, o componente faz join com `customers` e `leads` para mostrar rótulo amigável.
+- Upload do print do WhatsApp reaproveita o bucket `booking-proofs` e a função `onUpload` já existente.
+- Após associar um e-mail a um item, mostrar badge "📧 E-mail vinculado" e o assunto no card do item.
+
+---
+
+## Fora de escopo
+
+- Integração real com WhatsApp Business API (continua manual).
+- Sincronização de e-mails associados de volta para a timeline do lead (já acontece via `emails.lead_id`).

@@ -2,6 +2,14 @@
 import { buildPushPayload } from "@block65/webcrypto-web-push";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
+export type NotificationEventType =
+  | "lead_assigned"
+  | "lead_status_changed"
+  | "task_due_soon"
+  | "task_overdue"
+  | "sla_warning"
+  | "sla_overdue";
+
 type SendArgs = {
   userId: string;
   title: string;
@@ -9,7 +17,25 @@ type SendArgs = {
   url?: string;
   leadId?: string | null;
   tag?: string;
+  /** Se informado, respeita notification_preferences do usuário. */
+  eventType?: NotificationEventType;
 };
+
+/** Verifica se o usuário aceita receber pushes para um determinado evento. */
+export async function isEventEnabledForUser(
+  userId: string,
+  eventType: NotificationEventType,
+): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from("notification_preferences")
+    .select("push_enabled")
+    .eq("user_id", userId)
+    .eq("event_type", eventType)
+    .maybeSingle();
+  if (error) return true; // fail-open: por padrão envia
+  if (!data) return true; // sem registro = padrão ligado
+  return data.push_enabled;
+}
 
 type SendResult = {
   total: number;

@@ -707,6 +707,8 @@ const dict = {
     bulkStart: "Start",
     bulkPause: "Pause",
     bulkDelete: "Delete",
+    linkToLead: "Link to Lead",
+    unlinkLead: "Unlink",
     clearSelection: "Clear selection",
     confirmBulkDelete: "Delete selected activities?",
     activityTitle: "Title",

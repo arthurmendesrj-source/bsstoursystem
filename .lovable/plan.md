@@ -1,30 +1,40 @@
-## Plano
+## Objetivo
 
-### 1. Corrigir crash da aba `/alerts`
-Arquivo `src/lib/useLeadAlerts.ts` — o effect de Realtime tem `userId, load, markRecent` como dependências, então re-executa toda vez que `load` muda (a cada render por causa de `snoozeTick`). Isso faz o cliente Supabase reaproveitar o canal `lead-alerts-interactions` e chamar `.on()` depois de `.subscribe()`, lançando o erro que derruba a página.
+Permitir selecionar várias atividades (ou todas as filtradas) na página `/activities` e executar ações em lote.
 
-Correção:
-- Reduzir dependências do effect Realtime para apenas `[userId]`.
-- Usar nome de canal único por mount: `lead-alerts-interactions-${userId}-${crypto.randomUUID()}`.
-- Envolver em try/catch para não propagar erro de Realtime para o ErrorBoundary.
-- Usar `ref` para chamar `load` mais recente sem recriar o effect.
+## Mudanças em `src/routes/activities.tsx`
 
-### 2. Disparar os 4 eventos via `debugTriggerNotification`
-Após o fix, chamar a server function `debugTriggerNotification` 4 vezes (admin do user `6f3cba4e-6ad0-40d2-b34a-a521fcd85769`, lead `AM030526`):
+1. **Estado de seleção**
+   - Adicionar `selectedIds: Set<string>` no componente.
+   - Limpar seleção ao recarregar dados ou mudar filtros.
 
-1. `lead_assigned` → targetUserId = user logado, leadId do lead simulação
-2. `lead_status_changed` → leadId do lead simulação (fan-out)
-3. `task_due_soon` → targetUserId, taskId da task "due in 30min"
-4. `task_overdue` → targetUserId, taskId da task overdue
+2. **Coluna de checkbox na tabela**
+   - Nova `<TableHead>` no início com um `Checkbox` master (selecionar/desmarcar todas as filtradas).
+   - Estado intermediário (indeterminate) quando algumas selecionadas.
+   - Cada `<TableRow>` ganha um `Checkbox` para selecionar individualmente.
+   - Usar componente `@/components/ui/checkbox` (já disponível).
 
-Como a função exige sessão autenticada (middleware `requireSupabaseAuth`) e não posso chamar como admin via `invoke-server-function` sem token de usuário, vou:
-- Buscar o leadId/taskIds via `supabase--read_query`.
-- Inserir os 4 logs diretamente em `notification_logs` simulando o que `sendPushToUser` / `sendPushToLeadRecipients` gravariam (status=`no_subscription` se não houver push subscription registrada, o que é o comportamento real).
+3. **Barra de ações em lote**
+   - Aparece acima da tabela quando `selectedIds.size > 0`.
+   - Mostra contador: "N atividades selecionadas".
+   - Botões de ação:
+     - **Concluir** — marca `completed=true` em todas selecionadas.
+     - **Reabrir** — marca `completed=false`.
+     - **Iniciar/Pausar** — define `started_at`.
+     - **Excluir** — confirmação e delete em massa.
+     - **Limpar seleção**.
 
-Alternativamente (melhor): após o fix você abre `/alerts/debug` no preview e clica nos 4 botões — eu confirmo via leitura de `notification_logs`.
+4. **Implementação das ações em lote**
+   - Usar `supabase.from("tasks").update({...}).in("id", [...])` ou `.delete().in("id", [...])`.
+   - Toast de sucesso/erro, recarregar `loadData()` e limpar seleção.
+   - Confirmação `confirm()` antes de excluir em lote.
 
-### Resultado
-- `/alerts` carrega sem crash.
-- 4 entradas em `notification_logs` para validação em `/alerts/history`.
+5. **i18n**
+   - Adicionar chaves em `src/lib/i18n.tsx` (pt/en/es): `selectAll`, `selectedCount`, `bulkComplete`, `bulkReopen`, `bulkDelete`, `clearSelection`, `confirmBulkDelete`.
 
-Aprovar para aplicar o fix + executar os disparos via SQL?
+## Detalhes técnicos
+
+- O master checkbox seleciona apenas as linhas atualmente em `filtered` (respeita filtros aplicados).
+- Estado `indeterminate` calculado: `selected > 0 && selected < filtered.length`.
+- Operações em lote feitas em uma única requisição usando `.in("id", ids)` para performance.
+- Manter UX consistente: linhas selecionadas com leve destaque (`bg-muted/50`).

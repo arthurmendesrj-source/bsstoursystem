@@ -33,6 +33,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { to: "/leads", label: t("leads"), icon: UserPlus },
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
+    { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/customers", label: t("customers"), icon: Users },
     { to: "/suppliers", label: t("suppliers"), icon: Building2 },
     { to: "/packages", label: t("packages"), icon: Package },

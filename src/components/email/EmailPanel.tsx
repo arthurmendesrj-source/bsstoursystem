@@ -213,9 +213,23 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     const { error } = await supabase.from("emails").update(patch).eq("id", selected.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("emailLinked"));
-    await loadList(folder);
   };
 
+  const associatePick = async (e: AssociateEntity) => {
+    if (!selected) return;
+    const patch: { lead_id?: string | null; customer_id?: string | null; supplier_id?: string | null } = {};
+    if (e.kind === "lead") { patch.lead_id = e.lead_id; if (e.customer_id) patch.customer_id = e.customer_id; }
+    else if (e.kind === "customer") { patch.customer_id = e.customer_id; }
+    else if (e.kind === "supplier") { patch.supplier_id = e.supplier_id; }
+    else if (e.kind === "quote" || e.kind === "booking") {
+      if (e.lead_id) patch.lead_id = e.lead_id;
+      if (e.customer_id) patch.customer_id = e.customer_id;
+    }
+    const { error } = await supabase.from("emails").update(patch).eq("id", selected.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("emailLinked"));
+    await loadList(folder);
+  };
 
   // ---------------- actions ----------------
   const archive = async () => {

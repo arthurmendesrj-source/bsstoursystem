@@ -270,39 +270,66 @@ export function NotificationBell() {
       </PopoverContent>
     </Popover>
 
-    <AlertDialog open={!!confirmQuote} onOpenChange={(o) => !o && setConfirmQuote(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("convertToBooking")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("convertQuoteConfirm")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => { const q = confirmQuote; setConfirmQuote(null); if (q) convertQuote(q); }}
-          >
+    <Dialog open={!!quoteDialog} onOpenChange={(o) => !o && setQuoteDialog(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("convertToBooking")}</DialogTitle>
+          <DialogDescription>{t("convertQuoteConfirm")}</DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="dep">{t("departureDate")}</Label>
+            <Input id="dep" type="date" value={quoteForm.departure}
+              onChange={(e) => setQuoteForm((f) => ({ ...f, departure: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ret">Retorno</Label>
+            <Input id="ret" type="date" value={quoteForm.ret}
+              onChange={(e) => setQuoteForm((f) => ({ ...f, ret: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setQuoteDialog(null)}>{t("cancel")}</Button>
+          <Button onClick={convertQuote} disabled={busyId === quoteDialog?.id}>
+            {busyId === quoteDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("convertToBooking")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
-    <AlertDialog open={!!confirmBooking} onOpenChange={(o) => !o && setConfirmBooking(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("generateVoucher")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("generateVoucherConfirm")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => { const b = confirmBooking; setConfirmBooking(null); if (b) generateVoucher(b); }}
-          >
+    <Dialog open={!!bookingDialog} onOpenChange={(o) => !o && setBookingDialog(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("generateVoucher")}</DialogTitle>
+          <DialogDescription>{t("generateVoucherConfirm")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="vcode">Código</Label>
+            <Input id="vcode" value={voucherForm.code}
+              onChange={(e) => setVoucherForm((f) => ({ ...f, code: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vit">Roteiro</Label>
+            <Textarea id="vit" rows={5} value={voucherForm.itinerary}
+              onChange={(e) => setVoucherForm((f) => ({ ...f, itinerary: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vem">Contato de emergência</Label>
+            <Input id="vem" value={voucherForm.emergency}
+              onChange={(e) => setVoucherForm((f) => ({ ...f, emergency: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setBookingDialog(null)}>{t("cancel")}</Button>
+          <Button onClick={generateVoucher} disabled={busyId === bookingDialog?.id || !voucherForm.code}>
+            {busyId === bookingDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("generateVoucher")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Bell, CheckCircle2, XCircle, MinusCircle, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, CheckCircle2, XCircle, MinusCircle, RefreshCw, Search, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

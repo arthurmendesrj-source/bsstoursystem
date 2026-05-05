@@ -248,5 +248,40 @@ export function NotificationBell() {
         </ScrollArea>
       </PopoverContent>
     </Popover>
+
+    <AlertDialog open={!!confirmQuote} onOpenChange={(o) => !o && setConfirmQuote(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("convertToBooking")}</AlertDialogTitle>
+          <AlertDialogDescription>{t("convertQuoteConfirm")}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => { const q = confirmQuote; setConfirmQuote(null); if (q) convertQuote(q); }}
+          >
+            {t("convertToBooking")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={!!confirmBooking} onOpenChange={(o) => !o && setConfirmBooking(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("generateVoucher")}</AlertDialogTitle>
+          <AlertDialogDescription>{t("generateVoucherConfirm")}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => { const b = confirmBooking; setConfirmBooking(null); if (b) generateVoucher(b); }}
+          >
+            {t("generateVoucher")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

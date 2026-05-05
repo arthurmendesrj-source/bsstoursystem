@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -469,84 +469,101 @@ function WorkspacePage() {
         {/* MAIN */}
         <Card className="min-h-[600px] ml-2">
           <CardContent className="p-4">
-            <Tabs defaultValue="email">
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="email">{t("intEmail")}</TabsTrigger>
-                <TabsTrigger value="activities">{t("activities")}</TabsTrigger>
-                <TabsTrigger value="proposals">{t("proposals")}</TabsTrigger>
-                <TabsTrigger value="invoice">{t("invoice")}</TabsTrigger>
-                <TabsTrigger value="reservation">{t("reservation")}</TabsTrigger>
-              </TabsList>
+            <Accordion type="multiple" defaultValue={["email"]} className="w-full">
+              <AccordionItem value="email">
+                <AccordionTrigger className="text-sm font-semibold">
+                  <span className="flex items-center gap-2"><Mail className="h-4 w-4" />{t("intEmail")}</span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {!hasLead || !lead ? (
+                    <EmptyTab text={t("selectLeadToView")} />
+                  ) : (
+                    <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} />
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
-              <TabsContent value="email" className="mt-4">
-                {!hasLead || !lead ? (
-                  <EmptyTab text={t("selectLeadToView")} />
-                ) : (
-                  <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} />
-                )}
-              </TabsContent>
+              <AccordionItem value="activities">
+                <AccordionTrigger className="text-sm font-semibold">
+                  <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />{t("activities")}</span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {!hasLead || !lead ? (
+                    <EmptyTab text={t("selectLeadToView")} />
+                  ) : (
+                    <ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} />
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
-              <TabsContent value="activities" className="mt-4">
-                {!hasLead || !lead ? (
-                  <EmptyTab text={t("selectLeadToView")} />
-                ) : (
-                  <ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} />
-                )}
-              </TabsContent>
+              <AccordionItem value="proposals">
+                <AccordionTrigger className="text-sm font-semibold">
+                  <span className="flex items-center gap-2"><StickyNote className="h-4 w-4" />{t("proposals")}</span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {!hasLead || !lead ? (
+                    <EmptyTab text={t("selectLeadToView")} />
+                  ) : (
+                    <ProposalsTab
+                      leadId={lead.id}
+                      leadCode={lead.code}
+                      customerId={lead.customer_id}
+                      quotes={quotes}
+                      onChanged={() => loadLead(lead.id)}
+                      mode="proposal"
+                    />
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
-              <TabsContent value="proposals" className="mt-4">
-                {!hasLead || !lead ? (
-                  <EmptyTab text={t("selectLeadToView")} />
-                ) : (
-                  <ProposalsTab
-                    leadId={lead.id}
-                    leadCode={lead.code}
-                    customerId={lead.customer_id}
-                    quotes={quotes}
-                    onChanged={() => loadLead(lead.id)}
-                    mode="proposal"
-                  />
-                )}
-              </TabsContent>
+              <AccordionItem value="invoice">
+                <AccordionTrigger className="text-sm font-semibold">
+                  <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" />{t("invoice")}</span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {!hasLead || !lead ? (
+                    <EmptyTab text={t("selectLeadToView")} />
+                  ) : (
+                    <ProposalsTab
+                      leadId={lead.id}
+                      leadCode={lead.code}
+                      customerId={lead.customer_id}
+                      quotes={quotes.filter((q) => q.status === "aprovada")}
+                      onChanged={() => loadLead(lead.id)}
+                      mode="invoice"
+                    />
+                  )}
+                </AccordionContent>
+              </AccordionItem>
 
-              <TabsContent value="invoice" className="mt-4">
-                {!hasLead || !lead ? (
-                  <EmptyTab text={t("selectLeadToView")} />
-                ) : (
-                  <ProposalsTab
-                    leadId={lead.id}
-                    leadCode={lead.code}
-                    customerId={lead.customer_id}
-                    quotes={quotes.filter((q) => q.status === "aprovada")}
-                    onChanged={() => loadLead(lead.id)}
-                    mode="invoice"
-                  />
-                )}
-              </TabsContent>
-
-              <TabsContent value="reservation" className="mt-4">
-                {!hasLead ? (
-                  <EmptyTab text={t("selectLeadToView")} />
-                ) : bookings.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
-                ) : (
-                  <div className="space-y-2">
-                    {bookings.map((b) => (
-                      <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
-                        <div>
-                          <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
-                            {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
+              <AccordionItem value="reservation">
+                <AccordionTrigger className="text-sm font-semibold">
+                  <span className="flex items-center gap-2"><CalendarIcon className="h-4 w-4" />{t("reservation")}</span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  {!hasLead ? (
+                    <EmptyTab text={t("selectLeadToView")} />
+                  ) : bookings.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {bookings.map((b) => (
+                        <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
+                          <div>
+                            <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
+                              {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
+                            </div>
                           </div>
+                          <div className="font-semibold">{fmtCurrency(Number(b.total_amount), b.currency as "BRL")}</div>
                         </div>
-                        <div className="font-semibold">{fmtCurrency(Number(b.total_amount), b.currency as "BRL")}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+                      ))}
+                    </div>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
         </ResizablePanel>

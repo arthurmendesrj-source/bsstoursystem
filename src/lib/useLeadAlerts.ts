@@ -12,6 +12,7 @@ export type LeadAlert = {
   assigned_to: string | null;
   created_by: string | null;
   lastInteractionAt: string | null;
+  lastInteractionType: string | null;
   recent: boolean; // contact logged in the last 60s
   sla: LeadSlaInfo;
 };
@@ -39,15 +40,15 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
     }
     const { data: leads } = await q;
     const ids = (leads ?? []).map((l) => l.id);
-    const lastByLead = new Map<string, string>();
+    const lastByLead = new Map<string, { occurred_at: string; type: string | null }>();
     if (ids.length > 0) {
       const { data: ints } = await supabase
         .from("interactions")
-        .select("lead_id,occurred_at")
+        .select("lead_id,occurred_at,type")
         .in("lead_id", ids)
         .order("occurred_at", { ascending: false });
-      for (const it of (ints ?? []) as { lead_id: string | null; occurred_at: string }[]) {
-        if (it.lead_id && !lastByLead.has(it.lead_id)) lastByLead.set(it.lead_id, it.occurred_at);
+      for (const it of (ints ?? []) as { lead_id: string | null; occurred_at: string; type: string | null }[]) {
+        if (it.lead_id && !lastByLead.has(it.lead_id)) lastByLead.set(it.lead_id, { occurred_at: it.occurred_at, type: it.type });
       }
     }
     const now = Date.now();
@@ -58,11 +59,17 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
           status: l.status,
           updated_at: l.updated_at,
           next_action_date: l.next_action_date,
-          lastInteractionAt: last,
+          lastInteractionAt: last?.occurred_at ?? null,
         });
         const markedAt = recentRef.current.get(l.id);
         const recent = !!markedAt && now - markedAt < RECENT_MS;
-        return { ...l, lastInteractionAt: last, recent, sla } as LeadAlert;
+        return {
+          ...l,
+          lastInteractionAt: last?.occurred_at ?? null,
+          lastInteractionType: last?.type ?? null,
+          recent,
+          sla,
+        } as LeadAlert;
       })
       // keep alerts that are not ok OR were just contacted (so the user sees the
       // status drop in real time before they disappear from the feed)

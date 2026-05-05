@@ -32,6 +32,8 @@ import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
+import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
+import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -148,6 +150,17 @@ const AlertsHistoryRoute = AlertsHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AlertsRoute,
 } as any)
+const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
+  id: '/api/public/hooks/task-due',
+  path: '/api/public/hooks/task-due',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksLeadEventsRoute =
+  ApiPublicHooksLeadEventsRouteImport.update({
+    id: '/api/public/hooks/lead-events',
+    path: '/api/public/hooks/lead-events',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -173,6 +186,8 @@ export interface FileRoutesByFullPath {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
+  '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -198,6 +213,8 @@ export interface FileRoutesByTo {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
+  '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -224,6 +241,8 @@ export interface FileRoutesById {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
+  '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -251,6 +270,8 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/api/public/hooks/lead-events'
+    | '/api/public/hooks/task-due'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -276,6 +297,8 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/api/public/hooks/lead-events'
+    | '/api/public/hooks/task-due'
   id:
     | '__root__'
     | '/'
@@ -301,6 +324,8 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/api/public/hooks/lead-events'
+    | '/api/public/hooks/task-due'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -321,6 +346,8 @@ export interface RootRouteChildren {
   SuppliersRoute: typeof SuppliersRoute
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
+  ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
+  ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -486,6 +513,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsHistoryRouteImport
       parentRoute: typeof AlertsRoute
     }
+    '/api/public/hooks/task-due': {
+      id: '/api/public/hooks/task-due'
+      path: '/api/public/hooks/task-due'
+      fullPath: '/api/public/hooks/task-due'
+      preLoaderRoute: typeof ApiPublicHooksTaskDueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/lead-events': {
+      id: '/api/public/hooks/lead-events'
+      path: '/api/public/hooks/lead-events'
+      fullPath: '/api/public/hooks/lead-events'
+      preLoaderRoute: typeof ApiPublicHooksLeadEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -546,7 +587,18 @@ const rootRouteChildren: RootRouteChildren = {
   SuppliersRoute: SuppliersRoute,
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
+  ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
+  ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

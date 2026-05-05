@@ -26,6 +26,9 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { computeLeadSla } from "@/lib/leadSla";
 
 export const Route = createFileRoute("/leads/$leadId")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    quickContact: typeof search.quickContact === "string" ? (search.quickContact as string) : undefined,
+  }),
   component: () => (
     <AuthGate>
       <AppShell>
@@ -74,6 +77,7 @@ function LeadWorkspace() {
   const { user } = useAuth();
   const { format: fmtCurrency } = useCurrency();
   const navigate = useNavigate();
+  const search = Route.useSearch();
 
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,6 +119,31 @@ function LeadWorkspace() {
   };
 
   useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
+
+  // Auto-open quick contact dialog with suggested template when arriving via /alerts deep link
+  const [autoTriggered, setAutoTriggered] = useState(false);
+  useEffect(() => {
+    if (!lead || !search.quickContact || autoTriggered) return;
+    const type = search.quickContact;
+    const days = computeLeadSla({
+      status: lead.status,
+      updated_at: lead.updated_at,
+      next_action_date: lead.next_action_date,
+      lastInteractionAt: null,
+    }).daysSinceLast ?? 0;
+    const name = lead.name.split(" ")[0];
+    const dest = lead.destination ? ` sobre ${lead.destination}` : "";
+    const tpl =
+      type === "whatsapp" ? `Olá ${name}, tudo bem? Passando para retomar nossa conversa${dest}. Posso te ajudar com mais alguma informação?` :
+      type === "email" ? `Assunto: Retomando nossa conversa${dest}\n\nOlá ${name}, espero que esteja bem. Quero retomar nosso atendimento e entender como posso te ajudar nos próximos passos.` :
+      type === "reuniao" ? `Reunião de alinhamento com ${name}${dest}. Pauta: status atual, dúvidas e próximos passos.` :
+      `Ligação de follow-up com ${name}${dest}. Último contato há ${days} dia(s). Objetivo: retomar conversa, entender próximo passo e reagendar.`;
+    setQuickType(type);
+    setQuickContent(tpl);
+    setQuickOpen(true);
+    setAutoTriggered(true);
+    navigate({ to: "/leads/$leadId", params: { leadId }, search: {}, replace: true });
+  }, [lead, search.quickContact, leadId, navigate, autoTriggered]);
 
   const updateStatus = async (status: LeadStatus) => {
     if (!lead) return;
@@ -205,6 +234,23 @@ function LeadWorkspace() {
       ? { cls: "bg-amber-500/10 text-amber-700 border-amber-500/40", Icon: AlertTriangle, label: t("slaAtRisk") }
       : { cls: "bg-emerald-500/10 text-emerald-700 border-emerald-500/40", Icon: ShieldCheck, label: "OK" };
 
+  const buildTemplate = (type: string) => {
+    const days = sla.daysSinceLast ?? 0;
+    const name = lead.name.split(" ")[0];
+    const dest = lead.destination ? ` sobre ${lead.destination}` : "";
+    if (type === "ligacao") return `Ligação de follow-up com ${name}${dest}. Último contato há ${days} dia(s). Objetivo: retomar conversa, entender próximo passo e reagendar.`;
+    if (type === "whatsapp") return `Olá ${name}, tudo bem? Passando para retomar nossa conversa${dest}. Posso te ajudar com mais alguma informação?`;
+    if (type === "email") return `Assunto: Retomando nossa conversa${dest}\n\nOlá ${name}, espero que esteja bem. Quero retomar nosso atendimento e entender como posso te ajudar nos próximos passos.`;
+    if (type === "reuniao") return `Reunião de alinhamento com ${name}${dest}. Pauta: status atual, dúvidas e próximos passos.`;
+    return `Follow-up registrado com ${name}.`;
+  };
+
+  const openQuickWith = (type: string) => {
+    setQuickType(type);
+    setQuickContent(buildTemplate(type));
+    setQuickOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -216,7 +262,7 @@ function LeadWorkspace() {
             <Button
               size="sm"
               variant={sla.level === "overdue" ? "destructive" : "default"}
-              onClick={() => { setQuickType("ligacao"); setQuickContent(""); setQuickOpen(true); }}
+              onClick={() => openQuickWith("ligacao")}
             >
               <Phone className="h-3.5 w-3.5 mr-1.5" />
               {t("addInteraction")}

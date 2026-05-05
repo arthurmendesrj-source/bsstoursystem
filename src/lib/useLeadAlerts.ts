@@ -22,31 +22,35 @@ export type LeadAlert = {
 };
 
 const RECENT_MS = 60_000;
-const SNOOZE_KEY = "lead-alerts-snooze-v1";
+const LEGACY_SNOOZE_KEY = "lead-alerts-snooze-v1";
 // Module-level dedupe so multiple consumers don't emit duplicate toasts
 const toastedOverdue = new Set<string>();
+// In-memory cache shared across hook instances for instant render
+const snoozeCache = new Map<string, number>();
+let snoozeMigrated = false;
 
-function readSnooze(): Record<string, number> {
-  if (typeof window === "undefined") return {};
+async function migrateLegacySnoozes(userId: string) {
+  if (snoozeMigrated || typeof window === "undefined") return;
+  snoozeMigrated = true;
   try {
-    const raw = window.localStorage.getItem(SNOOZE_KEY);
-    if (!raw) return {};
+    const raw = window.localStorage.getItem(LEGACY_SNOOZE_KEY);
+    if (!raw) return;
     const parsed = JSON.parse(raw) as Record<string, number>;
     const now = Date.now();
-    let dirty = false;
-    for (const k of Object.keys(parsed)) {
-      if (parsed[k] <= now) { delete parsed[k]; dirty = true; }
+    const rows = Object.entries(parsed)
+      .filter(([, ts]) => typeof ts === "number" && ts > now)
+      .map(([lead_id, ts]) => ({
+        lead_id,
+        user_id: userId,
+        snoozed_until: new Date(ts).toISOString(),
+      }));
+    if (rows.length > 0) {
+      await supabase.from("lead_alert_snoozes").upsert(rows, { onConflict: "lead_id,user_id" });
     }
-    if (dirty) window.localStorage.setItem(SNOOZE_KEY, JSON.stringify(parsed));
-    return parsed;
+    window.localStorage.removeItem(LEGACY_SNOOZE_KEY);
   } catch {
-    return {};
+    /* ignore */
   }
-}
-
-function writeSnooze(map: Record<string, number>) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(SNOOZE_KEY, JSON.stringify(map));
 }
 
 export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolean) {
@@ -62,19 +66,36 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
     recentRef.current.set(leadId, Date.now());
   }, []);
 
-  const snooze = useCallback((leadId: string, hours: number) => {
-    const map = readSnooze();
-    map[leadId] = Date.now() + hours * 3600_000;
-    writeSnooze(map);
-    setSnoozeTick((t) => t + 1);
-  }, []);
+  const loadSnoozes = useCallback(async () => {
+    if (!userId) return;
+    const { data } = await supabase
+      .from("lead_alert_snoozes")
+      .select("lead_id,snoozed_until")
+      .eq("user_id", userId)
+      .gt("snoozed_until", new Date().toISOString());
+    snoozeCache.clear();
+    for (const row of (data ?? []) as { lead_id: string; snoozed_until: string }[]) {
+      snoozeCache.set(row.lead_id, new Date(row.snoozed_until).getTime());
+    }
+  }, [userId]);
 
-  const unsnooze = useCallback((leadId: string) => {
-    const map = readSnooze();
-    delete map[leadId];
-    writeSnooze(map);
+  const snooze = useCallback(async (leadId: string, hours: number) => {
+    if (!userId) return;
+    const until = Date.now() + hours * 3600_000;
+    snoozeCache.set(leadId, until);
     setSnoozeTick((t) => t + 1);
-  }, []);
+    await supabase.from("lead_alert_snoozes").upsert(
+      { lead_id: leadId, user_id: userId, snoozed_until: new Date(until).toISOString() },
+      { onConflict: "lead_id,user_id" },
+    );
+  }, [userId]);
+
+  const unsnooze = useCallback(async (leadId: string) => {
+    if (!userId) return;
+    snoozeCache.delete(leadId);
+    setSnoozeTick((t) => t + 1);
+    await supabase.from("lead_alert_snoozes").delete().eq("user_id", userId).eq("lead_id", leadId);
+  }, [userId]);
 
   const load = useCallback(async () => {
     if (!userId) return;
@@ -110,7 +131,7 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
       .gte("occurred_at", startOfDay.toISOString());
     setFollowupsToday(count ?? 0);
 
-    const snoozed = readSnooze();
+    const snoozed = Object.fromEntries(snoozeCache);
     const now = Date.now();
     const computedAll = (leads ?? []).map((l) => {
       const last = lastByLead.get(l.id) ?? null;
@@ -165,10 +186,15 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
   }, [userId, isAdmin]);
 
   useEffect(() => {
-    load();
+    if (!userId) return;
+    (async () => {
+      await migrateLegacySnoozes(userId);
+      await loadSnoozes();
+      load();
+    })();
     const id = setInterval(load, 120_000);
     return () => clearInterval(id);
-  }, [load, snoozeTick]);
+  }, [userId, load, loadSnoozes, snoozeTick]);
 
   useEffect(() => {
     if (!userId) return;

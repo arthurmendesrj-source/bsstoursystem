@@ -533,6 +533,33 @@ export type Database = {
           },
         ]
       }
+      lead_alert_snoozes: {
+        Row: {
+          created_at: string
+          id: string
+          lead_id: string
+          snoozed_until: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lead_id: string
+          snoozed_until: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lead_id?: string
+          snoozed_until?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           assigned_to: string | null
@@ -706,6 +733,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          daily_followup_goal: number
           full_name: string | null
           id: string
           phone: string | null
@@ -719,6 +747,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          daily_followup_goal?: number
           full_name?: string | null
           id?: string
           phone?: string | null
@@ -732,6 +761,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          daily_followup_goal?: number
           full_name?: string | null
           id?: string
           phone?: string | null

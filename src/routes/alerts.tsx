@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useLeadAlerts, type LeadAlert } from "@/lib/useLeadAlerts";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/alerts")({
   component: () => (
@@ -34,13 +35,6 @@ export const Route = createFileRoute("/alerts")({
 });
 
 const STATUSES = ["novo", "qualificado", "cotacao", "proposta"] as const;
-const GOAL_KEY = "daily-followup-goal";
-
-function getGoal(): number {
-  if (typeof window === "undefined") return 10;
-  const v = Number(window.localStorage.getItem(GOAL_KEY));
-  return Number.isFinite(v) && v > 0 ? v : 10;
-}
 
 function buildWhatsappLink(phone: string | null, name: string) {
   if (!phone) return null;
@@ -65,11 +59,51 @@ function AlertsPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [goal, setGoal] = useState(getGoal());
+  const [goal, setGoal] = useState<number>(10);
+  const [history, setHistory] = useState<{ date: string; count: number }[]>([]);
 
+  // Load goal from profile + 7-day history
   useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem(GOAL_KEY, String(goal));
-  }, [goal]);
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("daily_followup_goal")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cancelled && data?.daily_followup_goal) setGoal(data.daily_followup_goal);
+
+      const since = new Date();
+      since.setDate(since.getDate() - 6);
+      since.setHours(0, 0, 0, 0);
+      const { data: ints } = await supabase
+        .from("interactions")
+        .select("occurred_at")
+        .eq("created_by", user.id)
+        .gte("occurred_at", since.toISOString());
+      const counts = new Map<string, number>();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(since);
+        d.setDate(since.getDate() + i);
+        counts.set(d.toISOString().slice(0, 10), 0);
+      }
+      for (const it of (ints ?? []) as { occurred_at: string }[]) {
+        const key = new Date(it.occurred_at).toISOString().slice(0, 10);
+        if (counts.has(key)) counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      if (!cancelled) {
+        setHistory(Array.from(counts.entries()).map(([date, count]) => ({ date, count })));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, followupsToday]);
+
+  const updateGoal = async (next: number) => {
+    setGoal(next);
+    if (!user?.id) return;
+    await supabase.from("profiles").update({ daily_followup_goal: next }).eq("user_id", user.id);
+  };
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -138,7 +172,7 @@ function AlertsPage() {
                 type="number"
                 min={1}
                 value={goal}
-                onChange={(e) => setGoal(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => updateGoal(Math.max(1, Number(e.target.value) || 1))}
                 className="h-6 w-14 text-xs px-1.5"
               />
             </div>
@@ -146,6 +180,27 @@ function AlertsPage() {
             <div className="text-xs text-muted-foreground">
               {t("alertsGoalProgress").replace("{n}", String(followupsToday)).replace("{total}", String(goal))}
             </div>
+            {history.length > 0 && (
+              <div className="pt-1">
+                <div className="flex items-end gap-1 h-8">
+                  {history.map((d) => {
+                    const pct = Math.min(100, (d.count / goal) * 100);
+                    const reached = d.count >= goal;
+                    return (
+                      <div key={d.date} className="flex-1 flex flex-col items-center gap-0.5" title={`${d.date}: ${d.count}`}>
+                        <div className="w-full bg-muted rounded-sm relative h-6 flex items-end">
+                          <div
+                            className={cn("w-full rounded-sm", reached ? "bg-emerald-500" : "bg-primary/60")}
+                            style={{ height: `${Math.max(8, pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1 text-center">{t("alertsLast7Days")}</div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

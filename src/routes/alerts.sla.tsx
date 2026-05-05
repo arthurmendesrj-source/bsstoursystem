@@ -55,10 +55,78 @@ function SlaPanel() {
   const [interactions, setInteractions] = useState<InteractionRow[]>([]);
   const [profiles, setProfiles] = useState<Map<string, ProfileRow>>(new Map());
   const [goalInteractions, setGoalInteractions] = useState<InteractionRow[]>([]);
+  const [escalations, setEscalations] = useState<EscalationRow[]>([]);
+  const [sellers, setSellers] = useState<{ user_id: string; full_name: string | null }[]>([]);
+  const [reassigning, setReassigning] = useState<string | null>(null);
+  const reassign = useServerFn(reassignLead);
+
+  const reloadEscalations = async () => {
+    const [{ data: open }, { data: closed }] = await Promise.all([
+      supabase
+        .from("sla_escalations")
+        .select("id, lead_id, stage, hours_since_last_action, triggered_at, resolved_at, reassigned_to")
+        .is("resolved_at", null)
+        .order("triggered_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("sla_escalations")
+        .select("triggered_at, resolved_at")
+        .not("resolved_at", "is", null)
+        .gte("triggered_at", new Date(Date.now() - 30 * 86400000).toISOString())
+        .limit(500),
+    ]);
+    const openRows = ((open ?? []) as EscalationRow[]);
+    // Hidrata nome do lead para os abertos
+    const leadIds = openRows.map((e) => e.lead_id);
+    if (leadIds.length > 0) {
+      const { data: leadsInfo } = await supabase
+        .from("leads")
+        .select("id, name, assigned_to")
+        .in("id", leadIds);
+      const map = new Map((leadsInfo ?? []).map((l) => [l.id, l]));
+      openRows.forEach((e) => {
+        const li = map.get(e.lead_id);
+        e.lead_name = li?.name ?? null;
+        e.current_assigned_to = li?.assigned_to ?? null;
+      });
+    }
+    setEscalations(openRows);
+    // Tempo médio resolução (em horas)
+    const closedRows = (closed ?? []) as { triggered_at: string; resolved_at: string }[];
+    const total = closedRows.reduce(
+      (acc, r) => acc + (new Date(r.resolved_at).getTime() - new Date(r.triggered_at).getTime()) / 3600000,
+      0,
+    );
+    setAvgResolutionH(closedRows.length ? total / closedRows.length : 0);
+    setResolvedCount(closedRows.length);
+  };
+
+  const [avgResolutionH, setAvgResolutionH] = useState(0);
+  const [resolvedCount, setResolvedCount] = useState(0);
 
   useEffect(() => {
-    if (!authLoading && !isAdmin) navigate({ to: "/alerts" });
-  }, [authLoading, isAdmin, navigate]);
+    if (!isAdmin) return;
+    reloadEscalations();
+    // Carrega vendedores (perfis com role 'vendedor' ou todos os profiles para selecionar)
+    (async () => {
+      const { data } = await supabase.from("profiles").select("user_id, full_name");
+      setSellers((data ?? []) as { user_id: string; full_name: string | null }[]);
+    })();
+  }, [isAdmin]);
+
+  const handleReassign = async (escalationId: string, leadId: string, newAssigneeId: string) => {
+    setReassigning(escalationId);
+    try {
+      await reassign({ data: { leadId, newAssigneeId, escalationId } });
+      toast.success("Lead reatribuído.");
+      await reloadEscalations();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reatribuir.");
+    } finally {
+      setReassigning(null);
+    }
+  };
+
 
   useEffect(() => {
     if (!isAdmin) return;

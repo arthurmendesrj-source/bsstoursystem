@@ -1,47 +1,117 @@
-## Objetivo
+## Avaliação geral do CRM
 
-Reverter a criação automática de atividades a partir de emails. Em vez disso, a IA gera apenas um **resumo + sugestão**, e o operador decide manualmente: criar Lead, criar Atividade (Suporte/Negócio) ou ignorar.
+Stack: TanStack Start + Supabase (Lovable Cloud) + Lovable AI Gateway. Módulos ativos: Leads, Clientes, Fornecedores, Funil, Cotações/Propostas, Reservas, Pacotes, Workspace, Email (Gmail), Atividades, Configurações, Usuários.
 
-## Mudanças
+### Pontos fortes
+- Schema bem normalizado (leads, customers, suppliers, quotes/items, bookings, tasks, emails, interactions).
+- RLS consistente em todas as tabelas + roles via `has_role` (admin / vendedor / operacional).
+- Auto-código de entidades (`generate_entity_code`) por usuário/mês.
+- IA já integrada (Lovable AI) para análise de email, proposta, ditado.
+- i18n PT/EN/ES centralizado.
+- Triagem manual de email (recém-implementada) respeita o princípio "operador decide".
 
-### 1. Banco de dados (migration)
+### Lacunas e riscos
+1. **Sem orquestração entre módulos.** Lead → Cotação → Reserva → Voucher exige cliques manuais e duplicação de digitação. Não há ação "converter lead em cotação" nem "cotação aprovada → criar reserva".
+2. **Atividades soltas.** `tasks` não é gerada por mudanças de estágio do funil (ex: lead "novo" sem follow-up em 48h não vira atividade). Sem SLA/lembretes.
+3. **Pipeline sem gatilhos.** Mudança de `lead.status` não registra histórico nem dispara ação. `quote.status='aprovada'` não gera nada.
+4. **Email ↔ entidades fraco.** Vinculação de email ao lead/cliente é manual; não há matching automático por `from_email` para sugerir vínculo (sem criar nada).
+5. **Notificações inexistentes.** Sem feed de "para você", sem badge de pendências, sem email/push para o operador.
+6. **Dashboard pobre.** Não mostra KPIs operacionais (conversão funil, ticket médio, leads sem ação, cotações vencendo, reservas próximas).
+7. **Fornecedores desconectados de Reservas.** `booking_suppliers` existe mas sem fluxo "solicitar confirmação por email" / "registrar OK".
+8. **Vouchers/documentos sem automação.** Reserva confirmada não gera voucher draft.
+9. **Linter Supabase**: 14 funções `SECURITY DEFINER` sem `REVOKE EXECUTE FROM public/authenticated` — alerta a tratar.
+10. **Logs de auditoria ausentes.** Não há tabela `audit_log` para rastrear quem mudou status/valor de cotação, lead etc.
+11. **Atividades manuais sem fluxo.** Botão "Iniciar/Pausar" existe, mas sem timer visível na barra superior; difícil ter consciência do tempo gasto.
 
-- Remover triggers `trg_email_create_task` e `trg_email_sync_task_link`.
-- Remover funções `create_task_from_email()` e `sync_task_from_email()`.
-- **Não excluir** as atividades já criadas pela rotina anterior — ficam disponíveis no painel /activities, e o operador pode descartar manualmente o que não quiser.
+---
 
-### 2. Server function `emailAnalyze` (`src/server/gmail.functions.ts`)
+## Proposta — fases incrementais
 
-Ampliar o tool-call da IA para retornar, além dos campos do lead:
+> Princípio em todas as fases: **a IA sugere, o operador confirma**. Nenhuma escrita em entidade-chave (lead, cotação, reserva, email enviado) ocorre sem clique explícito.
 
-- `summary` — resumo curto (2-3 frases) em português do conteúdo do email.
-- `suggested_action` — `"create_lead" | "create_task" | "ignore"`.
-- `suggested_task_category` — `"negocio" | "suporte"` (quando `create_task`).
-- `suggested_task_priority` — `"baixa" | "media" | "alta"`.
-- `suggested_task_title` — título sugerido para a atividade.
+### Fase 1 — Conexões entre módulos (alta prioridade)
 
-Persistir tudo em `emails.ai_suggestion`.
+**1.1. Conversões assistidas com 1 clique**
+- Botão **"Gerar cotação"** na ficha do lead → abre editor de cotação já com `lead_id`, `customer_id`, moeda, destino, datas e valor estimado pré-preenchidos. Operador revisa e salva.
+- Botão **"Converter em reserva"** na cotação aprovada → abre formulário de reserva com itens copiados de `quote_items`, totais, cliente e fornecedores sugeridos.
+- Botão **"Gerar voucher"** na reserva confirmada → abre draft de voucher (código, itinerário a partir dos itens, contato de emergência do cliente).
 
-### 3. EmailPanel (`src/components/email/EmailPanel.tsx`)
+**1.2. Sugestão de vínculo de email**
+- Ao receber email novo (sem ação automática), painel de email mostra chip **"Possível lead: João Silva (cód L0125)"** quando `from_email` casa com `customers.email` ou `leads.email`. Botão **"Vincular"** confirma manualmente.
 
-Substituir o botão único "Analisar IA → Criar Lead" por um fluxo de triagem:
+**1.3. Atividades com origem rastreada**
+- Já existe `source` (manual/email/lead). Adicionar `source='quote'`, `source='booking'`, `source='supplier'` para tarefas geradas por outros fluxos quando o operador confirma.
 
-1. Botão **"Analisar com IA"** → chama `emailAnalyze` e abre um painel/modal de triagem com:
-   - Resumo gerado pela IA.
-   - Recomendação destacada (Lead / Atividade / Ignorar).
-   - Três botões de ação: **Criar Lead**, **Criar Atividade**, **Ignorar**.
-2. **Criar Lead** → abre o diálogo atual já pré-preenchido (mantém comportamento existente).
-3. **Criar Atividade** → abre novo diálogo simples com: título, categoria (negócio/suporte), prioridade, descrição (resumo), data prevista, vincular ao lead (se já existir vínculo no email). Salva em `tasks` com `source='email'` e `email_id` preenchido.
-4. **Ignorar** → fecha o painel; opcionalmente marca o email como lido/arquivado (já existem botões para isso).
+### Fase 2 — Histórico, SLA e notificações
 
-Manter os botões manuais já existentes ("Criar Lead manual"). Adicionar também botão manual **"Criar Atividade"** para quando o operador não quiser usar IA.
+**2.1. Tabela `activity_log`** (auditoria leve, escrita por triggers em mudanças de status):
+- `entity_type` (lead/quote/booking/supplier), `entity_id`, `field`, `from_value`, `to_value`, `actor_id`, `at`.
+- Linha do tempo na ficha de cada entidade.
 
-### 4. i18n (`src/lib/i18n.tsx`)
+**2.2. SLA de leads**
+- Coluna `last_action_at` no lead (atualizada por trigger quando se cria interaction/task/quote vinculada).
+- Painel **"Sem ação há X dias"** no dashboard. Ao abrir, botão **"Criar follow-up"** abre o diálogo de atividade pré-preenchido — não cria sozinho.
 
-Novas chaves PT/EN/ES: `aiSummary`, `aiRecommendation`, `createTaskFromEmail`, `ignoreEmail`, `taskTitle`, `taskCategory`, `taskPriority`, etc.
+**2.3. Centro de notificações in-app**
+- Tabela `notifications` (user_id, kind, payload, read_at).
+- Realtime via supabase channel; sino na AppShell mostra contador.
+- Eventos: cotação prestes a vencer, atividade vencendo hoje, novo email vinculado a lead atribuído a você, mudança de status feita por outro usuário em entidade sua.
 
-## Resultado
+### Fase 3 — Dashboard operacional
 
-- Nenhuma atividade é criada automaticamente.
-- A IA serve como apoio: resume e sugere, sem agir.
-- O operador valida e escolhe explicitamente o destino de cada email recebido.
+- KPIs: leads novos (semana/mês), taxa de conversão por estágio, ticket médio, cotações abertas/vencidas, reservas próximas (7/30 dias), tempo médio em "negócio" vs "suporte" (vem de `tasks.time_spent_minutes`).
+- Lista "Para hoje" agregando: tarefas vencendo, leads sem follow-up, cotações expirando.
+- Filtro por usuário (admin) e por período.
+
+### Fase 4 — Workflow de fornecedores na reserva
+
+- Em `booking_suppliers`, botão **"Solicitar confirmação"** → abre composer de email com template (datas, pax, serviço); ao enviar, registra `status='aguardando'` e cria atividade ao operador.
+- Resposta do fornecedor (email vinculado) → IA detecta confirmação/recusa e sugere atualização → operador clica para mudar `confirmation_code`/`status`.
+
+### Fase 5 — Cotação inteligente
+
+- Ao adicionar item, IA sugere markup baseado em histórico (média do `markup_pct` dos últimos itens da mesma `category`/cidade). Sugere — não aplica.
+- Ao mudar `quote.status='aprovada'` → modal "Deseja criar reserva agora?" (Fase 1.1).
+- Validade da cotação → atividade automática 2 dias antes (sugerida no painel, não criada silenciosamente).
+
+### Fase 6 — Higiene e segurança
+
+- Migration: `REVOKE EXECUTE ON FUNCTION ... FROM public, anon;` para todas as funções `SECURITY DEFINER` que não devem ser chamadas pelo cliente diretamente.
+- Adicionar índices: `tasks(assigned_to, completed)`, `tasks(due_date)`, `leads(status, assigned_to)`, `emails(from_email)`, `quotes(status, valid_until)`.
+- Política de retenção: `emails` antigos arquivados após 12 meses (movidos para tabela fria) — opcional.
+
+### Fase 7 — Qualidade de vida
+
+- Timer global de atividade ativa fixo na AppShell (mostra título + cronômetro), permitindo Pausar/Concluir sem sair da tela atual.
+- Busca global (cmd+K) por código (L0125, C0125…), nome, email, telefone — abre direto a ficha.
+- Atalhos de teclado em listas (j/k navegação, enter abrir).
+
+---
+
+## Arquitetura sugerida (resumo visual)
+
+```text
+                  ┌──────────────┐
+   Email (Gmail)  │  EmailPanel  │  IA: resume + sugere
+                  └──────┬───────┘
+                         │ operador escolhe
+              ┌──────────┼──────────┐
+              ▼          ▼          ▼
+           Lead       Tarefa     Ignorar
+             │
+             │ "Gerar cotação"
+             ▼
+          Cotação ──"aprovar"──► Reserva ──confirmar──► Voucher
+             │                      │
+             │                      └─► booking_suppliers (solicitar OK)
+             ▼
+        activity_log + notifications + tasks (sempre via confirmação)
+```
+
+---
+
+## O que entregar primeiro (recomendação)
+
+Sugiro começar pela **Fase 1.1 + 1.2** (conversões 1-clique e sugestão de vínculo de email) e **Fase 2.3** (notificações in-app). É o conjunto que mais reduz cliques no dia-a-dia sem mudar o modelo mental do operador. As demais fases entram em ordem conforme uso.
+
+Diga qual fase (ou item específico) implementar primeiro.

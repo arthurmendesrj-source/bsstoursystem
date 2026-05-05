@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useState, useEffect } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -18,6 +18,8 @@ import {
   ListChecks,
   Bell,
   BookOpen,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -25,6 +27,7 @@ import { useCurrency, type Currency } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
+import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, isAdmin, signOut } = useAuth();
@@ -32,6 +35,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("sidebar:collapsed") === "1";
+  });
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebar:collapsed", collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
 
   const items = [
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard },
@@ -52,114 +65,118 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/login" });
   };
 
+  const itemClass = (active: boolean) =>
+    cn(
+      "flex items-center gap-3 rounded-md py-2 text-sm transition-colors",
+      collapsed ? "justify-center px-2" : "px-3",
+      active
+        ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+        : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+    );
 
   return (
     <div className="flex h-screen w-full bg-background">
-      <aside className="hidden w-64 flex-col border-r border-border bg-sidebar md:flex">
-        <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <aside
+        className={cn(
+          "hidden flex-col border-r border-border bg-sidebar md:flex transition-[width] duration-200",
+          collapsed ? "w-16" : "w-64",
+        )}
+      >
+        <div className={cn("flex h-16 items-center gap-2 border-b border-sidebar-border", collapsed ? "justify-center px-2" : "px-6")}>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Plane className="h-5 w-5" />
           </div>
-          <div className="font-semibold text-sidebar-foreground">{t("appName")}</div>
+          {!collapsed && <div className="flex-1 truncate font-semibold text-sidebar-foreground">{t("appName")}</div>}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn("h-7 w-7 shrink-0", collapsed && "absolute -right-3 top-4 h-6 w-6 rounded-full border border-border bg-background shadow-sm hover:bg-muted")}
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </Button>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {items.map((it) => {
             const active = path === it.to || path.startsWith(it.to + "/");
             const Icon = it.icon;
             return (
-              <Link
-                key={it.to}
-                to={it.to}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-                }`}
-              >
-                <Icon className="h-4 w-4" />
-                {it.label}
+              <Link key={it.to} to={it.to} className={itemClass(active)} title={collapsed ? it.label : undefined}>
+                <Icon className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="truncate">{it.label}</span>}
               </Link>
             );
           })}
           <Link
             to="/workspace"
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-              path === "/workspace" || path.startsWith("/leads/")
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
-            }`}
+            className={itemClass(path === "/workspace" || path.startsWith("/leads/"))}
+            title={collapsed ? t("workspace") : undefined}
           >
-            <Briefcase className="h-4 w-4" />
-            {t("workspace")}
+            <Briefcase className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="truncate">{t("workspace")}</span>}
           </Link>
           {isAdmin && (
             <>
-              <div className="mt-4 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
-                {t("admin")}
-              </div>
-              <Link
-                to="/users"
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  path.startsWith("/users")
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
-                }`}
-              >
-                <Shield className="h-4 w-4" />
-                {t("users")}
+              {!collapsed && (
+                <div className="mt-4 px-3 text-xs font-medium uppercase tracking-wider text-sidebar-foreground/50">
+                  {t("admin")}
+                </div>
+              )}
+              <Link to="/users" className={itemClass(path.startsWith("/users"))} title={collapsed ? t("users") : undefined}>
+                <Shield className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="truncate">{t("users")}</span>}
               </Link>
-              <Link
-                to="/security-audit"
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                  path.startsWith("/security-audit")
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
-                }`}
-              >
-                <ShieldAlert className="h-4 w-4" />
-                {t("secAuditTitle")}
+              <Link to="/security-audit" className={itemClass(path.startsWith("/security-audit"))} title={collapsed ? t("secAuditTitle") : undefined}>
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="truncate">{t("secAuditTitle")}</span>}
               </Link>
             </>
           )}
-          <Link
-            to="/settings"
-            className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-              path === "/settings"
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
-            }`}
-          >
-            <Settings className="h-4 w-4" />
-            {t("settings")}
+          <Link to="/settings" className={itemClass(path === "/settings")} title={collapsed ? t("settings") : undefined}>
+            <Settings className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="truncate">{t("settings")}</span>}
           </Link>
-          <Link
-            to="/settings/templates"
-            className={`flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors ${
-              path.startsWith("/settings/templates")
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
-            }`}
-          >
-            {t("templatesMenu")}
-          </Link>
-          {isAdmin && (
-            <Link
-              to="/settings/sla"
-              className={`flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors ${
-                path.startsWith("/settings/sla")
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
-              }`}
-            >
-              {t("slaSettingsMenu")}
-            </Link>
+          {!collapsed && (
+            <>
+              <Link
+                to="/settings/templates"
+                className={cn(
+                  "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
+                  path.startsWith("/settings/templates")
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60",
+                )}
+              >
+                {t("templatesMenu")}
+              </Link>
+              {isAdmin && (
+                <Link
+                  to="/settings/sla"
+                  className={cn(
+                    "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
+                    path.startsWith("/settings/sla")
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  {t("slaSettingsMenu")}
+                </Link>
+              )}
+            </>
           )}
         </nav>
-        <div className="border-t border-sidebar-border p-3">
-          <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">{user?.email}</div>
-          <Button variant="ghost" className="w-full justify-start" onClick={handleSignOut}>
-            <LogOut className="mr-2 h-4 w-4" />
-            {t("logout")}
+        <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
+          {!collapsed && <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">{user?.email}</div>}
+          <Button
+            variant="ghost"
+            className={cn(collapsed ? "w-full justify-center px-0" : "w-full justify-start")}
+            onClick={handleSignOut}
+            title={collapsed ? t("logout") : undefined}
+          >
+            <LogOut className={cn("h-4 w-4", !collapsed && "mr-2")} />
+            {!collapsed && t("logout")}
           </Button>
         </div>
       </aside>

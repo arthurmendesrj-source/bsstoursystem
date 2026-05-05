@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
@@ -89,6 +90,10 @@ function LeadWorkspace() {
   // Interaction form
   const [intType, setIntType] = useState<string>("ligacao");
   const [intContent, setIntContent] = useState("");
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickType, setQuickType] = useState<string>("ligacao");
+  const [quickContent, setQuickContent] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
 
   const loadAll = async () => {
     setLoading(true);
@@ -152,6 +157,23 @@ function LeadWorkspace() {
     else { toast.success(t("saved")); setIntContent(""); loadAll(); }
   };
 
+  const submitQuickContact = async () => {
+    if (!user || !quickContent.trim()) return;
+    setQuickSaving(true);
+    const { error } = await supabase.from("interactions").insert({
+      lead_id: leadId,
+      type: quickType as "ligacao",
+      content: quickContent,
+      created_by: user.id,
+    });
+    setQuickSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    setQuickContent("");
+    setQuickOpen(false);
+    loadAll();
+  };
+
   const statusColor = (s: string) =>
     s === "fechado" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" :
     s === "perdido" ? "bg-red-500/10 text-red-700 border-red-500/30" :
@@ -190,6 +212,16 @@ function LeadWorkspace() {
           <Link to="/leads"><ArrowLeft className="h-4 w-4 mr-2" />{t("backToList")}</Link>
         </Button>
         <div className="flex items-center gap-2">
+          {sla.level !== "ok" && (
+            <Button
+              size="sm"
+              variant={sla.level === "overdue" ? "destructive" : "default"}
+              onClick={() => { setQuickType("ligacao"); setQuickContent(""); setQuickOpen(true); }}
+            >
+              <Phone className="h-3.5 w-3.5 mr-1.5" />
+              {t("addInteraction")}
+            </Button>
+          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -451,8 +483,37 @@ function LeadWorkspace() {
               </TabsContent>
             </Tabs>
           </CardContent>
-        </Card>
+      </Card>
       </div>
+
+      <Dialog open={quickOpen} onOpenChange={(o) => !quickSaving && setQuickOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("addInteraction")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Select value={quickType} onValueChange={setQuickType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {INTERACTION_TYPES.map((it) => (
+                  <SelectItem key={it.value} value={it.value}>{t(it.labelKey as "intCall")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Textarea
+              rows={4}
+              autoFocus
+              value={quickContent}
+              onChange={(e) => setQuickContent(e.target.value)}
+              placeholder="..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickOpen(false)} disabled={quickSaving}>{t("cancel")}</Button>
+            <Button onClick={submitQuickContact} disabled={quickSaving || !quickContent.trim()}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

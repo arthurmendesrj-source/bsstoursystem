@@ -174,6 +174,47 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
 
   const selected = useMemo(() => emails.find((e) => e.id === selectedId) ?? null, [emails, selectedId]);
 
+  // Load suggestions whenever selected email changes
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!selected?.from_email) { setSuggestions([]); return; }
+      const email = selected.from_email.toLowerCase();
+      const [{ data: leadRows }, { data: custRows }, { data: supRows }] = await Promise.all([
+        supabase.from("leads").select("id,name,email,destination").ilike("email", email).limit(5),
+        supabase.from("customers").select("id,full_name,email,phone").ilike("email", email).limit(5),
+        supabase.from("suppliers").select("id,name,email,category").ilike("email", email).limit(5),
+      ]);
+      if (cancelled) return;
+      const out: Suggestion[] = [
+        ...((leadRows ?? []) as { id: string; name: string; destination: string | null }[]).map(
+          (l) => ({ kind: "lead" as const, id: l.id, label: l.name, sub: l.destination ?? undefined }),
+        ),
+        ...((custRows ?? []) as { id: string; full_name: string; phone: string | null }[]).map(
+          (c) => ({ kind: "customer" as const, id: c.id, label: c.full_name, sub: c.phone ?? undefined }),
+        ),
+        ...((supRows ?? []) as { id: string; name: string; category: string | null }[]).map(
+          (s) => ({ kind: "supplier" as const, id: s.id, label: s.name, sub: s.category ?? undefined }),
+        ),
+      ];
+      setSuggestions(out);
+    })();
+    return () => { cancelled = true; };
+  }, [selected]);
+
+  const linkSuggestion = async (s: Suggestion) => {
+    if (!selected) return;
+    const patch: { lead_id?: string | null; customer_id?: string | null; supplier_id?: string | null } = {};
+    if (s.kind === "lead") patch.lead_id = s.id;
+    if (s.kind === "customer") patch.customer_id = s.id;
+    if (s.kind === "supplier") patch.supplier_id = s.id;
+    const { error } = await supabase.from("emails").update(patch).eq("id", selected.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("emailLinked"));
+    await loadList(folder);
+  };
+
+
   // ---------------- actions ----------------
   const archive = async () => {
     if (!selected) return;

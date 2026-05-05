@@ -528,6 +528,28 @@ function ActivitiesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t("linkToLead")} ({linkTargetIds.length})</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Label>{t("linkedLead")}</Label>
+            <Select value={linkLeadId || "none"} onValueChange={(v) => setLinkLeadId(v === "none" ? "" : v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— {t("unlinkLead")}</SelectItem>
+                {leadOptions.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>{l.code ?? "—"} · {l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLinkDialogOpen(false)}>{t("cancel")}</Button>
+            <Button onClick={linkToLead}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

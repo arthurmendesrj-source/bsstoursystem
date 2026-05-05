@@ -78,25 +78,24 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex h-screen w-full bg-background">
       <aside
         className={cn(
-          "hidden flex-col border-r border-border bg-sidebar md:flex transition-[width] duration-200",
+          "relative hidden flex-col border-r border-border bg-sidebar md:flex transition-[width] duration-200",
           collapsed ? "w-16" : "w-64",
         )}
       >
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          title={collapsed ? "Expandir menu" : "Recolher menu"}
+          className="absolute -right-3 top-5 z-20 flex h-6 w-6 items-center justify-center rounded-full border border-border bg-background text-foreground shadow-sm hover:bg-muted"
+        >
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+        </button>
         <div className={cn("flex h-16 items-center gap-2 border-b border-sidebar-border", collapsed ? "justify-center px-2" : "px-6")}>
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <Plane className="h-5 w-5" />
           </div>
           {!collapsed && <div className="flex-1 truncate font-semibold text-sidebar-foreground">{t("appName")}</div>}
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn("h-7 w-7 shrink-0", collapsed && "absolute -right-3 top-4 h-6 w-6 rounded-full border border-border bg-background shadow-sm hover:bg-muted")}
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </Button>
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {items.map((it) => {

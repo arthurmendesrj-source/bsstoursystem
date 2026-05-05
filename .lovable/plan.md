@@ -1,23 +1,18 @@
-# Sidebar recolhível na Caixa de Ferramentas
+# Sidebar: botão sempre visível + caixas redimensionáveis no Atendimento
 
-Adicionar um botão de seta (ChevronLeft/ChevronRight) no topo da barra lateral em `src/components/AppShell.tsx` para recolher/expandir o menu, ampliando a área útil da tela.
+## 1. Botão de recolher sempre visível na sidebar
+Em `src/components/AppShell.tsx`:
+- Tornar o `<aside>` `relative` e mover o botão para fora do header, posicionado em `absolute -right-3 top-5 z-20` como um pequeno círculo flutuante na borda direita da sidebar.
+- O botão fica visível tanto com a sidebar **expandida** (mostra `ChevronLeft`) quanto **recolhida** (mostra `ChevronRight`).
+- Mantém persistência em `localStorage`.
 
-## Comportamento
-- **Expandido** (padrão): largura `w-64`, mostra ícone + label dos itens.
-- **Recolhido**: largura `w-16`, mostra apenas os ícones (com `title` no link para tooltip nativa).
-- O botão de seta fica no canto superior direito do header da sidebar, ao lado do logo:
-  - Recolhido → ícone `ChevronRight` (clica para expandir)
-  - Expandido → ícone `ChevronLeft` (clica para recolher)
-- Estado persistido em `localStorage` (`sidebar:collapsed`) para manter entre sessões.
-- Header e conteúdo principal continuam ocupando o restante via `flex-1` — automaticamente expandem.
+## 2. Caixas redimensionáveis no Workspace (Atendimento)
+Em `src/routes/workspace.tsx`:
+- Substituir o grid fixo `grid-cols-[360px_1fr]` por `ResizablePanelGroup` (do shadcn `@/components/ui/resizable`, já instalado) com dois painéis horizontais:
+  - **Painel esquerdo** (sidebar de cards do lead): `defaultSize={28}`, `minSize={18}`, `maxSize={45}`.
+  - **Painel direito** (caixa principal com tabs): `defaultSize={72}`, `minSize={55}`.
+  - `<ResizableHandle withHandle />` entre eles (alça arrastável).
+- Tamanhos persistidos em `localStorage` (`workspace:layout`) via `onLayout` do PanelGroup.
+- Layout responsivo: mantém grid simples em mobile (`< md`); painéis redimensionáveis só em `md+`.
 
-## Mudanças
-- **`src/components/AppShell.tsx`**:
-  - Importar `ChevronLeft`, `ChevronRight`, `useState`, `useEffect`.
-  - Estado `collapsed` lido/salvo em `localStorage`.
-  - `<aside>` muda classe entre `w-64` e `w-16`.
-  - Esconder textos (label do app, labels dos itens, e-mail do usuário, label do botão "Sair") quando `collapsed`.
-  - Esconder título "Admin" quando recolhido.
-  - Adicionar botão circular com seta no header da sidebar.
-
-Sem alterações em rotas, dados ou outros componentes.
+Sem mudanças em rotas, dados ou outros componentes.

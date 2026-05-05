@@ -155,6 +155,11 @@ function AlertsPage() {
               {t("alertsNotificationsBlocked")}
             </span>
           )}
+          {isAdmin && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/alerts/sla">{t("slaPanelOpen")}</Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
             {loading ? t("loading") : t("alertsRefresh")}
           </Button>

@@ -80,14 +80,54 @@ function AlertsPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">(
-    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported",
+  const [notifPerm, setNotifPerm] = useState<PushPermission>(() =>
+    typeof window === "undefined" ? "default" : getPermissionState(),
   );
+  const [notifOptOut, setNotifOptOut] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(NOTIF_OPTOUT_KEY) === "1";
+  });
+  const notifEnabled = notifPerm === "granted" && !notifOptOut;
 
-  const requestNotif = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    const result = await Notification.requestPermission();
-    setNotifPerm(result);
+  const handleNotifToggle = async (next: boolean) => {
+    if (!isPushSupported()) {
+      toast.error("Notificações não são suportadas neste navegador.");
+      return;
+    }
+    if (!next) {
+      // Desativar: opt-out local (browsers não permitem revogar permissão)
+      localStorage.setItem(NOTIF_OPTOUT_KEY, "1");
+      setNotifOptOut(true);
+      toast.success("Notificações desativadas neste dispositivo.");
+      return;
+    }
+    if (notifPerm === "denied") {
+      toast.error(
+        "Permissão bloqueada no navegador. Clique no cadeado da URL → Notificações → Permitir.",
+      );
+      return;
+    }
+    const { permission } = await enablePushNotifications();
+    setNotifPerm(permission);
+    if (permission === "granted") {
+      localStorage.removeItem(NOTIF_OPTOUT_KEY);
+      setNotifOptOut(false);
+      toast.success("Notificações ativadas.");
+      await showLocalNotification("Notificações ativas", {
+        body: "Você receberá alertas de SLA aqui.",
+        tag: "alerts-test",
+      });
+    } else if (permission === "denied") {
+      toast.error("Permissão negada.");
+    }
+  };
+
+  const handleNotifTest = async () => {
+    const ok = await showLocalNotification("Teste de notificação", {
+      body: "Se você está vendo isto, está tudo certo! ✅",
+      tag: "alerts-test",
+    });
+    if (!ok) toast.error("Falha ao exibir notificação.");
   };
   const [goal, setGoal] = useState<number>(10);
   const [history, setHistory] = useState<{ date: string; count: number }[]>([]);

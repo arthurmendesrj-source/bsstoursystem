@@ -233,6 +233,9 @@ function AlertsPage() {
               Não suportado
             </span>
           )}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/alerts/history">Histórico</Link>
+          </Button>
           {isAdmin && (
             <Button asChild variant="outline" size="sm">
               <Link to="/alerts/sla">{t("slaPanelOpen")}</Link>

@@ -213,6 +213,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     const { error } = await supabase.from("emails").update(patch).eq("id", selected.id);
     if (error) { toast.error(error.message); return; }
     toast.success(t("emailLinked"));
+    await loadList(folder);
   };
 
   const associatePick = async (e: AssociateEntity) => {

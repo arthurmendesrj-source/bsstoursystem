@@ -157,6 +157,23 @@ function LeadWorkspace() {
     else { toast.success(t("saved")); setIntContent(""); loadAll(); }
   };
 
+  const submitQuickContact = async () => {
+    if (!user || !quickContent.trim()) return;
+    setQuickSaving(true);
+    const { error } = await supabase.from("interactions").insert({
+      lead_id: leadId,
+      type: quickType as "ligacao",
+      content: quickContent,
+      created_by: user.id,
+    });
+    setQuickSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("saved"));
+    setQuickContent("");
+    setQuickOpen(false);
+    loadAll();
+  };
+
   const statusColor = (s: string) =>
     s === "fechado" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" :
     s === "perdido" ? "bg-red-500/10 text-red-700 border-red-500/30" :
@@ -195,6 +212,16 @@ function LeadWorkspace() {
           <Link to="/leads"><ArrowLeft className="h-4 w-4 mr-2" />{t("backToList")}</Link>
         </Button>
         <div className="flex items-center gap-2">
+          {sla.level !== "ok" && (
+            <Button
+              size="sm"
+              variant={sla.level === "overdue" ? "destructive" : "default"}
+              onClick={() => { setQuickType("ligacao"); setQuickContent(""); setQuickOpen(true); }}
+            >
+              <Phone className="h-3.5 w-3.5 mr-1.5" />
+              {t("addInteraction")}
+            </Button>
+          )}
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

@@ -42,10 +42,31 @@ export const Route = createFileRoute("/api/public/hooks/lead-events")({
         const data = parsed.data;
         const exclude = data.actorId ? [data.actorId] : [];
 
+        // Janela de dedup: ignora eventos repetidos para o mesmo destino dentro deste intervalo
+        const DEDUP_WINDOW_MS = 5 * 60 * 1000; // 5 minutos
+        const nowIso = new Date().toISOString();
+
         try {
+          // Carrega marcadores de dedup do lead
+          const { data: leadRow } = await supabaseAdmin
+            .from("leads")
+            .select(
+              "last_assigned_notified_at, last_assigned_notified_to, last_status_notified_at, last_status_notified_value",
+            )
+            .eq("id", data.leadId)
+            .maybeSingle();
+
           if (data.event === "lead_assigned" && data.assignedTo) {
             if (exclude.includes(data.assignedTo)) {
               return Response.json({ ok: true, skipped: "self-assign" });
+            }
+            // Dedup: mesmo destinatário notificado dentro da janela
+            if (
+              leadRow?.last_assigned_notified_to === data.assignedTo &&
+              leadRow?.last_assigned_notified_at &&
+              Date.now() - new Date(leadRow.last_assigned_notified_at).getTime() < DEDUP_WINDOW_MS
+            ) {
+              return Response.json({ ok: true, skipped: "duplicate-assignment" });
             }
             const r = await sendPushToUser({
               userId: data.assignedTo,
@@ -56,9 +77,25 @@ export const Route = createFileRoute("/api/public/hooks/lead-events")({
               tag: `lead-assigned-${data.leadId}`,
               eventType: "lead_assigned",
             });
+            await supabaseAdmin
+              .from("leads")
+              .update({
+                last_assigned_notified_at: nowIso,
+                last_assigned_notified_to: data.assignedTo,
+              })
+              .eq("id", data.leadId);
             return Response.json({ ok: true, result: r });
           }
           if (data.event === "lead_status_changed") {
+            // Dedup: mesmo status final notificado dentro da janela
+            if (
+              data.newStatus &&
+              leadRow?.last_status_notified_value === data.newStatus &&
+              leadRow?.last_status_notified_at &&
+              Date.now() - new Date(leadRow.last_status_notified_at).getTime() < DEDUP_WINDOW_MS
+            ) {
+              return Response.json({ ok: true, skipped: "duplicate-status" });
+            }
             const r = await sendPushToLeadRecipients({
               leadId: data.leadId,
               title: "Status do lead alterado",
@@ -68,6 +105,15 @@ export const Route = createFileRoute("/api/public/hooks/lead-events")({
               eventType: "lead_status_changed",
               excludeUserIds: exclude,
             });
+            if (data.newStatus) {
+              await supabaseAdmin
+                .from("leads")
+                .update({
+                  last_status_notified_at: nowIso,
+                  last_status_notified_value: data.newStatus as never,
+                })
+                .eq("id", data.leadId);
+            }
             return Response.json({ ok: true, result: r });
           }
           return Response.json({ ok: true, skipped: "no-op" });

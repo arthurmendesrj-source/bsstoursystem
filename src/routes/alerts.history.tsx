@@ -48,10 +48,12 @@ function NotificationHistoryPage() {
   const { user, isAdmin } = useAuth();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [leadNames, setLeadNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(!isAdmin);
+  const [search, setSearch] = useState("");
 
   const load = async () => {
     if (!user?.id) return;

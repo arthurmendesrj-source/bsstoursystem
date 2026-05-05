@@ -57,7 +57,7 @@ export async function sendPushToUser(args: SendArgs): Promise<SendResult> {
         const res = await fetch(s.endpoint, {
           method: payload.method,
           headers: payload.headers as unknown as Record<string, string>,
-          body: payload.body,
+          body: payload.body as BodyInit,
         });
         if (res.status === 404 || res.status === 410) {
           // Subscription invalidada — remover

@@ -11,6 +11,7 @@ import {
   LogOut,
   Plane,
   Shield,
+  ShieldAlert,
   Mail,
   Building2,
   Briefcase,
@@ -102,6 +103,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Shield className="h-4 w-4" />
                 {t("users")}
+              </Link>
+              <Link
+                to="/security-audit"
+                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                  path.startsWith("/security-audit")
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
+                }`}
+              >
+                <ShieldAlert className="h-4 w-4" />
+                {t("secAuditTitle")}
               </Link>
             </>
           )}

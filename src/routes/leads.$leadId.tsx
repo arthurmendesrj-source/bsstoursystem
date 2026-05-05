@@ -120,6 +120,31 @@ function LeadWorkspace() {
 
   useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
 
+  // Auto-open quick contact dialog with suggested template when arriving via /alerts deep link
+  const autoTriggered = useState(false);
+  useEffect(() => {
+    if (!lead || !search.quickContact || autoTriggered[0]) return;
+    const type = search.quickContact;
+    const days = computeLeadSla({
+      status: lead.status,
+      updated_at: lead.updated_at,
+      next_action_date: lead.next_action_date,
+      lastInteractionAt: null,
+    }).daysSinceLast ?? 0;
+    const name = lead.name.split(" ")[0];
+    const dest = lead.destination ? ` sobre ${lead.destination}` : "";
+    const tpl =
+      type === "whatsapp" ? `Olá ${name}, tudo bem? Passando para retomar nossa conversa${dest}. Posso te ajudar com mais alguma informação?` :
+      type === "email" ? `Assunto: Retomando nossa conversa${dest}\n\nOlá ${name}, espero que esteja bem. Quero retomar nosso atendimento e entender como posso te ajudar nos próximos passos.` :
+      type === "reuniao" ? `Reunião de alinhamento com ${name}${dest}. Pauta: status atual, dúvidas e próximos passos.` :
+      `Ligação de follow-up com ${name}${dest}. Último contato há ${days} dia(s). Objetivo: retomar conversa, entender próximo passo e reagendar.`;
+    setQuickType(type);
+    setQuickContent(tpl);
+    setQuickOpen(true);
+    autoTriggered[1](true);
+    navigate({ to: "/leads/$leadId", params: { leadId }, search: {}, replace: true });
+  }, [lead, search.quickContact, leadId, navigate, autoTriggered]);
+
   const updateStatus = async (status: LeadStatus) => {
     if (!lead) return;
     setLead({ ...lead, status });

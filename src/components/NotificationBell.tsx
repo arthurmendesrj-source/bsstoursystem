@@ -270,7 +270,7 @@ export function NotificationBell() {
       </PopoverContent>
     </Popover>
 
-    <Dialog open={!!quoteDialog} onOpenChange={(o) => !o && setQuoteDialog(null)}>
+    <Dialog open={!!quoteDialog} onOpenChange={(o) => { if (!o && busyId === null) setQuoteDialog(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("convertToBooking")}</DialogTitle>

@@ -9,7 +9,6 @@ import {
   showLocalNotification,
   type PushPermission,
 } from "@/lib/pushNotifications";
-import { useI18n } from "@/lib/i18n";
 
 interface Props {
   variant?: "default" | "outline" | "secondary" | "ghost";
@@ -22,7 +21,6 @@ export function EnableNotificationsButton({
   size = "sm",
   className,
 }: Props) {
-  const { t } = useI18n();
   const [permission, setPermission] = useState<PushPermission>("default");
   const [loading, setLoading] = useState(false);
 
@@ -34,19 +32,16 @@ export function EnableNotificationsButton({
 
   const handleClick = async () => {
     if (permission === "granted") {
-      // Já habilitado → envia notificação de teste
-      const ok = await showLocalNotification(
-        t("notifTestTitle") || "Notificações ativas",
-        { body: t("notifTestBody") || "Você receberá alertas aqui." }
-      );
-      if (!ok) toast.error(t("notifTestFailed") || "Falha ao exibir notificação");
+      const ok = await showLocalNotification("Notificações ativas", {
+        body: "Você receberá alertas aqui.",
+      });
+      if (!ok) toast.error("Falha ao exibir notificação");
       return;
     }
 
     if (permission === "denied") {
       toast.error(
-        t("notifDeniedHelp") ||
-          "Notificações bloqueadas. Habilite manualmente nas configurações do navegador (cadeado da URL)."
+        "Notificações bloqueadas. Habilite manualmente nas configurações do navegador (cadeado da URL)."
       );
       return;
     }
@@ -56,15 +51,14 @@ export function EnableNotificationsButton({
       const { permission: result } = await enablePushNotifications();
       setPermission(result);
       if (result === "granted") {
-        toast.success(t("notifEnabled") || "Notificações ativadas");
-        await showLocalNotification(
-          t("notifTestTitle") || "Notificações ativas",
-          { body: t("notifTestBody") || "Você receberá alertas aqui." }
-        );
+        toast.success("Notificações ativadas");
+        await showLocalNotification("Notificações ativas", {
+          body: "Você receberá alertas aqui.",
+        });
       } else if (result === "denied") {
-        toast.error(t("notifDeniedHelp") || "Permissão negada. Reabilite no navegador.");
+        toast.error("Permissão negada. Reabilite no navegador para receber alertas.");
       } else {
-        toast.message(t("notifDismissed") || "Permissão não concedida.");
+        toast.message("Permissão não concedida.");
       }
     } finally {
       setLoading(false);
@@ -76,10 +70,10 @@ export function EnableNotificationsButton({
 
   const label =
     permission === "granted"
-      ? t("notifTest") || "Testar notificação"
+      ? "Testar notificação"
       : permission === "denied"
-      ? t("notifBlocked") || "Notificações bloqueadas"
-      : t("notifEnable") || "Ativar notificações";
+      ? "Notificações bloqueadas"
+      : "Ativar notificações";
 
   return (
     <Button

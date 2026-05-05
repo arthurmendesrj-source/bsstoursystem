@@ -1119,6 +1119,8 @@ const dict = {
     bulkStart: "Iniciar",
     bulkPause: "Pausar",
     bulkDelete: "Eliminar",
+    linkToLead: "Vincular a Lead",
+    unlinkLead: "Desvincular",
     clearSelection: "Limpiar selección",
     confirmBulkDelete: "¿Eliminar las actividades seleccionadas?",
     activityTitle: "Título",

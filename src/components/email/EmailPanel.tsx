@@ -905,6 +905,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AssociateDialog
+        open={associateOpen}
+        onOpenChange={setAssociateOpen}
+        onPick={associatePick}
+      />
     </div>
   );
 }

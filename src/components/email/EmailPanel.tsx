@@ -588,10 +588,13 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                   <>
                     <Button size="sm" onClick={analyze} disabled={analyzing}>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      {analyzing ? t("analyzing") : `${t("analyzeAi")} → ${t("createLead")}`}
+                      {analyzing ? t("analyzing") : t("aiTriage")}
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => openLeadDialog()}>
                       <Plus className="mr-2 h-4 w-4" /> {t("createLeadManual")}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => openTaskDialog()}>
+                      <Plus className="mr-2 h-4 w-4" /> {t("createTaskManual")}
                     </Button>
                   </>
                 )}

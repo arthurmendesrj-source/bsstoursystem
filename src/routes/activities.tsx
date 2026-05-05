@@ -106,12 +106,38 @@ function ActivitiesPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  // load lead options for the dialog
+  // link-to-lead dialog
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkTargetIds, setLinkTargetIds] = useState<string[]>([]);
+  const [linkLeadId, setLinkLeadId] = useState<string>("");
+
+  // load lead options for the dialogs
   useEffect(() => {
-    if (!dialogOpen) return;
-    supabase.from("leads").select("id,code,name").order("created_at", { ascending: false }).limit(100)
+    if (!dialogOpen && !linkDialogOpen) return;
+    supabase.from("leads").select("id,code,name").order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => setLeadOptions((data ?? []) as LeadLite[]));
-  }, [dialogOpen]);
+  }, [dialogOpen, linkDialogOpen]);
+
+  const openLinkDialog = (ids: string[]) => {
+    setLinkTargetIds(ids);
+    setLinkLeadId("");
+    setLinkDialogOpen(true);
+  };
+
+  const linkToLead = async () => {
+    if (!linkTargetIds.length) return;
+    const patch = linkLeadId
+      ? { lead_id: linkLeadId, category: "negocio" as const }
+      : { lead_id: null, category: "suporte" as const };
+    const { error } = await supabase.from("tasks").update(patch).in("id", linkTargetIds);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("saved"));
+      setLinkDialogOpen(false);
+      clearSelection();
+      loadData();
+    }
+  };
 
   const filtered = useMemo(() => {
     return tasks.filter((task) => {

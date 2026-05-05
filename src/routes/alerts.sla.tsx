@@ -320,7 +320,70 @@ function SlaPanel() {
         <MetricCard icon={<Activity className="h-4 w-4" />} label={t("slaInteractionsCount")} value={String(totalInteractions)} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* Escalonamentos abertos */}
+      <Card className="border-destructive/40">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm">Escalonamentos abertos</CardTitle>
+            <Badge variant="outline" className="ml-2">{escalations.length}</Badge>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Tempo médio resolução (30d): <span className="font-semibold text-foreground">{avgResolutionH ? `${avgResolutionH.toFixed(1)}h` : "—"}</span> · {resolvedCount} resolvidos
+          </div>
+        </CardHeader>
+        <CardContent>
+          {escalations.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">Nenhum lead escalado no momento.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lead</TableHead>
+                  <TableHead>Etapa</TableHead>
+                  <TableHead className="text-right">Parado há</TableHead>
+                  <TableHead>Reatribuir para</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {escalations.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="font-medium">
+                      <Link to="/leads/$leadId" params={{ leadId: e.lead_id }} className="hover:underline">
+                        {e.lead_name ?? e.lead_id.slice(0, 8)}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="capitalize">{e.stage}</TableCell>
+                    <TableCell className="text-right">{e.hours_since_last_action.toFixed(1)}h</TableCell>
+                    <TableCell>
+                      <Select
+                        disabled={reassigning === e.id}
+                        value=""
+                        onValueChange={(v) => handleReassign(e.id, e.lead_id, v)}
+                      >
+                        <SelectTrigger className="h-8 w-[200px]">
+                          <SelectValue placeholder={reassigning === e.id ? "Reatribuindo..." : "Selecionar vendedor"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sellers
+                            .filter((s) => s.user_id !== e.current_assigned_to)
+                            .map((s) => (
+                              <SelectItem key={s.user_id} value={s.user_id}>
+                                {s.full_name ?? s.user_id.slice(0, 8)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+
         {/* By seller */}
         <Card>
           <CardHeader className="pb-2">

@@ -106,7 +106,7 @@ function BookingDetailPage() {
   };
 
   const persist = async (itemId: string, patch: Partial<Confirmation>) => {
-    const merged = { ...(confs[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null }), ...patch };
+    const merged = { ...(confs[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null, proof_email_id: null }), ...patch };
     const { data, error } = await supabase
       .from("booking_item_confirmations")
       .upsert({
@@ -117,15 +117,47 @@ function BookingDetailPage() {
         proof_storage_path: merged.proof_storage_path,
         proof_text: merged.proof_text,
         proof_reference: merged.proof_reference,
+        proof_email_id: merged.proof_email_id ?? null,
         confirmed_at: merged.status === "confirmado" ? new Date().toISOString() : null,
         confirmed_by: merged.status === "confirmado" ? user?.id ?? null : null,
-      }, { onConflict: "booking_id,quote_item_id" })
+      } as never, { onConflict: "booking_id,quote_item_id" })
       .select()
       .single();
     if (error) { toast.error(error.message); return null; }
     setConfs((prev) => ({ ...prev, [itemId]: data as Confirmation }));
     return data as Confirmation;
   };
+
+  const [associateItem, setAssociateItem] = useState<QuoteItem | null>(null);
+
+  const handleProofPick = async (item: QuoteItem, p: ProofPick) => {
+    if (p.type === "email") {
+      await persist(item.id, {
+        proof_type: "email",
+        proof_reference: p.reference,
+        proof_text: p.text,
+        proof_email_id: p.email_id,
+      });
+      toast.success(t("saved"));
+    } else {
+      let storagePath: string | null = null;
+      if (p.file) {
+        if (p.file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
+        const ext = p.file.name.split(".").pop() || "bin";
+        storagePath = `${bookingId}/${item.id}/${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from("booking-proofs").upload(storagePath, p.file, { upsert: true });
+        if (error) { toast.error(error.message); return; }
+      }
+      await persist(item.id, {
+        proof_type: "whatsapp",
+        proof_reference: p.phone,
+        proof_text: p.text || null,
+        ...(storagePath ? { proof_storage_path: storagePath } : {}),
+      });
+      toast.success(t("saved"));
+    }
+  };
+
 
   const onUpload = async (item: QuoteItem, file: File) => {
     if (file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }

@@ -971,6 +971,33 @@ export type Database = {
           },
         ]
       }
+      sla_settings: {
+        Row: {
+          id: string
+          overdue_hours: number
+          stage: Database["public"]["Enums"]["lead_status"]
+          updated_at: string
+          updated_by: string | null
+          warning_hours: number
+        }
+        Insert: {
+          id?: string
+          overdue_hours: number
+          stage: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          updated_by?: string | null
+          warning_hours: number
+        }
+        Update: {
+          id?: string
+          overdue_hours?: number
+          stage?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          updated_by?: string | null
+          warning_hours?: number
+        }
+        Relationships: []
+      }
       supplier_contacts: {
         Row: {
           created_at: string

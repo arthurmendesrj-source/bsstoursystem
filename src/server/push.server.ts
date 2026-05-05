@@ -130,13 +130,11 @@ type LeadRecipientArgs = {
   body?: string;
   url?: string;
   tag?: string;
-  /** Quando true, também notifica administradores (default: false). */
+  eventType?: NotificationEventType;
   includeAdmins?: boolean;
-  /** IDs a excluir (ex.: o ator que disparou o evento). */
   excludeUserIds?: string[];
 };
 
-/** Resolve quem deve ser notificado sobre um lead (responsável + criador, opcionalmente admins). */
 export async function resolveLeadRecipients(
   leadId: string,
   opts?: { includeAdmins?: boolean; excludeUserIds?: string[] },
@@ -166,7 +164,6 @@ export async function resolveLeadRecipients(
   return Array.from(recipients);
 }
 
-/** Envia push para todos os destinatários relevantes do lead. */
 export async function sendPushToLeadRecipients(
   args: LeadRecipientArgs,
 ): Promise<{ recipients: string[]; perUser: Record<string, SendResult> }> {
@@ -185,8 +182,10 @@ export async function sendPushToLeadRecipients(
         url: args.url,
         leadId: args.leadId,
         tag: args.tag,
+        eventType: args.eventType,
       });
     }),
   );
   return { recipients, perUser };
 }
+

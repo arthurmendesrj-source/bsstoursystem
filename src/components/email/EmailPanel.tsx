@@ -80,6 +80,28 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   });
   const [aiNote, setAiNote] = useState<string | null>(null);
 
+  // Triagem com IA
+  type Triage = {
+    summary: string;
+    suggested_action: "create_lead" | "create_task" | "ignore";
+    suggested_task_category?: "negocio" | "suporte" | null;
+    suggested_task_priority?: "baixa" | "media" | "alta" | null;
+    suggested_task_title?: string | null;
+    raw: Record<string, unknown>;
+  };
+  const [triageOpen, setTriageOpen] = useState(false);
+  const [triage, setTriage] = useState<Triage | null>(null);
+
+  // Diálogo de criação de atividade
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    category: "suporte" as "negocio" | "suporte",
+    priority: "media" as "baixa" | "media" | "alta",
+    description: "",
+    due_date: "",
+  });
+
   // ---------------- list loading ----------------
   const loadList = async (f: Folder = folder) => {
     let query = supabase.from("emails").select("*").order("received_at", { ascending: false }).limit(200);

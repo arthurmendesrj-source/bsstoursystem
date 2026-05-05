@@ -1,11 +1,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bell, CalendarCheck, FileCheck, Ticket } from "lucide-react";
+import { Bell, CalendarCheck, FileCheck, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -34,6 +38,9 @@ export function NotificationBell() {
   const [quotes, setQuotes] = useState<PendingQuote[]>([]);
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
   const [loading, setLoading] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [confirmQuote, setConfirmQuote] = useState<PendingQuote | null>(null);
+  const [confirmBooking, setConfirmBooking] = useState<PendingBooking | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,43 +86,52 @@ export function NotificationBell() {
   }, [load]);
 
   const convertQuote = async (q: PendingQuote) => {
-    if (!confirm(t("convertQuoteConfirm"))) return;
-    const { data: existing } = await supabase
-      .from("bookings").select("id").eq("quote_id", q.id).maybeSingle();
-    if (existing) { toast.info(t("alreadyConverted")); load(); return; }
-    const { data: userRes } = await supabase.auth.getUser();
-    const uid = userRes.user?.id;
-    if (!uid) return;
-    const { data: its } = await supabase
-      .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
-    const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
-      .flatMap((it) => [it.item_date, it.check_out])
-      .filter((d): d is string => Boolean(d)).sort();
-    const departure = dates[0] ?? null;
-    const ret = dates[dates.length - 1] ?? departure;
-    const { error } = await supabase.from("bookings").insert({
-      lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
-      total_amount: q.total_amount, currency: q.currency as "BRL",
-      departure_date: departure, return_date: ret,
-      status: "pre_reserva", created_by: uid,
-    });
-    if (error) toast.error(error.message);
-    else { toast.success(t("bookingCreated")); load(); }
+    setBusyId(q.id);
+    try {
+      const { data: existing } = await supabase
+        .from("bookings").select("id").eq("quote_id", q.id).maybeSingle();
+      if (existing) { toast.info(t("alreadyConverted")); load(); return; }
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      if (!uid) return;
+      const { data: its } = await supabase
+        .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
+      const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
+        .flatMap((it) => [it.item_date, it.check_out])
+        .filter((d): d is string => Boolean(d)).sort();
+      const departure = dates[0] ?? null;
+      const ret = dates[dates.length - 1] ?? departure;
+      const { error } = await supabase.from("bookings").insert({
+        lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
+        total_amount: q.total_amount, currency: q.currency as "BRL",
+        departure_date: departure, return_date: ret,
+        status: "pre_reserva", created_by: uid,
+      });
+      if (error) toast.error(error.message);
+      else { toast.success(t("bookingCreated")); load(); }
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const generateVoucher = async (b: PendingBooking) => {
-    const dt = new Date();
-    const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
-    const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
-    const itinerary = [
-      b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
-      b.return_date ? `Retorno: ${b.return_date}` : null,
-    ].filter(Boolean).join("\n");
-    const { error } = await supabase.from("vouchers").insert({
-      booking_id: b.id, code, itinerary: itinerary || null,
-    });
-    if (error) toast.error(error.message);
-    else { toast.success(t("voucherCreated")); load(); }
+    setBusyId(b.id);
+    try {
+      const dt = new Date();
+      const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+      const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
+      const itinerary = [
+        b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
+        b.return_date ? `Retorno: ${b.return_date}` : null,
+      ].filter(Boolean).join("\n");
+      const { error } = await supabase.from("vouchers").insert({
+        booking_id: b.id, code, itinerary: itinerary || null,
+      });
+      if (error) toast.error(error.message);
+      else { toast.success(t("voucherCreated")); load(); }
+    } finally {
+      setBusyId(null);
+    }
   };
 
 
@@ -129,6 +145,7 @@ export function NotificationBell() {
   };
 
   return (
+    <>
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) load(); }}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
@@ -181,8 +198,11 @@ export function NotificationBell() {
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => convertQuote(q)}>
-                            <CalendarCheck className="h-3 w-3 mr-1" />{t("convertToBooking")}
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === q.id} onClick={() => setConfirmQuote(q)}>
+                            {busyId === q.id
+                              ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              : <CalendarCheck className="h-3 w-3 mr-1" />}
+                            {t("convertToBooking")}
                           </Button>
                         </div>
                       </div>
@@ -212,8 +232,11 @@ export function NotificationBell() {
                             {b.status.replace("_", " ")}
                             {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
                           </span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => generateVoucher(b)}>
-                            <Ticket className="h-3 w-3 mr-1" />{t("generateVoucher")}
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === b.id} onClick={() => setConfirmBooking(b)}>
+                            {busyId === b.id
+                              ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              : <Ticket className="h-3 w-3 mr-1" />}
+                            {t("generateVoucher")}
                           </Button>
                         </div>
                       </div>
@@ -226,5 +249,40 @@ export function NotificationBell() {
         </ScrollArea>
       </PopoverContent>
     </Popover>
+
+    <AlertDialog open={!!confirmQuote} onOpenChange={(o) => !o && setConfirmQuote(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("convertToBooking")}</AlertDialogTitle>
+          <AlertDialogDescription>{t("convertQuoteConfirm")}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => { const q = confirmQuote; setConfirmQuote(null); if (q) convertQuote(q); }}
+          >
+            {t("convertToBooking")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <AlertDialog open={!!confirmBooking} onOpenChange={(o) => !o && setConfirmBooking(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("generateVoucher")}</AlertDialogTitle>
+          <AlertDialogDescription>{t("generateVoucherConfirm")}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => { const b = confirmBooking; setConfirmBooking(null); if (b) generateVoucher(b); }}
+          >
+            {t("generateVoucher")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

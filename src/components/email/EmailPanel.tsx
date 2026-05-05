@@ -620,6 +620,30 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                   )}
                 </div>
               )}
+              {mode === "full" && !selected.lead_id && !selected.customer_id && suggestions.length > 0 && (
+                <div className="mt-3 rounded-md border bg-muted/30 p-2.5">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
+                    <Link2 className="h-3 w-3" /> {t("suggestedLinks")}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {suggestions.map((s) => (
+                      <Button
+                        key={`${s.kind}-${s.id}`}
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        onClick={() => linkSuggestion(s)}
+                        title={s.sub ?? ""}
+                      >
+                        <Badge variant="secondary" className="mr-1.5 px-1 text-[10px] uppercase">
+                          {s.kind === "lead" ? "Lead" : s.kind === "customer" ? "Cliente" : "Forn."}
+                        </Badge>
+                        {s.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={openReply}>
                   <Reply className="mr-2 h-4 w-4" /> {t("reply")}

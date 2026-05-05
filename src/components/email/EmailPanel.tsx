@@ -92,6 +92,13 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const [triageOpen, setTriageOpen] = useState(false);
   const [triage, setTriage] = useState<Triage | null>(null);
 
+  // Suggested links based on sender email
+  type Suggestion =
+    | { kind: "lead"; id: string; label: string; sub?: string }
+    | { kind: "customer"; id: string; label: string; sub?: string }
+    | { kind: "supplier"; id: string; label: string; sub?: string };
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+
   // Diálogo de criação de atividade
   const [taskOpen, setTaskOpen] = useState(false);
   const [taskForm, setTaskForm] = useState({

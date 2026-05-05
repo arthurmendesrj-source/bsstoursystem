@@ -89,50 +89,66 @@ export function NotificationBell() {
     return () => clearInterval(id);
   }, [load]);
 
-  const convertQuote = async (q: PendingQuote) => {
+  const openQuoteDialog = async (q: PendingQuote) => {
+    const { data: its } = await supabase
+      .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
+    const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
+      .flatMap((it) => [it.item_date, it.check_out])
+      .filter((d): d is string => Boolean(d)).sort();
+    setQuoteForm({ departure: dates[0] ?? "", ret: dates[dates.length - 1] ?? dates[0] ?? "" });
+    setQuoteDialog(q);
+  };
+
+  const convertQuote = async () => {
+    const q = quoteDialog;
+    if (!q) return;
     setBusyId(q.id);
     try {
       const { data: existing } = await supabase
         .from("bookings").select("id").eq("quote_id", q.id).maybeSingle();
-      if (existing) { toast.info(t("alreadyConverted")); load(); return; }
+      if (existing) { toast.info(t("alreadyConverted")); setQuoteDialog(null); load(); return; }
       const { data: userRes } = await supabase.auth.getUser();
       const uid = userRes.user?.id;
       if (!uid) return;
-      const { data: its } = await supabase
-        .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
-      const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
-        .flatMap((it) => [it.item_date, it.check_out])
-        .filter((d): d is string => Boolean(d)).sort();
-      const departure = dates[0] ?? null;
-      const ret = dates[dates.length - 1] ?? departure;
       const { error } = await supabase.from("bookings").insert({
         lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
         total_amount: q.total_amount, currency: q.currency as "BRL",
-        departure_date: departure, return_date: ret,
+        departure_date: quoteForm.departure || null,
+        return_date: quoteForm.ret || quoteForm.departure || null,
         status: "pre_reserva", created_by: uid,
       });
       if (error) toast.error(error.message);
-      else { toast.success(t("bookingCreated")); load(); }
+      else { toast.success(t("bookingCreated")); setQuoteDialog(null); load(); }
     } finally {
       setBusyId(null);
     }
   };
 
-  const generateVoucher = async (b: PendingBooking) => {
+  const openBookingDialog = (b: PendingBooking) => {
+    const dt = new Date();
+    const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+    const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
+    const itinerary = [
+      b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
+      b.return_date ? `Retorno: ${b.return_date}` : null,
+    ].filter(Boolean).join("\n");
+    setVoucherForm({ code, itinerary, emergency: "" });
+    setBookingDialog(b);
+  };
+
+  const generateVoucher = async () => {
+    const b = bookingDialog;
+    if (!b) return;
     setBusyId(b.id);
     try {
-      const dt = new Date();
-      const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
-      const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
-      const itinerary = [
-        b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
-        b.return_date ? `Retorno: ${b.return_date}` : null,
-      ].filter(Boolean).join("\n");
       const { error } = await supabase.from("vouchers").insert({
-        booking_id: b.id, code, itinerary: itinerary || null,
+        booking_id: b.id,
+        code: voucherForm.code,
+        itinerary: voucherForm.itinerary || null,
+        emergency_contact: voucherForm.emergency || null,
       });
       if (error) toast.error(error.message);
-      else { toast.success(t("voucherCreated")); load(); }
+      else { toast.success(t("voucherCreated")); setBookingDialog(null); load(); }
     } finally {
       setBusyId(null);
     }

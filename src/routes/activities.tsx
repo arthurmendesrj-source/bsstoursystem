@@ -428,7 +428,14 @@ function ActivitiesPage() {
                   const isOverdue = !task.completed && task.due_date && isAfter(new Date(), new Date(task.due_date));
                   const inProgress = !!task.started_at && !task.completed;
                   return (
-                    <TableRow key={task.id} className={cn(task.completed && "opacity-60")}>
+                    <TableRow key={task.id} className={cn(task.completed && "opacity-60", selectedIds.has(task.id) && "bg-muted/50")}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(task.id)}
+                          onCheckedChange={() => toggleOne(task.id)}
+                          aria-label="select"
+                        />
+                      </TableCell>
                       <TableCell>
                         <button onClick={() => toggleComplete(task)} aria-label="toggle">
                           {task.completed

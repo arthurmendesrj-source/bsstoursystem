@@ -212,24 +212,41 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
     return () => clearInterval(id);
   }, [userId, load, loadSnoozes, snoozeTick]);
 
+  // Use refs so the realtime channel is created exactly once per userId,
+  // independent of `load`/`markRecent` identity changes (which would otherwise
+  // re-subscribe and trigger "cannot add postgres_changes after subscribe()").
+  const loadRef = useRef(load);
+  const markRecentRef = useRef(markRecent);
+  useEffect(() => { loadRef.current = load; }, [load]);
+  useEffect(() => { markRecentRef.current = markRecent; }, [markRecent]);
+
   useEffect(() => {
     if (!userId) return;
-    const ch = supabase
-      .channel("lead-alerts-interactions")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "interactions" },
-        (payload) => {
-          const row = payload.new as { lead_id: string | null };
-          if (row?.lead_id) markRecent(row.lead_id);
-          load();
-        },
-      )
-      .subscribe();
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      const channelName = `lead-alerts-interactions-${userId}-${Math.random().toString(36).slice(2, 10)}`;
+      ch = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "interactions" },
+          (payload) => {
+            const row = payload.new as { lead_id: string | null };
+            if (row?.lead_id) markRecentRef.current(row.lead_id);
+            loadRef.current();
+          },
+        )
+        .subscribe();
+    } catch (e) {
+      // Don't let realtime failures bubble to the error boundary
+      console.warn("[useLeadAlerts] realtime subscribe failed", e);
+    }
     return () => {
-      supabase.removeChannel(ch);
+      if (ch) {
+        try { supabase.removeChannel(ch); } catch { /* ignore */ }
+      }
     };
-  }, [userId, load, markRecent]);
+  }, [userId]);
 
   return { alerts, loading, reload: load, markRecent, snooze, unsnooze, followupsToday };
 }

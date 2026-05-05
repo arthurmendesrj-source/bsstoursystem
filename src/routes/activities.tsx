@@ -114,7 +114,7 @@ function ActivitiesPage() {
   // load lead options for the dialogs
   useEffect(() => {
     if (!dialogOpen && !linkDialogOpen) return;
-    supabase.from("leads").select("id,code,name").order("created_at", { ascending: false }).limit(200)
+    supabase.from("leads").select("id,code,name,destination").order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setLeadOptions((data ?? []) as LeadLite[]));
   }, [dialogOpen, linkDialogOpen]);
 

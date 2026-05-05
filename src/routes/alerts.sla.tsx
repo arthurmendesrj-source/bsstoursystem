@@ -382,8 +382,7 @@ function SlaPanel() {
           )}
         </CardContent>
       </Card>
-
-
+      <div className="grid gap-4 md:grid-cols-2">
         {/* By seller */}
         <Card>
           <CardHeader className="pb-2">

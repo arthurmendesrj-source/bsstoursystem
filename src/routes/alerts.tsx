@@ -302,7 +302,7 @@ function AlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AlertList items={overdue} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoOverdue")} onSnooze={snooze} />
+            <AlertList items={overdue} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoOverdue")} onSnooze={snooze} templates={templates} vendorName={vendorName} />
           </CardContent>
         </Card>
         <Card>

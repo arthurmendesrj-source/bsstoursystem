@@ -14,6 +14,7 @@ export type LeadAlert = {
   created_by: string | null;
   phone: string | null;
   email: string | null;
+  destination: string | null;
   lastInteractionAt: string | null;
   lastInteractionType: string | null;
   recent: boolean;

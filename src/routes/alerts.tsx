@@ -278,6 +278,9 @@ function AlertsPage() {
             </span>
           )}
           <Button asChild variant="outline" size="sm">
+            <Link to="/alerts/preferences">Preferências</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm">
             <Link to="/alerts/history">Histórico</Link>
           </Button>
           {isAdmin && (

@@ -882,6 +882,7 @@ const dict = {
     convertQuoteConfirm: "¿Crear una reserva a partir de esta cotización?",
     bookingCreated: "Reserva creada",
     generateVoucher: "Generar voucher",
+    generateVoucherConfirm: "¿Generar voucher para esta reserva?",
     voucherCreated: "Voucher generado",
     openBooking: "Abrir reserva",
     openVoucher: "Abrir voucher",

@@ -121,9 +121,9 @@ function LeadWorkspace() {
   useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
 
   // Auto-open quick contact dialog with suggested template when arriving via /alerts deep link
-  const autoTriggered = useState(false);
+  const [autoTriggered, setAutoTriggered] = useState(false);
   useEffect(() => {
-    if (!lead || !search.quickContact || autoTriggered[0]) return;
+    if (!lead || !search.quickContact || autoTriggered) return;
     const type = search.quickContact;
     const days = computeLeadSla({
       status: lead.status,
@@ -141,7 +141,7 @@ function LeadWorkspace() {
     setQuickType(type);
     setQuickContent(tpl);
     setQuickOpen(true);
-    autoTriggered[1](true);
+    setAutoTriggered(true);
     navigate({ to: "/leads/$leadId", params: { leadId }, search: {}, replace: true });
   }, [lead, search.quickContact, leadId, navigate, autoTriggered]);
 

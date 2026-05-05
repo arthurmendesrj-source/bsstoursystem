@@ -116,9 +116,22 @@ function NotificationHistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, statusFilter, channelFilter, onlyMine]);
 
-  const successCount = rows.filter((r) => r.status === "success").length;
-  const errorCount = rows.filter((r) => r.status === "error").length;
-  const skippedCount = rows.filter((r) => r.status === "skipped").length;
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((r) => {
+      // Match por lead_id (prefixo) ou nome/código do lead, e título/corpo
+      if (r.lead_id && r.lead_id.toLowerCase().includes(term)) return true;
+      if (r.lead_id && leadNames[r.lead_id]?.toLowerCase().includes(term)) return true;
+      if (r.title.toLowerCase().includes(term)) return true;
+      if (r.body && r.body.toLowerCase().includes(term)) return true;
+      return false;
+    });
+  }, [rows, search, leadNames]);
+
+  const successCount = filtered.filter((r) => r.status === "success").length;
+  const errorCount = filtered.filter((r) => r.status === "error").length;
+  const skippedCount = filtered.filter((r) => r.status === "skipped").length;
 
   return (
     <div className="space-y-6">

@@ -483,8 +483,37 @@ function LeadWorkspace() {
               </TabsContent>
             </Tabs>
           </CardContent>
-        </Card>
+      </Card>
       </div>
+
+      <Dialog open={quickOpen} onOpenChange={(o) => !quickSaving && setQuickOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("addInteraction")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Select value={quickType} onValueChange={setQuickType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {INTERACTION_TYPES.map((it) => (
+                  <SelectItem key={it.value} value={it.value}>{t(it.labelKey as "intCall")}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Textarea
+              rows={4}
+              autoFocus
+              value={quickContent}
+              onChange={(e) => setQuickContent(e.target.value)}
+              placeholder="..."
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickOpen(false)} disabled={quickSaving}>{t("cancel")}</Button>
+            <Button onClick={submitQuickContact} disabled={quickSaving || !quickContent.trim()}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -193,6 +193,7 @@ function BookingsPage() {
               <TableHead>{t("price")}</TableHead>
               <TableHead>{t("status")}</TableHead>
               <TableHead className="text-right">Voucher</TableHead>
+              <TableHead className="text-right">{t("actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

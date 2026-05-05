@@ -71,6 +71,10 @@ function SlaPanel() {
   const [reassigning, setReassigning] = useState<string | null>(null);
   const reassign = useServerFn(reassignLead);
 
+  useEffect(() => {
+    if (!authLoading && !isAdmin) navigate({ to: "/alerts" });
+  }, [authLoading, isAdmin, navigate]);
+
   const reloadEscalations = async () => {
     const [{ data: open }, { data: closed }] = await Promise.all([
       supabase

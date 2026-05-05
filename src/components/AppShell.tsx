@@ -21,6 +21,7 @@ import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, isAdmin, signOut } = useAuth();
@@ -127,6 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 items-center justify-end gap-2 border-b border-border bg-card px-4 md:px-6">
+          <NotificationBell />
           <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
             <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
             <SelectContent>

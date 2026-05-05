@@ -11,6 +11,10 @@ import {
   CheckCircle2,
   Clock,
   Briefcase,
+  Play,
+  Pause,
+  Trash2,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { AuthGate } from "@/components/AuthGate";

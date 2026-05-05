@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format, isAfter, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
-import { Plus, Play, Pause, CheckCircle2, Clock, AlertCircle, Mail, ExternalLink, Trash2, Link2 } from "lucide-react";
+import { Plus, Play, Pause, CheckCircle2, Clock, AlertCircle, Mail, ExternalLink, Trash2, Link2, ChevronsUpDown, Check } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -48,7 +50,7 @@ type Task = {
   created_by: string | null;
 };
 
-type LeadLite = { id: string; code: string | null; name: string };
+type LeadLite = { id: string; code: string | null; name: string; destination?: string | null };
 
 function ActivitiesPage() {
   const { t } = useI18n();
@@ -110,11 +112,12 @@ function ActivitiesPage() {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkTargetIds, setLinkTargetIds] = useState<string[]>([]);
   const [linkLeadId, setLinkLeadId] = useState<string>("");
+  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
 
   // load lead options for the dialogs
   useEffect(() => {
     if (!dialogOpen && !linkDialogOpen) return;
-    supabase.from("leads").select("id,code,name").order("created_at", { ascending: false }).limit(200)
+    supabase.from("leads").select("id,code,name,destination").order("created_at", { ascending: false }).limit(500)
       .then(({ data }) => setLeadOptions((data ?? []) as LeadLite[]));
   }, [dialogOpen, linkDialogOpen]);
 
@@ -534,15 +537,50 @@ function ActivitiesPage() {
           <DialogHeader><DialogTitle>{t("linkToLead")} ({linkTargetIds.length})</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <Label>{t("linkedLead")}</Label>
-            <Select value={linkLeadId || "none"} onValueChange={(v) => setLinkLeadId(v === "none" ? "" : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— {t("unlinkLead")}</SelectItem>
-                {leadOptions.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.code ?? "—"} · {l.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {(() => {
+              const sel = leadOptions.find((l) => l.id === linkLeadId);
+              return (
+                <Popover open={linkPopoverOpen} onOpenChange={setLinkPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      <span className="truncate">
+                        {sel ? `${sel.code ?? "—"} · ${sel.name}${sel.destination ? ` · ${sel.destination}` : ""}` : t("searchLeadPlaceholder")}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder={t("searchLeadPlaceholder")} />
+                      <CommandList>
+                        <CommandEmpty>{t("noLeadsFound")}</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__unlink__"
+                            onSelect={() => { setLinkLeadId(""); setLinkPopoverOpen(false); }}
+                          >
+                            <Check className={cn("h-4 w-4 mr-2", !linkLeadId ? "opacity-100" : "opacity-0")} />
+                            — {t("unlinkLead")}
+                          </CommandItem>
+                          {leadOptions.map((l) => (
+                            <CommandItem
+                              key={l.id}
+                              value={`${l.code ?? ""} ${l.name} ${l.destination ?? ""}`}
+                              onSelect={() => { setLinkLeadId(l.id); setLinkPopoverOpen(false); }}
+                            >
+                              <Check className={cn("h-4 w-4 mr-2", linkLeadId === l.id ? "opacity-100" : "opacity-0")} />
+                              <span className="font-mono text-xs mr-2">{l.code ?? "—"}</span>
+                              <span className="truncate">{l.name}</span>
+                              {l.destination && <span className="text-muted-foreground text-xs ml-2 truncate">· {l.destination}</span>}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkDialogOpen(false)}>{t("cancel")}</Button>

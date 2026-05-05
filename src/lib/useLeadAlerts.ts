@@ -104,7 +104,7 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
     await ensureSlaSettingsLoaded();
     let q = supabase
       .from("leads")
-      .select("id,name,status,next_action,next_action_date,updated_at,assigned_to,created_by,phone,email")
+      .select("id,name,status,next_action,next_action_date,updated_at,assigned_to,created_by,phone,email,destination")
       .not("status", "in", "(fechado,perdido)");
     if (!isAdmin) {
       q = q.or(`assigned_to.eq.${userId},created_by.eq.${userId}`);

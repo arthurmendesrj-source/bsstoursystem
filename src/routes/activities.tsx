@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,6 +63,7 @@ function ActivitiesPage() {
   const [categoryFilter, setCategoryFilter] = useState<"all" | "negocio" | "suporte">("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | "baixa" | "media" | "alta">("all");
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -175,6 +177,33 @@ function ActivitiesPage() {
     const { error } = await supabase.from("tasks").delete().eq("id", task.id);
     if (error) toast.error(error.message);
     else loadData();
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const bulkUpdate = async (patch: Partial<Task>) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    const { error } = await supabase.from("tasks").update(patch).in("id", ids);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); clearSelection(); loadData(); }
+  };
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    if (!confirm(t("confirmBulkDelete"))) return;
+    const { error } = await supabase.from("tasks").delete().in("id", ids);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); clearSelection(); loadData(); }
   };
 
   const createActivity = async (e: React.FormEvent) => {
@@ -336,6 +365,31 @@ function ActivitiesPage() {
         </CardContent>
       </Card>
 
+      {/* bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium mr-2">{selectedIds.size} {t("selectedCount")}</span>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ completed: true, completed_at: new Date().toISOString() })}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />{t("bulkComplete")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ completed: false, completed_at: null })}>
+              {t("bulkReopen")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ started_at: new Date().toISOString() })}>
+              <Play className="h-4 w-4 mr-1" />{t("bulkStart")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ started_at: null })}>
+              <Pause className="h-4 w-4 mr-1" />{t("bulkPause")}
+            </Button>
+            <Button size="sm" variant="destructive" onClick={bulkDelete}>
+              <Trash2 className="h-4 w-4 mr-1" />{t("bulkDelete")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearSelection}>{t("clearSelection")}</Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* table */}
       <Card>
         <CardContent className="p-0">
@@ -347,6 +401,16 @@ function ActivitiesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={filtered.length > 0 && filtered.every((tk) => selectedIds.has(tk.id))}
+                      onCheckedChange={(v) => {
+                        if (v) setSelectedIds(new Set(filtered.map((tk) => tk.id)));
+                        else clearSelection();
+                      }}
+                      aria-label="select all"
+                    />
+                  </TableHead>
                   <TableHead className="w-10"></TableHead>
                   <TableHead>{t("activityTitle")}</TableHead>
                   <TableHead>{t("linkedLead")}</TableHead>
@@ -364,7 +428,14 @@ function ActivitiesPage() {
                   const isOverdue = !task.completed && task.due_date && isAfter(new Date(), new Date(task.due_date));
                   const inProgress = !!task.started_at && !task.completed;
                   return (
-                    <TableRow key={task.id} className={cn(task.completed && "opacity-60")}>
+                    <TableRow key={task.id} className={cn(task.completed && "opacity-60", selectedIds.has(task.id) && "bg-muted/50")}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(task.id)}
+                          onCheckedChange={() => toggleOne(task.id)}
+                          aria-label="select"
+                        />
+                      </TableCell>
                       <TableCell>
                         <button onClick={() => toggleComplete(task)} aria-label="toggle">
                           {task.completed

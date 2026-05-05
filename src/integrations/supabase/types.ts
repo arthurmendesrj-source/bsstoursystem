@@ -1076,6 +1076,51 @@ export type Database = {
           },
         ]
       }
+      sla_escalations: {
+        Row: {
+          created_at: string
+          hours_since_last_action: number
+          id: string
+          lead_id: string
+          notified_admins: string[]
+          overdue_hours_at_trigger: number
+          reassigned_to: string | null
+          resolution: string | null
+          resolved_at: string | null
+          stage: Database["public"]["Enums"]["lead_status"]
+          triggered_at: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hours_since_last_action: number
+          id?: string
+          lead_id: string
+          notified_admins?: string[]
+          overdue_hours_at_trigger: number
+          reassigned_to?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          stage: Database["public"]["Enums"]["lead_status"]
+          triggered_at?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hours_since_last_action?: number
+          id?: string
+          lead_id?: string
+          notified_admins?: string[]
+          overdue_hours_at_trigger?: number
+          reassigned_to?: string | null
+          resolution?: string | null
+          resolved_at?: string | null
+          stage?: Database["public"]["Enums"]["lead_status"]
+          triggered_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sla_settings: {
         Row: {
           id: string

@@ -37,18 +37,26 @@ export const Route = createFileRoute("/alerts")({
 
 const STATUSES = ["novo", "qualificado", "cotacao", "proposta"] as const;
 
-function buildWhatsappLink(phone: string | null, name: string) {
+function buildWhatsappLink(
+  phone: string | null,
+  vars: { nome: string; destino?: string | null; vendedor?: string | null },
+  templates: MessageTemplates,
+) {
   if (!phone) return null;
   const clean = phone.replace(/\D/g, "");
   if (!clean) return null;
-  const text = `Olá ${name.split(" ")[0]}, tudo bem? Passando para retomar nossa conversa. Posso te ajudar com alguma informação?`;
+  const text = renderTemplate(templates.whatsapp, vars);
   return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
 }
 
-function buildMailtoLink(email: string | null, name: string) {
+function buildMailtoLink(
+  email: string | null,
+  vars: { nome: string; destino?: string | null; vendedor?: string | null },
+  templates: MessageTemplates,
+) {
   if (!email) return null;
-  const subject = encodeURIComponent("Retomando nossa conversa");
-  const body = encodeURIComponent(`Olá ${name.split(" ")[0]},\n\nEspero que esteja bem. Quero retomar nosso atendimento e entender como posso te ajudar nos próximos passos.`);
+  const subject = encodeURIComponent(renderTemplate(templates.email_subject, vars));
+  const body = encodeURIComponent(renderTemplate(templates.email_body, vars));
   return `mailto:${email}?subject=${subject}&body=${body}`;
 }
 

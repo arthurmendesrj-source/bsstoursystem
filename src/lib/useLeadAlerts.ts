@@ -186,10 +186,15 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
   }, [userId, isAdmin]);
 
   useEffect(() => {
-    load();
+    if (!userId) return;
+    (async () => {
+      await migrateLegacySnoozes(userId);
+      await loadSnoozes();
+      load();
+    })();
     const id = setInterval(load, 120_000);
     return () => clearInterval(id);
-  }, [load, snoozeTick]);
+  }, [userId, load, loadSnoozes, snoozeTick]);
 
   useEffect(() => {
     if (!userId) return;

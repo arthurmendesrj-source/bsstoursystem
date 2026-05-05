@@ -140,7 +140,7 @@ function WorkspacePage() {
     setLoadingLead(true);
     const [leadRes, tasksRes, intRes, quotesRes, bookingsRes] = await Promise.all([
       supabase.from("leads").select("*").eq("id", id).maybeSingle(),
-      supabase.from("tasks").select("id,title,description,due_date,completed").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
+      supabase.from("tasks").select("id,title,description,due_date,completed,priority,started_at,completed_at").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", id).order("occurred_at", { ascending: false }),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", id).order("created_at", { ascending: false }),

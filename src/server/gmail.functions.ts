@@ -258,7 +258,7 @@ export const emailAnalyze = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "Você é um assistente de uma operadora de turismo. Analise o e-mail recebido e extraia dados estruturados para criar um lead de viagem. Use null quando não houver informação. Responda sempre via tool call.",
+              "Você é um assistente de uma operadora de turismo. Analise o e-mail recebido, gere um RESUMO curto em português (2-3 frases) e RECOMENDE uma ação ao operador: criar lead (interesse comercial de viagem), criar atividade (suporte, dúvida operacional, follow-up sem novo negócio) ou ignorar (spam, newsletter, conversa interna). Quando houver dados de viagem, extraia-os para pré-preencher o lead. Use null quando não houver informação. Responda sempre via tool call.",
           },
           {
             role: "user",

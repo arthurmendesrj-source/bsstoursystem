@@ -90,6 +90,10 @@ function LeadWorkspace() {
   // Interaction form
   const [intType, setIntType] = useState<string>("ligacao");
   const [intContent, setIntContent] = useState("");
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickType, setQuickType] = useState<string>("ligacao");
+  const [quickContent, setQuickContent] = useState("");
+  const [quickSaving, setQuickSaving] = useState(false);
 
   const loadAll = async () => {
     setLoading(true);

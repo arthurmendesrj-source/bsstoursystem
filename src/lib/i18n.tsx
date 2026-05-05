@@ -295,6 +295,8 @@ const dict = {
     bulkDelete: "Excluir",
     linkToLead: "Vincular a Lead",
     unlinkLead: "Desvincular",
+    searchLeadPlaceholder: "Buscar por código, nome ou destino…",
+    noLeadsFound: "Nenhum lead encontrado",
     clearSelection: "Limpar seleção",
     confirmBulkDelete: "Excluir as atividades selecionadas?",
     activityTitle: "Título",

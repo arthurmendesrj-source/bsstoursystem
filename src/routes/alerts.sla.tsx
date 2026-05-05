@@ -1,12 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Clock, AlertCircle, Users, Activity } from "lucide-react";
+import { ArrowLeft, Clock, AlertCircle, Users, Activity, ShieldAlert } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { useServerFn } from "@tanstack/react-start";
+import { reassignLead } from "@/server/sla.functions";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
@@ -33,6 +37,17 @@ type LeadRow = {
 };
 type InteractionRow = { lead_id: string | null; created_by: string | null; occurred_at: string };
 type ProfileRow = { user_id: string; full_name: string | null; daily_followup_goal: number | null };
+type EscalationRow = {
+  id: string;
+  lead_id: string;
+  stage: string;
+  hours_since_last_action: number;
+  triggered_at: string;
+  resolved_at: string | null;
+  reassigned_to: string | null;
+  lead_name?: string | null;
+  current_assigned_to?: string | null;
+};
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;
@@ -51,10 +66,82 @@ function SlaPanel() {
   const [interactions, setInteractions] = useState<InteractionRow[]>([]);
   const [profiles, setProfiles] = useState<Map<string, ProfileRow>>(new Map());
   const [goalInteractions, setGoalInteractions] = useState<InteractionRow[]>([]);
+  const [escalations, setEscalations] = useState<EscalationRow[]>([]);
+  const [sellers, setSellers] = useState<{ user_id: string; full_name: string | null }[]>([]);
+  const [reassigning, setReassigning] = useState<string | null>(null);
+  const reassign = useServerFn(reassignLead);
 
   useEffect(() => {
     if (!authLoading && !isAdmin) navigate({ to: "/alerts" });
   }, [authLoading, isAdmin, navigate]);
+
+  const reloadEscalations = async () => {
+    const [{ data: open }, { data: closed }] = await Promise.all([
+      supabase
+        .from("sla_escalations")
+        .select("id, lead_id, stage, hours_since_last_action, triggered_at, resolved_at, reassigned_to")
+        .is("resolved_at", null)
+        .order("triggered_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("sla_escalations")
+        .select("triggered_at, resolved_at")
+        .not("resolved_at", "is", null)
+        .gte("triggered_at", new Date(Date.now() - 30 * 86400000).toISOString())
+        .limit(500),
+    ]);
+    const openRows = ((open ?? []) as EscalationRow[]);
+    // Hidrata nome do lead para os abertos
+    const leadIds = openRows.map((e) => e.lead_id);
+    if (leadIds.length > 0) {
+      const { data: leadsInfo } = await supabase
+        .from("leads")
+        .select("id, name, assigned_to")
+        .in("id", leadIds);
+      const map = new Map((leadsInfo ?? []).map((l) => [l.id, l]));
+      openRows.forEach((e) => {
+        const li = map.get(e.lead_id);
+        e.lead_name = li?.name ?? null;
+        e.current_assigned_to = li?.assigned_to ?? null;
+      });
+    }
+    setEscalations(openRows);
+    // Tempo médio resolução (em horas)
+    const closedRows = (closed ?? []) as { triggered_at: string; resolved_at: string }[];
+    const total = closedRows.reduce(
+      (acc, r) => acc + (new Date(r.resolved_at).getTime() - new Date(r.triggered_at).getTime()) / 3600000,
+      0,
+    );
+    setAvgResolutionH(closedRows.length ? total / closedRows.length : 0);
+    setResolvedCount(closedRows.length);
+  };
+
+  const [avgResolutionH, setAvgResolutionH] = useState(0);
+  const [resolvedCount, setResolvedCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    reloadEscalations();
+    // Carrega vendedores (perfis com role 'vendedor' ou todos os profiles para selecionar)
+    (async () => {
+      const { data } = await supabase.from("profiles").select("user_id, full_name");
+      setSellers((data ?? []) as { user_id: string; full_name: string | null }[]);
+    })();
+  }, [isAdmin]);
+
+  const handleReassign = async (escalationId: string, leadId: string, newAssigneeId: string) => {
+    setReassigning(escalationId);
+    try {
+      await reassign({ data: { leadId, newAssigneeId, escalationId } });
+      toast.success("Lead reatribuído.");
+      await reloadEscalations();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reatribuir.");
+    } finally {
+      setReassigning(null);
+    }
+  };
+
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -233,6 +320,68 @@ function SlaPanel() {
         <MetricCard icon={<Activity className="h-4 w-4" />} label={t("slaInteractionsCount")} value={String(totalInteractions)} />
       </div>
 
+      {/* Escalonamentos abertos */}
+      <Card className="border-destructive/40">
+        <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-4 w-4 text-destructive" />
+            <CardTitle className="text-sm">Escalonamentos abertos</CardTitle>
+            <Badge variant="outline" className="ml-2">{escalations.length}</Badge>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Tempo médio resolução (30d): <span className="font-semibold text-foreground">{avgResolutionH ? `${avgResolutionH.toFixed(1)}h` : "—"}</span> · {resolvedCount} resolvidos
+          </div>
+        </CardHeader>
+        <CardContent>
+          {escalations.length === 0 ? (
+            <div className="py-6 text-center text-sm text-muted-foreground">Nenhum lead escalado no momento.</div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Lead</TableHead>
+                  <TableHead>Etapa</TableHead>
+                  <TableHead className="text-right">Parado há</TableHead>
+                  <TableHead>Reatribuir para</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {escalations.map((e) => (
+                  <TableRow key={e.id}>
+                    <TableCell className="font-medium">
+                      <Link to="/leads/$leadId" params={{ leadId: e.lead_id }} className="hover:underline">
+                        {e.lead_name ?? e.lead_id.slice(0, 8)}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="capitalize">{e.stage}</TableCell>
+                    <TableCell className="text-right">{e.hours_since_last_action.toFixed(1)}h</TableCell>
+                    <TableCell>
+                      <Select
+                        disabled={reassigning === e.id}
+                        value=""
+                        onValueChange={(v) => handleReassign(e.id, e.lead_id, v)}
+                      >
+                        <SelectTrigger className="h-8 w-[200px]">
+                          <SelectValue placeholder={reassigning === e.id ? "Reatribuindo..." : "Selecionar vendedor"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sellers
+                            .filter((s) => s.user_id !== e.current_assigned_to)
+                            .map((s) => (
+                              <SelectItem key={s.user_id} value={s.user_id}>
+                                {s.full_name ?? s.user_id.slice(0, 8)}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
       <div className="grid gap-4 md:grid-cols-2">
         {/* By seller */}
         <Card>

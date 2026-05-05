@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze } from "@/server/gmail.functions";
+import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 import { toast } from "sonner";
 
 type EmailRow = {
@@ -108,6 +109,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     description: "",
     due_date: "",
   });
+  const [associateOpen, setAssociateOpen] = useState(false);
 
   // ---------------- list loading ----------------
   const loadList = async (f: Folder = folder) => {
@@ -214,6 +216,21 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     await loadList(folder);
   };
 
+  const associatePick = async (e: AssociateEntity) => {
+    if (!selected) return;
+    const patch: { lead_id?: string | null; customer_id?: string | null; supplier_id?: string | null } = {};
+    if (e.kind === "lead") { patch.lead_id = e.lead_id; if (e.customer_id) patch.customer_id = e.customer_id; }
+    else if (e.kind === "customer") { patch.customer_id = e.customer_id; }
+    else if (e.kind === "supplier") { patch.supplier_id = e.supplier_id; }
+    else if (e.kind === "quote" || e.kind === "booking") {
+      if (e.lead_id) patch.lead_id = e.lead_id;
+      if (e.customer_id) patch.customer_id = e.customer_id;
+    }
+    const { error } = await supabase.from("emails").update(patch).eq("id", selected.id);
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("emailLinked"));
+    await loadList(folder);
+  };
 
   // ---------------- actions ----------------
   const archive = async () => {
@@ -651,6 +668,9 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                 <Button size="sm" variant="outline" onClick={openForward}>
                   <Forward className="mr-2 h-4 w-4" /> {t("forward")}
                 </Button>
+                <Button size="sm" variant="outline" onClick={() => setAssociateOpen(true)}>
+                  <Link2 className="mr-2 h-4 w-4" /> {t("associate")}
+                </Button>
                 {mode === "lead" && leadId && !selected.lead_id && (
                   <Button size="sm" variant="secondary" onClick={linkToLead}>
                     <Link2 className="mr-2 h-4 w-4" /> {t("linkToThisLead")}
@@ -885,6 +905,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AssociateDialog
+        open={associateOpen}
+        onOpenChange={setAssociateOpen}
+        onPick={associatePick}
+      />
     </div>
   );
 }

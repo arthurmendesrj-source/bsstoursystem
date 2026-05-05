@@ -52,6 +52,7 @@ export type Database = {
           created_at: string
           id: string
           notes: string | null
+          proof_email_id: string | null
           proof_reference: string | null
           proof_storage_path: string | null
           proof_text: string | null
@@ -67,6 +68,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          proof_email_id?: string | null
           proof_reference?: string | null
           proof_storage_path?: string | null
           proof_text?: string | null
@@ -82,6 +84,7 @@ export type Database = {
           created_at?: string
           id?: string
           notes?: string | null
+          proof_email_id?: string | null
           proof_reference?: string | null
           proof_storage_path?: string | null
           proof_text?: string | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.booking_item_confirmations ADD COLUMN IF NOT EXISTS proof_email_id uuid;

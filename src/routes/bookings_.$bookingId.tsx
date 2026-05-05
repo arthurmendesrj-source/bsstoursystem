@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ProofAssociateDialog, type ProofPick } from "@/components/ProofAssociateDialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
@@ -58,6 +59,7 @@ type Confirmation = {
   proof_storage_path: string | null;
   proof_text: string | null;
   proof_reference: string | null;
+  proof_email_id?: string | null;
 };
 
 function BookingDetailPage() {
@@ -98,13 +100,13 @@ function BookingDetailPage() {
 
   const updateLocal = (itemId: string, patch: Partial<Confirmation>) => {
     setConfs((prev) => {
-      const base: Confirmation = prev[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null };
+      const base: Confirmation = prev[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null, proof_email_id: null };
       return { ...prev, [itemId]: { ...base, ...patch } };
     });
   };
 
   const persist = async (itemId: string, patch: Partial<Confirmation>) => {
-    const merged = { ...(confs[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null }), ...patch };
+    const merged = { ...(confs[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null, proof_email_id: null }), ...patch };
     const { data, error } = await supabase
       .from("booking_item_confirmations")
       .upsert({
@@ -115,15 +117,47 @@ function BookingDetailPage() {
         proof_storage_path: merged.proof_storage_path,
         proof_text: merged.proof_text,
         proof_reference: merged.proof_reference,
+        proof_email_id: merged.proof_email_id ?? null,
         confirmed_at: merged.status === "confirmado" ? new Date().toISOString() : null,
         confirmed_by: merged.status === "confirmado" ? user?.id ?? null : null,
-      }, { onConflict: "booking_id,quote_item_id" })
+      } as never, { onConflict: "booking_id,quote_item_id" })
       .select()
       .single();
     if (error) { toast.error(error.message); return null; }
     setConfs((prev) => ({ ...prev, [itemId]: data as Confirmation }));
     return data as Confirmation;
   };
+
+  const [associateItem, setAssociateItem] = useState<QuoteItem | null>(null);
+
+  const handleProofPick = async (item: QuoteItem, p: ProofPick) => {
+    if (p.type === "email") {
+      await persist(item.id, {
+        proof_type: "email",
+        proof_reference: p.reference,
+        proof_text: p.text,
+        proof_email_id: p.email_id,
+      });
+      toast.success(t("saved"));
+    } else {
+      let storagePath: string | null = null;
+      if (p.file) {
+        if (p.file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
+        const ext = p.file.name.split(".").pop() || "bin";
+        storagePath = `${bookingId}/${item.id}/${Date.now()}.${ext}`;
+        const { error } = await supabase.storage.from("booking-proofs").upload(storagePath, p.file, { upsert: true });
+        if (error) { toast.error(error.message); return; }
+      }
+      await persist(item.id, {
+        proof_type: "whatsapp",
+        proof_reference: p.phone,
+        proof_text: p.text || null,
+        ...(storagePath ? { proof_storage_path: storagePath } : {}),
+      });
+      toast.success(t("saved"));
+    }
+  };
+
 
   const onUpload = async (item: QuoteItem, file: File) => {
     if (file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
@@ -257,10 +291,18 @@ function BookingDetailPage() {
                     />
                     <Button asChild variant="outline" size="sm"><span><Paperclip className="mr-1 h-4 w-4" />{t("attachProof")}</span></Button>
                   </label>
+                  <Button size="sm" variant="outline" onClick={() => setAssociateItem(item)}>
+                    <Link2 className="mr-1 h-4 w-4" />{t("associate")}
+                  </Button>
                   {c?.proof_storage_path && (
                     <Button size="sm" variant="ghost" onClick={() => downloadProof(c.proof_storage_path!)}>
                       <Download className="mr-1 h-4 w-4" />{t("downloadProof")}
                     </Button>
+                  )}
+                  {c?.proof_email_id && (
+                    <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
+                      <Mail className="mr-1 h-3 w-3" />{t("emailLinkedBadge")}
+                    </Badge>
                   )}
                   <div className="ml-auto flex items-center gap-2">
                     {status !== "confirmado" ? (
@@ -284,6 +326,13 @@ function BookingDetailPage() {
           })}
         </div>
       )}
+
+      <ProofAssociateDialog
+        open={!!associateItem}
+        onOpenChange={(v) => !v && setAssociateItem(null)}
+        customerId={booking.customer_id}
+        onPick={(p) => { if (associateItem) handleProofPick(associateItem, p); }}
+      />
     </div>
   );
 }

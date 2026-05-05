@@ -8,7 +8,8 @@ export type NotificationEventType =
   | "task_due_soon"
   | "task_overdue"
   | "sla_warning"
-  | "sla_overdue";
+  | "sla_overdue"
+  | "lead_escalated";
 
 type SendArgs = {
   userId: string;

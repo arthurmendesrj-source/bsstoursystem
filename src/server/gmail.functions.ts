@@ -270,11 +270,16 @@ export const emailAnalyze = createServerFn({ method: "POST" })
             type: "function",
             function: {
               name: "extract_lead",
-              description: "Extrai dados estruturados do e-mail para criar um lead.",
+              description: "Resume o e-mail, recomenda uma ação e extrai dados para criar um lead.",
               parameters: {
                 type: "object",
                 properties: {
-                  is_lead: { type: "boolean", description: "true se o e-mail representa interesse de viagem; false para spam/newsletters/conversa interna." },
+                  summary: { type: "string", description: "Resumo curto (2-3 frases) em português do conteúdo do e-mail." },
+                  suggested_action: { type: "string", enum: ["create_lead", "create_task", "ignore"], description: "Ação recomendada ao operador." },
+                  suggested_task_category: { type: ["string", "null"], enum: ["negocio", "suporte", null], description: "Categoria sugerida quando a ação for create_task." },
+                  suggested_task_priority: { type: ["string", "null"], enum: ["baixa", "media", "alta", null] },
+                  suggested_task_title: { type: ["string", "null"], description: "Título curto sugerido para a atividade." },
+                  is_lead: { type: "boolean", description: "true se o e-mail representa interesse de viagem." },
                   intent: { type: "string", enum: ["cotacao", "duvida", "reclamacao", "outro"] },
                   customer_name: { type: ["string", "null"] },
                   customer_email: { type: ["string", "null"] },
@@ -287,7 +292,7 @@ export const emailAnalyze = createServerFn({ method: "POST" })
                   notes: { type: ["string", "null"], description: "Resumo curto do pedido." },
                   next_action: { type: ["string", "null"] },
                 },
-                required: ["is_lead", "intent"],
+                required: ["summary", "suggested_action", "is_lead", "intent"],
                 additionalProperties: false,
               },
             },

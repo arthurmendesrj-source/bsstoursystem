@@ -573,6 +573,12 @@ export type Database = {
           estimated_value: number | null
           expected_travel_date: string | null
           id: string
+          last_assigned_notified_at: string | null
+          last_assigned_notified_to: string | null
+          last_status_notified_at: string | null
+          last_status_notified_value:
+            | Database["public"]["Enums"]["lead_status"]
+            | null
           name: string
           next_action: string | null
           next_action_date: string | null
@@ -594,6 +600,12 @@ export type Database = {
           estimated_value?: number | null
           expected_travel_date?: string | null
           id?: string
+          last_assigned_notified_at?: string | null
+          last_assigned_notified_to?: string | null
+          last_status_notified_at?: string | null
+          last_status_notified_value?:
+            | Database["public"]["Enums"]["lead_status"]
+            | null
           name: string
           next_action?: string | null
           next_action_date?: string | null
@@ -615,6 +627,12 @@ export type Database = {
           estimated_value?: number | null
           expected_travel_date?: string | null
           id?: string
+          last_assigned_notified_at?: string | null
+          last_assigned_notified_to?: string | null
+          last_status_notified_at?: string | null
+          last_status_notified_value?:
+            | Database["public"]["Enums"]["lead_status"]
+            | null
           name?: string
           next_action?: string | null
           next_action_date?: string | null

@@ -365,6 +365,31 @@ function ActivitiesPage() {
         </CardContent>
       </Card>
 
+      {/* bulk actions bar */}
+      {selectedIds.size > 0 && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="p-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium mr-2">{selectedIds.size} {t("selectedCount")}</span>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ completed: true, completed_at: new Date().toISOString() })}>
+              <CheckCircle2 className="h-4 w-4 mr-1" />{t("bulkComplete")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ completed: false, completed_at: null })}>
+              {t("bulkReopen")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ started_at: new Date().toISOString() })}>
+              <Play className="h-4 w-4 mr-1" />{t("bulkStart")}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => bulkUpdate({ started_at: null })}>
+              <Pause className="h-4 w-4 mr-1" />{t("bulkPause")}
+            </Button>
+            <Button size="sm" variant="destructive" onClick={bulkDelete}>
+              <Trash2 className="h-4 w-4 mr-1" />{t("bulkDelete")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={clearSelection}>{t("clearSelection")}</Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* table */}
       <Card>
         <CardContent className="p-0">
@@ -376,6 +401,16 @@ function ActivitiesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={filtered.length > 0 && filtered.every((tk) => selectedIds.has(tk.id))}
+                      onCheckedChange={(v) => {
+                        if (v) setSelectedIds(new Set(filtered.map((tk) => tk.id)));
+                        else clearSelection();
+                      }}
+                      aria-label="select all"
+                    />
+                  </TableHead>
                   <TableHead className="w-10"></TableHead>
                   <TableHead>{t("activityTitle")}</TableHead>
                   <TableHead>{t("linkedLead")}</TableHead>

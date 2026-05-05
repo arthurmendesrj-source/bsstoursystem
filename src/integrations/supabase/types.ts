@@ -736,6 +736,7 @@ export type Database = {
           daily_followup_goal: number
           full_name: string | null
           id: string
+          message_templates: Json
           phone: string | null
           preferred_currency:
             | Database["public"]["Enums"]["currency_code"]
@@ -750,6 +751,7 @@ export type Database = {
           daily_followup_goal?: number
           full_name?: string | null
           id?: string
+          message_templates?: Json
           phone?: string | null
           preferred_currency?:
             | Database["public"]["Enums"]["currency_code"]
@@ -764,6 +766,7 @@ export type Database = {
           daily_followup_goal?: number
           full_name?: string | null
           id?: string
+          message_templates?: Json
           phone?: string | null
           preferred_currency?:
             | Database["public"]["Enums"]["currency_code"]

@@ -189,7 +189,7 @@ function ActivitiesPage() {
     });
   };
 
-  const bulkUpdate = async (patch: Record<string, unknown>) => {
+  const bulkUpdate = async (patch: Partial<Task>) => {
     const ids = Array.from(selectedIds);
     if (!ids.length) return;
     const { error } = await supabase.from("tasks").update(patch).in("id", ids);

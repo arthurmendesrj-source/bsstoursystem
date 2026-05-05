@@ -1,0 +1,220 @@
+// Process an uploaded itinerary file (.docx or .pdf):
+// 1) download from storage
+// 2) extract text
+// 3) extract structured metadata via Lovable AI
+// 4) chunk + embed
+// 5) update itineraries + insert itinerary_chunks
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import mammoth from "https://esm.sh/mammoth@1.8.0";
+import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+// Use Gemini text embeddings (768 dims). Free tier supported.
+const EMBED_MODEL = "google/text-embedding-004";
+const META_MODEL = "google/gemini-2.5-flash";
+
+function chunkText(text: string, maxChars = 2400, overlap = 200): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const out: string[] = [];
+  let i = 0;
+  while (i < clean.length) {
+    const end = Math.min(clean.length, i + maxChars);
+    out.push(clean.slice(i, end));
+    if (end === clean.length) break;
+    i = end - overlap;
+  }
+  return out;
+}
+
+async function extractMetadata(apiKey: string, text: string) {
+  const sample = text.slice(0, 12000);
+  const resp = await fetch(AI_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: META_MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Você analisa roteiros de viagem e extrai metadados estruturados. Responda chamando a função fornecida.",
+        },
+        {
+          role: "user",
+          content: `Analise este roteiro e extraia os metadados:\n\n${sample}`,
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "extract_itinerary_metadata",
+            description: "Extrai metadados estruturados do roteiro de viagem.",
+            parameters: {
+              type: "object",
+              properties: {
+                title: { type: "string", description: "Título conciso (cidade(s) + duração)" },
+                destinations: { type: "array", items: { type: "string" }, description: "Cidades/países visitados" },
+                duration_days: { type: "number" },
+                language: { type: "string", enum: ["pt", "en", "es", "ru"] },
+                trip_type: {
+                  type: "string",
+                  enum: ["lua_de_mel", "familia", "aventura", "luxo", "cultural", "corporativo", "grupo", "outro"],
+                },
+                price_range: { type: "string", enum: ["economico", "medio", "alto", "luxo"] },
+                estimated_value: { type: "number" },
+                currency: { type: "string", enum: ["BRL", "USD", "EUR"] },
+                suppliers_mentioned: { type: "array", items: { type: "string" }, description: "Hotéis, operadoras citados" },
+                tags: { type: "array", items: { type: "string" } },
+                year: { type: "number" },
+                season: { type: "string" },
+                summary: { type: "string", description: "Resumo de 2-3 parágrafos do roteiro" },
+              },
+              required: ["title", "destinations", "summary"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "extract_itinerary_metadata" } },
+    }),
+  });
+
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`metadata AI ${resp.status}: ${t}`);
+  }
+  const data = await resp.json();
+  const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
+  if (!args) throw new Error("no tool call result");
+  return JSON.parse(args);
+}
+
+async function embedBatch(apiKey: string, inputs: string[]): Promise<number[][]> {
+  const resp = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: EMBED_MODEL, input: inputs }),
+  });
+  if (!resp.ok) {
+    const t = await resp.text();
+    throw new Error(`embed ${resp.status}: ${t}`);
+  }
+  const data = await resp.json();
+  return data.data.map((d: any) => d.embedding);
+}
+
+async function extractTextFromFile(buf: ArrayBuffer, format: string): Promise<string> {
+  if (format === "docx") {
+    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    return result.value || "";
+  }
+  if (format === "pdf") {
+    const pdf = await getDocumentProxy(new Uint8Array(buf));
+    const { text } = await extractText(pdf, { mergePages: true });
+    return Array.isArray(text) ? text.join("\n") : (text as string);
+  }
+  throw new Error(`unsupported format: ${format}`);
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  let itineraryId: string | null = null;
+  try {
+    const body = await req.json();
+    itineraryId = body.itinerary_id;
+    if (!itineraryId) throw new Error("itinerary_id required");
+
+    const { data: it, error: itErr } = await supabase
+      .from("itineraries")
+      .select("*")
+      .eq("id", itineraryId)
+      .single();
+    if (itErr || !it) throw new Error(itErr?.message || "not found");
+
+    await supabase.from("itineraries").update({ processing_status: "processing", processing_error: null }).eq("id", itineraryId);
+
+    // 1. Download
+    const { data: blob, error: dlErr } = await supabase.storage.from("itineraries").download(it.storage_path);
+    if (dlErr || !blob) throw new Error(`download: ${dlErr?.message}`);
+    const buf = await blob.arrayBuffer();
+
+    // 2. Extract text
+    const text = await extractTextFromFile(buf, it.file_format);
+    if (!text || text.length < 50) throw new Error("extracted text too short");
+
+    // 3. Metadata
+    const meta = await extractMetadata(LOVABLE_API_KEY, text);
+
+    // 4. Chunk + embed
+    const chunks = chunkText(text);
+    const embeddings: number[][] = [];
+    const BATCH = 16;
+    for (let i = 0; i < chunks.length; i += BATCH) {
+      const batch = chunks.slice(i, i + BATCH);
+      const embs = await embedBatch(LOVABLE_API_KEY, batch);
+      embeddings.push(...embs);
+    }
+
+    // 5. Save
+    await supabase.from("itinerary_chunks").delete().eq("itinerary_id", itineraryId);
+    if (chunks.length > 0) {
+      const rows = chunks.map((content, idx) => ({
+        itinerary_id: itineraryId,
+        chunk_index: idx,
+        content,
+        embedding: embeddings[idx] as any,
+      }));
+      // insert in batches of 50
+      for (let i = 0; i < rows.length; i += 50) {
+        const slice = rows.slice(i, i + 50);
+        const { error } = await supabase.from("itinerary_chunks").insert(slice);
+        if (error) throw new Error(`chunks: ${error.message}`);
+      }
+    }
+
+    await supabase.from("itineraries").update({
+      title: meta.title || it.title,
+      destinations: meta.destinations || [],
+      duration_days: meta.duration_days ?? null,
+      language: meta.language || it.language,
+      trip_type: meta.trip_type || null,
+      price_range: meta.price_range || null,
+      estimated_value: meta.estimated_value ?? null,
+      currency: meta.currency || null,
+      suppliers_mentioned: meta.suppliers_mentioned || [],
+      tags: meta.tags || [],
+      year: meta.year ?? null,
+      season: meta.season || null,
+      summary: meta.summary || null,
+      extracted_text: text.slice(0, 200000),
+      processing_status: "ready",
+    }).eq("id", itineraryId);
+
+    return new Response(JSON.stringify({ ok: true, chunks: chunks.length }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("process-itinerary error:", msg);
+    if (itineraryId) {
+      await supabase.from("itineraries").update({ processing_status: "failed", processing_error: msg }).eq("id", itineraryId);
+    }
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});

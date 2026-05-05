@@ -462,8 +462,9 @@ function WorkspacePage() {
         <Card className="min-h-[600px]">
           <CardContent className="p-4">
             <Tabs defaultValue="email">
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="email">{t("intEmail")}</TabsTrigger>
+                <TabsTrigger value="activities">{t("activities")}</TabsTrigger>
                 <TabsTrigger value="proposals">{t("proposals")}</TabsTrigger>
                 <TabsTrigger value="invoice">{t("invoice")}</TabsTrigger>
                 <TabsTrigger value="reservation">{t("reservation")}</TabsTrigger>
@@ -474,6 +475,14 @@ function WorkspacePage() {
                   <EmptyTab text={t("selectLeadToView")} />
                 ) : (
                   <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} />
+                )}
+              </TabsContent>
+
+              <TabsContent value="activities" className="mt-4">
+                {!hasLead || !lead ? (
+                  <EmptyTab text={t("selectLeadToView")} />
+                ) : (
+                  <ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} />
                 )}
               </TabsContent>
 

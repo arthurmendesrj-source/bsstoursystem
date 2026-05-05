@@ -80,6 +80,28 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   });
   const [aiNote, setAiNote] = useState<string | null>(null);
 
+  // Triagem com IA
+  type Triage = {
+    summary: string;
+    suggested_action: "create_lead" | "create_task" | "ignore";
+    suggested_task_category?: "negocio" | "suporte" | null;
+    suggested_task_priority?: "baixa" | "media" | "alta" | null;
+    suggested_task_title?: string | null;
+    raw: Record<string, unknown>;
+  };
+  const [triageOpen, setTriageOpen] = useState(false);
+  const [triage, setTriage] = useState<Triage | null>(null);
+
+  // Diálogo de criação de atividade
+  const [taskOpen, setTaskOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    category: "suporte" as "negocio" | "suporte",
+    priority: "media" as "baixa" | "media" | "alta",
+    description: "",
+    due_date: "",
+  });
+
   // ---------------- list loading ----------------
   const loadList = async (f: Folder = folder) => {
     let query = supabase.from("emails").select("*").order("received_at", { ascending: false }).limit(200);
@@ -273,26 +295,87 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     try {
       const r = await analyzeFn({ data: { gmail_id: selected.gmail_id } });
       const s = (r.suggestion ?? {}) as Record<string, unknown>;
-      const isLead = (s.is_lead as boolean | undefined) ?? false;
-      if (!isLead) toast.message(t("notALead"));
-      openLeadDialog(
-        {
-          name: (s.customer_name as string) || selected.from_name || "",
-          email: (s.customer_email as string) || selected.from_email || "",
-          phone: (s.customer_phone as string) || "",
-          destination: (s.destination as string) || "",
-          estimated_value: s.estimated_value != null ? String(s.estimated_value) : "",
-          currency: (s.currency as string) || "BRL",
-          expected_travel_date: (s.expected_travel_date as string) || "",
-          notes: (s.notes as string) || selected.subject || "",
-          next_action: (s.next_action as string) || "",
-        },
-        isLead ? null : t("notALead"),
-      );
+      setTriage({
+        summary: (s.summary as string) || (s.notes as string) || selected.snippet || "",
+        suggested_action: ((s.suggested_action as string) as Triage["suggested_action"])
+          || ((s.is_lead as boolean) ? "create_lead" : "create_task"),
+        suggested_task_category: (s.suggested_task_category as Triage["suggested_task_category"]) ?? "suporte",
+        suggested_task_priority: (s.suggested_task_priority as Triage["suggested_task_priority"]) ?? "media",
+        suggested_task_title: (s.suggested_task_title as string) || selected.subject || "",
+        raw: s,
+      });
+      setTriageOpen(true);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro");
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const openLeadFromTriage = () => {
+    if (!selected || !triage) return;
+    const s = triage.raw;
+    setTriageOpen(false);
+    openLeadDialog(
+      {
+        name: (s.customer_name as string) || selected.from_name || "",
+        email: (s.customer_email as string) || selected.from_email || "",
+        phone: (s.customer_phone as string) || "",
+        destination: (s.destination as string) || "",
+        estimated_value: s.estimated_value != null ? String(s.estimated_value) : "",
+        currency: (s.currency as string) || "BRL",
+        expected_travel_date: (s.expected_travel_date as string) || "",
+        notes: triage.summary || (s.notes as string) || selected.subject || "",
+        next_action: (s.next_action as string) || "",
+      },
+      null,
+    );
+  };
+
+  const openTaskDialog = (prefill?: Partial<typeof taskForm>) => {
+    if (!selected) return;
+    setTaskForm({
+      title: prefill?.title ?? selected.subject ?? "",
+      category: prefill?.category ?? "suporte",
+      priority: prefill?.priority ?? "media",
+      description: prefill?.description ?? selected.snippet ?? "",
+      due_date: prefill?.due_date ?? "",
+    });
+    setTriageOpen(false);
+    setTaskOpen(true);
+  };
+
+  const openTaskFromTriage = () => {
+    if (!triage) return;
+    openTaskDialog({
+      title: triage.suggested_task_title || selected?.subject || "",
+      category: triage.suggested_task_category ?? "suporte",
+      priority: triage.suggested_task_priority ?? "media",
+      description: triage.summary,
+    });
+  };
+
+  const saveTask = async () => {
+    if (!selected || !user) return;
+    try {
+      const { error } = await supabase.from("tasks").insert({
+        title: taskForm.title || selected.subject || "(sem assunto)",
+        description: taskForm.description || null,
+        category: taskForm.category,
+        priority: taskForm.priority,
+        source: "email",
+        email_id: selected.id,
+        lead_id: selected.lead_id,
+        customer_id: selected.customer_id,
+        due_date: taskForm.due_date || null,
+        created_by: user.id,
+        assigned_to: user.id,
+      });
+      if (error) throw error;
+      toast.success(t("taskCreated"));
+      setTaskOpen(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro");
     }
   };
 
@@ -505,10 +588,13 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                   <>
                     <Button size="sm" onClick={analyze} disabled={analyzing}>
                       <Sparkles className="mr-2 h-4 w-4" />
-                      {analyzing ? t("analyzing") : `${t("analyzeAi")} → ${t("createLead")}`}
+                      {analyzing ? t("analyzing") : t("aiTriage")}
                     </Button>
                     <Button size="sm" variant="secondary" onClick={() => openLeadDialog()}>
                       <Plus className="mr-2 h-4 w-4" /> {t("createLeadManual")}
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => openTaskDialog()}>
+                      <Plus className="mr-2 h-4 w-4" /> {t("createTaskManual")}
                     </Button>
                   </>
                 )}
@@ -616,6 +702,114 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
           <DialogFooter>
             <Button variant="ghost" onClick={() => setAiOpen(false)}>{t("cancel")}</Button>
             <Button onClick={saveLead}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Triage dialog */}
+      <Dialog open={triageOpen} onOpenChange={setTriageOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" /> {t("aiTriage")}
+            </DialogTitle>
+          </DialogHeader>
+          {triage && (
+            <div className="space-y-4">
+              <div>
+                <Label className="text-xs uppercase text-muted-foreground">{t("aiSummary")}</Label>
+                <p className="mt-1 whitespace-pre-wrap rounded-md border bg-muted/40 p-3 text-sm">
+                  {triage.summary || "—"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">{t("aiRecommendation")}:</span>
+                <Badge>
+                  {triage.suggested_action === "create_lead"
+                    ? t("recCreateLead")
+                    : triage.suggested_action === "create_task"
+                    ? t("recCreateTask")
+                    : t("recIgnore")}
+                </Badge>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex flex-wrap gap-2 sm:justify-between">
+            <Button variant="ghost" onClick={() => setTriageOpen(false)}>
+              {t("ignoreEmail")}
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={openTaskFromTriage}>
+                <Plus className="mr-2 h-4 w-4" /> {t("recCreateTask")}
+              </Button>
+              <Button onClick={openLeadFromTriage}>
+                <Plus className="mr-2 h-4 w-4" /> {t("recCreateLead")}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create activity dialog */}
+      <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-4 w-4" /> {t("createTaskFromEmail")}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <Label>{t("taskTitle")}</Label>
+              <Input value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} />
+            </div>
+            <div>
+              <Label>{t("taskCategory")}</Label>
+              <Select
+                value={taskForm.category}
+                onValueChange={(v) => setTaskForm({ ...taskForm, category: v as "negocio" | "suporte" })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="negocio">{t("categoryBusiness")}</SelectItem>
+                  <SelectItem value="suporte">{t("categorySupport")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>{t("taskPriority")}</Label>
+              <Select
+                value={taskForm.priority}
+                onValueChange={(v) => setTaskForm({ ...taskForm, priority: v as "baixa" | "media" | "alta" })}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="baixa">{t("priorityLow")}</SelectItem>
+                  <SelectItem value="media">{t("priorityMedium")}</SelectItem>
+                  <SelectItem value="alta">{t("priorityHigh")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label>{t("taskDueDate")}</Label>
+              <Input
+                type="date"
+                value={taskForm.due_date}
+                onChange={(e) => setTaskForm({ ...taskForm, due_date: e.target.value })}
+              />
+            </div>
+            <div className="col-span-2">
+              <Label>{t("taskDescription")}</Label>
+              <Textarea
+                rows={4}
+                value={taskForm.description}
+                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setTaskOpen(false)}>{t("cancel")}</Button>
+            <Button onClick={saveTask}>{t("save")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

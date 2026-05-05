@@ -258,7 +258,7 @@ export const emailAnalyze = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "Você é um assistente de uma operadora de turismo. Analise o e-mail recebido e extraia dados estruturados para criar um lead de viagem. Use null quando não houver informação. Responda sempre via tool call.",
+              "Você é um assistente de uma operadora de turismo. Analise o e-mail recebido, gere um RESUMO curto em português (2-3 frases) e RECOMENDE uma ação ao operador: criar lead (interesse comercial de viagem), criar atividade (suporte, dúvida operacional, follow-up sem novo negócio) ou ignorar (spam, newsletter, conversa interna). Quando houver dados de viagem, extraia-os para pré-preencher o lead. Use null quando não houver informação. Responda sempre via tool call.",
           },
           {
             role: "user",
@@ -270,11 +270,16 @@ export const emailAnalyze = createServerFn({ method: "POST" })
             type: "function",
             function: {
               name: "extract_lead",
-              description: "Extrai dados estruturados do e-mail para criar um lead.",
+              description: "Resume o e-mail, recomenda uma ação e extrai dados para criar um lead.",
               parameters: {
                 type: "object",
                 properties: {
-                  is_lead: { type: "boolean", description: "true se o e-mail representa interesse de viagem; false para spam/newsletters/conversa interna." },
+                  summary: { type: "string", description: "Resumo curto (2-3 frases) em português do conteúdo do e-mail." },
+                  suggested_action: { type: "string", enum: ["create_lead", "create_task", "ignore"], description: "Ação recomendada ao operador." },
+                  suggested_task_category: { type: ["string", "null"], enum: ["negocio", "suporte", null], description: "Categoria sugerida quando a ação for create_task." },
+                  suggested_task_priority: { type: ["string", "null"], enum: ["baixa", "media", "alta", null] },
+                  suggested_task_title: { type: ["string", "null"], description: "Título curto sugerido para a atividade." },
+                  is_lead: { type: "boolean", description: "true se o e-mail representa interesse de viagem." },
                   intent: { type: "string", enum: ["cotacao", "duvida", "reclamacao", "outro"] },
                   customer_name: { type: ["string", "null"] },
                   customer_email: { type: ["string", "null"] },
@@ -287,7 +292,7 @@ export const emailAnalyze = createServerFn({ method: "POST" })
                   notes: { type: ["string", "null"], description: "Resumo curto do pedido." },
                   next_action: { type: ["string", "null"] },
                 },
-                required: ["is_lead", "intent"],
+                required: ["summary", "suggested_action", "is_lead", "intent"],
                 additionalProperties: false,
               },
             },

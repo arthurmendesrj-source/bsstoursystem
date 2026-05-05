@@ -33,6 +33,7 @@ import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
+import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
@@ -155,6 +156,12 @@ const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
   path: '/api/public/hooks/task-due',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksSlaEscalationsRoute =
+  ApiPublicHooksSlaEscalationsRouteImport.update({
+    id: '/api/public/hooks/sla-escalations',
+    path: '/api/public/hooks/sla-escalations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksLeadEventsRoute =
   ApiPublicHooksLeadEventsRouteImport.update({
     id: '/api/public/hooks/lead-events',
@@ -187,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
+  '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
 }
 export interface FileRoutesByTo {
@@ -214,6 +222,7 @@ export interface FileRoutesByTo {
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
+  '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
 }
 export interface FileRoutesById {
@@ -242,6 +251,7 @@ export interface FileRoutesById {
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
+  '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
 }
 export interface FileRouteTypes {
@@ -271,6 +281,7 @@ export interface FileRouteTypes {
     | '/settings/sla'
     | '/settings/templates'
     | '/api/public/hooks/lead-events'
+    | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -298,6 +309,7 @@ export interface FileRouteTypes {
     | '/settings/sla'
     | '/settings/templates'
     | '/api/public/hooks/lead-events'
+    | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
   id:
     | '__root__'
@@ -325,6 +337,7 @@ export interface FileRouteTypes {
     | '/settings/sla'
     | '/settings/templates'
     | '/api/public/hooks/lead-events'
+    | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
   fileRoutesById: FileRoutesById
 }
@@ -347,6 +360,7 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
+  ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
 }
 
@@ -520,6 +534,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksTaskDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/sla-escalations': {
+      id: '/api/public/hooks/sla-escalations'
+      path: '/api/public/hooks/sla-escalations'
+      fullPath: '/api/public/hooks/sla-escalations'
+      preLoaderRoute: typeof ApiPublicHooksSlaEscalationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/lead-events': {
       id: '/api/public/hooks/lead-events'
       path: '/api/public/hooks/lead-events'
@@ -588,8 +609,18 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
+  ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

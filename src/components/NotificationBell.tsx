@@ -218,7 +218,7 @@ export function NotificationBell() {
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === q.id} onClick={() => openQuoteDialog(q)}>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId !== null} onClick={() => openQuoteDialog(q)}>
                             {busyId === q.id
                               ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                               : <CalendarCheck className="h-3 w-3 mr-1" />}

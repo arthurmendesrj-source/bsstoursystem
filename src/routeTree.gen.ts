@@ -29,7 +29,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
-import { Route as BookingsBookingIdRouteImport } from './routes/bookings.$bookingId'
+import { Route as BookingsBookingIdRouteImport } from './routes/bookings_.$bookingId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
@@ -139,9 +139,9 @@ const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   getParentRoute: () => LeadsRoute,
 } as any)
 const BookingsBookingIdRoute = BookingsBookingIdRouteImport.update({
-  id: '/$bookingId',
-  path: '/$bookingId',
-  getParentRoute: () => BookingsRoute,
+  id: '/bookings_/$bookingId',
+  path: '/bookings/$bookingId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsSlaRoute = AlertsSlaRouteImport.update({
   id: '/sla',
@@ -185,7 +185,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
-  '/bookings': typeof BookingsRouteWithChildren
+  '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
@@ -215,7 +215,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
-  '/bookings': typeof BookingsRouteWithChildren
+  '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
@@ -246,7 +246,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
-  '/bookings': typeof BookingsRouteWithChildren
+  '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
@@ -264,7 +264,7 @@ export interface FileRoutesById {
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
-  '/bookings/$bookingId': typeof BookingsBookingIdRoute
+  '/bookings_/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -356,7 +356,7 @@ export interface FileRouteTypes {
     | '/alerts/history'
     | '/alerts/preferences'
     | '/alerts/sla'
-    | '/bookings/$bookingId'
+    | '/bookings_/$bookingId'
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
@@ -369,7 +369,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivitiesRoute: typeof ActivitiesRoute
   AlertsRoute: typeof AlertsRouteWithChildren
-  BookingsRoute: typeof BookingsRouteWithChildren
+  BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   EmailRoute: typeof EmailRoute
@@ -383,6 +383,7 @@ export interface RootRouteChildren {
   SuppliersRoute: typeof SuppliersRoute
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
+  BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
@@ -530,12 +531,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadsLeadIdRouteImport
       parentRoute: typeof LeadsRoute
     }
-    '/bookings/$bookingId': {
-      id: '/bookings/$bookingId'
-      path: '/$bookingId'
+    '/bookings_/$bookingId': {
+      id: '/bookings_/$bookingId'
+      path: '/bookings/$bookingId'
       fullPath: '/bookings/$bookingId'
       preLoaderRoute: typeof BookingsBookingIdRouteImport
-      parentRoute: typeof BookingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/alerts/sla': {
       id: '/alerts/sla'
@@ -606,18 +607,6 @@ const AlertsRouteChildren: AlertsRouteChildren = {
 const AlertsRouteWithChildren =
   AlertsRoute._addFileChildren(AlertsRouteChildren)
 
-interface BookingsRouteChildren {
-  BookingsBookingIdRoute: typeof BookingsBookingIdRoute
-}
-
-const BookingsRouteChildren: BookingsRouteChildren = {
-  BookingsBookingIdRoute: BookingsBookingIdRoute,
-}
-
-const BookingsRouteWithChildren = BookingsRoute._addFileChildren(
-  BookingsRouteChildren,
-)
-
 interface LeadsRouteChildren {
   LeadsLeadIdRoute: typeof LeadsLeadIdRoute
 }
@@ -646,7 +635,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivitiesRoute: ActivitiesRoute,
   AlertsRoute: AlertsRouteWithChildren,
-  BookingsRoute: BookingsRouteWithChildren,
+  BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   EmailRoute: EmailRoute,
@@ -660,6 +649,7 @@ const rootRouteChildren: RootRouteChildren = {
   SuppliersRoute: SuppliersRoute,
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
+  BookingsBookingIdRoute: BookingsBookingIdRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,

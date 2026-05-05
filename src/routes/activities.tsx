@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,6 +67,7 @@ function ActivitiesPage() {
   const [priorityFilter, setPriorityFilter] = useState<"all" | "baixa" | "media" | "alta">("all");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -459,8 +461,13 @@ function ActivitiesPage() {
                   const isOverdue = !task.completed && task.due_date && isAfter(new Date(), new Date(task.due_date));
                   const inProgress = !!task.started_at && !task.completed;
                   return (
-                    <TableRow key={task.id} className={cn(task.completed && "opacity-60", selectedIds.has(task.id) && "bg-muted/50")}>
-                      <TableCell>
+                    <>
+                    <TableRow
+                      key={task.id}
+                      className={cn(task.completed && "opacity-60", selectedIds.has(task.id) && "bg-muted/50", "cursor-pointer")}
+                      onClick={() => setExpandedId(expandedId === task.id ? null : task.id)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(task.id)}
                           onCheckedChange={() => toggleOne(task.id)}
@@ -476,7 +483,7 @@ function ActivitiesPage() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         {lead ? (
                           <Link to="/leads/$leadId" params={{ leadId: lead.id }}>
                             <Badge variant="outline" className="font-mono hover:bg-muted">{lead.code ?? lead.name}</Badge>
@@ -503,7 +510,7 @@ function ActivitiesPage() {
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-sm">{fmtTime(task.time_spent_minutes)}</TableCell>
-                      <TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {!task.completed && (
                             <Button size="icon" variant="ghost" onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
@@ -524,6 +531,20 @@ function ActivitiesPage() {
                         </div>
                       </TableCell>
                     </TableRow>
+                    {expandedId === task.id && (
+                      <TableRow key={`${task.id}-exp`} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={8}>
+                          <TaskUpdatesPanel
+                            taskId={task.id}
+                            taskTitle={task.title}
+                            leadId={task.lead_id}
+                            onChanged={loadData}
+                            onClose={() => setExpandedId(null)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </>
                   );
                 })}
               </TableBody>

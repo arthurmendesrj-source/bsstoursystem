@@ -223,6 +223,7 @@ function NotificationHistoryPage() {
               </Label>
             </div>
           )}
+          </div>
         </CardContent>
       </Card>
 

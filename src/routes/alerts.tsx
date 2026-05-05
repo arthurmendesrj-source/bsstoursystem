@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import {
   AlertTriangle, AlertCircle, CalendarX, CheckCircle2, Phone, MessageSquare, Mail,
-  Users as UsersIcon, MoreHorizontal, BellOff, Search, Target, RotateCcw,
+  Users as UsersIcon, MoreHorizontal, BellOff, Search, Target, RotateCcw, Bell, BellRing,
 } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";

@@ -288,6 +288,11 @@ function AlertsPage() {
               <Link to="/alerts/sla">{t("slaPanelOpen")}</Link>
             </Button>
           )}
+          {isAdmin && (
+            <Button asChild variant="outline" size="sm">
+              <Link to="/alerts/debug">Debug</Link>
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
             {loading ? t("loading") : t("alertsRefresh")}
           </Button>

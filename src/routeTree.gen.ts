@@ -32,6 +32,7 @@ import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
+import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
@@ -151,6 +152,11 @@ const AlertsHistoryRoute = AlertsHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => AlertsRoute,
 } as any)
+const AlertsDebugRoute = AlertsDebugRouteImport.update({
+  id: '/debug',
+  path: '/debug',
+  getParentRoute: () => AlertsRoute,
+} as any)
 const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
   id: '/api/public/hooks/task-due',
   path: '/api/public/hooks/task-due',
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/debug'
     | '/alerts/history'
     | '/alerts/preferences'
     | '/alerts/sla'
@@ -302,6 +312,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/debug'
     | '/alerts/history'
     | '/alerts/preferences'
     | '/alerts/sla'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/debug'
     | '/alerts/history'
     | '/alerts/preferences'
     | '/alerts/sla'
@@ -527,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsHistoryRouteImport
       parentRoute: typeof AlertsRoute
     }
+    '/alerts/debug': {
+      id: '/alerts/debug'
+      path: '/debug'
+      fullPath: '/alerts/debug'
+      preLoaderRoute: typeof AlertsDebugRouteImport
+      parentRoute: typeof AlertsRoute
+    }
     '/api/public/hooks/task-due': {
       id: '/api/public/hooks/task-due'
       path: '/api/public/hooks/task-due'
@@ -552,12 +571,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AlertsRouteChildren {
+  AlertsDebugRoute: typeof AlertsDebugRoute
   AlertsHistoryRoute: typeof AlertsHistoryRoute
   AlertsPreferencesRoute: typeof AlertsPreferencesRoute
   AlertsSlaRoute: typeof AlertsSlaRoute
 }
 
 const AlertsRouteChildren: AlertsRouteChildren = {
+  AlertsDebugRoute: AlertsDebugRoute,
   AlertsHistoryRoute: AlertsHistoryRoute,
   AlertsPreferencesRoute: AlertsPreferencesRoute,
   AlertsSlaRoute: AlertsSlaRoute,

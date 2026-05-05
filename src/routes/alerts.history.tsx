@@ -231,15 +231,22 @@ function NotificationHistoryPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            {rows.length} {rows.length === 1 ? "registro" : "registros"}
+            {filtered.length} {filtered.length === 1 ? "registro" : "registros"}
+            {search && rows.length !== filtered.length && (
+              <span className="text-xs font-normal text-muted-foreground ml-2">
+                (de {rows.length})
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading && rows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">Carregando...</p>
-          ) : rows.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              Nenhuma notificação registrada ainda.
+              {search
+                ? "Nenhum registro encontrado para esta busca."
+                : "Nenhuma notificação registrada ainda."}
             </p>
           ) : (
             <div className="overflow-x-auto">

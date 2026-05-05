@@ -341,6 +341,7 @@ const dict = {
     alertsJustContacted: "Acabaram de receber contato",
     alertsJustNow: "Atualizado agora",
     alertsLastContact: "Último contato",
+    alertsLogAgain: "Registrar novo",
   },
   en: {
     appName: "TourismCRM",
@@ -677,6 +678,7 @@ const dict = {
     alertsJustContacted: "Just contacted",
     alertsJustNow: "Updated just now",
     alertsLastContact: "Last contact",
+    alertsLogAgain: "Log new",
   },
   es: {
     appName: "TurismoCRM",
@@ -1013,6 +1015,7 @@ const dict = {
     alertsJustContacted: "Recién contactados",
     alertsJustNow: "Actualizado ahora",
     alertsLastContact: "Último contacto",
+    alertsLogAgain: "Registrar nuevo",
   },
 } as const;
 

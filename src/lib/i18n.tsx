@@ -711,6 +711,8 @@ const dict = {
     bulkDelete: "Delete",
     linkToLead: "Link to Lead",
     unlinkLead: "Unlink",
+    searchLeadPlaceholder: "Search by code, name or destination…",
+    noLeadsFound: "No leads found",
     clearSelection: "Clear selection",
     confirmBulkDelete: "Delete selected activities?",
     activityTitle: "Title",

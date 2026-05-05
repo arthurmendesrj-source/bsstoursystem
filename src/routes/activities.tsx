@@ -179,7 +179,32 @@ function ActivitiesPage() {
     else loadData();
   };
 
-  const createActivity = async (e: React.FormEvent) => {
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const toggleOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const bulkUpdate = async (patch: Record<string, unknown>) => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    const { error } = await supabase.from("tasks").update(patch).in("id", ids);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); clearSelection(); loadData(); }
+  };
+
+  const bulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    if (!confirm(t("confirmBulkDelete"))) return;
+    const { error } = await supabase.from("tasks").delete().in("id", ids);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); clearSelection(); loadData(); }
+  };
     e.preventDefault();
     if (!user || !form.title.trim()) return;
     const category = form.lead_id ? "negocio" : form.category;

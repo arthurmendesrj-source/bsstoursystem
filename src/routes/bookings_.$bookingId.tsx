@@ -100,7 +100,7 @@ function BookingDetailPage() {
 
   const updateLocal = (itemId: string, patch: Partial<Confirmation>) => {
     setConfs((prev) => {
-      const base: Confirmation = prev[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null };
+      const base: Confirmation = prev[itemId] ?? { booking_id: bookingId, quote_item_id: itemId, status: "pendente", proof_type: null, proof_storage_path: null, proof_text: null, proof_reference: null, proof_email_id: null };
       return { ...prev, [itemId]: { ...base, ...patch } };
     });
   };

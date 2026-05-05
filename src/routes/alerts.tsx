@@ -136,9 +136,29 @@ function AlertsPage() {
           <h1 className="text-2xl font-semibold">{t("alertsTitle")}</h1>
           <p className="text-sm text-muted-foreground">{t("alertsSubtitle")}</p>
         </div>
-        <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
-          {loading ? t("loading") : t("alertsRefresh")}
-        </Button>
+        <div className="flex items-center gap-2">
+          {notifPerm === "default" && (
+            <Button variant="outline" size="sm" onClick={requestNotif}>
+              <Bell className="h-3.5 w-3.5 mr-1.5" />
+              {t("alertsEnableNotifications")}
+            </Button>
+          )}
+          {notifPerm === "granted" && (
+            <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 gap-1">
+              <BellRing className="h-3 w-3" />
+              {t("alertsNotificationsActive")}
+            </Badge>
+          )}
+          {notifPerm === "denied" && (
+            <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+              <BellOff className="h-3.5 w-3.5" />
+              {t("alertsNotificationsBlocked")}
+            </span>
+          )}
+          <Button variant="outline" size="sm" onClick={reload} disabled={loading}>
+            {loading ? t("loading") : t("alertsRefresh")}
+          </Button>
+        </div>
       </div>
 
       {/* Summary */}

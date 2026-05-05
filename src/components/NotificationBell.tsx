@@ -322,8 +322,8 @@ export function NotificationBell() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setBookingDialog(null)}>{t("cancel")}</Button>
-          <Button onClick={generateVoucher} disabled={busyId === bookingDialog?.id || !voucherForm.code}>
+          <Button variant="outline" onClick={() => setBookingDialog(null)} disabled={busyId !== null}>{t("cancel")}</Button>
+          <Button onClick={generateVoucher} disabled={busyId !== null || !voucherForm.code}>
             {busyId === bookingDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("generateVoucher")}
           </Button>

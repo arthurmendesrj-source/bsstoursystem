@@ -537,15 +537,50 @@ function ActivitiesPage() {
           <DialogHeader><DialogTitle>{t("linkToLead")} ({linkTargetIds.length})</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <Label>{t("linkedLead")}</Label>
-            <Select value={linkLeadId || "none"} onValueChange={(v) => setLinkLeadId(v === "none" ? "" : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">— {t("unlinkLead")}</SelectItem>
-                {leadOptions.map((l) => (
-                  <SelectItem key={l.id} value={l.id}>{l.code ?? "—"} · {l.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {(() => {
+              const sel = leadOptions.find((l) => l.id === linkLeadId);
+              return (
+                <Popover open={linkPopoverOpen} onOpenChange={setLinkPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
+                      <span className="truncate">
+                        {sel ? `${sel.code ?? "—"} · ${sel.name}${sel.destination ? ` · ${sel.destination}` : ""}` : t("searchLeadPlaceholder")}
+                      </span>
+                      <ChevronsUpDown className="h-4 w-4 opacity-50 shrink-0 ml-2" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder={t("searchLeadPlaceholder")} />
+                      <CommandList>
+                        <CommandEmpty>{t("noLeadsFound")}</CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                            value="__unlink__"
+                            onSelect={() => { setLinkLeadId(""); setLinkPopoverOpen(false); }}
+                          >
+                            <Check className={cn("h-4 w-4 mr-2", !linkLeadId ? "opacity-100" : "opacity-0")} />
+                            — {t("unlinkLead")}
+                          </CommandItem>
+                          {leadOptions.map((l) => (
+                            <CommandItem
+                              key={l.id}
+                              value={`${l.code ?? ""} ${l.name} ${l.destination ?? ""}`}
+                              onSelect={() => { setLinkLeadId(l.id); setLinkPopoverOpen(false); }}
+                            >
+                              <Check className={cn("h-4 w-4 mr-2", linkLeadId === l.id ? "opacity-100" : "opacity-0")} />
+                              <span className="font-mono text-xs mr-2">{l.code ?? "—"}</span>
+                              <span className="truncate">{l.name}</span>
+                              {l.destination && <span className="text-muted-foreground text-xs ml-2 truncate">· {l.destination}</span>}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setLinkDialogOpen(false)}>{t("cancel")}</Button>

@@ -24,6 +24,16 @@ import { useI18n } from "@/lib/i18n";
 import { useLeadAlerts, type LeadAlert } from "@/lib/useLeadAlerts";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserTemplates, renderTemplate, type MessageTemplates } from "@/lib/messageTemplates";
+import {
+  enablePushNotifications,
+  getPermissionState,
+  isPushSupported,
+  showLocalNotification,
+  type PushPermission,
+} from "@/lib/pushNotifications";
+import { toast } from "sonner";
+
+const NOTIF_OPTOUT_KEY = "alerts.notifications.optout";
 
 export const Route = createFileRoute("/alerts")({
   component: () => (
@@ -70,14 +80,54 @@ function AlertsPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">(
-    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported",
+  const [notifPerm, setNotifPerm] = useState<PushPermission>(() =>
+    typeof window === "undefined" ? "default" : getPermissionState(),
   );
+  const [notifOptOut, setNotifOptOut] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(NOTIF_OPTOUT_KEY) === "1";
+  });
+  const notifEnabled = notifPerm === "granted" && !notifOptOut;
 
-  const requestNotif = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    const result = await Notification.requestPermission();
-    setNotifPerm(result);
+  const handleNotifToggle = async (next: boolean) => {
+    if (!isPushSupported()) {
+      toast.error("Notificações não são suportadas neste navegador.");
+      return;
+    }
+    if (!next) {
+      // Desativar: opt-out local (browsers não permitem revogar permissão)
+      localStorage.setItem(NOTIF_OPTOUT_KEY, "1");
+      setNotifOptOut(true);
+      toast.success("Notificações desativadas neste dispositivo.");
+      return;
+    }
+    if (notifPerm === "denied") {
+      toast.error(
+        "Permissão bloqueada no navegador. Clique no cadeado da URL → Notificações → Permitir.",
+      );
+      return;
+    }
+    const { permission } = await enablePushNotifications();
+    setNotifPerm(permission);
+    if (permission === "granted") {
+      localStorage.removeItem(NOTIF_OPTOUT_KEY);
+      setNotifOptOut(false);
+      toast.success("Notificações ativadas.");
+      await showLocalNotification("Notificações ativas", {
+        body: "Você receberá alertas de SLA aqui.",
+        tag: "alerts-test",
+      });
+    } else if (permission === "denied") {
+      toast.error("Permissão negada.");
+    }
+  };
+
+  const handleNotifTest = async () => {
+    const ok = await showLocalNotification("Teste de notificação", {
+      body: "Se você está vendo isto, está tudo certo! ✅",
+      tag: "alerts-test",
+    });
+    if (!ok) toast.error("Falha ao exibir notificação.");
   };
   const [goal, setGoal] = useState<number>(10);
   const [history, setHistory] = useState<{ date: string; count: number }[]>([]);
@@ -149,22 +199,38 @@ function AlertsPage() {
           <p className="text-sm text-muted-foreground">{t("alertsSubtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          {notifPerm === "default" && (
-            <Button variant="outline" size="sm" onClick={requestNotif}>
-              <Bell className="h-3.5 w-3.5 mr-1.5" />
-              {t("alertsEnableNotifications")}
-            </Button>
-          )}
-          {notifPerm === "granted" && (
-            <Badge variant="outline" className="border-emerald-500/40 text-emerald-700 gap-1">
-              <BellRing className="h-3 w-3" />
-              {t("alertsNotificationsActive")}
-            </Badge>
-          )}
-          {notifPerm === "denied" && (
+          {isPushSupported() ? (
+            <div className="flex items-center gap-2 rounded-md border px-3 py-1.5">
+              {notifEnabled ? (
+                <BellRing className="h-4 w-4 text-emerald-600" />
+              ) : notifPerm === "denied" ? (
+                <BellOff className="h-4 w-4 text-destructive" />
+              ) : (
+                <Bell className="h-4 w-4 text-muted-foreground" />
+              )}
+              <Label htmlFor="notif-toggle" className="text-sm cursor-pointer">
+                {notifEnabled
+                  ? "Notificações ativas"
+                  : notifPerm === "denied"
+                  ? "Bloqueadas no navegador"
+                  : "Ativar notificações"}
+              </Label>
+              <Switch
+                id="notif-toggle"
+                checked={notifEnabled}
+                onCheckedChange={handleNotifToggle}
+                disabled={notifPerm === "denied"}
+              />
+              {notifEnabled && (
+                <Button variant="ghost" size="sm" className="h-7 px-2" onClick={handleNotifTest}>
+                  Testar
+                </Button>
+              )}
+            </div>
+          ) : (
             <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
               <BellOff className="h-3.5 w-3.5" />
-              {t("alertsNotificationsBlocked")}
+              Não suportado
             </span>
           )}
           {isAdmin && (

@@ -1371,6 +1371,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_lead: {
+        Args: { _lead_id: string; _user_id: string }
+        Returns: boolean
+      }
       extract_initials: { Args: { _full_name: string }; Returns: string }
       generate_entity_code: {
         Args: { _entity: string; _user_id: string }

@@ -92,3 +92,70 @@ export async function sendPushToUser(args: SendArgs): Promise<SendResult> {
 
   return result;
 }
+
+type LeadRecipientArgs = {
+  leadId: string;
+  title: string;
+  body?: string;
+  url?: string;
+  tag?: string;
+  /** Quando true, também notifica administradores (default: false). */
+  includeAdmins?: boolean;
+  /** IDs a excluir (ex.: o ator que disparou o evento). */
+  excludeUserIds?: string[];
+};
+
+/** Resolve quem deve ser notificado sobre um lead (responsável + criador, opcionalmente admins). */
+export async function resolveLeadRecipients(
+  leadId: string,
+  opts?: { includeAdmins?: boolean; excludeUserIds?: string[] },
+): Promise<string[]> {
+  const exclude = new Set(opts?.excludeUserIds ?? []);
+  const recipients = new Set<string>();
+
+  const { data: lead, error: leadErr } = await supabaseAdmin
+    .from("leads")
+    .select("assigned_to, created_by")
+    .eq("id", leadId)
+    .maybeSingle();
+  if (leadErr) throw new Error(leadErr.message);
+  if (lead?.assigned_to) recipients.add(lead.assigned_to);
+  if (lead?.created_by) recipients.add(lead.created_by);
+
+  if (opts?.includeAdmins) {
+    const { data: admins, error: aErr } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id")
+      .eq("role", "admin");
+    if (aErr) throw new Error(aErr.message);
+    admins?.forEach((r) => r.user_id && recipients.add(r.user_id));
+  }
+
+  for (const id of exclude) recipients.delete(id);
+  return Array.from(recipients);
+}
+
+/** Envia push para todos os destinatários relevantes do lead. */
+export async function sendPushToLeadRecipients(
+  args: LeadRecipientArgs,
+): Promise<{ recipients: string[]; perUser: Record<string, SendResult> }> {
+  const recipients = await resolveLeadRecipients(args.leadId, {
+    includeAdmins: args.includeAdmins,
+    excludeUserIds: args.excludeUserIds,
+  });
+
+  const perUser: Record<string, SendResult> = {};
+  await Promise.all(
+    recipients.map(async (uid) => {
+      perUser[uid] = await sendPushToUser({
+        userId: uid,
+        title: args.title,
+        body: args.body,
+        url: args.url,
+        leadId: args.leadId,
+        tag: args.tag,
+      });
+    }),
+  );
+  return { recipients, perUser };
+}

@@ -26,6 +26,7 @@ import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 
@@ -114,6 +115,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsSlaRoute = SettingsSlaRouteImport.update({
+  id: '/sla',
+  path: '/sla',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
@@ -139,12 +145,13 @@ export interface FileRoutesByFullPath {
   '/packages': typeof PackagesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/settings/sla': typeof SettingsSlaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -160,12 +167,13 @@ export interface FileRoutesByTo {
   '/packages': typeof PackagesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/settings/sla': typeof SettingsSlaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -182,12 +190,13 @@ export interface FileRoutesById {
   '/packages': typeof PackagesRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
-  '/settings': typeof SettingsRoute
+  '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/settings/sla': typeof SettingsSlaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/alerts/sla'
     | '/leads/$leadId'
+    | '/settings/sla'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/alerts/sla'
     | '/leads/$leadId'
+    | '/settings/sla'
   id:
     | '__root__'
     | '/'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/workspace'
     | '/alerts/sla'
     | '/leads/$leadId'
+    | '/settings/sla'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -269,7 +281,7 @@ export interface RootRouteChildren {
   PackagesRoute: typeof PackagesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityAuditRoute: typeof SecurityAuditRoute
-  SettingsRoute: typeof SettingsRoute
+  SettingsRoute: typeof SettingsRouteWithChildren
   SuppliersRoute: typeof SuppliersRoute
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
@@ -396,6 +408,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/sla': {
+      id: '/settings/sla'
+      path: '/sla'
+      fullPath: '/settings/sla'
+      preLoaderRoute: typeof SettingsSlaRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/leads/$leadId': {
       id: '/leads/$leadId'
       path: '/$leadId'
@@ -434,6 +453,18 @@ const LeadsRouteChildren: LeadsRouteChildren = {
 
 const LeadsRouteWithChildren = LeadsRoute._addFileChildren(LeadsRouteChildren)
 
+interface SettingsRouteChildren {
+  SettingsSlaRoute: typeof SettingsSlaRoute
+}
+
+const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsSlaRoute: SettingsSlaRoute,
+}
+
+const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
+  SettingsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivitiesRoute: ActivitiesRoute,
@@ -448,7 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   PackagesRoute: PackagesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityAuditRoute: SecurityAuditRoute,
-  SettingsRoute: SettingsRoute,
+  SettingsRoute: SettingsRouteWithChildren,
   SuppliersRoute: SuppliersRoute,
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
@@ -456,3 +487,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

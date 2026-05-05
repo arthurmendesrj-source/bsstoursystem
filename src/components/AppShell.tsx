@@ -16,6 +16,7 @@ import {
   Building2,
   Briefcase,
   ListChecks,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -36,6 +37,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/leads", label: t("leads"), icon: UserPlus },
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
     { to: "/activities", label: t("activities"), icon: ListChecks },
+    { to: "/alerts", label: t("alertsMenu"), icon: Bell },
     { to: "/customers", label: t("customers"), icon: Users },
     { to: "/suppliers", label: t("suppliers"), icon: Building2 },
     { to: "/packages", label: t("packages"), icon: Package },

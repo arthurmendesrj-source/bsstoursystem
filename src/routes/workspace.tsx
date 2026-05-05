@@ -256,11 +256,10 @@ function WorkspacePage() {
       </div>
 
       <ResizablePanelGroup
-        direction="horizontal"
-        autoSaveId="workspace:layout"
+        orientation="horizontal"
         className="min-h-[600px]"
       >
-        <ResizablePanel defaultSize={28} minSize={18} maxSize={45}>
+        <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%">
         {/* SIDEBAR */}
         <div className="space-y-4 pr-2">
           {/* Lead Selector */}

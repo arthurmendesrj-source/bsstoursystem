@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Calendar as CalendarIcon, Phone, Mail, MessageSquare, Users as UsersIcon, StickyNote, Plus, CheckCircle2, Clock } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Phone, Mail, MessageSquare, Users as UsersIcon, StickyNote, Plus, CheckCircle2, Clock, AlertCircle, AlertTriangle, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
@@ -21,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { computeLeadSla } from "@/lib/leadSla";
 
 export const Route = createFileRoute("/leads/$leadId")({
   component: () => (
@@ -54,6 +56,9 @@ type Lead = {
   currency: string;
   status: LeadStatus;
   notes: string | null;
+  updated_at: string;
+  next_action_date: string | null;
+  next_action: string | null;
 };
 
 type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean };
@@ -165,13 +170,58 @@ function LeadWorkspace() {
     </div>
   );
 
+  const sla = computeLeadSla({
+    status: lead.status,
+    updated_at: lead.updated_at,
+    next_action_date: lead.next_action_date,
+    lastInteractionAt: interactions[0]?.occurred_at ?? null,
+  });
+  const slaBadge =
+    sla.level === "overdue"
+      ? { cls: "bg-destructive/10 text-destructive border-destructive/40", Icon: AlertCircle, label: t("slaOverdue") }
+      : sla.level === "warning"
+      ? { cls: "bg-amber-500/10 text-amber-700 border-amber-500/40", Icon: AlertTriangle, label: t("slaAtRisk") }
+      : { cls: "bg-emerald-500/10 text-emerald-700 border-emerald-500/40", Icon: ShieldCheck, label: "OK" };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" asChild>
           <Link to="/leads"><ArrowLeft className="h-4 w-4 mr-2" />{t("backToList")}</Link>
         </Button>
-        <Badge variant="outline" className={cn("font-mono", statusColor(lead.status))}>{lead.code ?? "—"}</Badge>
+        <div className="flex items-center gap-2">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge variant="outline" className={cn("gap-1.5 cursor-default", slaBadge.cls)}>
+                  <slaBadge.Icon className="h-3 w-3" />
+                  {slaBadge.label}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs space-y-1">
+                <div className="font-medium">{slaBadge.label}</div>
+                {sla.daysSinceLast !== null && (
+                  <div className="text-xs">
+                    {t("slaDaysIdle").replace("{n}", String(sla.daysSinceLast))}
+                    {sla.threshold !== null && ` / ${sla.threshold}d`}
+                  </div>
+                )}
+                {sla.nextActionOverdue && (
+                  <div className="text-xs text-destructive">
+                    {t("slaNextActionOverdue")}
+                    {lead.next_action_date && ` · ${new Date(lead.next_action_date).toLocaleDateString()}`}
+                  </div>
+                )}
+                {!sla.nextActionOverdue && lead.next_action_date && (
+                  <div className="text-xs text-muted-foreground">
+                    {t("nextAction")}: {new Date(lead.next_action_date).toLocaleDateString()}
+                  </div>
+                )}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <Badge variant="outline" className={cn("font-mono", statusColor(lead.status))}>{lead.code ?? "—"}</Badge>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">

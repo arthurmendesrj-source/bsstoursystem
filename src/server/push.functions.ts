@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sendPushToUser, sendPushToLeadRecipients } from "./push.server";
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+
 
 const SubscriptionSchema = z.object({
   endpoint: z.string().url().min(1).max(2000),

@@ -167,21 +167,25 @@ export function NotificationBell() {
                   </div>
                   <div className="space-y-1.5">
                     {quotes.map((q) => (
-                      <Link
-                        key={q.id}
-                        to="/workspace"
-                        search={q.lead_id ? { lead: q.lead_id } : {}}
-                        onClick={() => setOpen(false)}
-                        className="block p-2 rounded hover:bg-muted text-xs"
-                      >
+                      <div key={q.id} className="p-2 rounded hover:bg-muted text-xs space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-muted-foreground">#{q.id.slice(0, 8)}</span>
-                          <span className="font-semibold">{fmt(Number(q.total_amount), q.currency)}</span>
+                          <Link
+                            to="/workspace"
+                            search={q.lead_id ? { lead: q.lead_id } : {}}
+                            onClick={() => setOpen(false)}
+                            className="flex-1 min-w-0 flex items-center justify-between gap-2"
+                          >
+                            <span className="font-mono text-muted-foreground">#{q.id.slice(0, 8)}</span>
+                            <span className="font-semibold">{fmt(Number(q.total_amount), q.currency)}</span>
+                          </Link>
                         </div>
-                        <div className="text-muted-foreground">
-                          {new Date(q.created_at).toLocaleDateString()}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => convertQuote(q)}>
+                            <CalendarCheck className="h-3 w-3 mr-1" />{t("convertToBooking")}
+                          </Button>
                         </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>

@@ -17,7 +17,7 @@ export interface NotificationLogInput {
 /** Registra uma notificação no histórico. Falhas são silenciosas (não interrompem o fluxo principal). */
 export async function logNotification(input: NotificationLogInput): Promise<void> {
   try {
-    await supabase.from("notification_logs").insert({
+    await (supabase.from("notification_logs" as any) as any).insert({
       user_id: input.user_id,
       lead_id: input.lead_id ?? null,
       channel: input.channel ?? "push",

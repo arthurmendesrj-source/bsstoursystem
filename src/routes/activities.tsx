@@ -440,14 +440,13 @@ function ActivitiesPage() {
                       aria-label="select all"
                     />
                   </TableHead>
-                  <TableHead className="w-10"></TableHead>
                   <TableHead>{t("activityTitle")}</TableHead>
                   <TableHead>{t("linkedLead")}</TableHead>
                   <TableHead>{t("category")}</TableHead>
                   <TableHead>{t("priority")}</TableHead>
                   <TableHead>{t("dueDate")}</TableHead>
                   <TableHead>{t("timeSpent")}</TableHead>
-                  <TableHead className="w-32">{t("actions")}</TableHead>
+                  <TableHead className="w-44 text-right">{t("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

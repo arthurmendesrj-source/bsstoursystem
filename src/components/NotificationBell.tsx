@@ -198,21 +198,25 @@ export function NotificationBell() {
                   </div>
                   <div className="space-y-1.5">
                     {bookings.map((b) => (
-                      <Link
-                        key={b.id}
-                        to="/bookings"
-                        onClick={() => setOpen(false)}
-                        className="block p-2 rounded hover:bg-muted text-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
+                      <div key={b.id} className="p-2 rounded hover:bg-muted text-xs space-y-1.5">
+                        <Link
+                          to="/bookings"
+                          onClick={() => setOpen(false)}
+                          className="flex items-center justify-between gap-2"
+                        >
                           <span className="font-mono text-muted-foreground">#{b.id.slice(0, 8)}</span>
                           <span className="font-semibold">{fmt(Number(b.total_amount), b.currency)}</span>
+                        </Link>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-muted-foreground capitalize">
+                            {b.status.replace("_", " ")}
+                            {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
+                          </span>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => generateVoucher(b)}>
+                            <Ticket className="h-3 w-3 mr-1" />{t("generateVoucher")}
+                          </Button>
                         </div>
-                        <div className="text-muted-foreground capitalize">
-                          {b.status.replace("_", " ")}
-                          {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
-                        </div>
-                      </Link>
+                      </div>
                     ))}
                   </div>
                 </div>

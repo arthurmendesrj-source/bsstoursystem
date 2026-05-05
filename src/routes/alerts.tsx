@@ -35,13 +35,6 @@ export const Route = createFileRoute("/alerts")({
 });
 
 const STATUSES = ["novo", "qualificado", "cotacao", "proposta"] as const;
-const GOAL_KEY = "daily-followup-goal";
-
-function getGoal(): number {
-  if (typeof window === "undefined") return 10;
-  const v = Number(window.localStorage.getItem(GOAL_KEY));
-  return Number.isFinite(v) && v > 0 ? v : 10;
-}
 
 function buildWhatsappLink(phone: string | null, name: string) {
   if (!phone) return null;

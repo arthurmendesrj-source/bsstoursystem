@@ -48,7 +48,7 @@ type Task = {
   created_by: string | null;
 };
 
-type LeadLite = { id: string; code: string | null; name: string };
+type LeadLite = { id: string; code: string | null; name: string; destination?: string | null };
 
 function ActivitiesPage() {
   const { t } = useI18n();

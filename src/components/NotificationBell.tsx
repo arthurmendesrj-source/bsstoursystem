@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "@tanstack/react-router";
-import { Bell, CalendarCheck, FileCheck, Loader2, Ticket } from "lucide-react";
+import { AlertCircle, AlertTriangle, Bell, CalendarCheck, FileCheck, Loader2, Ticket } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
+import { useAuth } from "@/lib/auth";
+import { useLeadAlerts } from "@/lib/useLeadAlerts";
 import { cn } from "@/lib/utils";
 
 type PendingQuote = {

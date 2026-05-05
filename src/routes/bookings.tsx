@@ -198,7 +198,7 @@ function BookingsPage() {
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>

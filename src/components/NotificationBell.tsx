@@ -161,7 +161,7 @@ export function NotificationBell() {
   };
 
 
-  const total = quotes.length + bookings.length;
+  const total = quotes.length + bookings.length + leadAlerts.length;
   const fmt = (n: number, c: string) => {
     try {
       return new Intl.NumberFormat("en-US", { style: "currency", currency: c }).format(n);
@@ -202,6 +202,46 @@ export function NotificationBell() {
             </div>
           ) : (
             <div className="divide-y">
+              {leadAlerts.length > 0 && (
+                <div className="px-4 py-2">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">
+                    <AlertCircle className="h-3 w-3" />
+                    {t("alertsBellSection")} · {leadAlerts.length}
+                    <Link
+                      to="/alerts"
+                      onClick={() => setOpen(false)}
+                      className="ml-auto text-[10px] font-normal normal-case tracking-normal text-primary hover:underline"
+                    >
+                      {t("alertsMenu")} →
+                    </Link>
+                  </div>
+                  <div className="space-y-1">
+                    {[...overdueAlerts, ...warningAlerts].slice(0, 6).map((a) => (
+                      <Link
+                        key={a.id}
+                        to="/leads/$leadId"
+                        params={{ leadId: a.id }}
+                        onClick={() => setOpen(false)}
+                        className="flex items-center justify-between gap-2 p-2 rounded hover:bg-muted text-xs"
+                      >
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {a.sla.level === "overdue"
+                            ? <AlertCircle className="h-3 w-3 text-destructive shrink-0" />
+                            : <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />}
+                          <span className="truncate font-medium">{a.name}</span>
+                        </div>
+                        <span className="text-muted-foreground shrink-0">
+                          {a.sla.nextActionOverdue
+                            ? t("slaNextActionOverdue")
+                            : a.sla.daysSinceLast !== null
+                              ? t("slaDaysIdle").replace("{n}", String(a.sla.daysSinceLast))
+                              : ""}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
               {quotes.length > 0 && (
                 <div className="px-4 py-2">
                   <div className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center gap-1.5">

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { computeLeadSla, type LeadSlaInfo } from "@/lib/leadSla";
+import { computeLeadSla, ensureSlaSettingsLoaded, type LeadSlaInfo } from "@/lib/leadSla";
 
 export type LeadAlert = {
   id: string;

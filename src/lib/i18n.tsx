@@ -1066,7 +1066,7 @@ const dict = {
     alertsToday: "Hoy",
     alertsGoal: "Meta de seguimientos",
     alertsGoalProgress: "{n} de {total}",
-    alertsLast7Days: "Últimos 7 dias",
+    alertsLast7Days: "Últimos 7 días",
     alertsChannelCall: "Llamar",
     alertsChannelWhatsapp: "WhatsApp",
     alertsChannelEmail: "Correo",

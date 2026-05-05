@@ -1,40 +1,45 @@
-## Fase 2.1 — Histórico (activity_log)
+## Fase 2.2 — SLA de leads
 
-Auditoria de mudanças em leads, cotações e reservas, com timeline por entidade.
+Alertas para leads parados, indicando risco no funil e no dashboard.
 
 ### O que será entregue
-- Tabela `activity_log` no backend (Lovable Cloud) registrando criação, atualização e mudança de status de `leads`, `quotes` e `bookings`.
-- Triggers no banco para gravar automaticamente cada mudança (sem precisar alterar código de cada formulário).
-- Componente de UI `ActivityTimeline` reutilizável que lista os eventos de uma entidade em ordem cronológica reversa, com:
-  - ícone por tipo de ação (criou, atualizou, mudou status, vinculou)
-  - autor (nome do profile)
-  - data/hora relativa ("há 2h")
-  - diff resumido dos campos alterados (ex.: `status: novo → qualificado`)
-- Integração da timeline nos detalhes de Lead, Cotação e Reserva.
-- Traduções PT/EN/ES.
+
+1. **Regras de SLA (por status)** — config central em `src/lib/leadSla.ts`:
+   - `novo`: 2 dias sem interação
+   - `qualificado`: 5 dias
+   - `cotacao` / `proposta`: 7 dias
+   - `fechado` / `perdido`: ignorados
+   - Lead em risco também quando `next_action_date < hoje`.
+   - Função `computeLeadSla(lead, lastInteractionAt)` retornando `{ level: "ok"|"warning"|"overdue", daysSinceLast, threshold, nextActionOverdue, reason }`.
+
+2. **Indicador no funil (`/funnel`)**
+   - Buscar `last_interaction_at` por lead (consulta agregada em `interactions` agrupada por `lead_id`).
+   - Adicionar badge de status no card: ponto âmbar para `warning`, vermelho para `overdue`, com tooltip explicando "X dias sem contato" / "ação atrasada".
+   - Filtro rápido no topo: "Todos | Em risco | Atrasados".
+
+3. **Bloco "Leads em risco" no Dashboard (`/dashboard`)**
+   - Card adicional com top 5 leads em `overdue`, mostrando nome, status, dias parado e link para `/leads/$id`.
+   - Contador agregado nos KPIs ("X leads em risco").
+
+4. **i18n PT/EN/ES**
+   - `slaAtRisk`, `slaOverdue`, `slaDaysIdle`, `slaNextActionOverdue`, `slaFilterAll`, `slaFilterRisk`, `slaFilterOverdue`, `dashAtRisk`.
 
 ### Detalhes técnicos
 
-**Migration**
-- `activity_log` com colunas:
-  - `id uuid pk`, `entity_type text` (lead/quote/booking), `entity_id uuid`, `action text` (created/updated/status_changed), `changes jsonb` (campos alterados com old/new), `actor_id uuid` (auth.uid), `created_at timestamptz default now()`.
-- Índice em `(entity_type, entity_id, created_at desc)`.
-- RLS: SELECT para authenticated; INSERT só via trigger (sem policy de insert direto, ou policy permitindo `auth.uid() = actor_id`).
-- Função `public.log_activity()` SECURITY DEFINER que, em AFTER INSERT/UPDATE, calcula o diff (apenas colunas relevantes) e insere em `activity_log`. Para UPDATE compara `OLD` vs `NEW` apenas em campos relevantes (status, datas, valores, vínculos) para evitar ruído.
-- Triggers `AFTER INSERT OR UPDATE` em `leads`, `quotes`, `bookings`.
+- **Sem migration necessária**: `leads.updated_at`, `leads.next_action_date` e `interactions.occurred_at` já existem.
+- Carregamento no funil:
+  ```ts
+  const { data } = await supabase
+    .from("interactions")
+    .select("lead_id, occurred_at")
+    .order("occurred_at", { ascending: false });
+  // reduce → { [lead_id]: maxOccurredAt }
+  ```
+  Para volumes grandes futuramente, dá para promover a uma view materializada ou função SQL; nesta fase, agregação client-side basta.
+- Tooltip usando `@/components/ui/tooltip` (já presente no shadcn).
+- Badge: ponto colorido + texto curto, sem alterar layout dos cards.
 
-**Frontend**
-- Novo componente `src/components/ActivityTimeline.tsx` com props `entityType` e `entityId`. Usa `supabase.from('activity_log')` com filtros e ordenação. Faz join leve com `profiles` para nome do autor (query separada por actor_ids únicos).
-- Renderização compacta com `Card`, ícones do `lucide-react` (Plus, Edit, ArrowRightLeft, Link2), badges para status.
-- Helper `formatChanges(changes)` que itera o jsonb e produz linhas legíveis com mapeamento de nomes de campos traduzidos.
-
-**Integração**
-- Adicionar `<ActivityTimeline entityType="lead" entityId={lead.id} />` na tela/drawer de detalhe do lead. Idem para cotação e reserva (localizar telas existentes em `src/pages` / `src/components`).
-
-**i18n**
-- Chaves: `activity.title`, `activity.created`, `activity.updated`, `activity.statusChanged`, `activity.by`, `activity.empty`, e nomes de campos comuns (status, valor, data, etc.).
-
-### Fora de escopo desta fase
-- Edição/exclusão de eventos (log é imutável).
-- Comentários manuais na timeline (pode virar fase 2.1.1 depois).
-- SLA de leads e Dashboard (fases 2.2 e 3).
+### Fora de escopo
+- Notificação push/e-mail de SLA estourado (futura Fase 2.2.1).
+- Configuração editável dos thresholds por usuário/admin (depois — começamos com config no código).
+- Dashboard com KPIs gerenciais completos (Fase 3).

@@ -104,6 +104,7 @@ function NotificationHistoryPage() {
       } else {
         setLeadNames({});
       }
+    } catch (err) {
       console.error("[notif-history] load failed", err);
     } finally {
       setLoading(false);

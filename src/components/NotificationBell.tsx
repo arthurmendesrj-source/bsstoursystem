@@ -145,6 +145,7 @@ export function NotificationBell() {
   };
 
   return (
+    <>
     <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) load(); }}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Bell, CheckCircle2, XCircle, MinusCircle, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Bell, CheckCircle2, XCircle, MinusCircle, RefreshCw, Search, X } from "lucide-react";
 import { AppShell } from "@/components/AppShell";
 import { AuthGate } from "@/components/AuthGate";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -47,10 +48,12 @@ function NotificationHistoryPage() {
   const { user, isAdmin } = useAuth();
   const [rows, setRows] = useState<LogRow[]>([]);
   const [profiles, setProfiles] = useState<Record<string, string>>({});
+  const [leadNames, setLeadNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(!isAdmin);
+  const [search, setSearch] = useState("");
 
   const load = async () => {
     if (!user?.id) return;
@@ -83,6 +86,24 @@ function NotificationHistoryPage() {
         }
         setProfiles(map);
       }
+
+      // Carrega nomes/códigos dos leads referenciados
+      const leadIds = Array.from(
+        new Set(list.map((r) => r.lead_id).filter((v): v is string => !!v)),
+      );
+      if (leadIds.length) {
+        const { data: leads } = await supabase
+          .from("leads")
+          .select("id,name,code")
+          .in("id", leadIds);
+        const lmap: Record<string, string> = {};
+        for (const l of (leads ?? []) as { id: string; name: string; code: string | null }[]) {
+          lmap[l.id] = l.code ? `${l.code} · ${l.name}` : l.name;
+        }
+        setLeadNames(lmap);
+      } else {
+        setLeadNames({});
+      }
     } catch (err) {
       console.error("[notif-history] load failed", err);
     } finally {
@@ -95,9 +116,22 @@ function NotificationHistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, statusFilter, channelFilter, onlyMine]);
 
-  const successCount = rows.filter((r) => r.status === "success").length;
-  const errorCount = rows.filter((r) => r.status === "error").length;
-  const skippedCount = rows.filter((r) => r.status === "skipped").length;
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return rows;
+    return rows.filter((r) => {
+      // Match por lead_id (prefixo) ou nome/código do lead, e título/corpo
+      if (r.lead_id && r.lead_id.toLowerCase().includes(term)) return true;
+      if (r.lead_id && leadNames[r.lead_id]?.toLowerCase().includes(term)) return true;
+      if (r.title.toLowerCase().includes(term)) return true;
+      if (r.body && r.body.toLowerCase().includes(term)) return true;
+      return false;
+    });
+  }, [rows, search, leadNames]);
+
+  const successCount = filtered.filter((r) => r.status === "success").length;
+  const errorCount = filtered.filter((r) => r.status === "error").length;
+  const skippedCount = filtered.filter((r) => r.status === "skipped").length;
 
   return (
     <div className="space-y-6">
@@ -131,7 +165,27 @@ function NotificationHistoryPage() {
 
       {/* Filtros */}
       <Card>
-        <CardContent className="pt-6 flex flex-wrap items-center gap-4">
+        <CardContent className="pt-6 space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por lead (ID, nome, código), título ou conteúdo..."
+              className="pl-9 pr-9"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Limpar busca"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Label className="text-sm">Status</Label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -169,6 +223,7 @@ function NotificationHistoryPage() {
               </Label>
             </div>
           )}
+          </div>
         </CardContent>
       </Card>
 
@@ -176,15 +231,22 @@ function NotificationHistoryPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">
-            {rows.length} {rows.length === 1 ? "registro" : "registros"}
+            {filtered.length} {filtered.length === 1 ? "registro" : "registros"}
+            {search && rows.length !== filtered.length && (
+              <span className="text-xs font-normal text-muted-foreground ml-2">
+                (de {rows.length})
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {loading && rows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">Carregando...</p>
-          ) : rows.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">
-              Nenhuma notificação registrada ainda.
+              {search
+                ? "Nenhum registro encontrado para esta busca."
+                : "Nenhuma notificação registrada ainda."}
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -201,7 +263,7 @@ function NotificationHistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {filtered.map((r) => (
                     <tr key={r.id} className="border-b last:border-b-0 align-top">
                       <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">
                         {new Date(r.sent_at).toLocaleString()}
@@ -230,9 +292,10 @@ function NotificationHistoryPage() {
                           <Link
                             to="/leads/$leadId"
                             params={{ leadId: r.lead_id }}
-                            className="text-primary hover:underline text-xs"
+                            className="text-primary hover:underline text-xs whitespace-nowrap"
+                            title={r.lead_id}
                           >
-                            abrir
+                            {leadNames[r.lead_id] ?? "abrir"}
                           </Link>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>

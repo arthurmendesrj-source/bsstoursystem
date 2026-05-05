@@ -586,6 +586,7 @@ const dict = {
     convertQuoteConfirm: "Create a booking from this quote?",
     bookingCreated: "Booking created",
     generateVoucher: "Generate voucher",
+    generateVoucherConfirm: "Generate voucher for this booking?",
     voucherCreated: "Voucher generated",
     openBooking: "Open booking",
     openVoucher: "Open voucher",

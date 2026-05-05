@@ -61,7 +61,7 @@ function TemplatesPage() {
     setSaving(true);
     const { error } = await supabase
       .from("profiles")
-      .update({ message_templates: tpl as unknown as Record<string, unknown> })
+      .update({ message_templates: { ...tpl } })
       .eq("user_id", user.id);
     setSaving(false);
     if (error) { toast.error(error.message); return; }

@@ -676,6 +676,33 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          created_at: string
+          event_type: Database["public"]["Enums"]["notification_event_type"]
+          id: string
+          push_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: Database["public"]["Enums"]["notification_event_type"]
+          id?: string
+          push_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["notification_event_type"]
+          id?: string
+          push_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       package_dates: {
         Row: {
           booked: number
@@ -1409,6 +1436,13 @@ export type Database = {
         | "fechado"
         | "perdido"
       notification_channel: "push" | "in_app" | "email" | "whatsapp"
+      notification_event_type:
+        | "lead_assigned"
+        | "lead_status_changed"
+        | "task_due_soon"
+        | "task_overdue"
+        | "sla_warning"
+        | "sla_overdue"
       notification_status: "success" | "error" | "skipped"
       quote_status: "rascunho" | "enviada" | "aprovada" | "rejeitada"
       supplier_category:
@@ -1570,6 +1604,14 @@ export const Constants = {
         "perdido",
       ],
       notification_channel: ["push", "in_app", "email", "whatsapp"],
+      notification_event_type: [
+        "lead_assigned",
+        "lead_status_changed",
+        "task_due_soon",
+        "task_overdue",
+        "sla_warning",
+        "sla_overdue",
+      ],
       notification_status: ["success", "error", "skipped"],
       quote_status: ["rascunho", "enviada", "aprovada", "rejeitada"],
       supplier_category: [

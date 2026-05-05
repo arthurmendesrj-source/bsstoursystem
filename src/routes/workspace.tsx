@@ -549,7 +549,8 @@ function WorkspacePage() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }

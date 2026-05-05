@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Ticket } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ type Booking = {
   return_date: string | null;
   customer_id: string | null;
   package_id: string | null;
+  voucher_code?: string | null;
 };
 
 const STATUSES = ["pre_reserva", "confirmada", "em_viagem", "concluida", "cancelada"];
@@ -54,12 +55,16 @@ function BookingsPage() {
   });
 
   const load = async () => {
-    const [b, c, p] = await Promise.all([
+    const [b, c, p, v] = await Promise.all([
       supabase.from("bookings").select("*").order("created_at", { ascending: false }),
       supabase.from("customers").select("id,full_name").order("full_name"),
       supabase.from("packages").select("id,name,base_price,base_currency").eq("active", true),
+      supabase.from("vouchers").select("booking_id,code"),
     ]);
-    setRows((b.data as Booking[]) ?? []);
+    const voucherMap = new Map<string, string>();
+    ((v.data ?? []) as { booking_id: string; code: string }[]).forEach((row) => voucherMap.set(row.booking_id, row.code));
+    const bookings = ((b.data ?? []) as Booking[]).map((bk) => ({ ...bk, voucher_code: voucherMap.get(bk.id) ?? null }));
+    setRows(bookings);
     setCustomers(c.data ?? []);
     setPkgs(p.data ?? []);
   };
@@ -90,6 +95,26 @@ function BookingsPage() {
   const updateStatus = async (id: string, status: string) => {
     const { error } = await supabase.from("bookings").update({ status: status as "pre_reserva" }).eq("id", id);
     if (error) toast.error(error.message); else load();
+  };
+
+  const generateVoucher = async (b: Booking) => {
+    if (b.voucher_code) { toast.info(t("voucherAlreadyExists")); return; }
+    // Build a simple sequential code: V + YYMMDD + first 4 chars of booking id
+    const dt = new Date();
+    const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+    const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
+    const itinerary = [
+      b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
+      b.return_date ? `Retorno: ${b.return_date}` : null,
+      pkgName(b.package_id) !== "—" ? `${t("packages")}: ${pkgName(b.package_id)}` : null,
+    ].filter(Boolean).join("\n");
+    const { error } = await supabase.from("vouchers").insert({
+      booking_id: b.id,
+      code,
+      itinerary: itinerary || null,
+    });
+    if (error) toast.error(error.message);
+    else { toast.success(t("voucherCreated")); load(); }
   };
 
   const customerName = (id: string | null) => customers.find((c) => c.id === id)?.full_name ?? "—";
@@ -167,11 +192,12 @@ function BookingsPage() {
               <TableHead>{t("departureDate")}</TableHead>
               <TableHead>{t("price")}</TableHead>
               <TableHead>{t("status")}</TableHead>
+              <TableHead className="text-right">Voucher</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
@@ -185,6 +211,17 @@ function BookingsPage() {
                     </SelectTrigger>
                     <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
+                </TableCell>
+                <TableCell className="text-right">
+                  {b.voucher_code ? (
+                    <Badge variant="outline" className="font-mono">{b.voucher_code}</Badge>
+                  ) : b.status === "confirmada" || b.status === "em_viagem" || b.status === "concluida" ? (
+                    <Button size="sm" variant="outline" onClick={() => generateVoucher(b)}>
+                      <Ticket className="h-3.5 w-3.5 mr-1" />{t("generateVoucher")}
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

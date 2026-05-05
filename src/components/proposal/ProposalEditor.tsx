@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,7 +71,7 @@ function fmtDate(d?: string | null) {
   }
 }
 
-export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Props) {
+export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -274,6 +274,47 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
     load();
   };
 
+  const convertToBooking = async () => {
+    if (!quote) return;
+    if (!confirm(t("convertQuoteConfirm"))) return;
+    // Check if a booking already exists for this quote
+    const { data: existing } = await supabase
+      .from("bookings")
+      .select("id")
+      .eq("quote_id", quote.id)
+      .maybeSingle();
+    if (existing) {
+      toast.info(t("alreadyConverted"));
+      return;
+    }
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) return toast.error("auth");
+
+    // Departure/return inferred from earliest item_date and latest check_out
+    const dates = items
+      .flatMap((it) => [it.item_date, it.check_out])
+      .filter((d): d is string => Boolean(d))
+      .sort();
+    const departure = dates[0] ?? null;
+    const ret = dates[dates.length - 1] ?? departure;
+
+    const { error } = await supabase.from("bookings").insert({
+      lead_id: leadId,
+      customer_id: customerId,
+      quote_id: quote.id,
+      total_amount: quote.total_amount,
+      currency: quote.currency,
+      departure_date: departure,
+      return_date: ret,
+      status: "pre_reserva",
+      created_by: uid,
+    });
+    if (error) return toast.error(error.message);
+    toast.success(t("bookingCreated"));
+    onSaved?.();
+  };
+
   if (loading || !quote) {
     return <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>;
   }
@@ -324,6 +365,11 @@ export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Pr
           {mode === "proposal" && quote.status !== "aprovada" && (
             <Button size="sm" variant="default" onClick={approve}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
+            </Button>
+          )}
+          {isClosed && (
+            <Button size="sm" variant="default" onClick={convertToBooking}>
+              <CalendarCheck className="h-4 w-4 mr-1" /> {t("convertToBooking")}
             </Button>
           )}
           {onClose && (

@@ -192,11 +192,12 @@ function BookingsPage() {
               <TableHead>{t("departureDate")}</TableHead>
               <TableHead>{t("price")}</TableHead>
               <TableHead>{t("status")}</TableHead>
+              <TableHead className="text-right">Voucher</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
@@ -210,6 +211,17 @@ function BookingsPage() {
                     </SelectTrigger>
                     <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                   </Select>
+                </TableCell>
+                <TableCell className="text-right">
+                  {b.voucher_code ? (
+                    <Badge variant="outline" className="font-mono">{b.voucher_code}</Badge>
+                  ) : b.status === "confirmada" || b.status === "em_viagem" || b.status === "concluida" ? (
+                    <Button size="sm" variant="outline" onClick={() => generateVoucher(b)}>
+                      <Ticket className="h-3.5 w-3.5 mr-1" />{t("generateVoucher")}
+                    </Button>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

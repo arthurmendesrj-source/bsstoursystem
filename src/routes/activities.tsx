@@ -67,6 +67,7 @@ function ActivitiesPage() {
   const [priorityFilter, setPriorityFilter] = useState<"all" | "baixa" | "media" | "alta">("all");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // dialog
   const [dialogOpen, setDialogOpen] = useState(false);

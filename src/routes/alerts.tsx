@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useLeadAlerts, type LeadAlert } from "@/lib/useLeadAlerts";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/alerts")({
   component: () => (

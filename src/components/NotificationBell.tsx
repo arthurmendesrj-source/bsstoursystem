@@ -7,9 +7,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -39,8 +41,10 @@ export function NotificationBell() {
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [confirmQuote, setConfirmQuote] = useState<PendingQuote | null>(null);
-  const [confirmBooking, setConfirmBooking] = useState<PendingBooking | null>(null);
+  const [quoteDialog, setQuoteDialog] = useState<PendingQuote | null>(null);
+  const [quoteForm, setQuoteForm] = useState({ departure: "", ret: "" });
+  const [bookingDialog, setBookingDialog] = useState<PendingBooking | null>(null);
+  const [voucherForm, setVoucherForm] = useState({ code: "", itinerary: "", emergency: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,50 +89,66 @@ export function NotificationBell() {
     return () => clearInterval(id);
   }, [load]);
 
-  const convertQuote = async (q: PendingQuote) => {
+  const openQuoteDialog = async (q: PendingQuote) => {
+    const { data: its } = await supabase
+      .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
+    const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
+      .flatMap((it) => [it.item_date, it.check_out])
+      .filter((d): d is string => Boolean(d)).sort();
+    setQuoteForm({ departure: dates[0] ?? "", ret: dates[dates.length - 1] ?? dates[0] ?? "" });
+    setQuoteDialog(q);
+  };
+
+  const convertQuote = async () => {
+    const q = quoteDialog;
+    if (!q) return;
     setBusyId(q.id);
     try {
       const { data: existing } = await supabase
         .from("bookings").select("id").eq("quote_id", q.id).maybeSingle();
-      if (existing) { toast.info(t("alreadyConverted")); load(); return; }
+      if (existing) { toast.info(t("alreadyConverted")); setQuoteDialog(null); load(); return; }
       const { data: userRes } = await supabase.auth.getUser();
       const uid = userRes.user?.id;
       if (!uid) return;
-      const { data: its } = await supabase
-        .from("quote_items").select("item_date,check_out").eq("quote_id", q.id);
-      const dates = ((its ?? []) as { item_date: string | null; check_out: string | null }[])
-        .flatMap((it) => [it.item_date, it.check_out])
-        .filter((d): d is string => Boolean(d)).sort();
-      const departure = dates[0] ?? null;
-      const ret = dates[dates.length - 1] ?? departure;
       const { error } = await supabase.from("bookings").insert({
         lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
         total_amount: q.total_amount, currency: q.currency as "BRL",
-        departure_date: departure, return_date: ret,
+        departure_date: quoteForm.departure || null,
+        return_date: quoteForm.ret || quoteForm.departure || null,
         status: "pre_reserva", created_by: uid,
       });
       if (error) toast.error(error.message);
-      else { toast.success(t("bookingCreated")); load(); }
+      else { toast.success(t("bookingCreated")); setQuoteDialog(null); load(); }
     } finally {
       setBusyId(null);
     }
   };
 
-  const generateVoucher = async (b: PendingBooking) => {
+  const openBookingDialog = (b: PendingBooking) => {
+    const dt = new Date();
+    const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
+    const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
+    const itinerary = [
+      b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
+      b.return_date ? `Retorno: ${b.return_date}` : null,
+    ].filter(Boolean).join("\n");
+    setVoucherForm({ code, itinerary, emergency: "" });
+    setBookingDialog(b);
+  };
+
+  const generateVoucher = async () => {
+    const b = bookingDialog;
+    if (!b) return;
     setBusyId(b.id);
     try {
-      const dt = new Date();
-      const yymmdd = `${String(dt.getFullYear()).slice(2)}${String(dt.getMonth() + 1).padStart(2, "0")}${String(dt.getDate()).padStart(2, "0")}`;
-      const code = `V${yymmdd}${b.id.slice(0, 4).toUpperCase()}`;
-      const itinerary = [
-        b.departure_date ? `${t("departureDate")}: ${b.departure_date}` : null,
-        b.return_date ? `Retorno: ${b.return_date}` : null,
-      ].filter(Boolean).join("\n");
       const { error } = await supabase.from("vouchers").insert({
-        booking_id: b.id, code, itinerary: itinerary || null,
+        booking_id: b.id,
+        code: voucherForm.code,
+        itinerary: voucherForm.itinerary || null,
+        emergency_contact: voucherForm.emergency || null,
       });
       if (error) toast.error(error.message);
-      else { toast.success(t("voucherCreated")); load(); }
+      else { toast.success(t("voucherCreated")); setBookingDialog(null); load(); }
     } finally {
       setBusyId(null);
     }
@@ -198,7 +218,7 @@ export function NotificationBell() {
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === q.id} onClick={() => setConfirmQuote(q)}>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === q.id} onClick={() => openQuoteDialog(q)}>
                             {busyId === q.id
                               ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                               : <CalendarCheck className="h-3 w-3 mr-1" />}
@@ -232,7 +252,7 @@ export function NotificationBell() {
                             {b.status.replace("_", " ")}
                             {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
                           </span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === b.id} onClick={() => setConfirmBooking(b)}>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === b.id} onClick={() => openBookingDialog(b)}>
                             {busyId === b.id
                               ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                               : <Ticket className="h-3 w-3 mr-1" />}
@@ -250,39 +270,66 @@ export function NotificationBell() {
       </PopoverContent>
     </Popover>
 
-    <AlertDialog open={!!confirmQuote} onOpenChange={(o) => !o && setConfirmQuote(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("convertToBooking")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("convertQuoteConfirm")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => { const q = confirmQuote; setConfirmQuote(null); if (q) convertQuote(q); }}
-          >
+    <Dialog open={!!quoteDialog} onOpenChange={(o) => !o && setQuoteDialog(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("convertToBooking")}</DialogTitle>
+          <DialogDescription>{t("convertQuoteConfirm")}</DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="dep">{t("departureDate")}</Label>
+            <Input id="dep" type="date" value={quoteForm.departure}
+              onChange={(e) => setQuoteForm((f) => ({ ...f, departure: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="ret">Retorno</Label>
+            <Input id="ret" type="date" value={quoteForm.ret}
+              onChange={(e) => setQuoteForm((f) => ({ ...f, ret: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setQuoteDialog(null)}>{t("cancel")}</Button>
+          <Button onClick={convertQuote} disabled={busyId === quoteDialog?.id}>
+            {busyId === quoteDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("convertToBooking")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
-    <AlertDialog open={!!confirmBooking} onOpenChange={(o) => !o && setConfirmBooking(null)}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("generateVoucher")}</AlertDialogTitle>
-          <AlertDialogDescription>{t("generateVoucherConfirm")}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={() => { const b = confirmBooking; setConfirmBooking(null); if (b) generateVoucher(b); }}
-          >
+    <Dialog open={!!bookingDialog} onOpenChange={(o) => !o && setBookingDialog(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t("generateVoucher")}</DialogTitle>
+          <DialogDescription>{t("generateVoucherConfirm")}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="vcode">Código</Label>
+            <Input id="vcode" value={voucherForm.code}
+              onChange={(e) => setVoucherForm((f) => ({ ...f, code: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vit">Roteiro</Label>
+            <Textarea id="vit" rows={5} value={voucherForm.itinerary}
+              onChange={(e) => setVoucherForm((f) => ({ ...f, itinerary: e.target.value }))} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="vem">Contato de emergência</Label>
+            <Input id="vem" value={voucherForm.emergency}
+              onChange={(e) => setVoucherForm((f) => ({ ...f, emergency: e.target.value }))} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setBookingDialog(null)}>{t("cancel")}</Button>
+          <Button onClick={generateVoucher} disabled={busyId === bookingDialog?.id || !voucherForm.code}>
+            {busyId === bookingDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("generateVoucher")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

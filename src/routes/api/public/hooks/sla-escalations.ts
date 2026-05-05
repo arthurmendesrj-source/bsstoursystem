@@ -89,11 +89,11 @@ export const Route = createFileRoute("/api/public/hooks/sla-escalations")({
             .from("sla_escalations")
             .insert({
               lead_id: l.id,
-              stage: l.status,
+              stage: l.status as never,
               overdue_hours_at_trigger: threshold,
               hours_since_last_action: Math.round(hours * 10) / 10,
               notified_admins: adminIds,
-            })
+            } as never)
             .select("id")
             .single();
           if (cErr) continue;

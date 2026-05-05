@@ -465,7 +465,7 @@ function WorkspacePage() {
         </div>
         </ResizablePanel>
         <ResizableHandle withHandle />
-        <ResizablePanel defaultSize={72} minSize={55}>
+        <ResizablePanel defaultSize="72%" minSize="55%">
         {/* MAIN */}
         <Card className="min-h-[600px] ml-2">
           <CardContent className="p-4">

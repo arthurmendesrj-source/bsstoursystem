@@ -32,6 +32,7 @@ import {
   type PushPermission,
 } from "@/lib/pushNotifications";
 import { toast } from "sonner";
+import { logNotification } from "@/lib/notificationLogs";
 
 const NOTIF_OPTOUT_KEY = "alerts.notifications.optout";
 
@@ -113,21 +114,51 @@ function AlertsPage() {
       localStorage.removeItem(NOTIF_OPTOUT_KEY);
       setNotifOptOut(false);
       toast.success("Notificações ativadas.");
-      await showLocalNotification("Notificações ativas", {
-        body: "Você receberá alertas de SLA aqui.",
-        tag: "alerts-test",
-      });
+      const testTitle = "Notificações ativas";
+      const testBody = "Você receberá alertas de SLA aqui.";
+      const ok = await showLocalNotification(testTitle, { body: testBody, tag: "alerts-test" });
+      if (user?.id) {
+        await logNotification({
+          user_id: user.id,
+          channel: "push",
+          status: ok ? "success" : "error",
+          title: testTitle,
+          body: testBody,
+          error_detail: ok ? null : "showNotification falhou",
+          metadata: { source: "toggle-on" },
+        });
+      }
     } else if (permission === "denied") {
       toast.error("Permissão negada.");
+      if (user?.id) {
+        await logNotification({
+          user_id: user.id,
+          channel: "push",
+          status: "skipped",
+          title: "Ativação de notificações",
+          error_detail: "Usuário negou a permissão",
+          metadata: { source: "toggle-on" },
+        });
+      }
     }
   };
 
   const handleNotifTest = async () => {
-    const ok = await showLocalNotification("Teste de notificação", {
-      body: "Se você está vendo isto, está tudo certo! ✅",
-      tag: "alerts-test",
-    });
+    const title = "Teste de notificação";
+    const body = "Se você está vendo isto, está tudo certo! ✅";
+    const ok = await showLocalNotification(title, { body, tag: "alerts-test" });
     if (!ok) toast.error("Falha ao exibir notificação.");
+    if (user?.id) {
+      await logNotification({
+        user_id: user.id,
+        channel: "push",
+        status: ok ? "success" : "error",
+        title,
+        body,
+        error_detail: ok ? null : "showNotification falhou",
+        metadata: { source: "manual-test" },
+      });
+    }
   };
   const [goal, setGoal] = useState<number>(10);
   const [history, setHistory] = useState<{ date: string; count: number }[]>([]);
@@ -233,6 +264,9 @@ function AlertsPage() {
               Não suportado
             </span>
           )}
+          <Button asChild variant="outline" size="sm">
+            <Link to="/alerts/history">Histórico</Link>
+          </Button>
           {isAdmin && (
             <Button asChild variant="outline" size="sm">
               <Link to="/alerts/sla">{t("slaPanelOpen")}</Link>

@@ -30,6 +30,7 @@ import { Route as SettingsTemplatesRouteImport } from './routes/settings.templat
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
+import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -136,6 +137,11 @@ const AlertsSlaRoute = AlertsSlaRouteImport.update({
   path: '/sla',
   getParentRoute: () => AlertsRoute,
 } as any)
+const AlertsHistoryRoute = AlertsHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => AlertsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -155,6 +161,7 @@ export interface FileRoutesByFullPath {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
@@ -178,6 +185,7 @@ export interface FileRoutesByTo {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
+  '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
@@ -227,6 +236,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/history'
     | '/alerts/sla'
     | '/leads/$leadId'
     | '/settings/sla'
@@ -250,6 +260,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/history'
     | '/alerts/sla'
     | '/leads/$leadId'
     | '/settings/sla'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/suppliers'
     | '/users'
     | '/workspace'
+    | '/alerts/history'
     | '/alerts/sla'
     | '/leads/$leadId'
     | '/settings/sla'
@@ -448,14 +460,23 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsSlaRouteImport
       parentRoute: typeof AlertsRoute
     }
+    '/alerts/history': {
+      id: '/alerts/history'
+      path: '/history'
+      fullPath: '/alerts/history'
+      preLoaderRoute: typeof AlertsHistoryRouteImport
+      parentRoute: typeof AlertsRoute
+    }
   }
 }
 
 interface AlertsRouteChildren {
+  AlertsHistoryRoute: typeof AlertsHistoryRoute
   AlertsSlaRoute: typeof AlertsSlaRoute
 }
 
 const AlertsRouteChildren: AlertsRouteChildren = {
+  AlertsHistoryRoute: AlertsHistoryRoute,
   AlertsSlaRoute: AlertsSlaRoute,
 }
 

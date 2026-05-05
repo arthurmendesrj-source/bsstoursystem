@@ -634,6 +634,48 @@ export type Database = {
           },
         ]
       }
+      notification_logs: {
+        Row: {
+          body: string | null
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          error_detail: string | null
+          id: string
+          lead_id: string | null
+          metadata: Json
+          sent_at: string
+          status: Database["public"]["Enums"]["notification_status"]
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          error_detail?: string | null
+          id?: string
+          lead_id?: string | null
+          metadata?: Json
+          sent_at?: string
+          status: Database["public"]["Enums"]["notification_status"]
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          error_detail?: string | null
+          id?: string
+          lead_id?: string | null
+          metadata?: Json
+          sent_at?: string
+          status?: Database["public"]["Enums"]["notification_status"]
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       package_dates: {
         Row: {
           booked: number
@@ -1329,6 +1371,8 @@ export type Database = {
         | "proposta"
         | "fechado"
         | "perdido"
+      notification_channel: "push" | "in_app" | "email" | "whatsapp"
+      notification_status: "success" | "error" | "skipped"
       quote_status: "rascunho" | "enviada" | "aprovada" | "rejeitada"
       supplier_category:
         | "hotel"
@@ -1488,6 +1532,8 @@ export const Constants = {
         "fechado",
         "perdido",
       ],
+      notification_channel: ["push", "in_app", "email", "whatsapp"],
+      notification_status: ["success", "error", "skipped"],
       quote_status: ["rascunho", "enviada", "aprovada", "rejeitada"],
       supplier_category: [
         "hotel",

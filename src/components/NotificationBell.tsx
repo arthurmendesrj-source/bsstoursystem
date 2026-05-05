@@ -218,7 +218,7 @@ export function NotificationBell() {
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === q.id} onClick={() => openQuoteDialog(q)}>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId !== null} onClick={() => openQuoteDialog(q)}>
                             {busyId === q.id
                               ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                               : <CalendarCheck className="h-3 w-3 mr-1" />}
@@ -252,7 +252,7 @@ export function NotificationBell() {
                             {b.status.replace("_", " ")}
                             {b.departure_date && ` · ${new Date(b.departure_date).toLocaleDateString()}`}
                           </span>
-                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId === b.id} onClick={() => openBookingDialog(b)}>
+                          <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" disabled={busyId !== null} onClick={() => openBookingDialog(b)}>
                             {busyId === b.id
                               ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                               : <Ticket className="h-3 w-3 mr-1" />}
@@ -270,7 +270,7 @@ export function NotificationBell() {
       </PopoverContent>
     </Popover>
 
-    <Dialog open={!!quoteDialog} onOpenChange={(o) => !o && setQuoteDialog(null)}>
+    <Dialog open={!!quoteDialog} onOpenChange={(o) => { if (!o && busyId === null) setQuoteDialog(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("convertToBooking")}</DialogTitle>
@@ -289,8 +289,8 @@ export function NotificationBell() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setQuoteDialog(null)}>{t("cancel")}</Button>
-          <Button onClick={convertQuote} disabled={busyId === quoteDialog?.id}>
+          <Button variant="outline" onClick={() => setQuoteDialog(null)} disabled={busyId !== null}>{t("cancel")}</Button>
+          <Button onClick={convertQuote} disabled={busyId !== null}>
             {busyId === quoteDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("convertToBooking")}
           </Button>
@@ -298,7 +298,7 @@ export function NotificationBell() {
       </DialogContent>
     </Dialog>
 
-    <Dialog open={!!bookingDialog} onOpenChange={(o) => !o && setBookingDialog(null)}>
+    <Dialog open={!!bookingDialog} onOpenChange={(o) => { if (!o && busyId === null) setBookingDialog(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("generateVoucher")}</DialogTitle>
@@ -322,8 +322,8 @@ export function NotificationBell() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setBookingDialog(null)}>{t("cancel")}</Button>
-          <Button onClick={generateVoucher} disabled={busyId === bookingDialog?.id || !voucherForm.code}>
+          <Button variant="outline" onClick={() => setBookingDialog(null)} disabled={busyId !== null}>{t("cancel")}</Button>
+          <Button onClick={generateVoucher} disabled={busyId !== null || !voucherForm.code}>
             {busyId === bookingDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("generateVoucher")}
           </Button>

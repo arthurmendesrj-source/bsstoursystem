@@ -23,6 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { useLeadAlerts, type LeadAlert } from "@/lib/useLeadAlerts";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserTemplates, renderTemplate, type MessageTemplates } from "@/lib/messageTemplates";
 
 export const Route = createFileRoute("/alerts")({
   component: () => (
@@ -36,18 +37,26 @@ export const Route = createFileRoute("/alerts")({
 
 const STATUSES = ["novo", "qualificado", "cotacao", "proposta"] as const;
 
-function buildWhatsappLink(phone: string | null, name: string) {
+function buildWhatsappLink(
+  phone: string | null,
+  vars: { nome: string; destino?: string | null; vendedor?: string | null },
+  templates: MessageTemplates,
+) {
   if (!phone) return null;
   const clean = phone.replace(/\D/g, "");
   if (!clean) return null;
-  const text = `Olá ${name.split(" ")[0]}, tudo bem? Passando para retomar nossa conversa. Posso te ajudar com alguma informação?`;
+  const text = renderTemplate(templates.whatsapp, vars);
   return `https://wa.me/${clean}?text=${encodeURIComponent(text)}`;
 }
 
-function buildMailtoLink(email: string | null, name: string) {
+function buildMailtoLink(
+  email: string | null,
+  vars: { nome: string; destino?: string | null; vendedor?: string | null },
+  templates: MessageTemplates,
+) {
   if (!email) return null;
-  const subject = encodeURIComponent("Retomando nossa conversa");
-  const body = encodeURIComponent(`Olá ${name.split(" ")[0]},\n\nEspero que esteja bem. Quero retomar nosso atendimento e entender como posso te ajudar nos próximos passos.`);
+  const subject = encodeURIComponent(renderTemplate(templates.email_subject, vars));
+  const body = encodeURIComponent(renderTemplate(templates.email_body, vars));
   return `mailto:${email}?subject=${subject}&body=${body}`;
 }
 
@@ -55,6 +64,8 @@ function AlertsPage() {
   const { user, isAdmin } = useAuth();
   const { t } = useI18n();
   const { alerts, loading, reload, snooze, followupsToday } = useLeadAlerts(user?.id, isAdmin);
+  const { templates } = useUserTemplates(user?.id);
+  const [vendorName, setVendorName] = useState<string>("");
 
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
@@ -78,10 +89,11 @@ function AlertsPage() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("daily_followup_goal")
+        .select("daily_followup_goal,full_name")
         .eq("user_id", user.id)
         .maybeSingle();
       if (!cancelled && data?.daily_followup_goal) setGoal(data.daily_followup_goal);
+      if (!cancelled && data?.full_name) setVendorName(data.full_name);
 
       const since = new Date();
       since.setDate(since.getDate() - 6);
@@ -276,7 +288,7 @@ function AlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AlertList items={justContacted} empty="" onSnooze={snooze} />
+            <AlertList items={justContacted} empty="" onSnooze={snooze} templates={templates} vendorName={vendorName} />
           </CardContent>
         </Card>
       )}
@@ -290,7 +302,7 @@ function AlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AlertList items={overdue} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoOverdue")} onSnooze={snooze} />
+            <AlertList items={overdue} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoOverdue")} onSnooze={snooze} templates={templates} vendorName={vendorName} />
           </CardContent>
         </Card>
         <Card>
@@ -301,7 +313,7 @@ function AlertsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <AlertList items={warning} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoWarning")} onSnooze={snooze} />
+            <AlertList items={warning} empty={search || stageFilter !== "all" ? t("alertsNoMatches") : t("alertsNoWarning")} onSnooze={snooze} templates={templates} vendorName={vendorName} />
           </CardContent>
         </Card>
       </div>
@@ -313,10 +325,14 @@ function AlertList({
   items,
   empty,
   onSnooze,
+  templates,
+  vendorName,
 }: {
   items: LeadAlert[];
   empty: string;
   onSnooze: (leadId: string, hours: number) => void;
+  templates: MessageTemplates;
+  vendorName: string;
 }) {
   const { t } = useI18n();
   if (items.length === 0) {
@@ -325,8 +341,9 @@ function AlertList({
   return (
     <ul className="divide-y">
       {items.map((a) => {
-        const wa = buildWhatsappLink(a.phone, a.name);
-        const mail = buildMailtoLink(a.email, a.name);
+        const vars = { nome: a.name, destino: a.destination, vendedor: vendorName };
+        const wa = buildWhatsappLink(a.phone, vars, templates);
+        const mail = buildMailtoLink(a.email, vars, templates);
         const tomorrowHours = (() => {
           const d = new Date();
           d.setHours(9, 0, 0, 0);

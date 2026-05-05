@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link
             to="/settings"
             className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-              path.startsWith("/settings")
+              path === "/settings"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                 : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60"
             }`}
@@ -130,6 +130,28 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Settings className="h-4 w-4" />
             {t("settings")}
           </Link>
+          <Link
+            to="/settings/templates"
+            className={`flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors ${
+              path.startsWith("/settings/templates")
+                ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
+            }`}
+          >
+            {t("templatesMenu")}
+          </Link>
+          {isAdmin && (
+            <Link
+              to="/settings/sla"
+              className={`flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors ${
+                path.startsWith("/settings/sla")
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60"
+              }`}
+            >
+              {t("slaSettingsMenu")}
+            </Link>
+          )}
         </nav>
         <div className="border-t border-sidebar-border p-3">
           <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">{user?.email}</div>

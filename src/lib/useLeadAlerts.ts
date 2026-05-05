@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { computeLeadSla, type LeadSlaInfo } from "@/lib/leadSla";
+import { computeLeadSla, ensureSlaSettingsLoaded, type LeadSlaInfo } from "@/lib/leadSla";
 
 export type LeadAlert = {
   id: string;
@@ -14,6 +14,7 @@ export type LeadAlert = {
   created_by: string | null;
   phone: string | null;
   email: string | null;
+  destination: string | null;
   lastInteractionAt: string | null;
   lastInteractionType: string | null;
   recent: boolean;
@@ -100,9 +101,10 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
   const load = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
+    await ensureSlaSettingsLoaded();
     let q = supabase
       .from("leads")
-      .select("id,name,status,next_action,next_action_date,updated_at,assigned_to,created_by,phone,email")
+      .select("id,name,status,next_action,next_action_date,updated_at,assigned_to,created_by,phone,email,destination")
       .not("status", "in", "(fechado,perdido)");
     if (!isAdmin) {
       q = q.or(`assigned_to.eq.${userId},created_by.eq.${userId}`);

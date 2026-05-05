@@ -736,6 +736,7 @@ export type Database = {
           daily_followup_goal: number
           full_name: string | null
           id: string
+          message_templates: Json
           phone: string | null
           preferred_currency:
             | Database["public"]["Enums"]["currency_code"]
@@ -750,6 +751,7 @@ export type Database = {
           daily_followup_goal?: number
           full_name?: string | null
           id?: string
+          message_templates?: Json
           phone?: string | null
           preferred_currency?:
             | Database["public"]["Enums"]["currency_code"]
@@ -764,6 +766,7 @@ export type Database = {
           daily_followup_goal?: number
           full_name?: string | null
           id?: string
+          message_templates?: Json
           phone?: string | null
           preferred_currency?:
             | Database["public"]["Enums"]["currency_code"]
@@ -970,6 +973,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      sla_settings: {
+        Row: {
+          id: string
+          overdue_hours: number
+          stage: Database["public"]["Enums"]["lead_status"]
+          updated_at: string
+          updated_by: string | null
+          warning_hours: number
+        }
+        Insert: {
+          id?: string
+          overdue_hours: number
+          stage: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          updated_by?: string | null
+          warning_hours: number
+        }
+        Update: {
+          id?: string
+          overdue_hours?: number
+          stage?: Database["public"]["Enums"]["lead_status"]
+          updated_at?: string
+          updated_by?: string | null
+          warning_hours?: number
+        }
+        Relationships: []
       }
       supplier_contacts: {
         Row: {

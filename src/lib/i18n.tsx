@@ -338,6 +338,9 @@ const dict = {
     alertsBellSection: "Alertas de leads",
     alertsBellOverdue: "Lead atrasado",
     alertsBellWarning: "Lead em risco",
+    alertsJustContacted: "Acabaram de receber contato",
+    alertsJustNow: "Atualizado agora",
+    alertsLastContact: "Último contato",
   },
   en: {
     appName: "TourismCRM",
@@ -671,6 +674,9 @@ const dict = {
     alertsBellSection: "Lead alerts",
     alertsBellOverdue: "Overdue lead",
     alertsBellWarning: "Lead at risk",
+    alertsJustContacted: "Just contacted",
+    alertsJustNow: "Updated just now",
+    alertsLastContact: "Last contact",
   },
   es: {
     appName: "TurismoCRM",
@@ -1004,6 +1010,9 @@ const dict = {
     alertsBellSection: "Alertas de leads",
     alertsBellOverdue: "Lead atrasado",
     alertsBellWarning: "Lead en riesgo",
+    alertsJustContacted: "Recién contactados",
+    alertsJustNow: "Actualizado ahora",
+    alertsLastContact: "Último contacto",
   },
 } as const;
 

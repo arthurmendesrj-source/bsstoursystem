@@ -20,6 +20,7 @@ import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ActivityTimeline } from "@/components/ActivityTimeline";
 
 export const Route = createFileRoute("/leads/$leadId")({
   component: () => (
@@ -322,11 +323,12 @@ function LeadWorkspace() {
         <Card className="min-h-[600px]">
           <CardContent className="p-4">
             <Tabs defaultValue="email">
-              <TabsList className="grid grid-cols-4 w-full">
+              <TabsList className="grid grid-cols-5 w-full">
                 <TabsTrigger value="email">{t("intEmail")}</TabsTrigger>
                 <TabsTrigger value="proposals">{t("proposals")}</TabsTrigger>
                 <TabsTrigger value="invoice">{t("invoice")}</TabsTrigger>
                 <TabsTrigger value="reservation">{t("reservation")}</TabsTrigger>
+                <TabsTrigger value="history">{t("activityTimeline")}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="email" className="mt-4">
@@ -392,6 +394,10 @@ function LeadWorkspace() {
                     ))}
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-4">
+                <ActivityTimeline entityType="lead" entityId={lead.id} />
               </TabsContent>
             </Tabs>
           </CardContent>

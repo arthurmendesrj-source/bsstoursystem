@@ -29,8 +29,10 @@ import {
   getPermissionState,
   isPushSupported,
   showLocalNotification,
+  unsubscribeFromPush,
   type PushPermission,
 } from "@/lib/pushNotifications";
+import { sendTestPush } from "@/server/push.functions";
 import { toast } from "sonner";
 import { logNotification } from "@/lib/notificationLogs";
 
@@ -96,9 +98,10 @@ function AlertsPage() {
       return;
     }
     if (!next) {
-      // Desativar: opt-out local (browsers não permitem revogar permissão)
+      // Desativar: opt-out local + remove subscription do servidor
       localStorage.setItem(NOTIF_OPTOUT_KEY, "1");
       setNotifOptOut(true);
+      await unsubscribeFromPush();
       toast.success("Notificações desativadas neste dispositivo.");
       return;
     }
@@ -108,12 +111,16 @@ function AlertsPage() {
       );
       return;
     }
-    const { permission } = await enablePushNotifications();
+    const { permission, subscription } = await enablePushNotifications();
     setNotifPerm(permission);
     if (permission === "granted") {
       localStorage.removeItem(NOTIF_OPTOUT_KEY);
       setNotifOptOut(false);
-      toast.success("Notificações ativadas.");
+      if (subscription) {
+        toast.success("Notificações ativadas. Push real registrado.");
+      } else {
+        toast.success("Notificações ativadas (modo local).");
+      }
       const testTitle = "Notificações ativas";
       const testBody = "Você receberá alertas de SLA aqui.";
       const ok = await showLocalNotification(testTitle, { body: testBody, tag: "alerts-test" });
@@ -125,7 +132,7 @@ function AlertsPage() {
           title: testTitle,
           body: testBody,
           error_detail: ok ? null : "showNotification falhou",
-          metadata: { source: "toggle-on" },
+          metadata: { source: "toggle-on", subscribed: !!subscription },
         });
       }
     } else if (permission === "denied") {
@@ -144,20 +151,26 @@ function AlertsPage() {
   };
 
   const handleNotifTest = async () => {
-    const title = "Teste de notificação";
-    const body = "Se você está vendo isto, está tudo certo! ✅";
-    const ok = await showLocalNotification(title, { body, tag: "alerts-test" });
-    if (!ok) toast.error("Falha ao exibir notificação.");
-    if (user?.id) {
-      await logNotification({
-        user_id: user.id,
-        channel: "push",
-        status: ok ? "success" : "error",
-        title,
-        body,
-        error_detail: ok ? null : "showNotification falhou",
-        metadata: { source: "manual-test" },
-      });
+    try {
+      const result = await sendTestPush();
+      if (result.sent > 0) {
+        toast.success(`Push real enviado (${result.sent}/${result.total} dispositivo(s)).`);
+        return;
+      }
+      if (result.total === 0) {
+        // Sem subscription registrada — fallback local
+        const ok = await showLocalNotification("Teste de notificação", {
+          body: "Push real ainda não registrado — exibindo localmente.",
+          tag: "alerts-test",
+        });
+        if (!ok) toast.error("Falha ao exibir notificação.");
+        else toast.message("Notificação local exibida (sem subscription registrada).");
+        return;
+      }
+      toast.error(`Falha no envio: ${result.errors[0] ?? "erro desconhecido"}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao enviar teste: " + (err instanceof Error ? err.message : String(err)));
     }
   };
   const [goal, setGoal] = useState<number>(10);

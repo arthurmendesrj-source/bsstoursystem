@@ -367,6 +367,11 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
             </Button>
           )}
+          {isClosed && (
+            <Button size="sm" variant="default" onClick={convertToBooking}>
+              <CalendarCheck className="h-4 w-4 mr-1" /> {t("convertToBooking")}
+            </Button>
+          )}
           {onClose && (
             <Button size="sm" variant="ghost" onClick={onClose}>{t("close")}</Button>
           )}

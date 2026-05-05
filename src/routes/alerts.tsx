@@ -325,10 +325,14 @@ function AlertList({
   items,
   empty,
   onSnooze,
+  templates,
+  vendorName,
 }: {
   items: LeadAlert[];
   empty: string;
   onSnooze: (leadId: string, hours: number) => void;
+  templates: MessageTemplates;
+  vendorName: string;
 }) {
   const { t } = useI18n();
   if (items.length === 0) {
@@ -337,8 +341,9 @@ function AlertList({
   return (
     <ul className="divide-y">
       {items.map((a) => {
-        const wa = buildWhatsappLink(a.phone, a.name);
-        const mail = buildMailtoLink(a.email, a.name);
+        const vars = { nome: a.name, destino: a.destination, vendedor: vendorName };
+        const wa = buildWhatsappLink(a.phone, vars, templates);
+        const mail = buildMailtoLink(a.email, vars, templates);
         const tomorrowHours = (() => {
           const d = new Date();
           d.setHours(9, 0, 0, 0);

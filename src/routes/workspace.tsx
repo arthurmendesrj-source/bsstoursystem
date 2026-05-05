@@ -254,9 +254,14 @@ function WorkspacePage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
+      <ResizablePanelGroup
+        direction="horizontal"
+        autoSaveId="workspace:layout"
+        className="min-h-[600px]"
+      >
+        <ResizablePanel defaultSize={28} minSize={18} maxSize={45}>
         {/* SIDEBAR */}
-        <div className="space-y-4">
+        <div className="space-y-4 pr-2">
           {/* Lead Selector */}
           <Card>
             <CardHeader className="pb-3">

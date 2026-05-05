@@ -79,7 +79,7 @@ type Lead = {
   notes: string | null;
   customer_id: string | null;
 };
-type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean };
+type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean; priority: "baixa" | "media" | "alta"; started_at: string | null; completed_at: string | null };
 type Interaction = { id: string; type: string; subject: string | null; content: string | null; occurred_at: string };
 type Quote = { id: string; status: string; total_amount: number; currency: string; valid_until: string | null; created_at: string };
 type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null };

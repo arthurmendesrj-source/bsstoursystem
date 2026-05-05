@@ -684,6 +684,7 @@ function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Ta
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"baixa" | "media" | "alta">("media");
   const [saving, setSaving] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();

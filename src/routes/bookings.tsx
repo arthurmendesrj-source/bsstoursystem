@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Ticket } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
@@ -193,11 +193,12 @@ function BookingsPage() {
               <TableHead>{t("price")}</TableHead>
               <TableHead>{t("status")}</TableHead>
               <TableHead className="text-right">Voucher</TableHead>
+              <TableHead className="text-right">{t("actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : rows.map((b) => (
               <TableRow key={b.id}>
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
@@ -222,6 +223,11 @@ function BookingsPage() {
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button asChild size="sm" variant="ghost">
+                    <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}

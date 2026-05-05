@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
@@ -254,9 +255,13 @@ function WorkspacePage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
+      <ResizablePanelGroup
+        orientation="horizontal"
+        className="min-h-[600px]"
+      >
+        <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%">
         {/* SIDEBAR */}
-        <div className="space-y-4">
+        <div className="space-y-4 pr-2">
           {/* Lead Selector */}
           <Card>
             <CardHeader className="pb-3">
@@ -458,9 +463,11 @@ function WorkspacePage() {
             </CardContent>
           </Card>
         </div>
-
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize="72%" minSize="55%">
         {/* MAIN */}
-        <Card className="min-h-[600px]">
+        <Card className="min-h-[600px] ml-2">
           <CardContent className="p-4">
             <Tabs defaultValue="email">
               <TabsList className="grid grid-cols-5 w-full">
@@ -542,7 +549,8 @@ function WorkspacePage() {
             </Tabs>
           </CardContent>
         </Card>
-      </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 }

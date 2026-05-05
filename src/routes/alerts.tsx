@@ -172,7 +172,7 @@ function AlertsPage() {
                 type="number"
                 min={1}
                 value={goal}
-                onChange={(e) => setGoal(Math.max(1, Number(e.target.value) || 1))}
+                onChange={(e) => updateGoal(Math.max(1, Number(e.target.value) || 1))}
                 className="h-6 w-14 text-xs px-1.5"
               />
             </div>
@@ -180,6 +180,27 @@ function AlertsPage() {
             <div className="text-xs text-muted-foreground">
               {t("alertsGoalProgress").replace("{n}", String(followupsToday)).replace("{total}", String(goal))}
             </div>
+            {history.length > 0 && (
+              <div className="pt-1">
+                <div className="flex items-end gap-1 h-8">
+                  {history.map((d) => {
+                    const pct = Math.min(100, (d.count / goal) * 100);
+                    const reached = d.count >= goal;
+                    return (
+                      <div key={d.date} className="flex-1 flex flex-col items-center gap-0.5" title={`${d.date}: ${d.count}`}>
+                        <div className="w-full bg-muted rounded-sm relative h-6 flex items-end">
+                          <div
+                            className={cn("w-full rounded-sm", reached ? "bg-emerald-500" : "bg-primary/60")}
+                            style={{ height: `${Math.max(8, pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="text-[10px] text-muted-foreground mt-1 text-center">{t("alertsLast7Days")}</div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

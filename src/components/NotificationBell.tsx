@@ -298,7 +298,7 @@ export function NotificationBell() {
       </DialogContent>
     </Dialog>
 
-    <Dialog open={!!bookingDialog} onOpenChange={(o) => !o && setBookingDialog(null)}>
+    <Dialog open={!!bookingDialog} onOpenChange={(o) => { if (!o && busyId === null) setBookingDialog(null); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("generateVoucher")}</DialogTitle>

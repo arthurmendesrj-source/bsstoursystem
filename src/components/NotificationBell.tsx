@@ -41,8 +41,10 @@ export function NotificationBell() {
   const [bookings, setBookings] = useState<PendingBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [confirmQuote, setConfirmQuote] = useState<PendingQuote | null>(null);
-  const [confirmBooking, setConfirmBooking] = useState<PendingBooking | null>(null);
+  const [quoteDialog, setQuoteDialog] = useState<PendingQuote | null>(null);
+  const [quoteForm, setQuoteForm] = useState({ departure: "", ret: "" });
+  const [bookingDialog, setBookingDialog] = useState<PendingBooking | null>(null);
+  const [voucherForm, setVoucherForm] = useState({ code: "", itinerary: "", emergency: "" });
 
   const load = useCallback(async () => {
     setLoading(true);

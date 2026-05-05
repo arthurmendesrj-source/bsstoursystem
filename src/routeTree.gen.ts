@@ -18,6 +18,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PackagesRouteImport } from './routes/packages'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadsRouteImport } from './routes/leads'
+import { Route as ItinerariesRouteImport } from './routes/itineraries'
 import { Route as FunnelRouteImport } from './routes/funnel'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -82,6 +83,11 @@ const LoginRoute = LoginRouteImport.update({
 const LeadsRoute = LeadsRouteImport.update({
   id: '/leads',
   path: '/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ItinerariesRoute = ItinerariesRouteImport.update({
+  id: '/itineraries',
+  path: '/itineraries',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FunnelRoute = FunnelRouteImport.update({
@@ -197,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
+  '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
@@ -228,6 +235,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
+  '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
@@ -260,6 +268,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
+  '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
@@ -293,6 +302,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email'
     | '/funnel'
+    | '/itineraries'
     | '/leads'
     | '/login'
     | '/packages'
@@ -324,6 +334,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email'
     | '/funnel'
+    | '/itineraries'
     | '/leads'
     | '/login'
     | '/packages'
@@ -355,6 +366,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email'
     | '/funnel'
+    | '/itineraries'
     | '/leads'
     | '/login'
     | '/packages'
@@ -387,6 +399,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   EmailRoute: typeof EmailRoute
   FunnelRoute: typeof FunnelRoute
+  ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
   PackagesRoute: typeof PackagesRoute
@@ -465,6 +478,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/leads'
       preLoaderRoute: typeof LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/itineraries': {
+      id: '/itineraries'
+      path: '/itineraries'
+      fullPath: '/itineraries'
+      preLoaderRoute: typeof ItinerariesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/funnel': {
@@ -661,6 +681,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   EmailRoute: EmailRoute,
   FunnelRoute: FunnelRoute,
+  ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,
   PackagesRoute: PackagesRoute,
@@ -678,12 +699,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

@@ -32,6 +32,7 @@ import {
   type PushPermission,
 } from "@/lib/pushNotifications";
 import { toast } from "sonner";
+import { logNotification } from "@/lib/notificationLogs";
 
 const NOTIF_OPTOUT_KEY = "alerts.notifications.optout";
 

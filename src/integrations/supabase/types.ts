@@ -44,6 +44,54 @@ export type Database = {
         }
         Relationships: []
       }
+      booking_item_confirmations: {
+        Row: {
+          booking_id: string
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          proof_reference: string | null
+          proof_storage_path: string | null
+          proof_text: string | null
+          proof_type: string | null
+          quote_item_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          booking_id: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          proof_reference?: string | null
+          proof_storage_path?: string | null
+          proof_text?: string | null
+          proof_type?: string | null
+          quote_item_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          proof_reference?: string | null
+          proof_storage_path?: string | null
+          proof_text?: string | null
+          proof_type?: string | null
+          quote_item_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       booking_pax: {
         Row: {
           booking_id: string

@@ -1,54 +1,64 @@
-## Atualizações de tarefas com Salvar / Encerrar
+## Página de Reserva: confirmação item-a-item com comprovante
 
-Adicionar um editor inline que abre ao clicar em uma atividade, tanto na aba **Atividades** dentro do lead (Atendimento → `/workspace`) quanto na página **/activities**.
+Hoje a `/bookings` é só uma lista plana. A reserva tem `quote_id` ligado à proposta, e a proposta tem `quote_items`. Vamos criar uma **tela de detalhe da reserva** que lista todos os itens da proposta e permite confirmar cada um anexando um comprovante (E-mail, Mensagem WhatsApp ou Outro).
 
-### Comportamento
+### 1. Banco de dados (migração)
 
-- Clicar na linha/cartão da atividade expande um painel logo abaixo com:
-  - `Textarea` (placeholder "Descreva a atualização desta tarefa…").
-  - Histórico das atualizações anteriores acima do textarea (lista compacta com data/hora + autor).
-  - Dois botões:
-    - **Salvar** → grava a atualização e mantém a tarefa aberta.
-    - **Encerrar** → grava a atualização e marca a tarefa como concluída (`completed = true`, `completed_at = now()`).
-- Clicar de novo (ou em "Cancelar") fecha o painel sem mudar nada.
-- Botão check existente continua funcionando (encerramento rápido sem texto).
+Nova tabela `booking_item_confirmations`:
 
-### Onde salvar as atualizações
+- `id` uuid pk
+- `booking_id` uuid (referência lógica a `bookings.id`)
+- `quote_item_id` uuid (referência lógica a `quote_items.id`)
+- `status` text default `'pendente'` — `pendente | confirmado | cancelado`
+- `proof_type` text — `email | whatsapp | outro` (nullable)
+- `proof_storage_path` text (nullable) — arquivo (PDF, imagem, .eml, screenshot)
+- `proof_text` text (nullable) — conteúdo colado (texto do e-mail / mensagem)
+- `proof_reference` text (nullable) — código de confirmação / nº de e-mail / link
+- `confirmed_at` timestamptz, `confirmed_by` uuid
+- `notes` text
+- `created_at`, `updated_at`
+- unique (`booking_id`, `quote_item_id`)
 
-Usar a tabela existente **`interactions`** (já tem RLS, `lead_id`, `created_by`, `occurred_at`, `subject`, `content`, `type`).
+RLS: leitura para autenticados; insert/update se for dono da reserva (`bookings.created_by = auth.uid()`) ou admin/operacional — mesmo padrão de `booking_suppliers`.
 
-- `type`: `nota` (valor já usado no enum no projeto — confirmar no carregamento; se o enum não tiver, usar o valor padrão de "nota/observação" disponível).
-- `subject`: `"Atualização: " + task.title`
-- `content`: texto digitado
-- `lead_id`: `task.lead_id` (quando houver)
-- `created_by`: `auth.uid()`
+Novo bucket de Storage **`booking-proofs`** (privado), com policies por usuário autenticado para upload/leitura.
 
-Vantagem: aparece automaticamente na timeline do lead (`ActivityTimeline`) e respeita as RLS já configuradas. Não precisa de migração.
+### 2. Rota nova: `src/routes/bookings.$bookingId.tsx`
 
-Para listar o histórico de updates de uma tarefa específica, filtrar `interactions` por `lead_id = task.lead_id` + `subject ilike 'Atualização: ' || task.title || '%'`. (Solução simples sem nova coluna; se o usuário preferir vínculo direto `task_id`, podemos adicionar coluna depois.)
+Tela de detalhe com:
 
-### Arquivos alterados
+- Cabeçalho: cliente, pacote, datas, status da reserva, total.
+- **Lista de itens** vinda de `quote_items` (filtrado por `bookings.quote_id`):
+  - Para cada item: descrição, qtd, valor.
+  - Badge de status (`pendente / confirmado / cancelado`).
+  - Linha de comprovante:
+    - Select `Tipo`: `E-mail | WhatsApp | Outro`.
+    - Campo de referência (assunto do e-mail / nº mensagem / código).
+    - Botão **Anexar comprovante** → upload para `booking-proofs/{booking_id}/{item_id}/...` + Textarea opcional para colar conteúdo.
+    - Botões **Confirmar item** (grava `status='confirmado'`, `confirmed_at`, `confirmed_by`) e **Cancelar item**.
+  - Se já existe registro em `booking_item_confirmations`, pré-carrega os campos e mostra link "Baixar comprovante" (signed URL via `supabase.storage.from('booking-proofs').createSignedUrl(...)`).
+- Resumo no topo: `X de Y itens confirmados` + barra de progresso.
+- Quando todos os itens estiverem confirmados, oferecer botão para mudar status da reserva para `confirmada`.
 
-1. **`src/routes/workspace.tsx`** — `ActivitiesTab`:
-   - Estado `expandedTaskId`, `updateText`, `updateHistory` (Map por taskId).
-   - Ao clicar no cartão da tarefa (área que não é o check/lixeira), alterna expansão e carrega histórico via `supabase.from("interactions").select(...)`.
-   - Painel expandido com Textarea + botões Salvar / Encerrar / Cancelar.
-   - `saveUpdate(task, alsoComplete)` → insere em `interactions`; se `alsoComplete`, faz `update({ completed: true, completed_at: now() })` em `tasks`. Recarrega lead via `onChanged()`.
+Se a reserva não tiver `quote_id`, mostrar aviso "Reserva sem proposta vinculada — adicione uma proposta para listar os itens".
 
-2. **`src/routes/activities.tsx`**:
-   - Mesma lógica: linha da tabela vira clicável (toggle expansão), e abaixo dela renderiza `<TableRow>` extra com `colSpan` total contendo o painel (histórico + textarea + Salvar/Encerrar/Cancelar).
-   - Reaproveitar `loadTasks()` para refresh.
+### 3. Ajustes em `src/routes/bookings.tsx`
 
-3. **`src/lib/i18n.tsx`** — adicionar (pt/en/es):
-   - `taskUpdate`: "Atualização"
-   - `taskUpdatePlaceholder`: "Descreva a atualização desta tarefa…"
-   - `save`: já existe? senão adicionar
-   - `closeTask`: "Encerrar"
-   - `cancel`: já existe
-   - `noUpdatesYet`: "Sem atualizações"
+- Linha da reserva vira clicável (Link para `/bookings/$bookingId`) ou botão "Abrir".
+- Coluna nova "Itens": `confirmados / total` (consulta agregada simples por reserva).
 
-### Observações
+### 4. i18n (`src/lib/i18n.tsx`) — pt/en/es
 
-- "Encerrar" usa o mesmo caminho do toggle atual (`completed = true, completed_at = now()`); o trigger `handle_task_completion` cuida de `time_spent_minutes` se `started_at` existir.
-- Não toca em RLS nem schema; nenhum migration necessário.
-- Na `/activities`, o clique na linha precisa ignorar cliques nos botões existentes (check, vincular, etc.) — usar `e.stopPropagation()` nos botões.
+`bookingItems`, `confirmItem`, `cancelItem`, `attachProof`, `proofType`, `proofEmail`, `proofWhatsapp`, `proofOther`, `proofReference`, `proofContent`, `downloadProof`, `itemsConfirmed`, `noQuoteLinked`, `markBookingConfirmed`.
+
+### 5. Detalhes técnicos
+
+- Upload usa o cliente browser do Supabase (`supabase.storage.from('booking-proofs').upload(path, file, { upsert: true })`).
+- Upsert em `booking_item_confirmations` por `(booking_id, quote_item_id)`.
+- Reaproveita `Table`, `Select`, `Textarea`, `Input`, `Button`, `Badge`, `Card` já existentes; sem novas libs.
+- Validação client-side: tamanho máximo de upload 10 MB; tipos aceitos: `.pdf .png .jpg .jpeg .eml .txt`.
+
+### Fora de escopo (pode vir depois)
+
+- Edição inline dos itens da proposta a partir da reserva (continuam sendo editados em `ProposalEditor`).
+- Notificação automática ao confirmar todos os itens.

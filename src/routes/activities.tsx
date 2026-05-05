@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format, isAfter, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
-import { Plus, Play, Pause, CheckCircle2, Clock, AlertCircle, Mail, ExternalLink, Trash2, Link2 } from "lucide-react";
+import { Plus, Play, Pause, CheckCircle2, Clock, AlertCircle, Mail, ExternalLink, Trash2, Link2, ChevronsUpDown, Check } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";

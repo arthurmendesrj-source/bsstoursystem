@@ -13,6 +13,7 @@ import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as SecurityAuditRouteImport } from './routes/security-audit'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PackagesRouteImport } from './routes/packages'
 import { Route as LoginRouteImport } from './routes/login'
@@ -44,6 +45,11 @@ const SuppliersRoute = SuppliersRouteImport.update({
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SecurityAuditRoute = SecurityAuditRouteImport.update({
+  id: '/security-audit',
+  path: '/security-audit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRoute
   '/users': typeof UsersRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/packages'
     | '/reset-password'
+    | '/security-audit'
     | '/settings'
     | '/suppliers'
     | '/users'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/packages'
     | '/reset-password'
+    | '/security-audit'
     | '/settings'
     | '/suppliers'
     | '/users'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/packages'
     | '/reset-password'
+    | '/security-audit'
     | '/settings'
     | '/suppliers'
     | '/users'
@@ -231,6 +243,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PackagesRoute: typeof PackagesRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SecurityAuditRoute: typeof SecurityAuditRoute
   SettingsRoute: typeof SettingsRoute
   SuppliersRoute: typeof SuppliersRoute
   UsersRoute: typeof UsersRoute
@@ -265,6 +278,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/security-audit': {
+      id: '/security-audit'
+      path: '/security-audit'
+      fullPath: '/security-audit'
+      preLoaderRoute: typeof SecurityAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -376,6 +396,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PackagesRoute: PackagesRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SecurityAuditRoute: SecurityAuditRoute,
   SettingsRoute: SettingsRoute,
   SuppliersRoute: SuppliersRoute,
   UsersRoute: UsersRoute,

@@ -289,8 +289,8 @@ export function NotificationBell() {
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setQuoteDialog(null)}>{t("cancel")}</Button>
-          <Button onClick={convertQuote} disabled={busyId === quoteDialog?.id}>
+          <Button variant="outline" onClick={() => setQuoteDialog(null)} disabled={busyId !== null}>{t("cancel")}</Button>
+          <Button onClick={convertQuote} disabled={busyId !== null}>
             {busyId === quoteDialog?.id && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
             {t("convertToBooking")}
           </Button>

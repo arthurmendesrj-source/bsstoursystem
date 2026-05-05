@@ -224,6 +224,11 @@ function BookingsPage() {
                     <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
+                <TableCell className="text-right">
+                  <Button asChild size="sm" variant="ghost">
+                    <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

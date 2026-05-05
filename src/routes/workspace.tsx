@@ -674,3 +674,152 @@ function ProposalsTab({
     </div>
   );
 }
+
+function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Task[]; onChanged: () => void }) {
+  const { t } = useI18n();
+  const { user } = useAuth();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [priority, setPriority] = useState<"baixa" | "media" | "alta">("media");
+  const [saving, setSaving] = useState(false);
+
+  const create = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !title.trim()) return;
+    setSaving(true);
+    const { error } = await supabase.from("tasks").insert({
+      title: title.slice(0, 200),
+      description: description || null,
+      due_date: dueDate ? new Date(dueDate).toISOString() : null,
+      priority,
+      category: "negocio",
+      source: "manual",
+      lead_id: leadId,
+      created_by: user.id,
+      assigned_to: user.id,
+    });
+    setSaving(false);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("saved"));
+      setTitle(""); setDescription(""); setDueDate(""); setPriority("media");
+      onChanged();
+    }
+  };
+
+  const toggleComplete = async (task: Task) => {
+    const { error } = await supabase.from("tasks").update({ completed: !task.completed }).eq("id", task.id);
+    if (error) toast.error(error.message); else onChanged();
+  };
+
+  const toggleStarted = async (task: Task) => {
+    const newStarted = task.started_at ? null : new Date().toISOString();
+    const { error } = await supabase.from("tasks").update({ started_at: newStarted }).eq("id", task.id);
+    if (error) toast.error(error.message); else onChanged();
+  };
+
+  const remove = async (task: Task) => {
+    if (!confirm(`${t("delete")}?`)) return;
+    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
+    if (error) toast.error(error.message); else onChanged();
+  };
+
+  const priorityColor = (p: string) =>
+    p === "alta" ? "bg-red-500/10 text-red-700 border-red-500/30" :
+    p === "baixa" ? "bg-slate-500/10 text-slate-700 border-slate-500/30" :
+    "bg-amber-500/10 text-amber-700 border-amber-500/30";
+
+  const sorted = [...tasks].sort((a, b) => {
+    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+    if (!a.due_date) return 1;
+    if (!b.due_date) return -1;
+    return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4">
+          <form onSubmit={create} className="space-y-3">
+            <div>
+              <Label className="text-xs">{t("activityTitle")}</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder={t("newActivity")} />
+            </div>
+            <div>
+              <Label className="text-xs">{t("description")}</Label>
+              <Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">{t("dueDate")}</Label>
+                <Input type="datetime-local" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </div>
+              <div>
+                <Label className="text-xs">{t("priority")}</Label>
+                <Select value={priority} onValueChange={(v) => setPriority(v as typeof priority)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="baixa">{t("priorityLow")}</SelectItem>
+                    <SelectItem value="media">{t("priorityMedium")}</SelectItem>
+                    <SelectItem value="alta">{t("priorityHigh")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button type="submit" size="sm" disabled={saving || !title.trim()}>
+              <Plus className="h-4 w-4 mr-1" />{t("newActivity")}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {sorted.length === 0 ? (
+        <div className="py-8 text-center text-muted-foreground text-sm">{t("noData")}</div>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((task) => {
+            const isOverdue = !task.completed && task.due_date && new Date(task.due_date) < new Date();
+            const inProgress = !!task.started_at && !task.completed;
+            return (
+              <div key={task.id} className={cn("flex items-start gap-3 p-3 rounded-md border", task.completed && "opacity-60")}>
+                <button onClick={() => toggleComplete(task)} className="mt-0.5" aria-label="toggle">
+                  {task.completed
+                    ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary" />}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <div className={cn("font-medium", task.completed && "line-through")}>{task.title}</div>
+                    <Badge variant="outline" className={priorityColor(task.priority)}>
+                      {task.priority === "alta" ? t("priorityHigh") : task.priority === "baixa" ? t("priorityLow") : t("priorityMedium")}
+                    </Badge>
+                    {inProgress && <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30">{t("inProgress")}</Badge>}
+                  </div>
+                  {task.description && <div className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{task.description}</div>}
+                  {task.due_date && (
+                    <div className={cn("text-xs mt-1 flex items-center gap-1", isOverdue ? "text-red-600 font-medium" : "text-muted-foreground")}>
+                      {isOverdue && <AlertCircle className="h-3 w-3" />}
+                      <CalendarIcon className="h-3 w-3" />
+                      {format(new Date(task.due_date), "dd/MM/yyyy HH:mm")}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {!task.completed && (
+                    <Button size="icon" variant="ghost" onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
+                      {inProgress ? <Pause className="h-4 w-4 text-amber-600" /> : <Play className="h-4 w-4" />}
+                    </Button>
+                  )}
+                  <Button size="icon" variant="ghost" onClick={() => remove(task)} title={t("delete")}>
+                    <Trash2 className="h-4 w-4 text-muted-foreground" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

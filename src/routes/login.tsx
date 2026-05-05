@@ -9,10 +9,39 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { LoginErrorBoundary, clearSupabaseLocalSession } from "@/components/LoginErrorBoundary";
+
+const RECOVERY_FLAG = "login-recovery-attempted";
 
 export const Route = createFileRoute("/login")({
-  component: LoginPage,
+  component: LoginRoute,
+  errorComponent: ({ error }) => {
+    if (typeof window !== "undefined") {
+      const tried = window.sessionStorage.getItem(RECOVERY_FLAG) === "1";
+      clearSupabaseLocalSession();
+      if (!tried) {
+        window.sessionStorage.setItem(RECOVERY_FLAG, "1");
+        window.location.reload();
+      }
+    }
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
+        <div className="max-w-sm">
+          <h1 className="text-xl font-semibold">Restaurando sessão...</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+        </div>
+      </div>
+    );
+  },
 });
+
+function LoginRoute() {
+  return (
+    <LoginErrorBoundary>
+      <LoginPage />
+    </LoginErrorBoundary>
+  );
+}
 
 function LoginPage() {
   const { user, signIn, signUp, loading } = useAuth();
@@ -24,8 +53,32 @@ function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Preventive: if getSession throws (corrupted token), clean and reload once.
   useEffect(() => {
-    if (!loading && user) navigate({ to: "/dashboard" });
+    let cancelled = false;
+    (async () => {
+      try {
+        await supabase.auth.getSession();
+      } catch {
+        if (cancelled || typeof window === "undefined") return;
+        const tried = window.sessionStorage.getItem(RECOVERY_FLAG) === "1";
+        clearSupabaseLocalSession();
+        if (!tried) {
+          window.sessionStorage.setItem(RECOVERY_FLAG, "1");
+          window.location.reload();
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!loading && user) {
+      if (typeof window !== "undefined") window.sessionStorage.removeItem(RECOVERY_FLAG);
+      navigate({ to: "/dashboard" });
+    }
   }, [user, loading, navigate]);
 
   const submit = async (e: React.FormEvent) => {

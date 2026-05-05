@@ -1,62 +1,51 @@
-# Fase 5 — Envio real de Push Notifications pelo backend
+## Simulação do fluxo (Lead → Booking → Voucher)
 
-Habilitar push notifications reais (Web Push com VAPID) para que usuários recebam alertas mesmo com o app fechado.
+O sistema **não possui módulo de invoices** — o fluxo termina em `vouchers`. Vou simular ponta-a-ponta o que existe hoje, gerando dados reais no banco com o seu usuário (`Arthur Mendes`, admin) e te dar um roteiro para validar cada etapa na UI.
 
-## O que será criado
+### Parte 1 — Seed automático (SQL via insert tool)
 
-### 1. Banco de dados
-- Tabela `push_subscriptions`:
-  - `id` uuid pk
-  - `user_id` uuid (não nulo)
-  - `endpoint` text (único)
-  - `p256dh` text
-  - `auth` text
-  - `user_agent` text
-  - `created_at`, `updated_at` timestamptz
-- RLS:
-  - usuário insere/lê/atualiza/deleta apenas as próprias subscriptions
-  - admin lê todas
+Tudo atribuído ao seu user_id `6f3cba4e-6ad0-40d2-b34a-a521fcd85769`:
 
-### 2. Secrets (VAPID)
-- `VAPID_PUBLIC_KEY` (também exposto como `VITE_VAPID_PUBLIC_KEY` para o cliente)
-- `VAPID_PRIVATE_KEY`
-- `VAPID_SUBJECT` (ex: `mailto:admin@dominio.com`)
+1. **Customer** "Cliente Simulação" (PF, e-mail/telefone fake).
+2. **Supplier** "Fornecedor Simulação" (categoria `outro`).
+3. **Package** "Pacote Simulação - Paris 7 dias" (BRL 8.000, ativo).
+4. **Lead** "Lead Simulação" → `assigned_to` = você → status `novo`
+   - dispara trigger `on_lead_event` → push `lead_assigned` (Fase 6).
+5. **Update do lead** → status `qualificado` → push `lead_status_changed`.
+6. **Quote** vinculado ao lead/cliente, com 2 `quote_items`:
+   - hotel: 1 quarto × 6 noites, custo 500, markup 30%
+   - serviço: 2 pax × 2 trechos (transfer), custo 80, markup 25%
+   - totais calculados conforme `proposal-totals.ts`.
+7. **Booking** com status `pre_reserva` → update para `confirmada`.
+8. **booking_pax** (cliente como primary) + **booking_supplier** (com custo).
+9. **Voucher** gerado (código `VYYMMDD…`).
+10. **Task** com `due_date` em ~30min e outra já vencida → ao bater o cron `task-due` dispara `task_due_soon` / `task_overdue`.
 
-Vou gerar o par de chaves e pedir que o usuário cole nas configurações de secrets (e a public key como build/runtime var).
+Cada passo retorno os IDs gerados.
 
-### 3. Cliente (`src/lib/pushNotifications.ts`)
-- Atualizar `subscribeToPush()` para:
-  - usar `VITE_VAPID_PUBLIC_KEY` como `applicationServerKey`
-  - chamar server function `savePushSubscription` com `endpoint/p256dh/auth/userAgent`
-- `unsubscribeFromPush()` chama `deletePushSubscription` com o endpoint
+### Parte 2 — Validação na UI (roteiro guiado)
 
-### 4. Server functions (`src/server/push.functions.ts` + `push.server.ts`)
-- `savePushSubscription` (auth) — upsert por `endpoint`
-- `deletePushSubscription` (auth) — remove por `endpoint`
-- `sendPushToUser({ userId, title, body, url?, leadId? })` (auth, admin-only ou interno):
-  - busca todas as subscriptions do usuário
-  - para cada uma, monta payload JWT VAPID (via `crypto.subtle`, sem dependência Node-only) e faz `fetch` POST ao endpoint
-  - grava em `notification_logs` (success/error com `error_detail`) usando o admin client
-  - remove subscriptions com 404/410 (gone)
-- `sendTestPush()` (auth) — envia push real para o próprio usuário (substitui o teste local atual)
+Após o seed, conferir nesta ordem:
 
-### 5. UI
-- Em `/alerts`, o botão "Enviar teste" passa a chamar `sendTestPush` (push real round-trip), mantendo fallback local se não houver subscription.
-- Toast confirma sucesso/erro com base no retorno.
+1. `/leads` → ver "Lead Simulação" no status qualificado, código gerado (ex.: `AM01XXYY`).
+2. `/leads/{id}` → timeline com `created` e `status_changed`.
+3. `/alerts/history` → 2 logs de push (`lead_assigned`, `lead_status_changed`).
+4. `/alerts` → contadores atualizados; SLA do lead começando a contar.
+5. `/funnel` → lead aparece na coluna "qualificado".
+6. `/customers` → "Cliente Simulação" listado.
+7. `/packages` → pacote ativo.
+8. `/suppliers` → fornecedor listado.
+9. **Quotes** (via `/leads/{id}` → aba propostas) → quote rascunho com 2 itens e total correto.
+10. `/bookings` → booking confirmado com voucher visível (badge com código).
+11. `/alerts/preferences` → confirmar que toggles existem para os 4 eventos.
+12. `/alerts/debug` (admin) → opcional: disparar manualmente `task_due_soon` para o seu user.
 
-## Detalhes técnicos
+### Parte 3 — Limpeza (opcional)
 
-- Web Push assinatura VAPID feita manualmente com `crypto.subtle` (ECDSA P-256) — evita dependências Node-only no Worker.
-- Payload é criptografado com aesgcm (RFC 8291). Para simplificar e manter compatibilidade Worker, o payload será enviado **sem criptografia de conteúdo** (apenas headers VAPID) e o `sw.js` exibirá um título/corpo padrão quando não houver `event.data` — alternativamente, incluiremos uma lib pura JS leve (`@negrel/webpush` ou implementação inline) compatível com Workers para criptografar o payload. Vou usar implementação inline mínima para garantir compatibilidade.
-- `notification_logs` continua sendo a fonte única de histórico (Fase 4).
+Ao final, posso gerar um script de DELETE encadeado (voucher → booking_* → booking → quote_items → quote → lead → customer → supplier → package → tasks) caso queira remover tudo depois.
 
-## Arquivos afetados
+### Observações
 
-- **Migração:** nova tabela `push_subscriptions` + RLS
-- **Novo:** `src/server/push.server.ts`, `src/server/push.functions.ts`
-- **Editado:** `src/lib/pushNotifications.ts`, `public/sw.js` (tratar payload criptografado), `src/routes/alerts.tsx` (teste real)
-- **Secrets:** pedir VAPID keys após gerá-las
-
-## Próximo passo
-
-Ao aprovar, gero as chaves VAPID e te peço para colar nos secrets antes de seguir com migração e código.
+- Não vou criar tabela de invoices/payments (escopo escolhido foi "só simular o fluxo existente"). Se depois quiser o módulo financeiro, peço em uma próxima rodada.
+- Push notifications reais só chegam se você estiver com a inscrição ativada no navegador; mesmo sem isso, os logs em `notification_logs` são gravados e visíveis em `/alerts/history`.
+- Os triggers de lead já estão ativos; o seed vai produzir os webhooks automaticamente.

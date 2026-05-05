@@ -89,10 +89,11 @@ function AlertsPage() {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("daily_followup_goal")
+        .select("daily_followup_goal,full_name")
         .eq("user_id", user.id)
         .maybeSingle();
       if (!cancelled && data?.daily_followup_goal) setGoal(data.daily_followup_goal);
+      if (!cancelled && data?.full_name) setVendorName(data.full_name);
 
       const since = new Date();
       since.setDate(since.getDate() - 6);

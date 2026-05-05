@@ -59,6 +59,15 @@ function AlertsPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(false);
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | "unsupported">(
+    typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported",
+  );
+
+  const requestNotif = async () => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    const result = await Notification.requestPermission();
+    setNotifPerm(result);
+  };
   const [goal, setGoal] = useState<number>(10);
   const [history, setHistory] = useState<{ date: string; count: number }[]>([]);
 

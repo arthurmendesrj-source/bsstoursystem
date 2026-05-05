@@ -17,6 +17,7 @@ import {
   Briefcase,
   ListChecks,
   Bell,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";

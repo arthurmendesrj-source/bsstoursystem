@@ -59,11 +59,51 @@ function AlertsPage() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<string>("all");
   const [onlyMine, setOnlyMine] = useState(false);
-  const [goal, setGoal] = useState(getGoal());
+  const [goal, setGoal] = useState<number>(10);
+  const [history, setHistory] = useState<{ date: string; count: number }[]>([]);
 
+  // Load goal from profile + 7-day history
   useEffect(() => {
-    if (typeof window !== "undefined") window.localStorage.setItem(GOAL_KEY, String(goal));
-  }, [goal]);
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("daily_followup_goal")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!cancelled && data?.daily_followup_goal) setGoal(data.daily_followup_goal);
+
+      const since = new Date();
+      since.setDate(since.getDate() - 6);
+      since.setHours(0, 0, 0, 0);
+      const { data: ints } = await supabase
+        .from("interactions")
+        .select("occurred_at")
+        .eq("created_by", user.id)
+        .gte("occurred_at", since.toISOString());
+      const counts = new Map<string, number>();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(since);
+        d.setDate(since.getDate() + i);
+        counts.set(d.toISOString().slice(0, 10), 0);
+      }
+      for (const it of (ints ?? []) as { occurred_at: string }[]) {
+        const key = new Date(it.occurred_at).toISOString().slice(0, 10);
+        if (counts.has(key)) counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      if (!cancelled) {
+        setHistory(Array.from(counts.entries()).map(([date, count]) => ({ date, count })));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.id, followupsToday]);
+
+  const updateGoal = async (next: number) => {
+    setGoal(next);
+    if (!user?.id) return;
+    await supabase.from("profiles").update({ daily_followup_goal: next }).eq("user_id", user.id);
+  };
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();

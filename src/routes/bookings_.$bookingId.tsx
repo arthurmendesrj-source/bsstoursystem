@@ -326,6 +326,13 @@ function BookingDetailPage() {
           })}
         </div>
       )}
+
+      <ProofAssociateDialog
+        open={!!associateItem}
+        onOpenChange={(v) => !v && setAssociateItem(null)}
+        customerId={booking.customer_id}
+        onPick={(p) => { if (associateItem) handleProofPick(associateItem, p); }}
+      />
     </div>
   );
 }

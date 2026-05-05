@@ -1,43 +1,70 @@
-## Nova aba "Bíblia" — registro completo de serviços reservados
+# Bíblia — Ferramenta Operacional
 
-Criar uma nova página acessível pela barra lateral (caixa de ferramentas) chamada **Bíblia**, que consolida todos os serviços de todas as reservas, com filtros por tipo de serviço e datas.
+Reformular a aba **Bíblia** para servir o time operacional: lista de atividades do dia (com hora de execução), vinculada a reservas mas também alimentável manualmente e totalmente editável.
 
-### O que é
+## Colunas da tabela
+- **Cód. Invoice** (ex.: `IN<codigo_lead>`) — link para a reserva quando houver
+- **Nome Pax** (cliente principal ou pax informado)
+- **Tipo** (hotel, transfer, passeio, voo, outro…)
+- **Data** de execução
+- **Hora** de execução
+- **Descrição** (cidade / fornecedor / observação curta)
+- **Status** (pendente / confirmado / executado / cancelado)
+- **Ações** (editar, excluir)
 
-Uma "Bíblia operacional" — visão única, em formato de tabela, com **todos os itens de todas as reservas** (extraídos de `quote_items` via `bookings.quote_id`), permitindo à operação consultar rapidamente "quem está hospedado em qual hotel em tal data", "quais voos saem essa semana", etc.
+## Filtros (topo da página)
+- **Data** — padrão: **hoje**; opção "intervalo" (de/até)
+- **Tipo** de serviço (multi)
+- **Status**
+- **Busca** livre (pax, invoice, descrição)
+- Botão **Limpar**, **Exportar CSV**, **Importar de Reservas**, **+ Nova atividade**
 
-### Página `/biblia`
+## Ações principais
+1. **Importar de Reservas** — varre `quote_items` cujas reservas tenham `departure_date` no intervalo escolhido e cria registros na tabela operacional (idempotente: pula itens já importados pelo mesmo `quote_item_id`).
+2. **+ Nova atividade** — dialog para criar manualmente (sem precisar de reserva).
+3. **Editar** linha — dialog com todos os campos editáveis (inclusive itens importados; edição não altera o `quote_items` original, vive apenas na tabela operacional).
+4. **Excluir** linha.
 
-Colunas da tabela:
-- Reserva (código curto + cliente, com link para `/bookings/{id}`)
-- Tipo de serviço (`quote_items.kind` — hotel, voo, transfer, passeio, serviço…)
-- Descrição
-- Cidade (`quote_items.city`)
-- Data início (`quote_items.item_date`)
-- Data fim / check-out (`quote_items.check_out`)
-- Pax / Qtd
-- Status do item (de `booking_item_confirmations.status`: pendente / confirmado / cancelado)
-- Valor
+## Modelo de dados (nova tabela)
 
-### Filtros (topo da página)
-- **Tipo de serviço** — multi-select com os valores distintos de `kind` presentes na base
-- **Período** — dois date pickers (data inicial / data final) que filtram pelo `item_date` (ou `check_out` quando aplicável)
-- **Status do item** — pendente / confirmado / cancelado / todos
-- **Busca livre** — descrição, cidade, código da reserva, nome do cliente
-- Botão **Limpar filtros** e botão **Exportar CSV**
+```text
+operations_activities
+  id uuid pk
+  booking_id uuid null               -- referência opcional à reserva
+  quote_item_id uuid null unique     -- origem da importação (idempotência)
+  invoice_code text null             -- copiado no import; editável
+  pax_name text null
+  kind text not null default 'service'
+  description text null
+  city text null
+  activity_date date null
+  activity_time time null
+  status text not null default 'pendente'
+  notes text null
+  source text not null default 'manual'   -- 'manual' | 'imported'
+  created_by uuid not null
+  created_at / updated_at timestamptz
+```
 
-### Acesso
-- Novo item na sidebar `AppShell.tsx`: **Bíblia** com ícone `BookOpen`, rota `/biblia`, posicionado logo abaixo de "Reservas".
+RLS: leitura para autenticados; insert/update/delete para o criador, admin e `operacional` (mesmo padrão de `booking_item_confirmations`).
 
-### Detalhes técnicos
+## Lógica de importação
+- Para cada booking no intervalo (com `lead_id`), monta `invoice_code = "IN" + leads.code`.
+- Para cada `quote_item` desse booking ainda não presente em `operations_activities`, insere:
+  - `pax_name` = cliente principal do booking (`customers.full_name`)
+  - `kind`, `description`, `city`, `activity_date = item_date` (ou `departure_date` quando vazio)
+  - `activity_time` = null (operador preenche)
+  - `status = 'pendente'`
+  - `source = 'imported'`
+- Toast com total importado / pulado.
 
-- Nova rota: `src/routes/biblia.tsx` (envolta em `AuthGate` + `AppShell`).
-- Query única: `quote_items` join com `bookings` (via `quote_id`) e `customers` (via `bookings.customer_id`); só traz itens cujo `quote_id` pertence a uma reserva. Carrega também `booking_item_confirmations` para exibir status por item.
-- Filtros aplicados client-side sobre o resultado (o volume cabe — paginação de 200/página com `order by item_date desc nulls last`).
-- Sem migração de banco: tudo já existe em `quote_items` + `bookings` + `booking_item_confirmations`.
-- Novas chaves i18n (pt/en/es): `bibliaMenu`, `bibliaTitle`, `bibliaIntro`, `filterServiceType`, `filterPeriod`, `filterStatus`, `clearFilters`, `exportCsv`, `noServicesFound`.
-- Date pickers: shadcn `Calendar` + `Popover` com `pointer-events-auto`.
+## Mudanças nos arquivos
+- **migração SQL**: criar tabela `operations_activities` + índices (`activity_date`, `booking_id`) + RLS + trigger `updated_at`.
+- **`src/routes/biblia.tsx`**: reescrever página inteira (lista, filtros com data padrão hoje, importar, criar/editar/excluir, exportar CSV).
+- **`src/components/BibliaActivityDialog.tsx`** (novo): formulário de criar/editar (campos: invoice_code, pax_name, kind, description, city, activity_date, activity_time, status, notes, booking_id opcional via busca).
+- **`src/lib/i18n.tsx`**: novas chaves (`bibliaImport`, `bibliaNewActivity`, `bibliaImported`, `invoiceCodeShort`, `paxName`, `executionTime`, `bibliaSourceManual`, `bibliaSourceImported`, status, etc.) em pt/en/es.
+- **`src/components/AppShell.tsx`**: mantém item "Bíblia" já presente.
 
-### Fora de escopo
-- Edição de itens nesta tela (read-only; clicar em "Reserva" leva ao detalhe da reserva onde já existe a confirmação item-a-item).
-- Agrupamentos hierárquicos (por hotel/fornecedor) — pode vir depois se necessário.
+## Fora de escopo
+- Edição reversa em `quote_items` original.
+- Geração automática ao criar item de reserva (poderá ser adicionada depois via trigger).

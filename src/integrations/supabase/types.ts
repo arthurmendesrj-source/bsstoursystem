@@ -772,6 +772,63 @@ export type Database = {
         }
         Relationships: []
       }
+      operations_activities: {
+        Row: {
+          activity_date: string | null
+          activity_time: string | null
+          booking_id: string | null
+          city: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          invoice_code: string | null
+          kind: string
+          notes: string | null
+          pax_name: string | null
+          quote_item_id: string | null
+          source: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          activity_date?: string | null
+          activity_time?: string | null
+          booking_id?: string | null
+          city?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          invoice_code?: string | null
+          kind?: string
+          notes?: string | null
+          pax_name?: string | null
+          quote_item_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          activity_date?: string | null
+          activity_time?: string | null
+          booking_id?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          invoice_code?: string | null
+          kind?: string
+          notes?: string | null
+          pax_name?: string | null
+          quote_item_id?: string | null
+          source?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       package_dates: {
         Row: {
           booked: number

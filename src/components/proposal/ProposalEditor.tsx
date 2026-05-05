@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,7 +71,7 @@ function fmtDate(d?: string | null) {
   }
 }
 
-export function ProposalEditor({ quoteId, leadCode, mode, onSaved, onClose }: Props) {
+export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

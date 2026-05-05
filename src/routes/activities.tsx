@@ -112,6 +112,7 @@ function ActivitiesPage() {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkTargetIds, setLinkTargetIds] = useState<string[]>([]);
   const [linkLeadId, setLinkLeadId] = useState<string>("");
+  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
 
   // load lead options for the dialogs
   useEffect(() => {

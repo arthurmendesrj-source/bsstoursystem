@@ -262,7 +262,7 @@ function LeadWorkspace() {
             <Button
               size="sm"
               variant={sla.level === "overdue" ? "destructive" : "default"}
-              onClick={() => { setQuickType("ligacao"); setQuickContent(""); setQuickOpen(true); }}
+              onClick={() => openQuickWith("ligacao")}
             >
               <Phone className="h-3.5 w-3.5 mr-1.5" />
               {t("addInteraction")}

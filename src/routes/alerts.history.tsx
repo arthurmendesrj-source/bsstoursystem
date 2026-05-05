@@ -263,7 +263,7 @@ function NotificationHistoryPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r) => (
+                  {filtered.map((r) => (
                     <tr key={r.id} className="border-b last:border-b-0 align-top">
                       <td className="py-2 pr-4 whitespace-nowrap text-muted-foreground">
                         {new Date(r.sent_at).toLocaleString()}
@@ -292,9 +292,10 @@ function NotificationHistoryPage() {
                           <Link
                             to="/leads/$leadId"
                             params={{ leadId: r.lead_id }}
-                            className="text-primary hover:underline text-xs"
+                            className="text-primary hover:underline text-xs whitespace-nowrap"
+                            title={r.lead_id}
                           >
-                            abrir
+                            {leadNames[r.lead_id] ?? "abrir"}
                           </Link>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>

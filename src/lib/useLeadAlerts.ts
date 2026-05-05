@@ -157,11 +157,25 @@ export function useLeadAlerts(userId: string | null | undefined, isAdmin: boolea
     if (!firstRunRef.current) {
       for (const a of computedAll) {
         const prev = prevLevelsRef.current.get(a.id);
-        if (a.sla.level === "overdue" && prev && prev !== "overdue" && !toastedOverdue.has(a.id) && !a.snoozedUntil) {
+        const isSnoozed = !!a.snoozedUntil && a.snoozedUntil > Date.now();
+        if (a.sla.level === "overdue" && prev && prev !== "overdue" && !toastedOverdue.has(a.id) && !isSnoozed) {
           toastedOverdue.add(a.id);
-          toast.warning(`${a.name}: SLA atrasado`, {
-            description: a.sla.daysSinceLast !== null ? `${a.sla.daysSinceLast} dia(s) sem contato` : undefined,
-          });
+          const desc = a.sla.daysSinceLast !== null ? `${a.sla.daysSinceLast} dia(s) sem contato` : undefined;
+          toast.warning(`${a.name}: SLA atrasado`, { description: desc });
+          if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+            try {
+              const n = new Notification(`${a.name}: SLA atrasado`, {
+                body: desc,
+                tag: `lead-overdue-${a.id}`,
+                icon: "/favicon.ico",
+              });
+              n.onclick = () => {
+                window.focus();
+                window.location.href = `/leads/${a.id}`;
+                n.close();
+              };
+            } catch { /* ignore */ }
+          }
         }
         if (a.sla.level !== "overdue") toastedOverdue.delete(a.id);
       }

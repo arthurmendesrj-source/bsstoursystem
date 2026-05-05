@@ -1,32 +1,24 @@
-# Próxima etapa — Snooze + meta diária no banco (multi-dispositivo)
+# Próxima fase — Notificações push do navegador
 
-Escolhi começar pela base que destrava as outras: tirar snooze e meta diária do `localStorage` e levar para o banco. Sem isso, push notifications e analytics de SLA ficam inconsistentes entre dispositivos.
+Hoje os alertas de SLA estourado só aparecem com a aba `/alerts` aberta (toast Sonner). Vamos disparar notificação nativa do navegador na transição para `overdue`, funcionando com a aba em background.
 
 ## O que muda
 
-### 1. Snooze persistente
-- Nova tabela `lead_alert_snoozes` (`id`, `lead_id`, `user_id`, `snoozed_until`, `created_at`), única por (`lead_id`, `user_id`).
-- RLS: usuário lê/escreve só os próprios; admin lê todos.
-- `useLeadAlerts` carrega os snoozes do banco no mount + escuta realtime.
-- Botão "Adiar" faz `upsert` no banco (não mais `localStorage`).
-- Migração suave: na primeira execução, se houver `lead-alerts-snooze-v1` no `localStorage`, sobe pro banco e limpa a chave.
+### 1. Botão "Ativar avisos" em `/alerts`
+- Mostra estado atual: `default` → botão "Ativar avisos do navegador"; `granted` → badge "Avisos ativos"; `denied` → aviso curto pedindo para reativar nas configurações do navegador.
+- Clique chama `Notification.requestPermission()` e atualiza estado local.
 
-### 2. Meta diária no perfil
-- Nova coluna `daily_followup_goal int default 10` em `profiles`.
-- Card de meta lê/grava direto no perfil do usuário logado.
-- Progresso continua sendo contado a partir das `interactions` criadas hoje pelo usuário (já funciona).
-
-### 3. Mini-histórico de 7 dias
-- Mesmo card mostra barrinhas dos últimos 7 dias (contagem de interações por dia × meta).
-- Query agregada simples em `interactions` filtrando `created_by = auth.uid()` e `occurred_at >= now() - 7 days`.
+### 2. Disparo no hook `useLeadAlerts`
+- Onde já existe a lógica de toast na transição `ok|warning → overdue`, adicionar `new Notification(...)` quando `Notification.permission === "granted"` e o lead **não** estiver em snooze.
+- `tag: "lead-overdue-<id>"` para evitar duplicatas.
+- `onclick`: foca a aba e navega para `/leads/{id}`.
 
 ## Arquivos afetados
-- **Migração nova**: cria `lead_alert_snoozes` (com RLS) e adiciona `daily_followup_goal` em `profiles`.
-- `src/lib/useLeadAlerts.ts` — snooze passa a vir do Supabase, com migração do localStorage.
-- `src/routes/alerts.tsx` — card de meta lê do perfil + mini-gráfico de 7 dias; botão "Adiar" chama upsert.
-- `src/lib/i18n.tsx` — chave nova para "últimos 7 dias" (PT/EN/ES).
+- `src/lib/useLeadAlerts.ts` — disparar `new Notification` ao lado do `toast.warning`.
+- `src/routes/alerts.tsx` — botão/estado de permissão no header.
+- `src/lib/i18n.tsx` — `alertsEnableNotifications`, `alertsNotificationsActive`, `alertsNotificationsBlocked`.
 
-## Fora desta etapa (próximas)
-- Push notifications nativas do navegador.
-- Painel de SLA (analytics para gestor).
-- Configuração de janelas de SLA por estágio.
+## Fora desta fase
+- Push real com app fechado (precisa Service Worker + Web Push).
+- Som customizado.
+- Painel de SLA analytics e config de janelas por estágio (próximas).

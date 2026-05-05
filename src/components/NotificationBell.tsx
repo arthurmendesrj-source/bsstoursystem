@@ -40,13 +40,13 @@ export function NotificationBell() {
     // Approved quotes
     const { data: qs } = await supabase
       .from("quotes")
-      .select("id,total_amount,currency,created_at,lead_id")
+      .select("id,total_amount,currency,created_at,lead_id,customer_id")
       .eq("status", "aprovada")
       .order("created_at", { ascending: false });
     // Bookings tied to those quotes
     const { data: bks } = await supabase
       .from("bookings")
-      .select("id,total_amount,currency,status,departure_date,quote_id");
+      .select("id,total_amount,currency,status,departure_date,return_date,package_id,quote_id");
     // Vouchers
     const { data: vs } = await supabase.from("vouchers").select("booking_id");
 

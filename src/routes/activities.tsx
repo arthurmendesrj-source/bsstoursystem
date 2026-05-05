@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { format, isAfter, startOfWeek, endOfWeek, startOfDay, endOfDay } from "date-fns";
-import { Plus, Play, Pause, CheckCircle2, Clock, AlertCircle, Mail, ExternalLink, Trash2 } from "lucide-react";
+import { Plus, Play, Pause, CheckCircle2, Clock, AlertCircle, Mail, ExternalLink, Trash2, Link2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -106,12 +106,38 @@ function ActivitiesPage() {
 
   useEffect(() => { loadData(); }, []);
 
-  // load lead options for the dialog
+  // link-to-lead dialog
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkTargetIds, setLinkTargetIds] = useState<string[]>([]);
+  const [linkLeadId, setLinkLeadId] = useState<string>("");
+
+  // load lead options for the dialogs
   useEffect(() => {
-    if (!dialogOpen) return;
-    supabase.from("leads").select("id,code,name").order("created_at", { ascending: false }).limit(100)
+    if (!dialogOpen && !linkDialogOpen) return;
+    supabase.from("leads").select("id,code,name").order("created_at", { ascending: false }).limit(200)
       .then(({ data }) => setLeadOptions((data ?? []) as LeadLite[]));
-  }, [dialogOpen]);
+  }, [dialogOpen, linkDialogOpen]);
+
+  const openLinkDialog = (ids: string[]) => {
+    setLinkTargetIds(ids);
+    setLinkLeadId("");
+    setLinkDialogOpen(true);
+  };
+
+  const linkToLead = async () => {
+    if (!linkTargetIds.length) return;
+    const patch = linkLeadId
+      ? { lead_id: linkLeadId, category: "negocio" as const }
+      : { lead_id: null, category: "suporte" as const };
+    const { error } = await supabase.from("tasks").update(patch).in("id", linkTargetIds);
+    if (error) toast.error(error.message);
+    else {
+      toast.success(t("saved"));
+      setLinkDialogOpen(false);
+      clearSelection();
+      loadData();
+    }
+  };
 
   const filtered = useMemo(() => {
     return tasks.filter((task) => {
@@ -382,6 +408,9 @@ function ActivitiesPage() {
             <Button size="sm" variant="outline" onClick={() => bulkUpdate({ started_at: null })}>
               <Pause className="h-4 w-4 mr-1" />{t("bulkPause")}
             </Button>
+            <Button size="sm" variant="outline" onClick={() => openLinkDialog(Array.from(selectedIds))}>
+              <Link2 className="h-4 w-4 mr-1" />{t("linkToLead")}
+            </Button>
             <Button size="sm" variant="destructive" onClick={bulkDelete}>
               <Trash2 className="h-4 w-4 mr-1" />{t("bulkDelete")}
             </Button>
@@ -411,14 +440,13 @@ function ActivitiesPage() {
                       aria-label="select all"
                     />
                   </TableHead>
-                  <TableHead className="w-10"></TableHead>
                   <TableHead>{t("activityTitle")}</TableHead>
                   <TableHead>{t("linkedLead")}</TableHead>
                   <TableHead>{t("category")}</TableHead>
                   <TableHead>{t("priority")}</TableHead>
                   <TableHead>{t("dueDate")}</TableHead>
                   <TableHead>{t("timeSpent")}</TableHead>
-                  <TableHead className="w-32">{t("actions")}</TableHead>
+                  <TableHead className="w-44 text-right">{t("actions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -435,13 +463,6 @@ function ActivitiesPage() {
                           onCheckedChange={() => toggleOne(task.id)}
                           aria-label="select"
                         />
-                      </TableCell>
-                      <TableCell>
-                        <button onClick={() => toggleComplete(task)} aria-label="toggle">
-                          {task.completed
-                            ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                            : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary" />}
-                        </button>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-start gap-2">
@@ -480,14 +501,22 @@ function ActivitiesPage() {
                       </TableCell>
                       <TableCell className="text-sm">{fmtTime(task.time_spent_minutes)}</TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-end gap-1">
                           {!task.completed && (
                             <Button size="icon" variant="ghost" onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
                               {inProgress ? <Pause className="h-4 w-4 text-amber-600" /> : <Play className="h-4 w-4" />}
                             </Button>
                           )}
+                          <Button size="icon" variant="ghost" onClick={() => openLinkDialog([task.id])} title={t("linkToLead")}>
+                            <Link2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
                           <Button size="icon" variant="ghost" onClick={() => removeTask(task)} title={t("delete")}>
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
+                          </Button>
+                          <Button size="icon" variant="ghost" onClick={() => toggleComplete(task)} title={t("bulkComplete")}>
+                            {task.completed
+                              ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                              : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary" />}
                           </Button>
                         </div>
                       </TableCell>
@@ -499,6 +528,28 @@ function ActivitiesPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t("linkToLead")} ({linkTargetIds.length})</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <Label>{t("linkedLead")}</Label>
+            <Select value={linkLeadId || "none"} onValueChange={(v) => setLinkLeadId(v === "none" ? "" : v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">— {t("unlinkLead")}</SelectItem>
+                {leadOptions.map((l) => (
+                  <SelectItem key={l.id} value={l.id}>{l.code ?? "—"} · {l.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLinkDialogOpen(false)}>{t("cancel")}</Button>
+            <Button onClick={linkToLead}>{t("save")}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

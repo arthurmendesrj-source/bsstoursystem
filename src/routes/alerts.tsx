@@ -24,6 +24,16 @@ import { useI18n } from "@/lib/i18n";
 import { useLeadAlerts, type LeadAlert } from "@/lib/useLeadAlerts";
 import { supabase } from "@/integrations/supabase/client";
 import { useUserTemplates, renderTemplate, type MessageTemplates } from "@/lib/messageTemplates";
+import {
+  enablePushNotifications,
+  getPermissionState,
+  isPushSupported,
+  showLocalNotification,
+  type PushPermission,
+} from "@/lib/pushNotifications";
+import { toast } from "sonner";
+
+const NOTIF_OPTOUT_KEY = "alerts.notifications.optout";
 
 export const Route = createFileRoute("/alerts")({
   component: () => (

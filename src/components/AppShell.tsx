@@ -17,6 +17,7 @@ import {
   Briefcase,
   ListChecks,
   Bell,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -42,6 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/suppliers", label: t("suppliers"), icon: Building2 },
     { to: "/packages", label: t("packages"), icon: Package },
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },
+    { to: "/biblia", label: t("bibliaMenu"), icon: BookOpen },
     { to: "/email", label: t("email"), icon: Mail },
   ];
 

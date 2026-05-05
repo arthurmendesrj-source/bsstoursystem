@@ -23,6 +23,7 @@ import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BookingsRouteImport } from './routes/bookings'
+import { Route as BibliaRouteImport } from './routes/biblia'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
@@ -108,6 +109,11 @@ const BookingsRoute = BookingsRouteImport.update({
   path: '/bookings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BibliaRoute = BibliaRouteImport.update({
+  id: '/biblia',
+  path: '/biblia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AlertsRoute = AlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -185,6 +191,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/biblia': typeof BibliaRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/biblia': typeof BibliaRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/biblia': typeof BibliaRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activities'
     | '/alerts'
+    | '/biblia'
     | '/bookings'
     | '/customers'
     | '/dashboard'
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activities'
     | '/alerts'
+    | '/biblia'
     | '/bookings'
     | '/customers'
     | '/dashboard'
@@ -338,6 +349,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activities'
     | '/alerts'
+    | '/biblia'
     | '/bookings'
     | '/customers'
     | '/dashboard'
@@ -369,6 +381,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivitiesRoute: typeof ActivitiesRoute
   AlertsRoute: typeof AlertsRouteWithChildren
+  BibliaRoute: typeof BibliaRoute
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
@@ -487,6 +500,13 @@ declare module '@tanstack/react-router' {
       path: '/bookings'
       fullPath: '/bookings'
       preLoaderRoute: typeof BookingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biblia': {
+      id: '/biblia'
+      path: '/biblia'
+      fullPath: '/biblia'
+      preLoaderRoute: typeof BibliaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -635,6 +655,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivitiesRoute: ActivitiesRoute,
   AlertsRoute: AlertsRouteWithChildren,
+  BibliaRoute: BibliaRoute,
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,

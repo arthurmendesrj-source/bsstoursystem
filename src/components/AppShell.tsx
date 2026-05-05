@@ -14,6 +14,7 @@ import {
   Mail,
   Building2,
   Briefcase,
+  ListChecks,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";

@@ -63,6 +63,7 @@ function ActivitiesPage() {
   const [categoryFilter, setCategoryFilter] = useState<"all" | "negocio" | "suporte">("all");
   const [priorityFilter, setPriorityFilter] = useState<"all" | "baixa" | "media" | "alta">("all");
   const [search, setSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // dialog
   const [dialogOpen, setDialogOpen] = useState(false);

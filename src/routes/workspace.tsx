@@ -463,9 +463,11 @@ function WorkspacePage() {
             </CardContent>
           </Card>
         </div>
-
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={72} minSize={55}>
         {/* MAIN */}
-        <Card className="min-h-[600px]">
+        <Card className="min-h-[600px] ml-2">
           <CardContent className="p-4">
             <Tabs defaultValue="email">
               <TabsList className="grid grid-cols-5 w-full">

@@ -27,6 +27,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as BibliaRouteImport } from './routes/biblia'
+import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
@@ -46,6 +47,7 @@ import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferenc
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
+import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
@@ -138,6 +140,11 @@ const BookingsRoute = BookingsRouteImport.update({
 const BibliaRoute = BibliaRouteImport.update({
   id: '/biblia',
   path: '/biblia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssistantRoute = AssistantRouteImport.update({
+  id: '/assistant',
+  path: '/assistant',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -237,6 +244,11 @@ const UsersUserIdPermissionsRoute = UsersUserIdPermissionsRouteImport.update({
   path: '/users/$userId/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
+  id: '/api/assistant/chat',
+  path: '/api/assistant/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
   id: '/api/public/hooks/task-due',
   path: '/api/public/hooks/task-due',
@@ -259,6 +271,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/assistant': typeof AssistantRoute
   '/biblia': typeof BibliaRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
@@ -292,6 +305,7 @@ export interface FileRoutesByFullPath {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
@@ -301,6 +315,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/assistant': typeof AssistantRoute
   '/biblia': typeof BibliaRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
@@ -334,6 +349,7 @@ export interface FileRoutesByTo {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
@@ -344,6 +360,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
+  '/assistant': typeof AssistantRoute
   '/biblia': typeof BibliaRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
@@ -377,6 +394,7 @@ export interface FileRoutesById {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
@@ -388,6 +406,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activities'
     | '/alerts'
+    | '/assistant'
     | '/biblia'
     | '/bookings'
     | '/customers'
@@ -421,6 +440,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/api/assistant/chat'
     | '/users/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
@@ -430,6 +450,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activities'
     | '/alerts'
+    | '/assistant'
     | '/biblia'
     | '/bookings'
     | '/customers'
@@ -463,6 +484,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/api/assistant/chat'
     | '/users/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
@@ -472,6 +494,7 @@ export interface FileRouteTypes {
     | '/'
     | '/activities'
     | '/alerts'
+    | '/assistant'
     | '/biblia'
     | '/bookings'
     | '/customers'
@@ -505,6 +528,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/api/assistant/chat'
     | '/users_/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
@@ -515,6 +539,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActivitiesRoute: typeof ActivitiesRoute
   AlertsRoute: typeof AlertsRouteWithChildren
+  AssistantRoute: typeof AssistantRoute
   BibliaRoute: typeof BibliaRoute
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
@@ -534,6 +559,7 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
+  ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
@@ -666,6 +692,13 @@ declare module '@tanstack/react-router' {
       path: '/biblia'
       fullPath: '/biblia'
       preLoaderRoute: typeof BibliaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assistant': {
+      id: '/assistant'
+      path: '/assistant'
+      fullPath: '/assistant'
+      preLoaderRoute: typeof AssistantRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -801,6 +834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsersUserIdPermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/assistant/chat': {
+      id: '/api/assistant/chat'
+      path: '/api/assistant/chat'
+      fullPath: '/api/assistant/chat'
+      preLoaderRoute: typeof ApiAssistantChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/task-due': {
       id: '/api/public/hooks/task-due'
       path: '/api/public/hooks/task-due'
@@ -913,6 +953,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivitiesRoute: ActivitiesRoute,
   AlertsRoute: AlertsRouteWithChildren,
+  AssistantRoute: AssistantRoute,
   BibliaRoute: BibliaRoute,
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
@@ -932,6 +973,7 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
+  ApiAssistantChatRoute: ApiAssistantChatRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,

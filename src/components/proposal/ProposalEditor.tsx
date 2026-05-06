@@ -23,6 +23,7 @@ import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
 import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
+import { HotelDialog, type HotelInitial } from "./HotelDialog";
 
 type Mode = "proposal" | "invoice";
 

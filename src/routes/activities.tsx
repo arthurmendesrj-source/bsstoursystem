@@ -19,6 +19,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -57,6 +58,8 @@ type LeadLite = { id: string; code: string | null; name: string; destination?: s
 function ActivitiesPage() {
   const { t } = useI18n();
   const { user, isAdmin } = useAuth();
+  const { viewAs } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const { subordinates } = useSubordinates();
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -86,12 +89,14 @@ function ActivitiesPage() {
 
   const loadData = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from("tasks")
       .select("id,title,description,due_date,completed,category,priority,source,started_at,completed_at,time_spent_minutes,lead_id,customer_id,assigned_to,created_by")
       .order("completed", { ascending: true })
       .order("due_date", { ascending: true, nullsFirst: false })
       .limit(500);
+    if (targetUserId) query = query.eq("assigned_to", targetUserId);
+    const { data, error } = await query;
     if (error) {
       toast.error(error.message);
       setLoading(false);
@@ -111,7 +116,7 @@ function ActivitiesPage() {
     setLoading(false);
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { loadData(); }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // link-to-lead dialog
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -254,7 +259,7 @@ function ActivitiesPage() {
       source,
       lead_id: form.lead_id || null,
       created_by: user.id,
-      assigned_to: form.assigned_to || user.id,
+      assigned_to: form.assigned_to || targetUserId || user.id,
     });
     if (error) toast.error(error.message);
     else {

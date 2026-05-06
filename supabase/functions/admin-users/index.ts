@@ -116,6 +116,7 @@ Deno.serve(async (req) => {
       const redirectTo = req.headers.get("origin") ? `${req.headers.get("origin")}/` : undefined;
       const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, { redirectTo });
       if (error) return json({ error: error.message }, 400);
+      await audit({ action: "resend_invite", target_user_id: targetId, target_email: u.user.email });
       return json({ ok: true });
     }
 

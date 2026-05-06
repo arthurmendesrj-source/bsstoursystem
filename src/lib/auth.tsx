@@ -31,7 +31,16 @@ if (typeof window !== "undefined" && !(window as unknown as { __serverFnAuthPatc
   };
 }
 
-export type AppRole = "admin" | "vendedor" | "operacional" | "financeiro";
+export type AppRole =
+  | "admin"
+  | "diretor"
+  | "gerente"
+  | "supervisor"
+  | "operador"
+  // legacy (mantidos para compatibilidade durante migração)
+  | "vendedor"
+  | "operacional"
+  | "financeiro";
 
 type AuthCtx = {
   user: User | null;

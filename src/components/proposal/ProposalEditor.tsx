@@ -521,7 +521,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         ccy={ccy}
         readOnly={readOnly}
         onChange={updateItem}
-        onRemove={removeItem}
+        onRemove={(idx) => {
+          if (confirm("Tem certeza que deseja excluir este serviço?")) removeItem(idx);
+        }}
         onEdit={(id) => openEditService(id)}
       />
 

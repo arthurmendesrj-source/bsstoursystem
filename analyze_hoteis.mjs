@@ -223,6 +223,9 @@ for (const g of groups.values()) {
       .ilike("name", g.hotel_name);
     let supplierId = existing?.find(s => slug(s.address_city || "") === slug(g.address_city || ""))?.id || null;
 
+    const notesParts = [];
+    if (meta.full_address) notesParts.push(`Endereço: ${meta.full_address}`);
+    if (meta.notes) notesParts.push(meta.notes);
     const payload = {
       name: g.hotel_name,
       trade_name: meta.trade_name || null,
@@ -231,14 +234,13 @@ for (const g of groups.values()) {
       address_city: g.address_city,
       address_state: g.address_state,
       address_country: g.address_country,
-      address_full: meta.full_address || null,
       email: firstNonEmpty(meta.emails || []),
       phone: firstNonEmpty(meta.phones || []),
       whatsapp: firstNonEmpty(meta.whatsapp || []),
       website: meta.website || null,
-      currency: pickCurrency(meta.default_currency),
+      default_currency: pickCurrency(meta.default_currency),
       tax_id: meta.tax_id || null,
-      notes: meta.notes || null
+      notes: notesParts.join("\n\n") || null
     };
 
     if (!supplierId) {

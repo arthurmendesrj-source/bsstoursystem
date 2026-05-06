@@ -159,7 +159,7 @@ function LeadsPage() {
                 <TableCell>{l.destination ?? "—"}</TableCell>
                 <TableCell>{l.estimated_value ? format(Number(l.estimated_value), l.currency as "BRL") : "—"}</TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Select value={l.status} onValueChange={(v) => updateStatus(l.id, v)}>
+                  <Select value={l.status} onValueChange={(v) => updateStatus(l.id, v)} disabled={!can("leads", "edit")}>
                     <SelectTrigger className="h-8 w-36">
                       <Badge variant="outline" className={statusColor(l.status)}>{l.status}</Badge>
                     </SelectTrigger>

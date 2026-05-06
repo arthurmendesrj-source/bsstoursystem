@@ -15,6 +15,7 @@ import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
 import { Can, usePermissions } from "@/lib/permissions";
+import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -47,10 +48,11 @@ function LeadsPage() {
   const { user } = useAuth();
   const { format } = useCurrency();
   const { can } = usePermissions();
+  const { subordinates } = useSubordinates();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
 
   const load = async () => {
     const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
@@ -70,13 +72,13 @@ function LeadsPage() {
       estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
       status: form.status as "novo",
       created_by: user.id,
-      assigned_to: user.id,
+      assigned_to: form.assigned_to || user.id,
     });
     if (error) toast.error(error.message);
     else {
       toast.success(t("saved"));
       setOpen(false);
-      setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo" });
+      setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
       load();
     }
   };
@@ -132,6 +134,18 @@ function LeadsPage() {
                   <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+              {subordinates.length > 0 && (
+                <div>
+                  <Label>Atribuir a</Label>
+                  <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Eu mesmo</SelectItem>
+                      {subordinates.map((s) => <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button type="submit" className="w-full">{t("save")}</Button>
             </form>
           </DialogContent>

@@ -19,6 +19,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,7 @@ type LeadLite = { id: string; code: string | null; name: string; destination?: s
 function ActivitiesPage() {
   const { t } = useI18n();
   const { user, isAdmin } = useAuth();
+  const { subordinates } = useSubordinates();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [leadsMap, setLeadsMap] = useState<Record<string, LeadLite>>({});
@@ -78,6 +80,7 @@ function ActivitiesPage() {
     priority: "media" as "baixa" | "media" | "alta",
     category: "suporte" as "negocio" | "suporte",
     lead_id: "",
+    assigned_to: "",
   });
   const [leadOptions, setLeadOptions] = useState<LeadLite[]>([]);
 
@@ -251,13 +254,13 @@ function ActivitiesPage() {
       source,
       lead_id: form.lead_id || null,
       created_by: user.id,
-      assigned_to: user.id,
+      assigned_to: form.assigned_to || user.id,
     });
     if (error) toast.error(error.message);
     else {
       toast.success(t("saved"));
       setDialogOpen(false);
-      setForm({ title: "", description: "", due_date: "", priority: "media", category: "suporte", lead_id: "" });
+      setForm({ title: "", description: "", due_date: "", priority: "media", category: "suporte", lead_id: "", assigned_to: "" });
       loadData();
     }
   };
@@ -334,6 +337,18 @@ function ActivitiesPage() {
                   </Select>
                 </div>
               </div>
+              {subordinates.length > 0 && (
+                <div>
+                  <Label>Responsável</Label>
+                  <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Eu mesmo</SelectItem>
+                      {subordinates.map((s) => <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                 <Button type="submit">{t("save")}</Button>
@@ -342,7 +357,6 @@ function ActivitiesPage() {
           </DialogContent>
         </Dialog>
       </div>
-
       {/* stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={Clock} label={t("openTasks")} value={stats.open} />

@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze } from "@/server/gmail.functions";
@@ -49,6 +50,7 @@ export type EmailPanelProps = {
 export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelProps) {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { subordinates } = useSubordinates();
 
   const syncFn = useServerFn(gmailSync);
   const getFn = useServerFn(gmailGet);
@@ -78,6 +80,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     expected_travel_date: "", notes: "", next_action: "",
     status: "novo",
     create_customer: true,
+    assigned_to: "",
   });
   const [aiNote, setAiNote] = useState<string | null>(null);
 
@@ -108,6 +111,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     priority: "media" as "baixa" | "media" | "alta",
     description: "",
     due_date: "",
+    assigned_to: "",
   });
   const [associateOpen, setAssociateOpen] = useState(false);
 
@@ -349,6 +353,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
       next_action: prefill?.next_action ?? "",
       status: "novo",
       create_customer: true,
+      assigned_to: prefill?.assigned_to ?? "",
     });
     setAiNote(note ?? null);
     setAiOpen(true);
@@ -405,6 +410,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
       priority: prefill?.priority ?? "media",
       description: prefill?.description ?? selected.snippet ?? "",
       due_date: prefill?.due_date ?? "",
+      assigned_to: prefill?.assigned_to ?? "",
     });
     setTriageOpen(false);
     setTaskOpen(true);
@@ -482,7 +488,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
           status: leadForm.status as "novo",
           customer_id: cId,
           created_by: user.id,
-          assigned_to: user.id,
+          assigned_to: leadForm.assigned_to || user.id,
         })
         .select("id").single();
       if (lErr) throw lErr;

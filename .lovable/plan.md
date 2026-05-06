@@ -1,40 +1,41 @@
-## Objetivo
-Ao clicar no nome de um usuário em `/users`, abrir a tela de **permissões daquele usuário específico**, permitindo configurar/editar o acesso individual (override sobre o que o papel já dá).
+# Hierarquia + criação cruzada + IA no e-mail
 
-## Modelo de dados (override por usuário)
+## Hierarquia por papel
+Definir ranking dos papéis (admin=4, diretor=3, gerente=2, supervisor=1, operador=0) e função SQL `get_subordinates(_user_id)` SECURITY DEFINER que retorna todos os `user_id` cujo papel tem ranking estritamente menor que o do usuário (admin/diretor → todos não-admin; gerente → supervisores+operadores; supervisor → operadores; operador → vazio).
 
-Hoje as permissões são só por papel (`role_module_permissions` + `role_field_permissions`). Vou adicionar duas novas tabelas de override individual:
+Espelho em TS em `src/lib/hierarchy.ts` com helper `useSubordinates()` que carrega `user_roles + profiles` e filtra pelo ranking do usuário atual. Retorna lista `{ user_id, full_name, role }` para usar nos seletores.
 
-- **`user_module_permissions`** — `user_id`, `module_key`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_approve`. Cada coluna booleana é nullable: `null` = "herda do papel", `true/false` = override explícito.
-- **`user_field_permissions`** — `user_id`, `module_key`, `field_key`, `can_view` (nullable), `can_edit` (nullable). Mesma lógica de herança.
+## RLS — leads, activities, bookings
+Atualizar policies de **INSERT** e **SELECT/UPDATE** para permitir que gerente/diretor criem itens com `assigned_to` apontando para subordinado:
 
-RLS:
-- Admin gerencia tudo.
-- Usuário lê apenas as próprias linhas.
+- `leads_insert`: `created_by = auth.uid()` E (admin OU `has_module_permission(...,'create')`) E (`assigned_to = auth.uid()` OU `assigned_to IN (SELECT public.get_subordinates(auth.uid()))` OU `assigned_to IS NULL`).
+- `leads_select` / `leads_update`: ampliar para incluir `assigned_to IN get_subordinates(auth.uid())` (hoje operador só vê os seus; gerente passa a ver os dos subordinados).
+- Mesma lógica em `operations_activities` (adicionar coluna `assigned_to uuid` se ainda não existir — confirmei que já existe) e em `bookings` (created_by pode ser delegado).
 
-Função SQL `has_module_permission` será atualizada para considerar override individual primeiro; se `null`, cai no papel; admin sempre passa.
+## UI
 
-## Mudanças no frontend
+### `/users` — Hierarquia visível e ação em massa
+- Coluna **"Subordinado de"** mostrando nada (operador é folha) ou hierarquia agregada.
+- Botão **"Distribuir…"** (visível para gerente+) abre dialog: escolher tipo (Leads novos / Tarefas pendentes / Atividades), selecionar N itens próprios não-atribuídos, escolher subordinado destino → `update assigned_to`.
 
-1. **`/users`** — nome do usuário vira link → navega para `/users/$userId/permissions`.
-2. **Nova rota `/users/$userId/permissions`** (admin-only):
-   - Header: nome + papéis atuais do usuário.
-   - Aba "Por módulo" e "Campos sensíveis", mesmo layout da matriz atual, mas com **3 estados** por checkbox:
-     - **Herdado do papel** (cinza/indeterminado, mostra valor calculado)
-     - **Permitir** (✓ override)
-     - **Bloquear** (✗ override)
-   - Botão "Resetar para o papel" por linha (apaga override).
-   - Mesma lógica de **edit-gating**: o editor não pode conceder o que ele próprio não tem.
-3. **`src/lib/permissions.tsx`** — `PermissionsProvider` carrega também os overrides do usuário logado e aplica precedência: admin > override individual > papel.
+### Modal "Novo lead" (`src/routes/leads.tsx`) e "Nova atividade" (`src/routes/activities.tsx`)
+Adicionar campo **"Atribuir a"** (Select) — visível só se `useSubordinates().length > 0`. Default = eu mesmo. Persiste em `assigned_to` e mantém `created_by = auth.uid()`.
 
-## Detalhes técnicos
+### E-mail → "Criar lead com IA" (`src/components/email/EmailPanel.tsx`)
+- Já existe botão de criar lead manual no painel; adicionar **"✨ Criar lead com IA"** ao lado.
+- Chama nova server function `createLeadFromEmail` (`src/server/email-ai.functions.ts`) que usa Lovable AI Gateway (`google/gemini-2.5-flash`, sem API key) para extrair `{ name, email, phone, destination, expected_travel_date, estimated_value, currency, notes }` do `subject + body_text + from_*`.
+- Retorna sugestão → abre o modal **"Novo lead"** já preenchido (não grava direto), permitindo revisar e escolher "Atribuir a".
 
-- Migration cria as 2 tabelas + RLS + atualiza `has_module_permission(user, module, action)` para checar `user_module_permissions` antes de `role_module_permissions`.
-- Nova função `has_field_permission(user, module, field, action)` (caso ainda não exista) com mesma lógica de precedência.
-- Componente `<GatedTriCheckbox>` substitui `<GatedCheckbox>` na nova rota; ciclo de clique: herdado → permitir → bloquear → herdado.
-- `/users` ganha `<Link to="/users/$userId/permissions">` no nome (ícone de engrenagem ao lado também).
+## Auditoria
+Trigger existente `log_activity` em leads/activities já registra `created_by/assigned_to`; nada a mudar.
 
 ## Fora de escopo
-- Não muda `/settings/permissions` (continua sendo a matriz por papel = padrão).
-- Não muda papéis dos 4 usuários simulados — você continua atribuindo em `/users`.
-- Não cria UI de auditoria de overrides (já existe `/permissions-audit` que pode ser estendido depois).
+- Não criar tabela de "times" (decisão: hierarquia por papel).
+- Não mexer em `customers`/`quotes` (não foi pedido).
+- Sem reatribuição automática — só manual via "Distribuir…".
+
+## Detalhes técnicos
+- Nova função SQL: `public.get_subordinates(_user_id uuid) RETURNS SETOF uuid` (SECURITY DEFINER, search_path=public). Lê `user_roles` do alvo, calcula ranking via CASE, retorna `user_id` de outros `user_roles` com ranking menor.
+- Index: já existe em `user_roles(user_id)`; adicionar `(role)` se ausente.
+- Edge-gating na UI: o seletor "Atribuir a" só lista o que `get_subordinates` retorna (defesa em profundidade — RLS já bloqueia).
+- IA: prompt em PT-BR, `response_format: json_object`, schema simples; tratar 429/402 com toast.

@@ -111,6 +111,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     priority: "media" as "baixa" | "media" | "alta",
     description: "",
     due_date: "",
+    assigned_to: "",
   });
   const [associateOpen, setAssociateOpen] = useState(false);
 

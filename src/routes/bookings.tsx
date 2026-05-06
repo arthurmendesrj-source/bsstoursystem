@@ -188,6 +188,7 @@ function BookingsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </Can>
       </div>
 
       <Card>

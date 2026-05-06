@@ -69,7 +69,8 @@ function LeadsPage() {
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!effectiveId) return;
+    if (!user) return;
+    const ownerId = effectiveId ?? user.id;
     const { error } = await supabase.from("leads").insert({
       name: form.name,
       email: form.email || null,
@@ -77,8 +78,8 @@ function LeadsPage() {
       destination: form.destination || null,
       estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
       status: form.status as "novo",
-      created_by: effectiveId,
-      assigned_to: form.assigned_to || effectiveId,
+      created_by: user.id,
+      assigned_to: form.assigned_to || ownerId,
     });
     if (error) toast.error(error.message);
     else {

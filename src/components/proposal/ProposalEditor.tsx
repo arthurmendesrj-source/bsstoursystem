@@ -386,6 +386,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => addItem("service")}>
             <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
+            <Plane className="h-4 w-4 mr-1" /> Adicionar voo
+          </Button>
           <Button size="sm" onClick={save} disabled={saving}>
             <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
           </Button>

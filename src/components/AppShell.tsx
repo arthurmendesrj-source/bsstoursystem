@@ -129,6 +129,51 @@ export function AppShell({ children }: { children: ReactNode }) {
           {!collapsed && <div className="flex-1 truncate font-semibold text-sidebar-foreground">{t("appName")}</div>}
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {/* CRM group */}
+          <button
+            type="button"
+            onClick={() => {
+              if (collapsed) {
+                setCollapsed(false);
+                setCrmOpen(true);
+              } else {
+                setCrmOpen((o) => !o);
+              }
+            }}
+            className={cn(itemClass(isCrmActive), "w-full")}
+            title={collapsed ? "CRM" : undefined}
+          >
+            <LayoutGrid className="h-4 w-4 shrink-0" />
+            {!collapsed && (
+              <>
+                <span className="flex-1 truncate text-left">CRM</span>
+                <ChevronDown
+                  className={cn("h-4 w-4 shrink-0 transition-transform", crmOpen ? "rotate-0" : "-rotate-90")}
+                />
+              </>
+            )}
+          </button>
+          {!collapsed && crmOpen &&
+            crmChildren.map((it) => {
+              const active = path === it.to || (it.to === "/workspace" && path.startsWith("/leads/")) || path.startsWith(it.to + "/");
+              const Icon = it.icon;
+              return (
+                <Link
+                  key={it.to}
+                  to={it.to}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{it.label}</span>
+                </Link>
+              );
+            })}
+
           {items.map((it) => {
             const active = path === it.to || path.startsWith(it.to + "/");
             const Icon = it.icon;
@@ -139,14 +184,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          <Link
-            to="/workspace"
-            className={itemClass(path === "/workspace" || path.startsWith("/leads/"))}
-            title={collapsed ? t("workspace") : undefined}
-          >
-            <Briefcase className="h-4 w-4 shrink-0" />
-            {!collapsed && <span className="truncate">{t("workspace")}</span>}
-          </Link>
           {showManagerial && !viewAs && (
             <Link to="/gerencial" className={itemClass(path === "/gerencial" || path.startsWith("/gerencial/"))} title={collapsed ? "Gerencial" : undefined}>
               <BarChart3 className="h-4 w-4 shrink-0" />

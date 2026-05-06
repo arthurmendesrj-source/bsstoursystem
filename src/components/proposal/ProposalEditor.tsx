@@ -786,22 +786,24 @@ function ItemTable({
                       className="h-8 w-full min-w-[260px]"
                     />
                   </td>
-                  {!readOnly && (
+                  {!readOnly && showCost && (
                     <td className="p-2">
                       <Input
                         type="number" step="0.01"
                         value={it.unit_cost}
                         onChange={(e) => onChange(i, { unit_cost: Number(e.target.value) })}
+                        disabled={!editCost}
                         className="h-8 text-right"
                       />
                     </td>
                   )}
-                  {!readOnly && (
+                  {!readOnly && showMarkup && (
                     <td className="p-2">
                       <Input
                         type="number" step="0.1"
                         value={it.markup_pct}
                         onChange={(e) => onChange(i, { markup_pct: Number(e.target.value) })}
+                        disabled={!editMarkup}
                         className="h-8 text-right"
                       />
                     </td>

@@ -904,7 +904,24 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                   <SelectItem value="alta">{t("priorityHigh")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            {subordinates.length > 0 && (
+              <div className="col-span-2">
+                <Label>Responsável</Label>
+                <Select
+                  value={taskForm.assigned_to || "self"}
+                  onValueChange={(v) => setTaskForm({ ...taskForm, assigned_to: v === "self" ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Eu mesmo</SelectItem>
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
             <div className="col-span-2">
               <Label>{t("taskDueDate")}</Label>
               <Input

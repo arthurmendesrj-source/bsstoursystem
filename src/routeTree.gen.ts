@@ -43,6 +43,7 @@ import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
+import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
@@ -219,6 +220,11 @@ const AlertsDebugRoute = AlertsDebugRouteImport.update({
   path: '/debug',
   getParentRoute: () => AlertsRoute,
 } as any)
+const UsersUserIdPermissionsRoute = UsersUserIdPermissionsRouteImport.update({
+  id: '/users_/$userId/permissions',
+  path: '/users/$userId/permissions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
   id: '/api/public/hooks/task-due',
   path: '/api/public/hooks/task-due',
@@ -272,6 +278,7 @@ export interface FileRoutesByFullPath {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -311,6 +318,7 @@ export interface FileRoutesByTo {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -392,6 +401,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/users/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/users/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -470,6 +481,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/users_/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -497,6 +509,7 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
+  UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
@@ -742,6 +755,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsDebugRouteImport
       parentRoute: typeof AlertsRoute
     }
+    '/users_/$userId/permissions': {
+      id: '/users_/$userId/permissions'
+      path: '/users/$userId/permissions'
+      fullPath: '/users/$userId/permissions'
+      preLoaderRoute: typeof UsersUserIdPermissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/task-due': {
       id: '/api/public/hooks/task-due'
       path: '/api/public/hooks/task-due'
@@ -860,6 +880,7 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
+  UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,

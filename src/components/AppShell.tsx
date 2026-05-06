@@ -248,7 +248,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
               <Eye className="h-4 w-4" />
               <span>
-                Visualizando como <strong>{viewAs.full_name}</strong> ({viewAs.role}) — modo somente leitura
+                Sessão espelhada de <strong>{viewAs.full_name}</strong> ({viewAs.role}) — você está agindo como este usuário
               </span>
             </div>
             <Button

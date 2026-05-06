@@ -95,6 +95,10 @@ function LeadsPage() {
     s === "qualificado" ? "bg-blue-500/10 text-blue-700" :
     "bg-slate-500/10 text-slate-700";
 
+  if (!can("leads", "view")) {
+    return <Card className="p-12 text-center text-muted-foreground">{t("noPermission") ?? "Sem permissão para visualizar Leads"}</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

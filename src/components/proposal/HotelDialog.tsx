@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 
 const MEAL_PLANS = ["Room only", "Breakfast", "Half board", "Full board", "All inclusive"];
 const CATEGORIES = ["3★", "4★", "5★", "Boutique", "Other"];

@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -222,12 +223,14 @@ function RatesImportPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <Label>Fornecedor</Label>
-            <Select value={supplierId} onValueChange={setSupplierId}>
-              <SelectTrigger><SelectValue placeholder="Selecione…" /></SelectTrigger>
-              <SelectContent>
-                {suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+              value={supplierId}
+              onChange={setSupplierId}
+              placeholder="Selecione…"
+              searchPlaceholder="Buscar fornecedor…"
+              emptyMessage="Nenhum fornecedor"
+            />
           </div>
           <div>
             <Label>Arquivo CSV</Label>

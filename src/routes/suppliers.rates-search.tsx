@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -162,22 +163,26 @@ function RatesSearchPage() {
           </div>
           <div>
             <Label className="text-xs">Cidade</Label>
-            <Select value={city} onValueChange={setCity}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as cidades</SelectItem>
-                {cities.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={[{ value: "all", label: "Todas as cidades" }, ...cities.map((c) => ({ value: c, label: c }))]}
+              value={city}
+              onChange={(v) => setCity(v || "all")}
+              placeholder="Todas as cidades"
+              searchPlaceholder="Buscar cidade…"
+              emptyMessage="Nenhuma cidade"
+              clearable={false}
+            />
           </div>
           <div>
             <Label className="text-xs">Tipo</Label>
-            <Select value={kind} onValueChange={setKind}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {KINDS.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={KINDS.map((k) => ({ value: k.value, label: k.label }))}
+              value={kind}
+              onChange={(v) => setKind(v || "all")}
+              placeholder="Todos os tipos"
+              searchPlaceholder="Buscar tipo…"
+              clearable={false}
+            />
           </div>
           <div>
             <Label className="text-xs">Unidade</Label>

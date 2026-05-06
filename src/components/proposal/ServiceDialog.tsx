@@ -98,7 +98,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     setSaving(true);
     const totalNum = total === "" ? null : Number(total);
     const unitCost = totalNum != null && pax > 0 ? +(totalNum / pax).toFixed(2) : 0;
-    const unitPrice = unitCost; // cost = price by default; markup applied via field later
+    const unitPrice = unitCost;
     const payload = {
       quote_id: quoteId,
       kind: "service",
@@ -114,13 +114,15 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
       guide_type: guideType || null,
       notes: notes || null,
     };
-    const { error } = await supabase.from("quote_items").insert(payload);
+    const { error } = initial?.id
+      ? await supabase.from("quote_items").update(payload).eq("id", initial.id)
+      : await supabase.from("quote_items").insert(payload);
     setSaving(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success("Serviço adicionado");
+    toast.success(initial?.id ? "Serviço atualizado" : "Serviço adicionado");
     onSaved();
     onOpenChange(false);
   };
@@ -131,7 +133,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adicionar serviço</DialogTitle>
+          <DialogTitle>{initial?.id ? "Editar serviço" : "Adicionar serviço"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>

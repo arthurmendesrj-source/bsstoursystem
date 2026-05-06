@@ -72,13 +72,13 @@ function LeadsPage() {
       estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
       status: form.status as "novo",
       created_by: user.id,
-      assigned_to: user.id,
+      assigned_to: form.assigned_to || user.id,
     });
     if (error) toast.error(error.message);
     else {
       toast.success(t("saved"));
       setOpen(false);
-      setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo" });
+      setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
       load();
     }
   };

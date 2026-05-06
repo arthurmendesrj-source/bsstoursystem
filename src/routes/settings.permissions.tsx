@@ -38,7 +38,7 @@ type FieldRow = { role: AppRole; module_key: string; field_key: string; can_view
 
 function PermissionsPage() {
   const { isAdmin, loading } = useAuth();
-  const { refresh } = usePermissions();
+  const { refresh, can: editorCan, canField: editorCanField } = usePermissions();
   const navigate = useNavigate();
   const [modules, setModules] = useState<Module[]>([]);
   const [moduleRows, setModuleRows] = useState<ModuleRow[]>([]);

@@ -152,7 +152,6 @@ function FinancialAuditPage() {
       {loading && <div className="text-sm text-muted-foreground">Carregando matriz…</div>}
 
       {SCREENS.map((s) => {
-        const canViewModule = can(s.module ?? "", "view");
         return (
           <Card key={s.screen}>
             <CardHeader className="flex flex-row items-center justify-between gap-2">

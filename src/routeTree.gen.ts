@@ -36,6 +36,7 @@ import { Route as SuppliersRatesImportRouteImport } from './routes/suppliers.rat
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
+import { Route as PermissionsAuditFinancialRouteImport } from './routes/permissions-audit.financial'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as BookingsBookingIdRouteImport } from './routes/bookings_.$bookingId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
@@ -182,6 +183,12 @@ const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
   path: '/permissions',
   getParentRoute: () => SettingsRoute,
 } as any)
+const PermissionsAuditFinancialRoute =
+  PermissionsAuditFinancialRouteImport.update({
+    id: '/financial',
+    path: '/financial',
+    getParentRoute: () => PermissionsAuditRoute,
+  } as any)
 const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
@@ -244,7 +251,7 @@ export interface FileRoutesByFullPath {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
-  '/permissions-audit': typeof PermissionsAuditRoute
+  '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -257,6 +264,7 @@ export interface FileRoutesByFullPath {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -282,7 +290,7 @@ export interface FileRoutesByTo {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
-  '/permissions-audit': typeof PermissionsAuditRoute
+  '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -295,6 +303,7 @@ export interface FileRoutesByTo {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -321,7 +330,7 @@ export interface FileRoutesById {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
-  '/permissions-audit': typeof PermissionsAuditRoute
+  '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -334,6 +343,7 @@ export interface FileRoutesById {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings_/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -374,6 +384,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/leads/$leadId'
+    | '/permissions-audit/financial'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -412,6 +423,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/leads/$leadId'
+    | '/permissions-audit/financial'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -450,6 +462,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings_/$bookingId'
     | '/leads/$leadId'
+    | '/permissions-audit/financial'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -476,7 +489,7 @@ export interface RootRouteChildren {
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
   PackagesRoute: typeof PackagesRoute
-  PermissionsAuditRoute: typeof PermissionsAuditRoute
+  PermissionsAuditRoute: typeof PermissionsAuditRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityAuditRoute: typeof SecurityAuditRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -680,6 +693,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsPermissionsRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/permissions-audit/financial': {
+      id: '/permissions-audit/financial'
+      path: '/financial'
+      fullPath: '/permissions-audit/financial'
+      preLoaderRoute: typeof PermissionsAuditFinancialRouteImport
+      parentRoute: typeof PermissionsAuditRoute
+    }
     '/leads/$leadId': {
       id: '/leads/$leadId'
       path: '/$leadId'
@@ -773,6 +793,17 @@ const LeadsRouteChildren: LeadsRouteChildren = {
 
 const LeadsRouteWithChildren = LeadsRoute._addFileChildren(LeadsRouteChildren)
 
+interface PermissionsAuditRouteChildren {
+  PermissionsAuditFinancialRoute: typeof PermissionsAuditFinancialRoute
+}
+
+const PermissionsAuditRouteChildren: PermissionsAuditRouteChildren = {
+  PermissionsAuditFinancialRoute: PermissionsAuditFinancialRoute,
+}
+
+const PermissionsAuditRouteWithChildren =
+  PermissionsAuditRoute._addFileChildren(PermissionsAuditRouteChildren)
+
 interface SettingsRouteChildren {
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
@@ -821,7 +852,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,
   PackagesRoute: PackagesRoute,
-  PermissionsAuditRoute: PermissionsAuditRoute,
+  PermissionsAuditRoute: PermissionsAuditRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityAuditRoute: SecurityAuditRoute,
   SettingsRoute: SettingsRouteWithChildren,
@@ -836,12 +867,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

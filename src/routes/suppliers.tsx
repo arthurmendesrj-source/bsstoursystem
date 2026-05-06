@@ -348,12 +348,28 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         {supplier && (
           <>
-            <SheetHeader><SheetTitle>{supplier.name}</SheetTitle></SheetHeader>
+            <SheetHeader>
+              <SheetTitle className="flex items-center justify-between gap-2">
+                <span>{supplier.name}</span>
+                <span className="flex gap-1">
+                  <Button size="sm" variant="outline" disabled={!!busy} onClick={() => runAI("extract-supplier-contacts")}>
+                    {busy === "extract-supplier-contacts" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    <span className="ml-1 text-xs">Contatos</span>
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={!!busy} onClick={() => runAI("extract-supplier-rates")}>
+                    {busy === "extract-supplier-rates" ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+                    <span className="ml-1 text-xs">Tarifas</span>
+                  </Button>
+                </span>
+              </SheetTitle>
+            </SheetHeader>
             <div className="mt-4">
               <Tabs defaultValue="info">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-6 w-full">
                   <TabsTrigger value="info">{t("details")}</TabsTrigger>
                   <TabsTrigger value="contacts">{t("contacts")}</TabsTrigger>
+                  <TabsTrigger value="docs">Docs ({docs.length})</TabsTrigger>
+                  <TabsTrigger value="rates">Tarifas ({rates.length})</TabsTrigger>
                   <TabsTrigger value="bookings">{t("bookings")}</TabsTrigger>
                   <TabsTrigger value="emails">{t("email")}</TabsTrigger>
                 </TabsList>

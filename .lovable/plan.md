@@ -1,44 +1,40 @@
-## Objetivo
+## Distribuição final dos 50 emails
 
-Popular a tabela `emails` com 30 mensagens (20 B2B + 10 internas), distribuídas entre as caixas de Alexandra Ermolaeva, Mikhail Kutuzov e Agrafena Svetlova.
+Confirmado os 3 usuários existem com emails:
+- Alexandra Ermolaeva → `alexandra.ermolaeva@sim.local`
+- Mikhail Kutuzov → `mikhail.kutuzov@sim.local`
+- Agrafena Svetlova → `agrafena.svetlova@sim.local`
 
-## Decisões (assumidas como padrão pois você pulou as perguntas)
+### Categoria 1 — B2B clientes (20) → metade Alexandra / metade Agrafena
+- **Alexandra (10)**: 1, 3, 5, 7, 9, 11, 13, 15, 17, 19
+- **Agrafena (10)**: 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
 
-- **Faltam 20 emails** dos 50 mencionados. Vou seguir apenas com os 30 enviados nesta leva. Se quiser os outros 20, basta colar depois.
-- **Usuários já existem** no sistema (confirmado: Alexandra, Mikhail e Agrafena estão em `profiles`).
-- **"Caixa de entrada" por usuário**: como a tabela `emails` é compartilhada e não tem coluna de owner, vou marcar a propriedade colocando o **email do usuário no campo `to_emails`** (sem mudança de schema). Cada usuário verá seus emails filtrando por `to_emails @> ARRAY['<seu_email>']`.
+### Categoria 2 — Operacionais internos (20: emails 21-40) → metade Alexandra / metade Mikhail
+- **Alexandra (10)**: 21, 23, 25, 27, 29, 31, 33, 35, 37, 39
+- **Mikhail (10)**: 22, 24, 26, 28, 30, 32, 34, 36, 38, 40
 
-## Distribuição
+### Categoria 3 — Diretoria (10: emails 41-50) → todos Agrafena
+- **Agrafena (10)**: 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
 
-### B2B — 20 emails (clientes solicitando programas turísticos)
-- **Alexandra Ermolaeva** (10): emails 1, 3, 5, 7, 9, 11, 13, 15, 17, 19
-- **Agrafena Svetlova** (10): emails 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
-
-### Internos — 10 emails (21–30)
-Classificação por natureza:
-- **Diretoria → Agrafena Svetlova** (4): 24 (Finanças/aprovação), 25 (Qualidade/auditoria), 27 (RH/contratação), 30 (Compras/cotação)
-- **Operacional → divididos 3/3 entre Alexandra e Mikhail**:
-  - Alexandra (3): 21 (briefing guias), 26 (marketing/feira), 28 (TI/manutenção)
-  - Mikhail (3): 22 (reservas hotéis), 23 (logística equipamentos), 29 (segurança/protocolo)
+### Totais por caixa
+- Alexandra: 20 emails (10 B2B + 10 operacionais)
+- Mikhail: 10 emails (10 operacionais)
+- Agrafena: 20 emails (10 B2B + 10 diretoria)
 
 ## Implementação
 
-1. Buscar via edge function (admin-users existente, ação custom ou nova `seed_emails`) os emails reais de auth.users dos 3 usuários — necessário porque psql não acessa schema `auth`.
-2. Alternativa mais simples: criar uma migration/função SECURITY DEFINER que retorna emails dos 3 user_ids, ou rodar um script único via edge function que faz INSERT direto.
-3. Para cada um dos 30 emails, inserir em `public.emails` com:
-   - `gmail_id`: identificador sintético único (ex: `seed-2026-{n}`)
-   - `from_email`, `from_name`, `subject`, `body_text`, `snippet`, `received_at`
-   - `to_emails`: array com o email do usuário-dono
-   - `is_unread: true`, `labels: ['INBOX']`
+"Caixa de entrada" será marcada via `to_emails` (array contendo o email do usuário-dono). Sem mudança de schema.
 
-## Detalhes técnicos
+Insert único com 50 linhas em `public.emails`:
+- `gmail_id`: `seed-2026-{n}` (único)
+- `from_email`, `from_name` extraídos do remetente
+- `subject`, `body_text`, `snippet` (primeiros ~140 chars)
+- `to_emails`: `ARRAY['<email_dono>']`
+- `received_at`: datas escalonadas em fev/mar 2026
+- `is_unread: true`, `labels: ['INBOX']`
 
-```text
-emails table — sem owner_id, ownership inferida via to_emails[]
-RLS atual permite SELECT a todos autenticados (filtro será no client/UI)
-gmail_id é NOT NULL e único — usar prefixo "seed-" para identificar
-```
+Após o insert, cada usuário verá apenas seus emails filtrando `to_emails @> ARRAY[<seu_email>]` na UI (a tabela já tem RLS que permite SELECT a autenticados; o filtro é feito no client).
 
 ## Próximo passo
 
-Confirme e eu executo: (a) obtenho os 3 emails reais via função SECURITY DEFINER e (b) faço bulk insert dos 30 registros.
+Aprove e eu executo o INSERT em massa dos 50 registros.

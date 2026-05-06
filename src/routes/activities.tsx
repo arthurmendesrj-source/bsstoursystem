@@ -254,13 +254,13 @@ function ActivitiesPage() {
       source,
       lead_id: form.lead_id || null,
       created_by: user.id,
-      assigned_to: user.id,
+      assigned_to: form.assigned_to || user.id,
     });
     if (error) toast.error(error.message);
     else {
       toast.success(t("saved"));
       setDialogOpen(false);
-      setForm({ title: "", description: "", due_date: "", priority: "media", category: "suporte", lead_id: "" });
+      setForm({ title: "", description: "", due_date: "", priority: "media", category: "suporte", lead_id: "", assigned_to: "" });
       loadData();
     }
   };

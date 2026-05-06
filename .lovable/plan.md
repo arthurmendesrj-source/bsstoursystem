@@ -1,56 +1,66 @@
-# Modo Espelho Completo ("Logar como" usuário)
+# Replica completa da tela do usuário no modo espelho
 
-## Problema atual
-Hoje, ao clicar num usuário no Gerencial, só o **Dashboard**, **Funil** e **Leads** filtram pelo `effectiveUserId` (e ainda em modo somente leitura). Os demais módulos (Atividades, E-mails, Reservas, Clientes, Alertas, Workspace) continuam mostrando os dados do **admin logado**, porque suas queries usam `useAuth().user.id` diretamente. Resultado: o usuário só "vê" o Dashboard do alvo; o resto do app fica como se nada tivesse mudado.
+## Diagnóstico
 
-## Objetivo
-Quando um gestor clica num subordinado no Gerencial, o app inteiro deve se comportar como se ele estivesse **logado na conta daquele usuário**: todos os menus visíveis, todas as listagens filtradas pelo alvo, e ações (criar lead, tarefa, etc.) devem registrar o alvo como `created_by` / `assigned_to`. O banner amarelo continua no topo para deixar claro que é uma sessão espelhada, com botão para sair.
+Hoje, ao clicar num usuário no Gerencial, o app navega para `/dashboard` e mostra o banner amarelo, mas a **barra lateral (sidebar) e os itens de menu continuam baseados no usuário logado (gestor)**. Pior: o menu "Gerencial" some, e o usuário fica com a sensação de que "só o Dashboard apareceu", porque:
 
-> Observação: a sessão de autenticação real continua sendo a do gestor (RLS de admin/diretor já permite ler tudo). Não é um login real — é um "contexto efetivo" aplicado em todo o frontend.
+1. Não há sinalização de que ele *pode* clicar nos outros itens (Leads, Funil, Atividades, etc.) — os dados ali ainda eram do gestor até as últimas correções, então parecia "não funcionar".
+2. A sidebar reflete os **papéis do gestor**, não os do alvo. Itens administrativos (Usuários, Auditoria, Configurações > Permissões/SLA) aparecem quando o gestor é admin, mesmo se o alvo for um operador. Isso quebra a ilusão de "estou logado como ele".
+3. Em telas mais estreitas a sidebar `md:flex` simplesmente não aparece, e não há menu mobile/hamburguer — então em viewport reduzida o usuário só vê o conteúdo da rota atual.
 
-## Mudanças
+O objetivo agora é: **quando o gestor está em modo espelho, o app deve parecer 100% a tela daquele usuário** — sidebar visível, com exatamente os itens que aquele usuário veria, toolbar, banner identificando, e navegação livre por todas as abas.
 
-### 1. `src/lib/viewAs.tsx`
-- Manter `effectiveUserId()`, mas remover a flag `readOnly` (ou deixar sempre `false`). Adicionar `isImpersonating` apenas como sinalização visual.
-- Exportar um helper único `useEffectiveUser()` que devolve `{ id, isImpersonating, target }` para evitar repetir `viewAs?.user_id ?? user.id` em cada arquivo.
+## Plano
 
-### 2. `src/components/AppShell.tsx`
-- Trocar o texto do banner para algo como:  
-  *"Sessão espelhada de **Fulano** (gerente). Você está agindo como este usuário."*
-- Remover o "(modo somente leitura)".
-- Manter o botão "Sair da visualização".
-- Esconder/desabilitar o item de menu **Gerencial** enquanto impersonando (evita loop e confusão de hierarquia).
+### 1. `src/lib/viewAs.tsx` — carregar papéis do alvo
 
-### 3. Rotas que precisam usar `effectiveUserId()` em vez de `user.id`
-Refatorar todas as queries/mutations que hoje escopam pelo usuário logado:
+- Adicionar fetch dos `user_roles` do `viewAs.user_id` (quando impersonando) e expor `targetRoles: AppRole[]` no contexto.
+- Cachear na sessionStorage junto com o target para não piscar a UI ao recarregar.
 
-- `src/routes/dashboard.tsx` — KPIs, listas (já parcialmente feito; revisar).
-- `src/routes/funnel.tsx` — leads do board; remover bloqueio de drag-and-drop.
-- `src/routes/leads.tsx` — listagem + criação (`created_by`, `assigned_to`); reabilitar botão "Novo lead".
-- `src/routes/activities.tsx` — listagem de tarefas e criação.
-- `src/routes/alerts.tsx` — `useLeadAlerts(effectiveId)`, templates, metas.
-- `src/routes/bookings.tsx` — listagem e criação.
-- `src/routes/customers.tsx` — listagem e criação.
-- `src/routes/workspace.tsx` — todas as 3 telas (lead, booking, task).
-- `src/components/email/EmailPanel.tsx` — caixa de entrada filtrada pelo alvo.
+### 2. `src/lib/auth.tsx` ou helper novo `useEffectiveRoles()`
 
-Padrão da refatoração:
-```ts
-const { id: effectiveId, isImpersonating } = useEffectiveUser();
-// queries: .eq("assigned_to", effectiveId) etc.
-// inserts: created_by: effectiveId, assigned_to: effectiveId
-```
+- Criar hook `useEffectiveAuth()` que devolve `{ userId, roles, isAdmin, hasRole }` baseado no alvo da impersonação se houver, senão no usuário real.
+- Lógica:
+  ```ts
+  const { user, roles: realRoles, isAdmin: realIsAdmin, hasRole: realHasRole } = useAuth();
+  const { viewAs, targetRoles } = useViewAs();
+  if (!viewAs) return { userId: user?.id, roles: realRoles, isAdmin: realIsAdmin, hasRole: realHasRole };
+  return {
+    userId: viewAs.user_id,
+    roles: targetRoles,
+    isAdmin: targetRoles.includes("admin"),
+    hasRole: (r) => targetRoles.includes(r),
+  };
+  ```
 
-### 4. Gerencial
-- `src/routes/gerencial.tsx`: ao clicar na linha, chama `enterViewAs(...)` e navega para `/dashboard` (já faz). Mantém igual.
-- `src/routes/gerencial.$userId.tsx`: continua sendo o relatório consolidado (acessível pelo link "Relatório" da tabela), separado do modo espelho.
+### 3. `src/components/AppShell.tsx` — renderizar como o alvo
 
-### 5. Permissões / RLS
-Não há mudança de banco. As policies já permitem que admin/diretor/gerente leiam dados dos subordinados (via `is_subordinate_of` / `is_admin`), então as queries com `effectiveId` vão funcionar sem ajustar RLS. **Inserts** com `created_by = effectiveId` precisam ser validados — se alguma policy de INSERT exigir `created_by = auth.uid()`, ela falhará. Vou rodar o linter de RLS depois da refatoração e, se necessário, ajustar a policy da tabela afetada (provavelmente `leads`, `tasks`, `bookings`, `customers`) para permitir inserir em nome de subordinado quando `is_admin(auth.uid())` ou `is_subordinate_of(target, auth.uid())`.
+- Trocar `useAuth()` (para gating de menu) por `useEffectiveAuth()`. O `signOut` continua vindo de `useAuth()` (gestor real).
+- Resultado: sidebar mostra itens conforme o papel do alvo (operador não vê "Usuários", admin vê tudo, etc.).
+- Cabeçalho: mostrar nome do alvo no canto + badge "Espelho" ao lado do email.
+- Banner amarelo: continuar, com texto "Sessão espelhada de **Fulano** (papel) — agindo como este usuário" + botão "Sair da visualização".
+- "Gerencial" continua oculto durante a impersonação (evita loop).
+- **Adicionar botão hamburguer** (`md:hidden`) para abrir a sidebar como Sheet em viewports menores, garantindo que o menu nunca fique invisível.
+
+### 4. Reforçar `useEffectiveUser()` nas rotas restantes
+
+Já foi feito em `dashboard`, `funnel`, `leads`, `activities`, `bookings`. Falta:
+- `customers.tsx`
+- `alerts.tsx` (passar `effectiveId` para `useLeadAlerts`)
+- `workspace.tsx`
+- `email/EmailPanel.tsx`
+- `itineraries.tsx` se relevante
+
+Padrão: query usa `effectiveId`; inserts gravam `created_by/assigned_to = effectiveId` (mantendo `created_by = auth.uid()` quando RLS exigir).
+
+### 5. RLS (verificação, sem mudança planejada)
+
+Rodar o linter de Supabase após as mudanças. Se algum INSERT falhar por exigir `created_by = auth.uid()`, ajustar a policy daquela tabela para permitir `is_admin(auth.uid()) OR is_subordinate_of(target, auth.uid())`. Não há mudança preventiva — só reativa.
 
 ## Critérios de aceitação
-- Clicar num usuário no Gerencial → app inteiro passa a mostrar dados dele em todos os menus (Dashboard, Leads, Funil, Atividades, Alertas, Reservas, Clientes, E-mails, Workspace).
-- Banner amarelo no topo identifica claramente que é sessão espelhada e oferece "Sair".
-- Criar um lead/tarefa enquanto impersonando grava `created_by` e `assigned_to` como o usuário-alvo.
-- Sair da visualização restaura instantaneamente a visão do gestor.
-- Menu "Gerencial" some/desabilita durante a impersonação.
+
+- Clicar num usuário no Gerencial → app inteiro vira a "tela dele": sidebar com os itens que **ele** veria, todas as abas navegáveis, dados filtrados por ele.
+- Sidebar permanece visível (ou acessível via hamburguer em telas pequenas).
+- Banner amarelo identifica claramente "sessão espelhada" + botão sair.
+- Operações (criar lead/tarefa/reserva) gravam com o usuário-alvo como dono.
+- Sair da visualização restaura instantaneamente a visão do gestor (com "Gerencial" de volta no menu).

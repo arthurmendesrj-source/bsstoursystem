@@ -1,9 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +24,12 @@ export const Route = createFileRoute("/gerencial/$userId")({
 });
 
 const FUNNEL_KEYS = ["novo", "qualificado", "cotacao", "proposta", "fechado", "perdido"] as const;
+const PAGE_SIZE = 25;
+
+type Kpis = {
+  leadsActive: number; leadsClosed: number; leadsLost: number;
+  revenue: number; tasksPending: number; tasksOverdue: number; emailsUnread: number;
+};
 
 function UserDetailPage() {
   const { userId } = Route.useParams();
@@ -38,61 +44,83 @@ function UserDetailPage() {
   }, [authLoading, allowed, navigate]);
 
   const [profile, setProfile] = useState<{ full_name: string | null } | null>(null);
-  const [leads, setLeads] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [emails, setEmails] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState<Kpis>({ leadsActive: 0, leadsClosed: 0, leadsLost: 0, revenue: 0, tasksPending: 0, tasksOverdue: 0, emailsUnread: 0 });
+  const [funnel, setFunnel] = useState<Record<string, number>>({});
+  const [leadIds, setLeadIds] = useState<string[]>([]);
+  const [counts, setCounts] = useState({ leads: 0, tasks: 0, emails: 0 });
+  const [aggLoading, setAggLoading] = useState(true);
 
   const sub = subordinates.find((s) => s.user_id === userId);
 
+  // Aggregates / KPIs / funnel — independent of pagination, count-only queries
   useEffect(() => {
     let cancel = false;
     (async () => {
-      setLoading(true);
-      const [{ data: prof }, { data: l }, { data: t }, { data: b }] = await Promise.all([
+      setAggLoading(true);
+      const nowISO = new Date().toISOString();
+
+      const [
+        prof,
+        leadsCnt, leadsActiveCnt, leadsClosedCnt, leadsLostCnt,
+        bookingsSum,
+        tasksCnt, tasksPendingCnt, tasksOverdueCnt,
+        // funnel counts
+        ...funnelCnts
+      ] = await Promise.all([
         supabase.from("profiles").select("full_name").eq("user_id", userId).maybeSingle(),
-        supabase.from("leads").select("id,name,destination,status,estimated_value,currency,next_action_date,updated_at,created_at").or(`assigned_to.eq.${userId},created_by.eq.${userId}`).order("updated_at", { ascending: false }),
-        supabase.from("tasks").select("id,title,due_date,completed,priority,lead_id,created_at").eq("assigned_to", userId).order("due_date", { ascending: false, nullsFirst: false }),
-        supabase.from("bookings").select("id,total_amount,status,created_at").eq("created_by", userId),
+        supabase.from("leads").select("id", { count: "exact", head: true }).or(`assigned_to.eq.${userId},created_by.eq.${userId}`),
+        supabase.from("leads").select("id", { count: "exact", head: true }).or(`assigned_to.eq.${userId},created_by.eq.${userId}`).not("status", "in", "(fechado,perdido)"),
+        supabase.from("leads").select("id", { count: "exact", head: true }).or(`assigned_to.eq.${userId},created_by.eq.${userId}`).eq("status", "fechado"),
+        supabase.from("leads").select("id", { count: "exact", head: true }).or(`assigned_to.eq.${userId},created_by.eq.${userId}`).eq("status", "perdido"),
+        supabase.from("bookings").select("total_amount").eq("created_by", userId).eq("status", "confirmada"),
+        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assigned_to", userId),
+        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assigned_to", userId).eq("completed", false),
+        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assigned_to", userId).eq("completed", false).lt("due_date", nowISO),
+        ...FUNNEL_KEYS.map((k) =>
+          supabase.from("leads").select("id", { count: "exact", head: true }).or(`assigned_to.eq.${userId},created_by.eq.${userId}`).eq("status", k)
+        ),
       ]);
       if (cancel) return;
-      setProfile(prof);
-      setLeads(l ?? []);
-      setTasks(t ?? []);
-      setBookings(b ?? []);
 
-      const leadIds = (l ?? []).map((x: any) => x.id);
-      if (leadIds.length > 0) {
-        const { data: e } = await supabase.from("emails").select("id,subject,from_name,from_email,is_unread,received_at,lead_id")
-          .in("lead_id", leadIds).order("received_at", { ascending: false }).limit(200);
-        if (!cancel) setEmails(e ?? []);
-      } else {
-        setEmails([]);
+      setProfile(prof.data ?? null);
+      const revenue = (bookingsSum.data ?? []).reduce((s: number, b: any) => s + Number(b.total_amount || 0), 0);
+
+      const fmap: Record<string, number> = {};
+      FUNNEL_KEYS.forEach((k, i) => { fmap[k] = funnelCnts[i].count ?? 0; });
+      setFunnel(fmap);
+
+      // Compute total emails count: need lead ids first (cap to 1000 ids — RLS already scopes)
+      const { data: idsData } = await supabase.from("leads").select("id").or(`assigned_to.eq.${userId},created_by.eq.${userId}`).limit(1000);
+      const ids = (idsData ?? []).map((x: any) => x.id);
+      if (cancel) return;
+      setLeadIds(ids);
+
+      let emailsCount = 0;
+      let emailsUnread = 0;
+      if (ids.length > 0) {
+        const [eAll, eUnread] = await Promise.all([
+          supabase.from("emails").select("id", { count: "exact", head: true }).in("lead_id", ids),
+          supabase.from("emails").select("id", { count: "exact", head: true }).in("lead_id", ids).eq("is_unread", true),
+        ]);
+        emailsCount = eAll.count ?? 0;
+        emailsUnread = eUnread.count ?? 0;
       }
-      setLoading(false);
+      if (cancel) return;
+
+      setCounts({ leads: leadsCnt.count ?? 0, tasks: tasksCnt.count ?? 0, emails: emailsCount });
+      setKpis({
+        leadsActive: leadsActiveCnt.count ?? 0,
+        leadsClosed: leadsClosedCnt.count ?? 0,
+        leadsLost: leadsLostCnt.count ?? 0,
+        revenue,
+        tasksPending: tasksPendingCnt.count ?? 0,
+        tasksOverdue: tasksOverdueCnt.count ?? 0,
+        emailsUnread,
+      });
+      setAggLoading(false);
     })();
     return () => { cancel = true; };
   }, [userId]);
-
-  const kpis = useMemo(() => {
-    const active = leads.filter((l) => !["fechado", "perdido"].includes(l.status)).length;
-    const closed = leads.filter((l) => l.status === "fechado").length;
-    const lost = leads.filter((l) => l.status === "perdido").length;
-    const revenue = bookings.filter((b) => b.status === "confirmada").reduce((s, b) => s + Number(b.total_amount || 0), 0);
-    const now = Date.now();
-    const tasksPending = tasks.filter((t) => !t.completed).length;
-    const tasksOverdue = tasks.filter((t) => !t.completed && t.due_date && new Date(t.due_date).getTime() < now).length;
-    const emailsUnread = emails.filter((e) => e.is_unread).length;
-    return { active, closed, lost, revenue, tasksPending, tasksOverdue, emailsUnread };
-  }, [leads, tasks, bookings, emails]);
-
-  const funnel = useMemo(() => {
-    const m: Record<string, number> = {};
-    FUNNEL_KEYS.forEach((k) => (m[k] = 0));
-    leads.forEach((l) => { if (FUNNEL_KEYS.includes(l.status)) m[l.status] += 1; });
-    return m;
-  }, [leads]);
 
   if (!allowed) return null;
 
@@ -114,16 +142,16 @@ function UserDetailPage() {
         <TabsList>
           <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
           <TabsTrigger value="funnel">Funil</TabsTrigger>
-          <TabsTrigger value="leads">Leads ({leads.length})</TabsTrigger>
-          <TabsTrigger value="tasks">Tarefas ({tasks.length})</TabsTrigger>
-          <TabsTrigger value="emails">E-mails ({emails.length})</TabsTrigger>
+          <TabsTrigger value="leads">Leads ({counts.leads})</TabsTrigger>
+          <TabsTrigger value="tasks">Tarefas ({counts.tasks})</TabsTrigger>
+          <TabsTrigger value="emails">E-mails ({counts.emails})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-4">
+        <TabsContent value="dashboard">
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-            <Kpi label="Leads ativos" value={kpis.active} />
-            <Kpi label="Leads fechados" value={kpis.closed} />
-            <Kpi label="Leads perdidos" value={kpis.lost} />
+            <Kpi label="Leads ativos" value={kpis.leadsActive} />
+            <Kpi label="Leads fechados" value={kpis.leadsClosed} />
+            <Kpi label="Leads perdidos" value={kpis.leadsLost} />
             <Kpi label="Receita confirmada" value={format(kpis.revenue, "BRL")} />
             <Kpi label="Tarefas pendentes" value={kpis.tasksPending} />
             <Kpi label="Tarefas vencidas" value={kpis.tasksOverdue} accent={kpis.tasksOverdue > 0} />
@@ -145,80 +173,179 @@ function UserDetailPage() {
         </TabsContent>
 
         <TabsContent value="leads">
-          <Card><CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Nome</TableHead><TableHead>Destino</TableHead>
-                <TableHead>Status</TableHead><TableHead className="text-right">Valor</TableHead>
-                <TableHead>Próx. ação</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {leads.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem leads</TableCell></TableRow>}
-                {leads.map((l) => (
-                  <TableRow key={l.id}>
-                    <TableCell><Link to="/leads/$leadId" params={{ leadId: l.id }} className="hover:underline font-medium">{l.name}</Link></TableCell>
-                    <TableCell className="text-muted-foreground">{l.destination ?? "—"}</TableCell>
-                    <TableCell><Badge variant="outline">{l.status}</Badge></TableCell>
-                    <TableCell className="text-right">{l.estimated_value ? format(Number(l.estimated_value), l.currency || "BRL") : "—"}</TableCell>
-                    <TableCell className="text-xs">{l.next_action_date ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
+          <LeadsTable userId={userId} total={counts.leads} format={format} />
         </TabsContent>
 
         <TabsContent value="tasks">
-          <Card><CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>Título</TableHead><TableHead>Prioridade</TableHead>
-                <TableHead>Vencimento</TableHead><TableHead>Status</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {tasks.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Sem tarefas</TableCell></TableRow>}
-                {tasks.map((t) => {
-                  const overdue = !t.completed && t.due_date && new Date(t.due_date).getTime() < Date.now();
-                  return (
-                    <TableRow key={t.id}>
-                      <TableCell className="font-medium">{t.title}</TableCell>
-                      <TableCell><Badge variant="outline">{t.priority}</Badge></TableCell>
-                      <TableCell className={`text-xs ${overdue ? "text-rose-600 font-medium" : ""}`}>{t.due_date ? new Date(t.due_date).toLocaleString() : "—"}</TableCell>
-                      <TableCell>{t.completed ? <Badge variant="secondary">Concluída</Badge> : overdue ? <Badge className="bg-rose-100 text-rose-700">Vencida</Badge> : <Badge variant="outline">Pendente</Badge>}</TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
+          <TasksTable userId={userId} total={counts.tasks} />
         </TabsContent>
 
         <TabsContent value="emails">
-          <Card><CardContent className="p-0 overflow-x-auto">
-            <Table>
-              <TableHeader><TableRow>
-                <TableHead>De</TableHead><TableHead>Assunto</TableHead>
-                <TableHead>Recebido</TableHead><TableHead>Status</TableHead>
-              </TableRow></TableHeader>
-              <TableBody>
-                {emails.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Sem e-mails vinculados a leads</TableCell></TableRow>}
-                {emails.map((e) => (
-                  <TableRow key={e.id}>
-                    <TableCell className="text-sm">{e.from_name || e.from_email}</TableCell>
-                    <TableCell className="font-medium truncate max-w-md">{e.subject || "(sem assunto)"}</TableCell>
-                    <TableCell className="text-xs">{e.received_at ? new Date(e.received_at).toLocaleString() : "—"}</TableCell>
-                    <TableCell>{e.is_unread ? <Badge>Não lido</Badge> : <Badge variant="secondary">Lido</Badge>}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent></Card>
+          <EmailsTable leadIds={leadIds} total={counts.emails} />
         </TabsContent>
       </Tabs>
 
-      {loading && <p className="text-xs text-muted-foreground">Carregando…</p>}
+      {aggLoading && <p className="text-xs text-muted-foreground">Carregando…</p>}
       <p className="text-xs text-muted-foreground">Visão somente leitura.</p>
     </div>
+  );
+}
+
+function Pager({ page, total, onPage }: { page: number; total: number; onPage: (p: number) => void }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  return (
+    <div className="flex items-center justify-between px-3 py-2 border-t">
+      <span className="text-xs text-muted-foreground">
+        Página {page + 1} de {pages} · {total} registros
+      </span>
+      <div className="flex gap-1">
+        <Button size="sm" variant="ghost" disabled={page <= 0} onClick={() => onPage(page - 1)}>
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button size="sm" variant="ghost" disabled={page + 1 >= pages} onClick={() => onPage(page + 1)}>
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function LeadsTable({ userId, total, format }: { userId: string; total: number; format: (n: number, c: any) => string }) {
+  const [page, setPage] = useState(0);
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      const from = page * PAGE_SIZE;
+      const { data } = await supabase.from("leads")
+        .select("id,name,destination,status,estimated_value,currency,next_action_date,updated_at")
+        .or(`assigned_to.eq.${userId},created_by.eq.${userId}`)
+        .order("updated_at", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (!cancel) { setRows(data ?? []); setLoading(false); }
+    })();
+    return () => { cancel = true; };
+  }, [userId, page]);
+
+  return (
+    <Card><CardContent className="p-0 overflow-x-auto">
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>Nome</TableHead><TableHead>Destino</TableHead>
+          <TableHead>Status</TableHead><TableHead className="text-right">Valor</TableHead>
+          <TableHead>Próx. ação</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {loading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>}
+          {!loading && rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Sem leads</TableCell></TableRow>}
+          {rows.map((l) => (
+            <TableRow key={l.id}>
+              <TableCell><Link to="/leads/$leadId" params={{ leadId: l.id }} className="hover:underline font-medium">{l.name}</Link></TableCell>
+              <TableCell className="text-muted-foreground">{l.destination ?? "—"}</TableCell>
+              <TableCell><Badge variant="outline">{l.status}</Badge></TableCell>
+              <TableCell className="text-right">{l.estimated_value ? format(Number(l.estimated_value), l.currency || "BRL") : "—"}</TableCell>
+              <TableCell className="text-xs">{l.next_action_date ?? "—"}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Pager page={page} total={total} onPage={setPage} />
+    </CardContent></Card>
+  );
+}
+
+function TasksTable({ userId, total }: { userId: string; total: number }) {
+  const [page, setPage] = useState(0);
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      const from = page * PAGE_SIZE;
+      const { data } = await supabase.from("tasks")
+        .select("id,title,due_date,completed,priority,lead_id")
+        .eq("assigned_to", userId)
+        .order("due_date", { ascending: false, nullsFirst: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (!cancel) { setRows(data ?? []); setLoading(false); }
+    })();
+    return () => { cancel = true; };
+  }, [userId, page]);
+
+  return (
+    <Card><CardContent className="p-0 overflow-x-auto">
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>Título</TableHead><TableHead>Prioridade</TableHead>
+          <TableHead>Vencimento</TableHead><TableHead>Status</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {loading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>}
+          {!loading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Sem tarefas</TableCell></TableRow>}
+          {rows.map((t) => {
+            const overdue = !t.completed && t.due_date && new Date(t.due_date).getTime() < Date.now();
+            return (
+              <TableRow key={t.id}>
+                <TableCell className="font-medium">{t.title}</TableCell>
+                <TableCell><Badge variant="outline">{t.priority}</Badge></TableCell>
+                <TableCell className={`text-xs ${overdue ? "text-rose-600 font-medium" : ""}`}>{t.due_date ? new Date(t.due_date).toLocaleString() : "—"}</TableCell>
+                <TableCell>{t.completed ? <Badge variant="secondary">Concluída</Badge> : overdue ? <Badge className="bg-rose-100 text-rose-700">Vencida</Badge> : <Badge variant="outline">Pendente</Badge>}</TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      <Pager page={page} total={total} onPage={setPage} />
+    </CardContent></Card>
+  );
+}
+
+function EmailsTable({ leadIds, total }: { leadIds: string[]; total: number }) {
+  const [page, setPage] = useState(0);
+  const [rows, setRows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const key = leadIds.join(",");
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      setLoading(true);
+      if (leadIds.length === 0) { setRows([]); setLoading(false); return; }
+      const from = page * PAGE_SIZE;
+      const { data } = await supabase.from("emails")
+        .select("id,subject,from_name,from_email,is_unread,received_at,lead_id")
+        .in("lead_id", leadIds)
+        .order("received_at", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (!cancel) { setRows(data ?? []); setLoading(false); }
+    })();
+    return () => { cancel = true; };
+  }, [key, page]);
+
+  return (
+    <Card><CardContent className="p-0 overflow-x-auto">
+      <Table>
+        <TableHeader><TableRow>
+          <TableHead>De</TableHead><TableHead>Assunto</TableHead>
+          <TableHead>Recebido</TableHead><TableHead>Status</TableHead>
+        </TableRow></TableHeader>
+        <TableBody>
+          {loading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Carregando…</TableCell></TableRow>}
+          {!loading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-6">Sem e-mails vinculados a leads</TableCell></TableRow>}
+          {rows.map((e) => (
+            <TableRow key={e.id}>
+              <TableCell className="text-sm">{e.from_name || e.from_email}</TableCell>
+              <TableCell className="font-medium truncate max-w-md">{e.subject || "(sem assunto)"}</TableCell>
+              <TableCell className="text-xs">{e.received_at ? new Date(e.received_at).toLocaleString() : "—"}</TableCell>
+              <TableCell>{e.is_unread ? <Badge>Não lido</Badge> : <Badge variant="secondary">Lido</Badge>}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <Pager page={page} total={total} onPage={setPage} />
+    </CardContent></Card>
   );
 }
 

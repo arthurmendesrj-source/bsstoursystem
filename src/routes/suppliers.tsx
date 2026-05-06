@@ -155,6 +155,10 @@ function SuppliersPage() {
     else { toast.success(t("saved")); load(); }
   };
 
+  if (!can("suppliers", "view")) {
+    return <Card className="p-12 text-center text-muted-foreground">Sem permissão para visualizar Fornecedores</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -163,7 +167,8 @@ function SuppliersPage() {
           <p className="text-muted-foreground">{filtered.length} / {rows.length}</p>
         </div>
         <div className="flex gap-2">
-          <BulkAIButtons />
+          <Can module="suppliers" action="create"><BulkAIButtons /></Can>
+          <Can module="suppliers" action="create">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("addManually")}</Button></DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

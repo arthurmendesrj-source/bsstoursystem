@@ -1,61 +1,37 @@
-## Objetivo
+## Diagnóstico
 
-Criar uma biblioteca de roteiros e programas de viagem (arquivos .DOC, .DOCX e .PDF) que sirva tanto para consulta humana quanto para alimentar a IA na geração de novas propostas (RAG — busca semântica).
+Olhando os logs da edge function `process-itinerary`, há **dois problemas reais** acontecendo (o upload ao Storage funciona — o que falha é o processamento que roda logo depois):
 
-## Banco de dados
+1. **`Memory limit exceeded`** — a função está estourando memória ao processar arquivos grandes. Hoje ela faz tudo num único request: baixa o .docx/.pdf, extrai texto, chama IA para metadados, gera *todos* os embeddings e insere chunks. Para roteiros longos isso ultrapassa o limite da edge function.
 
-Habilitar extensão `pgvector` e criar:
+2. **`Could not find file in options`** — erro do `mammoth` no Deno. Ao receber `{ arrayBuffer: buf }` vindo de `blob.arrayBuffer()`, o build de `mammoth@1.8.0` no esm.sh não reconhece o ArrayBuffer puro e exige um `Buffer` do Node ou `Uint8Array`.
 
-**`itineraries`** — um registro por roteiro
-- `id`, `code` (auto), `title`, `original_filename`, `storage_path`, `file_format` (`docx`/`pdf`/`doc`)
-- Metadados completos: `destinations text[]`, `duration_days int`, `language`, `tags text[]`
-- `trip_type` (lua_de_mel, família, aventura, luxo, cultural, corporativo, grupo, outro)
-- `price_range` (econômico, médio, alto, luxo), `estimated_value numeric`, `currency`
-- `suppliers_mentioned text[]` (nomes extraídos do conteúdo)
-- `customer_id uuid` (cliente original, opcional — link para `customers`)
-- `season`, `year int`, `notes`
-- `extracted_text text` (texto bruto para busca/IA), `summary text` (resumo gerado pela IA)
-- `processing_status` (`pending` / `processing` / `ready` / `failed`), `processing_error`
-- `created_by`, `created_at`, `updated_at`
+Resultado prático para você: o arquivo *sobe* para o Storage e o registro é criado, mas o card aparece com status **"failed"** ou trava em "processing", e parece que "o upload não funcionou".
 
-**`itinerary_chunks`** — pedaços do texto com embeddings p/ RAG
-- `id`, `itinerary_id`, `chunk_index`, `content text`, `embedding vector(1536)`
-- Índice IVFFlat sobre `embedding` para busca por similaridade
-- Função SQL `match_itineraries(query_embedding, match_count, filter)` retornando trechos relevantes + metadados
+## O que vou mudar
 
-**Bucket de Storage** `itineraries` (privado), com policies para staff.
+### 1. `supabase/functions/process-itinerary/index.ts`
+- **Corrigir mammoth**: passar `Buffer.from(buf)` (via `node:buffer`) em vez de `{ arrayBuffer }`. Resolve o "Could not find file in options".
+- **Reduzir uso de memória**:
+  - Liberar o `ArrayBuffer` (`buf = null`) imediatamente após extrair o texto.
+  - Baixar embeddings em lotes menores (8 em vez de 16) e fazer `insert` dos chunks no mesmo loop, sem manter o array gigante de embeddings em memória.
+  - Truncar `extracted_text` salvo no DB para 100 KB (em vez de 200 KB).
+  - Limitar texto enviado para extração de metadados (já está em 12k — manter).
+- **Timeout/erro mais claro**: retornar mensagem específica quando texto > X chars, sugerindo dividir o documento.
 
-RLS: leitura para autenticados; insert/update/delete para admin + operacional.
+### 2. `src/routes/itineraries.tsx`
+- **Desacoplar upload de processamento**: hoje o frontend espera o `process-itinerary` retornar antes de marcar "ready". Vou:
+  - Marcar a job como **"ready"** (enviado) assim que o upload ao Storage + insert do registro derem certo.
+  - Disparar `process-itinerary` em *fire-and-forget* (sem `await` bloqueando o worker), e deixar o realtime + status do registro mostrarem o progresso da IA.
+  - Assim, mesmo se a IA falhar para um arquivo, o upload em si nunca aparece como "falhou" e o usuário pode reprocessar depois pelo botão já existente.
+- Mostrar mensagens de erro mais legíveis (truncar stack, traduzir "Memory limit exceeded" para "Documento muito grande — tente dividir").
+- Reduzir concorrência padrão de 3 para 2 para não saturar a edge function.
 
-## Edge Function: `process-itinerary`
+### 3. Reprocessar os que já falharam
+Após o deploy das correções, vou:
+- Listar os roteiros com `processing_status = 'failed'` ou travados em `processing`.
+- Re-disparar `process-itinerary` para cada um (em lotes pequenos), para você não precisar reenviar manualmente.
 
-Roda em background quando um arquivo é enviado:
-1. Baixa do Storage
-2. Extrai texto: `mammoth` para DOCX, `unpdf` para PDF (`.doc` legado pede conversão prévia — alertamos no upload)
-3. Chama Lovable AI (`google/gemini-2.5-flash`) para extrair metadados estruturados (destinos, duração, tipo, fornecedores, faixa de preço, resumo) — retorna JSON
-4. Quebra o texto em chunks (~800 tokens com overlap)
-5. Gera embeddings via Lovable AI (`google/text-embedding-004`)
-6. Salva chunks + atualiza `itineraries` com metadados e `processing_status='ready'`
-
-## Upload em massa (frontend)
-
-Nova rota **`/itineraries`** (item no menu "Biblioteca de Roteiros"):
-
-- **Lista/busca**: filtros por destino, tipo, duração, tags, ano; busca textual + busca semântica ("encontre roteiros parecidos com…"); botão para baixar o arquivo original
-- **Detalhe**: metadados, resumo da IA, texto extraído, link p/ cliente original
-- **Upload em massa**: drag-and-drop de múltiplos arquivos OU de um `.zip` (extraído no cliente com JSZip). Cada arquivo vira uma linha em `itineraries` com `processing_status='pending'`, sobe pro Storage, e dispara `process-itinerary` em paralelo (com limite de concorrência ~3). Barra de progresso por arquivo + status final.
-- **Edição manual** dos metadados depois que a IA preenche (caso queira ajustar).
-
-## Uso pela IA na geração de propostas
-
-Em `generate-proposal-doc` (já existe), adicionar etapa opcional: gerar embedding do briefing/destino do quote, chamar `match_itineraries` para trazer 3-5 trechos mais relevantes, e injetar no prompt como "Exemplos de roteiros anteriores nossos" — IA usa como referência de estilo/estrutura.
-
-## Entregáveis
-
-1. Migration: extensão pgvector, tabelas, índices, função `match_itineraries`, bucket + policies
-2. Edge function `process-itinerary`
-3. Rota `/itineraries` (lista + upload em massa + detalhe)
-4. Item no menu lateral
-5. Integração opcional no `generate-proposal-doc`
-
-Confirma para implementar?
+## Fora do escopo
+- Conversão automática de `.doc` legado → continua exigindo conversão manual para `.docx`/`.pdf`.
+- Não vou trocar o modelo de embedding nem mexer no schema do banco.

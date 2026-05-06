@@ -2,11 +2,12 @@
 // 1) download from storage
 // 2) extract text
 // 3) extract structured metadata via Lovable AI
-// 4) chunk + embed
+// 4) chunk + embed (streamed in small batches to keep memory low)
 // 5) update itineraries + insert itinerary_chunks
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import mammoth from "https://esm.sh/mammoth@1.8.0";
 import { extractText, getDocumentProxy } from "https://esm.sh/unpdf@0.12.1";
+import { Buffer } from "node:buffer";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -14,9 +15,14 @@ const corsHeaders = {
 };
 
 const AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-// Use Gemini text embeddings (768 dims). Free tier supported.
+const EMBED_URL = "https://ai.gateway.lovable.dev/v1/embeddings";
 const EMBED_MODEL = "google/text-embedding-004";
 const META_MODEL = "google/gemini-2.5-flash";
+
+const MAX_TEXT_FOR_EXTRACTION = 600_000; // ~600 KB of text -> safety cap
+const SAVED_TEXT_CHARS = 100_000;
+const EMBED_BATCH = 8;
+const INSERT_BATCH = 25;
 
 function chunkText(text: string, maxChars = 2400, overlap = 200): string[] {
   const clean = text.replace(/\s+/g, " ").trim();
@@ -40,56 +46,40 @@ async function extractMetadata(apiKey: string, text: string) {
     body: JSON.stringify({
       model: META_MODEL,
       messages: [
-        {
-          role: "system",
-          content:
-            "Você analisa roteiros de viagem e extrai metadados estruturados. Responda chamando a função fornecida.",
-        },
-        {
-          role: "user",
-          content: `Analise este roteiro e extraia os metadados:\n\n${sample}`,
-        },
+        { role: "system", content: "Você analisa roteiros de viagem e extrai metadados estruturados. Responda chamando a função fornecida." },
+        { role: "user", content: `Analise este roteiro e extraia os metadados:\n\n${sample}` },
       ],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "extract_itinerary_metadata",
-            description: "Extrai metadados estruturados do roteiro de viagem.",
-            parameters: {
-              type: "object",
-              properties: {
-                title: { type: "string", description: "Título conciso (cidade(s) + duração)" },
-                destinations: { type: "array", items: { type: "string" }, description: "Cidades/países visitados" },
-                duration_days: { type: "number" },
-                language: { type: "string", enum: ["pt", "en", "es", "ru"] },
-                trip_type: {
-                  type: "string",
-                  enum: ["lua_de_mel", "familia", "aventura", "luxo", "cultural", "corporativo", "grupo", "outro"],
-                },
-                price_range: { type: "string", enum: ["economico", "medio", "alto", "luxo"] },
-                estimated_value: { type: "number" },
-                currency: { type: "string", enum: ["BRL", "USD", "EUR"] },
-                suppliers_mentioned: { type: "array", items: { type: "string" }, description: "Hotéis, operadoras citados" },
-                tags: { type: "array", items: { type: "string" } },
-                year: { type: "number" },
-                season: { type: "string" },
-                summary: { type: "string", description: "Resumo de 2-3 parágrafos do roteiro" },
-              },
-              required: ["title", "destinations", "summary"],
-              additionalProperties: false,
+      tools: [{
+        type: "function",
+        function: {
+          name: "extract_itinerary_metadata",
+          description: "Extrai metadados estruturados do roteiro de viagem.",
+          parameters: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              destinations: { type: "array", items: { type: "string" } },
+              duration_days: { type: "number" },
+              language: { type: "string", enum: ["pt", "en", "es", "ru"] },
+              trip_type: { type: "string", enum: ["lua_de_mel", "familia", "aventura", "luxo", "cultural", "corporativo", "grupo", "outro"] },
+              price_range: { type: "string", enum: ["economico", "medio", "alto", "luxo"] },
+              estimated_value: { type: "number" },
+              currency: { type: "string", enum: ["BRL", "USD", "EUR"] },
+              suppliers_mentioned: { type: "array", items: { type: "string" } },
+              tags: { type: "array", items: { type: "string" } },
+              year: { type: "number" },
+              season: { type: "string" },
+              summary: { type: "string" },
             },
+            required: ["title", "destinations", "summary"],
+            additionalProperties: false,
           },
         },
-      ],
+      }],
       tool_choice: { type: "function", function: { name: "extract_itinerary_metadata" } },
     }),
   });
-
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`metadata AI ${resp.status}: ${t}`);
-  }
+  if (!resp.ok) throw new Error(`metadata AI ${resp.status}: ${await resp.text()}`);
   const data = await resp.json();
   const args = data.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
   if (!args) throw new Error("no tool call result");
@@ -97,22 +87,20 @@ async function extractMetadata(apiKey: string, text: string) {
 }
 
 async function embedBatch(apiKey: string, inputs: string[]): Promise<number[][]> {
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+  const resp = await fetch(EMBED_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: EMBED_MODEL, input: inputs }),
   });
-  if (!resp.ok) {
-    const t = await resp.text();
-    throw new Error(`embed ${resp.status}: ${t}`);
-  }
+  if (!resp.ok) throw new Error(`embed ${resp.status}: ${await resp.text()}`);
   const data = await resp.json();
   return data.data.map((d: any) => d.embedding);
 }
 
 async function extractTextFromFile(buf: ArrayBuffer, format: string): Promise<string> {
   if (format === "docx") {
-    const result = await mammoth.extractRawText({ arrayBuffer: buf });
+    // mammoth on Deno expects a Node Buffer, not a raw ArrayBuffer
+    const result = await mammoth.extractRawText({ buffer: Buffer.from(buf) });
     return result.value || "";
   }
   if (format === "pdf") {
@@ -138,51 +126,54 @@ Deno.serve(async (req) => {
     if (!itineraryId) throw new Error("itinerary_id required");
 
     const { data: it, error: itErr } = await supabase
-      .from("itineraries")
-      .select("*")
-      .eq("id", itineraryId)
-      .single();
+      .from("itineraries").select("*").eq("id", itineraryId).single();
     if (itErr || !it) throw new Error(itErr?.message || "not found");
 
-    await supabase.from("itineraries").update({ processing_status: "processing", processing_error: null }).eq("id", itineraryId);
+    await supabase.from("itineraries")
+      .update({ processing_status: "processing", processing_error: null })
+      .eq("id", itineraryId);
 
     // 1. Download
     const { data: blob, error: dlErr } = await supabase.storage.from("itineraries").download(it.storage_path);
     if (dlErr || !blob) throw new Error(`download: ${dlErr?.message}`);
-    const buf = await blob.arrayBuffer();
+    let buf: ArrayBuffer | null = await blob.arrayBuffer();
 
     // 2. Extract text
-    const text = await extractTextFromFile(buf, it.file_format);
+    let text = await extractTextFromFile(buf!, it.file_format);
+    buf = null; // release
     if (!text || text.length < 50) throw new Error("extracted text too short");
-
-    // 3. Metadata
-    const meta = await extractMetadata(LOVABLE_API_KEY, text);
-
-    // 4. Chunk + embed
-    const chunks = chunkText(text);
-    const embeddings: number[][] = [];
-    const BATCH = 16;
-    for (let i = 0; i < chunks.length; i += BATCH) {
-      const batch = chunks.slice(i, i + BATCH);
-      const embs = await embedBatch(LOVABLE_API_KEY, batch);
-      embeddings.push(...embs);
+    if (text.length > MAX_TEXT_FOR_EXTRACTION) {
+      text = text.slice(0, MAX_TEXT_FOR_EXTRACTION);
     }
 
-    // 5. Save
+    // 3. Metadata (uses only first 12k chars)
+    const meta = await extractMetadata(LOVABLE_API_KEY, text);
+
+    // 4+5. Chunk, embed and insert in small streamed batches to keep memory low
     await supabase.from("itinerary_chunks").delete().eq("itinerary_id", itineraryId);
-    if (chunks.length > 0) {
-      const rows = chunks.map((content, idx) => ({
-        itinerary_id: itineraryId,
-        chunk_index: idx,
-        content,
-        embedding: embeddings[idx] as any,
-      }));
-      // insert in batches of 50
-      for (let i = 0; i < rows.length; i += 50) {
-        const slice = rows.slice(i, i + 50);
-        const { error } = await supabase.from("itinerary_chunks").insert(slice);
-        if (error) throw new Error(`chunks: ${error.message}`);
+    const chunks = chunkText(text);
+    let pendingRows: Array<{ itinerary_id: string; chunk_index: number; content: string; embedding: any }> = [];
+    for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
+      const batch = chunks.slice(i, i + EMBED_BATCH);
+      const embs = await embedBatch(LOVABLE_API_KEY, batch);
+      for (let j = 0; j < batch.length; j++) {
+        pendingRows.push({
+          itinerary_id: itineraryId!,
+          chunk_index: i + j,
+          content: batch[j],
+          embedding: embs[j] as any,
+        });
       }
+      if (pendingRows.length >= INSERT_BATCH) {
+        const { error } = await supabase.from("itinerary_chunks").insert(pendingRows);
+        if (error) throw new Error(`chunks: ${error.message}`);
+        pendingRows = [];
+      }
+    }
+    if (pendingRows.length > 0) {
+      const { error } = await supabase.from("itinerary_chunks").insert(pendingRows);
+      if (error) throw new Error(`chunks: ${error.message}`);
+      pendingRows = [];
     }
 
     await supabase.from("itineraries").update({
@@ -199,7 +190,7 @@ Deno.serve(async (req) => {
       year: meta.year ?? null,
       season: meta.season || null,
       summary: meta.summary || null,
-      extracted_text: text.slice(0, 200000),
+      extracted_text: text.slice(0, SAVED_TEXT_CHARS),
       processing_status: "ready",
     }).eq("id", itineraryId);
 
@@ -207,7 +198,10 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    let msg = e instanceof Error ? e.message : String(e);
+    if (/memory limit/i.test(msg)) {
+      msg = "Documento muito grande para processar — tente dividir o arquivo em partes menores.";
+    }
     console.error("process-itinerary error:", msg);
     if (itineraryId) {
       await supabase.from("itineraries").update({ processing_status: "failed", processing_error: msg }).eq("id", itineraryId);

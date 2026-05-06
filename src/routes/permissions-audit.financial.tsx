@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Check, X, Eye, EyeOff, Lock, Unlock } from "lucide-react";
+import { Check, X, Eye, EyeOff, Lock, Unlock, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -171,6 +172,7 @@ function FinancialAuditPage() {
                     <TableHead>Visualização</TableHead>
                     <TableHead>Edição</TableHead>
                     <TableHead className="text-right">Exemplo renderizado</TableHead>
+                    <TableHead className="text-right">Ação</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -203,7 +205,20 @@ function FinancialAuditPage() {
                           />
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {v ? "R$ 1.234,56" : "•••"}
+                          <span
+                            data-perm-field={`${f.module}.${f.field}`}
+                            data-perm-masked={v ? "0" : "1"}
+                          >
+                            {v ? "R$ 1.234,56" : "•••"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button asChild size="sm" variant="outline" className="gap-1">
+                            <a href={`${s.route}?highlight=${encodeURIComponent(`${f.module}.${f.field}`)}`}>
+                              <ExternalLink className="h-3 w-3" />
+                              Ver na tela
+                            </a>
+                          </Button>
                         </TableCell>
                       </TableRow>
                     );

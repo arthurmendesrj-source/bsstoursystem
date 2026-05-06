@@ -102,6 +102,7 @@ function LeadsPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("leads")}</h1>
           <p className="text-muted-foreground">{leads.length} {t("leads").toLowerCase()}</p>
         </div>
+        <Can module="leads" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button>
@@ -131,6 +132,7 @@ function LeadsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </Can>
       </div>
 
       <Card>

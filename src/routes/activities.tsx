@@ -337,14 +337,6 @@ function ActivitiesPage() {
                   </Select>
                 </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
-                <Button type="submit">{t("save")}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-              </div>
               {subordinates.length > 0 && (
                 <div>
                   <Label>Responsável</Label>
@@ -357,6 +349,14 @@ function ActivitiesPage() {
                   </Select>
                 </div>
               )}
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
+                <Button type="submit">{t("save")}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
       {/* stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={Clock} label={t("openTasks")} value={stats.open} />

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
+import { FlightDialog, type FlightRow } from "./FlightDialog";
 
 type Mode = "proposal" | "invoice";
 
@@ -81,6 +82,32 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [dictating, setDictating] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [docsRefresh, setDocsRefresh] = useState(0);
+  const [flights, setFlights] = useState<FlightRow[]>([]);
+  const [flightDialogOpen, setFlightDialogOpen] = useState(false);
+  const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
+
+  const loadFlights = async () => {
+    const { data } = await supabase
+      .from("quote_flights")
+      .select("*")
+      .eq("quote_id", quoteId)
+      .order("flight_date", { ascending: true });
+    setFlights((data ?? []) as FlightRow[]);
+  };
+
+  const removeFlight = async (id: string) => {
+    const { error } = await supabase.from("quote_flights").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    loadFlights();
+  };
+
+  useEffect(() => {
+    loadFlights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteId]);
 
   const load = async () => {
     setLoading(true);

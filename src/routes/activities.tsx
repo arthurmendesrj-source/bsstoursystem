@@ -344,8 +344,19 @@ function ActivitiesPage() {
             </form>
           </DialogContent>
         </Dialog>
-      </div>
-
+              </div>
+              {subordinates.length > 0 && (
+                <div>
+                  <Label>Responsável</Label>
+                  <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Eu mesmo</SelectItem>
+                      {subordinates.map((s) => <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
       {/* stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <StatCard icon={Clock} label={t("openTasks")} value={stats.open} />

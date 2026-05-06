@@ -277,6 +277,8 @@ function UsersPage() {
         onChange={load}
       />
 
+      <AuditLogSection profiles={profiles} authInfo={authInfo} />
+
       <p className="text-xs text-muted-foreground">
         Convites enviam um e-mail com link de cadastro. Clique nas badges de papel para removê-las.
       </p>

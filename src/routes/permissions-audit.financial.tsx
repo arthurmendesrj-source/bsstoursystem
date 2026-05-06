@@ -107,7 +107,7 @@ function StatusBadge({
 
 function FinancialAuditPage() {
   const { user, roles, isAdmin } = useAuth();
-  const { canField, can, loading } = usePermissions();
+  const { canField, loading } = usePermissions();
 
   const totals = SCREENS.flatMap((s) => s.fields);
   const visible = totals.filter((f) => canField(f.module, f.field, "view")).length;

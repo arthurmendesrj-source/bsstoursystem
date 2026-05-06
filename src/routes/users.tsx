@@ -551,3 +551,133 @@ function DeleteUserDialog({
     </Dialog>
   );
 }
+
+type AuditEntry = {
+  id: string;
+  action: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  target_user_id: string | null;
+  target_email: string | null;
+  details: Record<string, unknown> | null;
+  success: boolean;
+  error_message: string | null;
+  created_at: string;
+};
+
+const ACTION_LABELS: Record<string, string> = {
+  invite: "Convite enviado",
+  resend_invite: "Convite reenviado",
+  block: "Usuário bloqueado",
+  unblock: "Usuário desbloqueado",
+  delete: "Usuário excluído",
+};
+
+const ACTION_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  invite: "secondary",
+  resend_invite: "outline",
+  block: "destructive",
+  unblock: "default",
+  delete: "destructive",
+};
+
+function AuditLogSection({
+  profiles,
+  authInfo,
+}: {
+  profiles: ProfileRow[];
+  authInfo: Record<string, AuthUserInfo>;
+}) {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const profileName = (uid: string | null) => {
+    if (!uid) return null;
+    return profiles.find((p) => p.user_id === uid)?.full_name ?? null;
+  };
+  const userLabel = (uid: string | null, fallbackEmail: string | null) => {
+    const name = profileName(uid);
+    const email = fallbackEmail ?? (uid ? authInfo[uid]?.email ?? null : null);
+    if (name && email) return `${name} (${email})`;
+    return name ?? email ?? "—";
+  };
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await callAdminUsers("list_audit", { limit: 100 });
+      setEntries((data?.entries ?? []) as AuditEntry[]);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "medium" });
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <History className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Log de auditoria</h2>
+        <Badge variant="secondary" className="ml-auto">{entries.length}</Badge>
+        <Button size="sm" variant="ghost" onClick={load} disabled={loading} title="Atualizar">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+        </Button>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhuma ação registrada ainda.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Data/Hora</TableHead>
+              <TableHead>Ação</TableHead>
+              <TableHead>Executado por</TableHead>
+              <TableHead>Usuário alvo</TableHead>
+              <TableHead>Detalhes</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {entries.map((e) => {
+              const details = e.details ?? {};
+              const detailParts: string[] = [];
+              if (Array.isArray((details as { roles?: unknown[] }).roles)) {
+                const roles = (details as { roles: string[] }).roles;
+                if (roles.length > 0) detailParts.push(`papéis: ${roles.join(", ")}`);
+              }
+              if ((details as { mode?: string }).mode === "reassign") {
+                const re = (details as { reassigned_to_email?: string }).reassigned_to_email;
+                detailParts.push(`reatribuído para ${re ?? "outro usuário"}`);
+              } else if ((details as { mode?: string }).mode === "cascade_delete") {
+                detailParts.push("dados excluídos em cascata");
+              }
+              return (
+                <TableRow key={e.id}>
+                  <TableCell className="text-sm whitespace-nowrap">{fmt(e.created_at)}</TableCell>
+                  <TableCell>
+                    <Badge variant={ACTION_VARIANTS[e.action] ?? "outline"}>
+                      {ACTION_LABELS[e.action] ?? e.action}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm">{userLabel(e.actor_id, e.actor_email)}</TableCell>
+                  <TableCell className="text-sm">{userLabel(e.target_user_id, e.target_email)}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {detailParts.length > 0 ? detailParts.join(" · ") : "—"}
+                    {!e.success && e.error_message && (
+                      <span className="block text-destructive">Erro: {e.error_message}</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </Card>
+  );
+}

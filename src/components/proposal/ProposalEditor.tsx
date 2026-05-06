@@ -692,6 +692,11 @@ function ItemTable({
   onEdit?: (id: string) => void;
 }) {
   const { t } = useI18n();
+  const { canField } = usePermissions();
+  const showCost = canField("quotes", "unit_cost", "view");
+  const showMarkup = canField("quotes", "markup_pct", "view");
+  const editCost = canField("quotes", "unit_cost", "edit");
+  const editMarkup = canField("quotes", "markup_pct", "edit");
   const isHotel = kind === "hotel";
   if (rows.length === 0) {
     return (

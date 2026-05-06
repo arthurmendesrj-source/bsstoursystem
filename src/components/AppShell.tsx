@@ -80,12 +80,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
     { to: "/workspace", label: "Atendimento", icon: Briefcase },
     { to: "/packages", label: t("packages"), icon: Package },
-    { to: "/assistant", label: "Assistente IA", icon: Sparkles },
   ];
 
   const items = [
     { to: "/email", label: t("email"), icon: Mail },
-    { to: "/assistant", label: "Assistente IA", icon: Sparkles },
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },
     { to: "/customers", label: t("customers"), icon: Users },

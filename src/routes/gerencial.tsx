@@ -43,6 +43,7 @@ const FUNNEL_KEYS = ["novo", "qualificado", "cotacao", "proposta", "fechado", "p
 
 function GerencialPage() {
   const { user, isAdmin, hasRole, loading: authLoading } = useAuth();
+  const { enterViewAs } = useViewAs();
   const { subordinates, loading: subLoading } = useSubordinates();
   const { format } = useCurrency();
   const navigate = useNavigate();

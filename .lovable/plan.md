@@ -1,60 +1,62 @@
 ## Objetivo
 
-No botão **Adicionar hotel** da aba "Proposta em atendimento", abrir um popup `HotelDialog` no mesmo padrão do `ServiceDialog`, com layout conforme a imagem. Permitir texto livre nos campos com autocomplete (Cidade e Hotel), sobrepondo as sugestões, e cadastrar automaticamente em `ref_cities`/`ref_services` quando o valor digitado ainda não existir.
+Processar os ZIPs anexados (HOTEIS_… e 2027…) em duas fases sequenciais:
 
-## Layout do popup (conforme imagem)
+1. **Fase 1 — Upload**: enviar todos os PDFs para o bucket `supplier-docs` sem criar fornecedores ainda.
+2. **Fase 2 — Análise e cadastro**: ler cada PDF com IA (Lovable AI / `google/gemini-2.5-flash`), extrair dados do hotel e criar/atualizar `suppliers` (categoria `hotel`), vinculando o documento já enviado.
 
-Dialog `max-w-md`, uma coluna, campos na ordem:
+Aproveita a infraestrutura existente: bucket `supplier-docs`, tabela `supplier_documents`, `suppliers` (enum `hotel`) e o padrão de extração já implementado em `supabase/functions/extract-supplier-contacts`.
 
-- **Em*** (check-in) — date picker (Popover + Calendar)
-- **Fora*** (check-out) — date picker
-- **Cidade** — `ComboboxAutocomplete` sobre `ref_cities` (allowCustom)
-- **Hotel*** — `ComboboxAutocomplete` sobre `ref_services` (allowCustom)
-- **Sala*** (Room/Quarto) — Input texto (ex.: "Standard", "Deluxe")
-- **Tipo** (Meal plan) — Select: Room only, Breakfast, Half board, Full board, All inclusive
-- **Avaliar** (Categoria/estrelas) — Select: 3★, 4★, 5★, Boutique, Other
-- **Quantidade*** — number (nº de quartos), default 1
-- **Total** — number
-- **Notas** — Textarea
+---
 
-Footer com **Cancelar** / **Salvar**.
+## Fase 1 — Upload em massa (executar agora)
 
-Validações: check-in, check-out, hotel, sala e quantidade obrigatórios; check-out ≥ check-in.
+Script `code--exec` (Node/TS one-off, sem UI):
 
-## Comportamento de salvamento
+1. Descompactar `/tmp/hoteis.zip` e `/tmp/2027.zip` em `/tmp/hoteis_unzipped/`.
+2. Iterar recursivamente todos os `.pdf` (ignorar `.png`, pastas vazias, `image00*`).
+3. Para cada PDF, derivar metadados pelo path:
+   - `country` = primeiro segmento após `HOTEIS /<ano>/` (BRASIL, ARGENTINA, PERU, CHILE…)
+   - `city` = segundo segmento (FOZ DE IGUACU, BUZIOS…)
+   - `hotel_folder` = terceiro segmento quando existir (ex: `KA BRU`, `LABORIE 2025e2026`)
+   - `year` = pasta `2025`/`2026`/`2027`
+   - `filename` (limpo) e `storage_path` único: `pending/<uuid>-<slug(filename)>.pdf`
+4. Upload para `storage://supplier-docs/<storage_path>` via `supabaseAdmin` (service role).
+5. Gravar uma fila intermediária em `/mnt/documents/hoteis_upload_manifest.json` com a lista de uploads + metadados extraídos do path. **Nada é inserido em `suppliers` ou `supplier_documents` ainda** — assim você pode revisar antes da Fase 2.
+6. Ao final, retornar um resumo: quantos uploads OK, quantos falharam, total de bytes.
 
-Insert/update em `quote_items` com `kind="hotel"`:
-- `description` = nome do hotel
-- `city`, `category` (Avaliar), `meal_plan` (Tipo)
-- `rooms` = quantidade
-- `item_date` = check-in, `check_out` = check-out
-- `nights` = `diffNights(check_in, check_out)`, `quantity` = `nights`
-- `unit_cost` = `total / max(nights,1)`, `unit_price` = `unit_cost`, `markup_pct` = `defaultMarkupPct`
-- `total` = total digitado
-- `notes` = "Sala: <sala>" + (se houver) "\n" + notas
-  - Como `quote_items` não tem coluna específica de "sala", preservamos o valor dentro de `notes` para não exigir migração.
+Saída: arquivo `hoteis_upload_manifest.json` em `/mnt/documents/` (downloadable) + tabela resumo no chat.
 
-## Auto-cadastro de referências
+---
 
-Mesma lógica do ServiceDialog:
-- `ensureRefCity(city)` → `upsert ref_cities {name, slug}`, `onConflict: "slug", ignoreDuplicates: true`
-- `ensureRefHotel(hotel)` → `upsert ref_services {name, slug, category_id}`, `onConflict: "slug", ignoreDuplicates: true`
-  - `category_id` resolvido por `ref_service_categories` onde `kind='hotel'` e `slug='hotel'`; se não existir, fica `null`.
-- Comparação normalizada (sem acentos, lowercase, pontuação/espaços colapsados) contra as opções carregadas para evitar duplicados.
-- Toast `Novo hotel cadastrado: …` / `Nova cidade cadastrada: …` quando inéditos.
+## Fase 2 — Análise e criação de fornecedores (após você aprovar a Fase 1)
 
-## Edição/exclusão na tabela de hotéis
+Script separado que lê o manifest:
 
-- Adicionar botões **Pencil** (editar) e **Trash2** (excluir com `confirm`) na linha de hotel da `ItemTable`, espelhando o que já existe para serviço.
-- `openEditHotel(id)` carrega o item por id e abre o dialog com `initial`. O campo "Sala" é extraído do `notes` se prefixado por `"Sala: "`.
+1. Para cada PDF:
+   - Baixar do storage, extrair texto com `unpdf` (mesmo padrão da edge function existente).
+   - Chamar Lovable AI (`google/gemini-2.5-flash`) com tool-calling para devolver JSON estruturado:
+     - `hotel_name`, `trade_name`, `address_city`, `address_state`, `address_country`, `email`, `phone`, `whatsapp`, `website`, `default_currency` (BRL/USD/ARS…), `notes` (resumo), `tax_id` se houver.
+   - Fallback: se IA não retornar nome, usar nome do arquivo + cidade.
+2. **Dedup por nome normalizado + cidade** (slug). Antes de inserir, buscar `suppliers` com `category='hotel'` e nome similar — se existir, reaproveitar o id (não duplicar).
+3. Inserir/atualizar em `suppliers` com `category='hotel'`, `status='ativo'`.
+4. Mover o PDF em storage de `pending/<...>` para `<supplier_id>/<...>` e inserir `supplier_documents` (kind=`tarifario`, year, original_filename, file_format=`pdf`).
+5. Gravar log final em `/mnt/documents/hoteis_import_report.json` com mapping arquivo → supplier_id, e contagens (criados / reaproveitados / falharam).
 
-## Arquivos afetados
+Sem migração de banco — todas as colunas necessárias já existem.
 
-- `src/components/proposal/HotelDialog.tsx` (criar)
-- `src/components/proposal/ProposalEditor.tsx` (editar):
-  - importar `HotelDialog` e `HotelInitial`
-  - estados `hotelDialogOpen`, `editingHotel`
-  - trocar `addItem("hotel")` no botão para abrir o dialog
-  - passar `onEdit` e `onRemove` (com confirm) na `ItemTable` de hotéis
+---
 
-Sem migrações de banco — todas as colunas necessárias já existem em `quote_items`.
+## Observações técnicas
+
+- `psql` está disponível, mas as inserções usarão `supabase-js` com service role para respeitar triggers (`set_supplier_code` gera o código automaticamente).
+- IA usa `LOVABLE_API_KEY` (já configurada) — sem custo de API key adicional.
+- Total: ~76 PDFs, ~50 MB. Upload em paralelo limitado (concorrência 5) para não estourar limites.
+- Fica fora do escopo: criação de tarifas (`supplier_rates`) — isso é um passo posterior usando `extract-supplier-rates` que já existe.
+
+---
+
+## Perguntas antes de iniciar a Fase 1
+
+1. Devo separar fornecedores **por hotel individual** (cada PDF = 1 fornecedor) ou **agrupar PDFs do mesmo hotel** (ex.: VIVAZ CATARATAS 2025 + 2026 + 2027 viram 1 fornecedor com 3 documentos)? Recomendo agrupar.
+2. Para PDFs que listam **vários hotéis** (ex: `Hoteis Casa Andina PERU 2026.pdf`, `Sonesta TODO PERU`, `Wholesales`), devo criar **um fornecedor por hotel listado dentro do PDF** ou **um único fornecedor "rede"** (Casa Andina, Sonesta)? Recomendo um por rede + notas com lista de unidades.

@@ -45,6 +45,7 @@ function LeadsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const { format } = useCurrency();
+  const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo" });

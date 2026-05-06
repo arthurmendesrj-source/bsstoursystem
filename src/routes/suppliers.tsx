@@ -395,7 +395,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                   <Row k={t("website")} v={supplier.website} />
                   <Row k={t("address")} v={[supplier.address_city, supplier.address_country].filter(Boolean).join(", ") || null} />
                   <Row k={t("paymentTerms")} v={supplier.payment_terms} />
-                  <Row k={t("commission")} v={supplier.commission_pct != null ? `${supplier.commission_pct}%` : null} />
+                  <Row k={t("commission")} v={supplier.commission_pct != null ? `${supplier.commission_pct}%` : null} mask={{ module: "suppliers", field: "commission_pct" }} />
                   <Row k={t("currency")} v={supplier.default_currency} />
                   <Row k={t("rating")} v={supplier.rating?.toString() ?? null} />
                   <Row k={t("tags")} v={supplier.tags?.join(", ") || null} />

@@ -96,7 +96,9 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
       .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const norm = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
 
   const ensureRefService = async (name: string) => {
     const trimmed = name.trim();

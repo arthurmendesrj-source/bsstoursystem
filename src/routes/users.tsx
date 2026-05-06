@@ -41,7 +41,16 @@ export const Route = createFileRoute("/users")({
 
 type ProfileRow = { id: string; user_id: string; full_name: string | null };
 type RoleRow = { user_id: string; role: AppRole };
-type AuthUserInfo = { user_id: string; email: string | null; banned_until: string | null };
+type AuthUserInfo = {
+  user_id: string;
+  email: string | null;
+  banned_until: string | null;
+  invited_at: string | null;
+  email_confirmed_at: string | null;
+  confirmed_at: string | null;
+  last_sign_in_at: string | null;
+  created_at: string | null;
+};
 
 const ROLES: AppRole[] = ["admin", "diretor", "gerente", "supervisor", "operador"];
 const PROTECTED: AppRole[] = ["admin", "diretor"];

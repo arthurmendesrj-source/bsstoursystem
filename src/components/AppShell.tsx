@@ -21,6 +21,7 @@ import {
   Library,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -31,7 +32,8 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, hasRole, signOut } = useAuth();
+  const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const { t, lang, setLang } = useI18n();
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();
@@ -118,6 +120,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Briefcase className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t("workspace")}</span>}
           </Link>
+          {showManagerial && (
+            <Link to="/gerencial" className={itemClass(path === "/gerencial" || path.startsWith("/gerencial/"))} title={collapsed ? "Gerencial" : undefined}>
+              <BarChart3 className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="truncate">Gerencial</span>}
+            </Link>
+          )}
           {isAdmin && (
             <>
               {!collapsed && (

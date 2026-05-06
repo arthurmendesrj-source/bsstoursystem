@@ -17,7 +17,9 @@ import { useAuth } from "@/lib/auth";
 import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze } from "@/server/gmail.functions";
+import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze, emailAnalyzeLocal } from "@/server/gmail.functions";
+
+const isSeedId = (id: string | null | undefined) => !!id && id.startsWith("seed-");
 import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 import { toast } from "sonner";
 

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import { useCurrency } from "@/lib/currency";
+import { useViewAs } from "@/lib/viewAs";
 import { supabase } from "@/integrations/supabase/client";
 import { computeLeadSla } from "@/lib/leadSla";
 

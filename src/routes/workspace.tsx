@@ -33,7 +33,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
-import { usePermissions } from "@/lib/permissions";
+import { usePermissions, MaskedField } from "@/lib/permissions";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -557,7 +557,7 @@ function WorkspacePage() {
                               {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
                             </div>
                           </div>
-                          <div className="font-semibold">{fmtCurrency(Number(b.total_amount), b.currency as "BRL")}</div>
+                          <div className="font-semibold"><MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} /></div>
                         </div>
                       ))}
                     </div>
@@ -676,7 +676,7 @@ function ProposalsTab({
                     {q.valid_until && ` · ${t("validUntil")}: ${format(new Date(q.valid_until), "dd/MM/yyyy")}`}
                   </div>
                 </div>
-                <div className="font-semibold">{fmtCurrency(Number(q.total_amount), q.currency as "BRL")}</div>
+                <div className="font-semibold"><MaskedField module="quotes" field="total_amount" value={fmtCurrency(Number(q.total_amount), q.currency as "BRL")} /></div>
               </button>
             );
           })}

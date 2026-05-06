@@ -1,28 +1,37 @@
-## Importar fornecedores do Beglobber
+## Reformatar a tabela de Fornecedores
 
-Você colou ~100 fornecedores do `adatours.beglobber.com/suppliers` (a página exige login Google, então não consegui buscar direto — copy/paste é o caminho).
+Ajustar `/suppliers` para o layout da imagem, mantendo a coluna de Categoria.
 
-### Passos
+### Novo cabeçalho da tabela (na ordem)
 
-1. **Parse do texto colado** — script Node converte cada linha em registro:
-   - `name`, `address_city` (código IATA: RIO, MAO, GUA…), `address_country` (BR, MX, PE…), `phone`, `email`.
-   - Trata múltiplos telefones/emails separados por `;` (mantém o primeiro, demais vão para `notes`).
-   - Limpa lixo: `@nenhum`, `nenhum@nenhum`, `naotem@naotem`, `.` viram `NULL`.
+1. Ação excluir (ícone lixeira, à esquerda)
+2. Nome (negrito)
+3. Categoria (badge — mantida conforme pedido)
+4. Código da Cidade
+5. Código do País
+6. Telefone
+7. E-mail
+8. Ação editar (ícone lápis, à direita)
 
-2. **Dedup contra os 437 existentes**:
-   - Match por (a) email exato, (b) phone normalizado (só dígitos), ou (c) nome normalizado (lower, sem acento, sem espaços).
-   - Se já existe → **atualiza** campos vazios (preenche email/phone/cidade se estiverem nulos no banco).
-   - Se não existe → **insere** novo com `category='outro'`, `status='ativo'`, `default_currency='BRL'`, `created_by` = seu user_id.
+Removidas: City (texto livre "cidade, país"), Status, Rating, ícone Eye.
 
-3. **Mapeamento de país** — converte códigos para nomes consistentes:
-   - BR→Brasil, MX→México, PE→Peru, AR→Argentina, CR→Costa Rica, CO→Colômbia, BO→Bolívia, BZ→Belize, CL→Chile, GT→Guatemala, PA→Panamá, UY→Uruguai, CU→Cuba, CE→Equador, COL→Colômbia.
+### Mudanças visuais
 
-4. **Relatório final** no chat: X inseridos, Y atualizados, Z ignorados (duplicados sem alterações), com lista dos nomes em cada bucket para você revisar.
+- Linhas com **zebra striping** (alternar `bg-muted/30` nas linhas pares) como na imagem.
+- Ícone lixeira em botão `variant="ghost" size="icon"` na primeira célula → confirma e chama `supabase.from("suppliers").delete().eq("id", s.id)` + reload.
+- Ícone lápis na última célula → abre o `SupplierDrawer` (em vez de clicar na linha inteira) ou abre dialog de edição. Mantemos drawer para preservar funcionalidade existente.
+- Campo de busca "Procurar" continua no topo do Card; remover os dois selects de filtro (Categoria/Status) para combinar com a imagem — ou mantê-los? **Decisão:** remover para ficar igual à imagem; categoria já aparece como coluna.
+- Cabeçalho do Card mostra "Fornecedores" à esquerda e search à direita (layout flex).
 
-### Observações
+### Mapeamento de campos
 
-- O `code` (ex: SF0526) é gerado automaticamente pelo trigger `set_supplier_code`.
-- Não importo `iata_code` para `address_city` literalmente porque o campo `address_city` espera nome — vou colocar o código IATA em `iata_code` (campo correto da tabela) e deixar `address_city` em branco para enriquecer depois.
-- Linhas claramente quebradas (ex: "Sérgio Luiz" com email no campo phone) são corrigidas heuristicamente: se o "phone" tem `@`, troca com o email.
+- **Código da Cidade** → `address_city` (já armazena códigos IATA tipo "CUN", "RIO" nos dados importados).
+- **Código do País** → `address_country` (já armazena "BR", "MX" etc).
+- **Telefone** → `phone`.
+- **E-mail** → `email`.
 
-Aprovar para eu rodar o import?
+### Arquivos a editar
+
+- `src/routes/suppliers.tsx` — substituir o bloco da tabela (linhas ~249-307) e adicionar handler `handleDelete`.
+
+Sem mudanças de schema, sem migrations.

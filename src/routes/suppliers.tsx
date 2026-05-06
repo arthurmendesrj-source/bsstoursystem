@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Eye, Star, Sparkles, FileText, Loader2 } from "lucide-react";
+import { Plus, Search, Eye, Star, Sparkles, FileText, Loader2, Pencil, Trash2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";

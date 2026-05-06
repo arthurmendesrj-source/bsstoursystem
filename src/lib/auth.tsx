@@ -48,6 +48,8 @@ type AuthCtx = {
   roles: AppRole[];
   loading: boolean;
   isAdmin: boolean;
+  isDirector: boolean;
+  canManageUsers: boolean;
   hasRole: (r: AppRole) => boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;

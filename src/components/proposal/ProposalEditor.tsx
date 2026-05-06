@@ -558,6 +558,14 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onSaved={loadFlights}
       />
 
+      <ServiceDialog
+        open={serviceDialogOpen}
+        onOpenChange={setServiceDialogOpen}
+        quoteId={quoteId}
+        defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
+        onSaved={load}
+      />
+
 
       <div className="rounded-md border p-4 space-y-1.5 bg-muted/20">
         {!readOnly && (

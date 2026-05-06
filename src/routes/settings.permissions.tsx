@@ -8,7 +8,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, type AppRole } from "@/lib/auth";
-import { usePermissions } from "@/lib/permissions";
+import { usePermissions, type Action } from "@/lib/permissions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -37,7 +38,7 @@ type FieldRow = { role: AppRole; module_key: string; field_key: string; can_view
 
 function PermissionsPage() {
   const { isAdmin, loading } = useAuth();
-  const { refresh } = usePermissions();
+  const { refresh, can: editorCan, canField: editorCanField } = usePermissions();
   const navigate = useNavigate();
   const [modules, setModules] = useState<Module[]>([]);
   const [moduleRows, setModuleRows] = useState<ModuleRow[]>([]);
@@ -95,10 +96,34 @@ function PermissionsPage() {
     });
   };
 
+  // Edit-gating: editor não pode conceder o que ele próprio não tem.
+  // Admin sempre pode (editorCan/editorCanField já retornam true para admin).
+  const actionToKey: Record<typeof ACTIONS[number]["key"], Action> = {
+    can_view: "view", can_create: "create", can_edit: "edit", can_delete: "delete", can_approve: "approve",
+  };
+  const canGrantMod = (mk: string, action: typeof ACTIONS[number]["key"]) =>
+    editorCan(mk, actionToKey[action]);
+  const canGrantField = (mk: string, fk: string, action: "can_view" | "can_edit") =>
+    editorCanField(mk, fk, action === "can_view" ? "view" : "edit");
+
   const save = async () => {
     setSaving(true);
-    const m = await supabase.from("role_module_permissions").upsert(moduleRows, { onConflict: "role,module_key" });
-    const f = await supabase.from("role_field_permissions").upsert(fieldRows, { onConflict: "role,module_key,field_key" });
+    // Defesa em profundidade: filtra do payload qualquer linha que viole o edit-gating.
+    const safeMods = moduleRows.map((row) => ({
+      ...row,
+      can_view: row.can_view && canGrantMod(row.module_key, "can_view"),
+      can_create: row.can_create && canGrantMod(row.module_key, "can_create"),
+      can_edit: row.can_edit && canGrantMod(row.module_key, "can_edit"),
+      can_delete: row.can_delete && canGrantMod(row.module_key, "can_delete"),
+      can_approve: row.can_approve && canGrantMod(row.module_key, "can_approve"),
+    }));
+    const safeFields = fieldRows.map((row) => ({
+      ...row,
+      can_view: row.can_view && canGrantField(row.module_key, row.field_key, "can_view"),
+      can_edit: row.can_edit && canGrantField(row.module_key, row.field_key, "can_edit"),
+    }));
+    const m = await supabase.from("role_module_permissions").upsert(safeMods, { onConflict: "role,module_key" });
+    const f = await supabase.from("role_field_permissions").upsert(safeFields, { onConflict: "role,module_key,field_key" });
     setSaving(false);
     if (m.error || f.error) { toast.error(m.error?.message ?? f.error?.message ?? "Erro"); return; }
     toast.success("Permissões salvas");
@@ -107,7 +132,21 @@ function PermissionsPage() {
 
   if (!isAdmin) return null;
 
+  const GatedCheckbox = ({ checked, onChange, locked, lockedReason }: {
+    checked: boolean; onChange: () => void; locked: boolean; lockedReason: string;
+  }) => {
+    const cb = <Checkbox checked={checked} onCheckedChange={onChange} disabled={locked} />;
+    if (!locked) return cb;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild><span className="inline-flex">{cb}</span></TooltipTrigger>
+        <TooltipContent>{lockedReason}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -124,6 +163,9 @@ function PermissionsPage() {
         </TabsList>
 
         <TabsContent value="modules">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Checkboxes em cinza não podem ser alterados — você não pode conceder um acesso que não possui.
+          </p>
           <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -146,9 +188,18 @@ function PermissionsPage() {
                     <TableCell className="font-medium">{m.label}</TableCell>
                     {ROLES.flatMap((r) => ACTIONS.map((a) => {
                       const row = getMod(r, m.key);
+                      const locked = r === "admin" || !canGrantMod(m.key, a.key);
+                      const reason = r === "admin"
+                        ? "Admin sempre tem acesso total."
+                        : "Você não pode conceder um acesso que não possui.";
                       return (
                         <TableCell key={`${r}-${m.key}-${a.key}`} className="text-center">
-                          <Checkbox checked={row[a.key]} onCheckedChange={() => toggleMod(r, m.key, a.key)} disabled={r === "admin"} />
+                          <GatedCheckbox
+                            checked={row[a.key]}
+                            onChange={() => toggleMod(r, m.key, a.key)}
+                            locked={locked}
+                            lockedReason={reason}
+                          />
                         </TableCell>
                       );
                     }))}
@@ -161,6 +212,9 @@ function PermissionsPage() {
         </TabsContent>
 
         <TabsContent value="fields">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Checkboxes em cinza não podem ser alterados — você não pode conceder um acesso que não possui.
+          </p>
           <div className="space-y-4">
             {modules.filter((m) => m.sensitive_fields.length > 0).map((m) => (
               <Card key={m.key} className="p-4">
@@ -185,12 +239,17 @@ function PermissionsPage() {
                         <TableCell className="font-mono text-xs">{f}</TableCell>
                         {ROLES.flatMap((r) => {
                           const row = getField(r, m.key, f);
+                          const lockedV = r === "admin" || !canGrantField(m.key, f, "can_view");
+                          const lockedE = r === "admin" || !canGrantField(m.key, f, "can_edit");
+                          const reason = r === "admin"
+                            ? "Admin sempre tem acesso total."
+                            : "Você não pode conceder um acesso que não possui.";
                           return [
                             <TableCell key={`${r}-${f}-v`} className="text-center">
-                              <Checkbox checked={row.can_view} onCheckedChange={() => toggleField(r, m.key, f, "can_view")} disabled={r === "admin"} />
+                              <GatedCheckbox checked={row.can_view} onChange={() => toggleField(r, m.key, f, "can_view")} locked={lockedV} lockedReason={reason} />
                             </TableCell>,
                             <TableCell key={`${r}-${f}-e`} className="text-center">
-                              <Checkbox checked={row.can_edit} onCheckedChange={() => toggleField(r, m.key, f, "can_edit")} disabled={r === "admin"} />
+                              <GatedCheckbox checked={row.can_edit} onChange={() => toggleField(r, m.key, f, "can_edit")} locked={lockedE} lockedReason={reason} />
                             </TableCell>,
                           ];
                         })}
@@ -204,5 +263,6 @@ function PermissionsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }

@@ -124,6 +124,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     if (mode === "lead" && leadId) {
       query = query.eq("lead_id", leadId);
     } else {
+      if (user?.email) query = query.contains("to_emails", [user.email]);
       if (f === "unread") query = query.eq("is_unread", true);
       if (f === "sent") query = query.contains("labels", ["SENT"]);
       if (f === "trash") query = query.contains("labels", ["TRASH"]);

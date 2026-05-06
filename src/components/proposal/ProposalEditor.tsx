@@ -532,10 +532,10 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               step="0.1"
               value={quote.default_markup_pct}
               onChange={(e) => setQuote({ ...quote, default_markup_pct: Number(e.target.value) })}
-              disabled={readOnly}
+              disabled={readOnly || !editMarkupPct}
               className="h-9"
             />
-            {!readOnly && (
+            {!readOnly && editMarkupPct && (
               <Button type="button" size="sm" variant="outline" onClick={applyDefaultMarkup} title={t("applyDefaultMarkup")}>
                 ↻
               </Button>
@@ -549,7 +549,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             step="0.01"
             value={bankFee}
             onChange={(e) => setBankFee(Number(e.target.value))}
-            disabled={readOnly}
+            disabled={readOnly || !editDiscount}
             className="h-9"
           />
         </div>

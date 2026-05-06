@@ -84,7 +84,7 @@ function Dashboard() {
       });
       setAtRisk(risk.slice(0, 5));
     })();
-  }, []);
+  }, [targetUserId]);
 
   const cards = [
     { label: t("totalLeads"), value: stats.leads, icon: UserPlus, color: "text-blue-600" },

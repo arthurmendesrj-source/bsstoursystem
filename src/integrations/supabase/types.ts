@@ -2088,6 +2088,8 @@ export type Database = {
         }[]
       }
       slugify: { Args: { _t: string }; Returns: string }
+      slugify_text: { Args: { input: string }; Returns: string }
+      unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "vendedor" | "operacional" | "financeiro"

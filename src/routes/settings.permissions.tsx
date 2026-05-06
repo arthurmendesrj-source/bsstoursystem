@@ -132,7 +132,21 @@ function PermissionsPage() {
 
   if (!isAdmin) return null;
 
+  const GatedCheckbox = ({ checked, onChange, locked, lockedReason }: {
+    checked: boolean; onChange: () => void; locked: boolean; lockedReason: string;
+  }) => {
+    const cb = <Checkbox checked={checked} onCheckedChange={onChange} disabled={locked} />;
+    if (!locked) return cb;
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild><span className="inline-flex">{cb}</span></TooltipTrigger>
+        <TooltipContent>{lockedReason}</TooltipContent>
+      </Tooltip>
+    );
+  };
+
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -149,6 +163,9 @@ function PermissionsPage() {
         </TabsList>
 
         <TabsContent value="modules">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Checkboxes em cinza não podem ser alterados — você não pode conceder um acesso que não possui.
+          </p>
           <Card className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -171,9 +188,18 @@ function PermissionsPage() {
                     <TableCell className="font-medium">{m.label}</TableCell>
                     {ROLES.flatMap((r) => ACTIONS.map((a) => {
                       const row = getMod(r, m.key);
+                      const locked = r === "admin" || !canGrantMod(m.key, a.key);
+                      const reason = r === "admin"
+                        ? "Admin sempre tem acesso total."
+                        : "Você não pode conceder um acesso que não possui.";
                       return (
                         <TableCell key={`${r}-${m.key}-${a.key}`} className="text-center">
-                          <Checkbox checked={row[a.key]} onCheckedChange={() => toggleMod(r, m.key, a.key)} disabled={r === "admin"} />
+                          <GatedCheckbox
+                            checked={row[a.key]}
+                            onChange={() => toggleMod(r, m.key, a.key)}
+                            locked={locked}
+                            lockedReason={reason}
+                          />
                         </TableCell>
                       );
                     }))}
@@ -186,6 +212,9 @@ function PermissionsPage() {
         </TabsContent>
 
         <TabsContent value="fields">
+          <p className="mb-2 text-xs text-muted-foreground">
+            Checkboxes em cinza não podem ser alterados — você não pode conceder um acesso que não possui.
+          </p>
           <div className="space-y-4">
             {modules.filter((m) => m.sensitive_fields.length > 0).map((m) => (
               <Card key={m.key} className="p-4">
@@ -210,12 +239,17 @@ function PermissionsPage() {
                         <TableCell className="font-mono text-xs">{f}</TableCell>
                         {ROLES.flatMap((r) => {
                           const row = getField(r, m.key, f);
+                          const lockedV = r === "admin" || !canGrantField(m.key, f, "can_view");
+                          const lockedE = r === "admin" || !canGrantField(m.key, f, "can_edit");
+                          const reason = r === "admin"
+                            ? "Admin sempre tem acesso total."
+                            : "Você não pode conceder um acesso que não possui.";
                           return [
                             <TableCell key={`${r}-${f}-v`} className="text-center">
-                              <Checkbox checked={row.can_view} onCheckedChange={() => toggleField(r, m.key, f, "can_view")} disabled={r === "admin"} />
+                              <GatedCheckbox checked={row.can_view} onChange={() => toggleField(r, m.key, f, "can_view")} locked={lockedV} lockedReason={reason} />
                             </TableCell>,
                             <TableCell key={`${r}-${f}-e`} className="text-center">
-                              <Checkbox checked={row.can_edit} onCheckedChange={() => toggleField(r, m.key, f, "can_edit")} disabled={r === "admin"} />
+                              <GatedCheckbox checked={row.can_edit} onChange={() => toggleField(r, m.key, f, "can_edit")} locked={lockedE} lockedReason={reason} />
                             </TableCell>,
                           ];
                         })}
@@ -229,5 +263,6 @@ function PermissionsPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </TooltipProvider>
   );
 }

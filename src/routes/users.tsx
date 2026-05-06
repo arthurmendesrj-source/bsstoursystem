@@ -288,10 +288,114 @@ function UsersPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <PendingInvites
+        authInfo={authInfo}
+        profiles={profiles}
+        canActOn={canActOn}
+        onChange={load}
+      />
+
       <p className="text-xs text-muted-foreground">
         Convites enviam um e-mail com link de cadastro. Clique nas badges de papel para removê-las.
       </p>
     </div>
+  );
+}
+
+const INVITE_TTL_HOURS = 24;
+
+function PendingInvites({
+  authInfo,
+  profiles,
+  canActOn,
+  onChange,
+}: {
+  authInfo: Record<string, AuthUserInfo>;
+  profiles: ProfileRow[];
+  canActOn: (uid: string) => boolean;
+  onChange: () => void;
+}) {
+  const profileName = (uid: string) => profiles.find((p) => p.user_id === uid)?.full_name ?? null;
+  const pending = Object.values(authInfo).filter(
+    (u) => u.invited_at && !u.email_confirmed_at && !u.confirmed_at,
+  );
+
+  const expiresAt = (invitedAt: string) =>
+    new Date(new Date(invitedAt).getTime() + INVITE_TTL_HOURS * 3600_000);
+
+  const fmt = (d: Date) => d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+
+  const resend = async (uid: string) => {
+    try {
+      await callAdminUsers("resend_invite", { user_id: uid });
+      toast.success("Convite reenviado");
+      onChange();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  };
+
+  return (
+    <Card className="p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Mail className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-lg font-semibold">Convites pendentes</h2>
+        <Badge variant="secondary" className="ml-auto">{pending.length}</Badge>
+      </div>
+      {pending.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Nenhum convite pendente.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>E-mail</TableHead>
+              <TableHead>Nome</TableHead>
+              <TableHead>Enviado em</TableHead>
+              <TableHead>Expira em</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {pending.map((u) => {
+              const exp = u.invited_at ? expiresAt(u.invited_at) : null;
+              const expired = exp ? exp.getTime() < Date.now() : false;
+              return (
+                <TableRow key={u.user_id}>
+                  <TableCell className="font-medium">{u.email ?? "—"}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{profileName(u.user_id) ?? "—"}</TableCell>
+                  <TableCell className="text-sm">{u.invited_at ? fmt(new Date(u.invited_at)) : "—"}</TableCell>
+                  <TableCell className="text-sm">
+                    <span className={expired ? "text-destructive" : ""}>
+                      {exp ? fmt(exp) : "—"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {expired ? (
+                      <Badge variant="destructive">Expirado</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-600 border-amber-600/50">
+                        <Clock className="mr-1 h-3 w-3" />Aguardando
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {canActOn(u.user_id) && (
+                        <Button size="sm" variant="ghost" onClick={() => resend(u.user_id)} title="Reenviar convite">
+                          <RefreshCw className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </Card>
   );
 }
 

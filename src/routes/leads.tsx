@@ -47,8 +47,9 @@ const STATUSES = ["novo", "qualificado", "cotacao", "proposta", "fechado", "perd
 function LeadsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
-  const { viewAs, readOnly } = useViewAs();
+  const { viewAs } = useViewAs();
   const targetUserId = viewAs?.user_id ?? null;
+  const effectiveId = targetUserId ?? user?.id;
   const { format } = useCurrency();
   const { can } = usePermissions();
   const { subordinates } = useSubordinates();
@@ -69,6 +70,7 @@ function LeadsPage() {
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    const ownerId = effectiveId ?? user.id;
     const { error } = await supabase.from("leads").insert({
       name: form.name,
       email: form.email || null,
@@ -77,7 +79,7 @@ function LeadsPage() {
       estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
       status: form.status as "novo",
       created_by: user.id,
-      assigned_to: form.assigned_to || user.id,
+      assigned_to: form.assigned_to || ownerId,
     });
     if (error) toast.error(error.message);
     else {
@@ -113,7 +115,7 @@ function LeadsPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("leads")}</h1>
           <p className="text-muted-foreground">{leads.length} {t("leads").toLowerCase()}</p>
         </div>
-        {!readOnly && <Can module="leads" action="create">
+        <Can module="leads" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button>
@@ -155,7 +157,7 @@ function LeadsPage() {
             </form>
           </DialogContent>
         </Dialog>
-        </Can>}
+        </Can>
       </div>
 
       <Card>

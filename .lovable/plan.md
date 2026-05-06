@@ -1,75 +1,56 @@
-## Modo "Visualizar como usuário" (impersonação visual)
+# Modo Espelho Completo ("Logar como" usuário)
 
-Ao clicar em um usuário no /gerencial, o app inteiro passa a mostrar os dados daquele usuário (leads, tarefas, e-mails, dashboard, funil), mantendo você logado na sua conta. Você continua sendo o autor real de qualquer ação administrativa (reatribuir lead, marcar tarefa concluída), mas a navegação simula a experiência dele.
+## Problema atual
+Hoje, ao clicar num usuário no Gerencial, só o **Dashboard**, **Funil** e **Leads** filtram pelo `effectiveUserId` (e ainda em modo somente leitura). Os demais módulos (Atividades, E-mails, Reservas, Clientes, Alertas, Workspace) continuam mostrando os dados do **admin logado**, porque suas queries usam `useAuth().user.id` diretamente. Resultado: o usuário só "vê" o Dashboard do alvo; o resto do app fica como se nada tivesse mudado.
 
-### 1. Contexto global de impersonação
+## Objetivo
+Quando um gestor clica num subordinado no Gerencial, o app inteiro deve se comportar como se ele estivesse **logado na conta daquele usuário**: todos os menus visíveis, todas as listagens filtradas pelo alvo, e ações (criar lead, tarefa, etc.) devem registrar o alvo como `created_by` / `assigned_to`. O banner amarelo continua no topo para deixar claro que é uma sessão espelhada, com botão para sair.
 
-Criar `src/lib/viewAs.tsx` com `ViewAsProvider` e hook `useViewAs()`:
-- Estado: `{ viewAsUserId, viewAsName, viewAsRole }` persistido em `sessionStorage`.
-- Métodos: `enterViewAs(user)`, `exitViewAs()`.
-- Guard de segurança no provider: só ativa se o usuário logado for admin/diretor/gerente E o alvo estiver em `useSubordinates()`. Caso contrário, limpa.
-- Helper `effectiveUserId()` que retorna `viewAsUserId ?? auth.user.id`.
+> Observação: a sessão de autenticação real continua sendo a do gestor (RLS de admin/diretor já permite ler tudo). Não é um login real — é um "contexto efetivo" aplicado em todo o frontend.
 
-Montar o provider em `src/router.tsx` (ou no `__root.tsx`) dentro do `AuthProvider`.
+## Mudanças
 
-### 2. Banner global de impersonação
+### 1. `src/lib/viewAs.tsx`
+- Manter `effectiveUserId()`, mas remover a flag `readOnly` (ou deixar sempre `false`). Adicionar `isImpersonating` apenas como sinalização visual.
+- Exportar um helper único `useEffectiveUser()` que devolve `{ id, isImpersonating, target }` para evitar repetir `viewAs?.user_id ?? user.id` em cada arquivo.
 
-Em `src/components/AppShell.tsx`, renderizar um banner fixo no topo quando `viewAsUserId` estiver ativo:
-- Texto: "Visualizando como **{nome}** ({papel}) — modo somente leitura".
-- Botão "Sair da visualização" → `exitViewAs()` + redireciona para `/gerencial`.
-- Cor de destaque (`bg-amber-500/15 border-amber-500/40`) para deixar evidente.
+### 2. `src/components/AppShell.tsx`
+- Trocar o texto do banner para algo como:  
+  *"Sessão espelhada de **Fulano** (gerente). Você está agindo como este usuário."*
+- Remover o "(modo somente leitura)".
+- Manter o botão "Sair da visualização".
+- Esconder/desabilitar o item de menu **Gerencial** enquanto impersonando (evita loop e confusão de hierarquia).
 
-### 3. Disparo da impersonação no Gerencial
+### 3. Rotas que precisam usar `effectiveUserId()` em vez de `user.id`
+Refatorar todas as queries/mutations que hoje escopam pelo usuário logado:
 
-Em `src/routes/gerencial.tsx`, na linha do ranking:
-- Trocar a navegação de `/gerencial/$userId` por: `enterViewAs({user_id, full_name, role})` e em seguida `navigate({ to: "/dashboard" })`.
-- Manter um link "Ver detalhes" pequeno que continua indo a `/gerencial/$userId` (relatório consolidado read-only já existente).
+- `src/routes/dashboard.tsx` — KPIs, listas (já parcialmente feito; revisar).
+- `src/routes/funnel.tsx` — leads do board; remover bloqueio de drag-and-drop.
+- `src/routes/leads.tsx` — listagem + criação (`created_by`, `assigned_to`); reabilitar botão "Novo lead".
+- `src/routes/activities.tsx` — listagem de tarefas e criação.
+- `src/routes/alerts.tsx` — `useLeadAlerts(effectiveId)`, templates, metas.
+- `src/routes/bookings.tsx` — listagem e criação.
+- `src/routes/customers.tsx` — listagem e criação.
+- `src/routes/workspace.tsx` — todas as 3 telas (lead, booking, task).
+- `src/components/email/EmailPanel.tsx` — caixa de entrada filtrada pelo alvo.
 
-### 4. Filtragem das páginas pelo usuário visualizado
+Padrão da refatoração:
+```ts
+const { id: effectiveId, isImpersonating } = useEffectiveUser();
+// queries: .eq("assigned_to", effectiveId) etc.
+// inserts: created_by: effectiveId, assigned_to: effectiveId
+```
 
-Em cada rota relevante, ler `useViewAs()` e usar `effectiveUserId()` no lugar de `user.id` ao montar as queries Supabase:
-- `src/routes/dashboard.tsx`
-- `src/routes/funnel.tsx`
-- `src/routes/leads.tsx` (filtrar por `assigned_to`)
-- `src/routes/leads.$leadId.tsx` (apenas exibir; ocultar botões de edição quando em viewAs — ver §5)
-- `src/routes/activities.tsx`
-- `src/routes/email.tsx` (filtrar por `lead_id` dos leads do usuário; Gmail OAuth permanece o do gestor — e-mails exibidos vêm da tabela `emails` filtrada)
-- `src/routes/bookings.tsx`, `src/routes/customers.tsx`, `src/routes/itineraries.tsx`, `src/routes/workspace.tsx` quando aplicável.
+### 4. Gerencial
+- `src/routes/gerencial.tsx`: ao clicar na linha, chama `enterViewAs(...)` e navega para `/dashboard` (já faz). Mantém igual.
+- `src/routes/gerencial.$userId.tsx`: continua sendo o relatório consolidado (acessível pelo link "Relatório" da tabela), separado do modo espelho.
 
-RLS continua garantindo o acesso (admin/diretor/gerente já enxergam subordinados). Nenhuma migration necessária.
+### 5. Permissões / RLS
+Não há mudança de banco. As policies já permitem que admin/diretor/gerente leiam dados dos subordinados (via `is_subordinate_of` / `is_admin`), então as queries com `effectiveId` vão funcionar sem ajustar RLS. **Inserts** com `created_by = effectiveId` precisam ser validados — se alguma policy de INSERT exigir `created_by = auth.uid()`, ela falhará. Vou rodar o linter de RLS depois da refatoração e, se necessário, ajustar a policy da tabela afetada (provavelmente `leads`, `tasks`, `bookings`, `customers`) para permitir inserir em nome de subordinado quando `is_admin(auth.uid())` ou `is_subordinate_of(target, auth.uid())`.
 
-### 5. Modo somente-leitura + ações administrativas
-
-Criar helper `useReadOnly()` em `viewAs.tsx`: `readOnly = !!viewAsUserId`.
-
-Regra geral nas páginas filtradas:
-- Esconder botões de **criar**, **editar**, **excluir**, **enviar e-mail**, **adicionar nota**, **upload**.
-- Manter visíveis e funcionais somente as **ações administrativas** que o gestor já tem permissão:
-  - Reatribuir lead (campo `assigned_to`).
-  - Marcar tarefa como concluída / reabrir.
-- Inputs editáveis recebem `disabled={readOnly && !isAdminAction}`.
-
-Implementação prática: passar `readOnly` para componentes de detalhe (`LeadDetail`, `TaskUpdatesPanel`, `EmailPanel`, etc.) e condicionar a renderização dos botões.
-
-### 6. Navegação e proteções
-
-- `AuthGate` permanece exigindo login do gestor real.
-- Se `viewAsUserId` apontar para um id que sumiu da lista de subordinados (mudança de hierarquia), `ViewAsProvider` chama `exitViewAs()` automaticamente.
-- O menu "Gerencial" continua visível durante a impersonação para permitir trocar de usuário ou sair.
-
-### 7. Auditoria
-
-Toda escrita continua usando `auth.uid()` real do gestor, então o `activity_log` registra corretamente quem executou a ação. Opcional: adicionar `viewing_as` no payload de notas/atividades em uma iteração futura.
-
-### Arquivos a criar
-- `src/lib/viewAs.tsx`
-
-### Arquivos a editar
-- `src/router.tsx` ou `src/routes/__root.tsx` (montar provider)
-- `src/components/AppShell.tsx` (banner)
-- `src/routes/gerencial.tsx` (disparar impersonação)
-- `src/routes/dashboard.tsx`, `funnel.tsx`, `leads.tsx`, `leads.$leadId.tsx`, `activities.tsx`, `email.tsx`, `bookings.tsx`, `customers.tsx`, `itineraries.tsx`, `workspace.tsx` (usar `effectiveUserId` + `readOnly`)
-
-### Fora do escopo
-- Login real (sessão Supabase) na conta do subordinado.
-- Migrations de RLS (políticas atuais já permitem leitura pelo gestor).
+## Critérios de aceitação
+- Clicar num usuário no Gerencial → app inteiro passa a mostrar dados dele em todos os menus (Dashboard, Leads, Funil, Atividades, Alertas, Reservas, Clientes, E-mails, Workspace).
+- Banner amarelo no topo identifica claramente que é sessão espelhada e oferece "Sair".
+- Criar um lead/tarefa enquanto impersonando grava `created_by` e `assigned_to` como o usuário-alvo.
+- Sair da visualização restaura instantaneamente a visão do gestor.
+- Menu "Gerencial" some/desabilita durante a impersonação.

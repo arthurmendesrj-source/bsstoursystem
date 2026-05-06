@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useCurrency } from "@/lib/currency";
 import { Can, MaskedField, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,6 +46,8 @@ const STATUSES = ["pre_reserva", "confirmada", "em_viagem", "concluida", "cancel
 function BookingsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { viewAs } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const { format } = useCurrency();
   const { can } = usePermissions();
   const [rows, setRows] = useState<Booking[]>([]);
@@ -57,8 +60,10 @@ function BookingsPage() {
   });
 
   const load = async () => {
+    let bookingsQ = supabase.from("bookings").select("*").order("created_at", { ascending: false });
+    if (targetUserId) bookingsQ = bookingsQ.eq("created_by", targetUserId);
     const [b, c, p, v] = await Promise.all([
-      supabase.from("bookings").select("*").order("created_at", { ascending: false }),
+      bookingsQ,
       supabase.from("customers").select("id,full_name").order("full_name"),
       supabase.from("packages").select("id,name,base_price,base_currency").eq("active", true),
       supabase.from("vouchers").select("booking_id,code"),
@@ -70,7 +75,7 @@ function BookingsPage() {
     setCustomers(c.data ?? []);
     setPkgs(p.data ?? []);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

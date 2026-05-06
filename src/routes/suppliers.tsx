@@ -257,6 +257,7 @@ function SuppliersPage() {
             </form>
             </DialogContent>
           </Dialog>
+          </Can>
         </div>
       </div>
 

@@ -239,9 +239,9 @@ function ItinerariesPage() {
     }));
     setJobs((prev) => [...newJobs, ...prev]);
 
-    // Concurrency 3
+    // Concurrency 2 (process-itinerary is memory-heavy)
     const queue = valid.map((f, idx) => ({ file: f, jobId: newJobs[idx].id }));
-    const CONCURRENCY = 3;
+    const CONCURRENCY = 2;
     const workers = Array.from({ length: CONCURRENCY }, async () => {
       while (queue.length) {
         const item = queue.shift();
@@ -297,14 +297,16 @@ function ItinerariesPage() {
         return;
       }
 
-      updateJob(jobId, { status: "processing" });
-      const { error: fnErr } = await supabase.functions.invoke("process-itinerary", {
-        body: { itinerary_id: ins.id },
-      });
-      if (fnErr) throw fnErr;
+      // Mark as ready (uploaded). Processing runs in background; status reflected via realtime.
       updateJob(jobId, { status: "ready" });
+      // Fire-and-forget: don't block the upload worker on AI processing
+      supabase.functions
+        .invoke("process-itinerary", { body: { itinerary_id: ins.id } })
+        .catch((err) => console.warn("process-itinerary kickoff failed", err));
     } catch (e: any) {
-      const msg = e?.message ?? String(e);
+      let msg = e?.message ?? String(e);
+      if (/memory limit/i.test(msg)) msg = "Documento muito grande — tente dividir";
+      if (msg.length > 140) msg = msg.slice(0, 140) + "…";
       updateJob(jobId, { status: "failed", error: msg });
     }
   };

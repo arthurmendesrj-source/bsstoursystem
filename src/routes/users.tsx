@@ -445,3 +445,107 @@ function InviteDialog({ isAdmin, onClose, onDone }: { isAdmin: boolean; onClose:
     </DialogContent>
   );
 }
+
+function DeleteUserDialog({
+  targetId,
+  targetName,
+  candidates,
+  authInfo,
+  onConfirm,
+}: {
+  targetId: string;
+  targetName: string;
+  candidates: ProfileRow[];
+  authInfo: Record<string, AuthUserInfo>;
+  onConfirm: (reassignTo: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"reassign" | "delete_all">("reassign");
+  const [reassignTo, setReassignTo] = useState<string>("");
+
+  const submit = () => {
+    if (mode === "reassign" && !reassignTo) {
+      toast.error("Selecione um usuário para reatribuir");
+      return;
+    }
+    onConfirm(mode === "reassign" ? reassignTo : null);
+    setOpen(false);
+    setReassignTo("");
+    setMode("reassign");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="ghost" title="Excluir">
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Excluir {targetName}?</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Escolha o que fazer com os dados vinculados (leads, clientes, orçamentos, reservas, interações):
+          </p>
+          <div className="space-y-3">
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={mode === "reassign"}
+                onChange={() => setMode("reassign")}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <div className="font-medium text-sm">Reatribuir para outro usuário</div>
+                <div className="text-xs text-muted-foreground mb-2">
+                  Os registros serão transferidos e preservados.
+                </div>
+                {mode === "reassign" && (
+                  <Select value={reassignTo} onValueChange={setReassignTo}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o usuário destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {candidates.map((c) => (
+                        <SelectItem key={c.user_id} value={c.user_id}>
+                          {c.full_name ?? authInfo[c.user_id]?.email ?? c.user_id}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            </label>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={mode === "delete_all"}
+                onChange={() => setMode("delete_all")}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <div className="font-medium text-sm text-destructive">Excluir todos os dados</div>
+                <div className="text-xs text-muted-foreground">
+                  Remove permanentemente leads, clientes, orçamentos, reservas e interações criados por este usuário. Não pode ser desfeito.
+                </div>
+              </div>
+            </label>
+          </div>
+          {/* targetId reserved for future use */}
+          <input type="hidden" value={targetId} />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            onClick={submit}
+          >
+            Excluir usuário
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

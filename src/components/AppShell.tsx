@@ -55,6 +55,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [collapsed]);
 
+  const crmRoutes = ["/dashboard", "/leads", "/funnel", "/workspace", "/packages"];
+  const isCrmActive = crmRoutes.some((r) => path === r || path.startsWith(r + "/"));
+  const [crmOpen, setCrmOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("sidebar:group:crm");
+    if (saved === null) return true;
+    return saved === "1";
+  });
+  useEffect(() => {
+    if (isCrmActive) setCrmOpen(true);
+  }, [isCrmActive]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebar:group:crm", crmOpen ? "1" : "0");
+    }
+  }, [crmOpen]);
+
   const items = [
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { to: "/leads", label: t("leads"), icon: UserPlus },

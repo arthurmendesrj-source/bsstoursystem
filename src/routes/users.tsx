@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useI18n } from "@/lib/i18n";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { filterAdmins } from "@/lib/hideAdmin";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/users")({

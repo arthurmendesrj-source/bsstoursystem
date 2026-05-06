@@ -53,7 +53,7 @@ for (const g of groups.values()) {
   let id = sh(`select id from suppliers where category='hotel' and lower(unaccent(name))=lower(unaccent(${q(g.name)})) and coalesce(lower(unaccent(address_city)),'')=coalesce(lower(unaccent(${q(g.city)})),'') limit 1;`);
   if (!id) {
     const code = 'FOR-HOT-' + Math.random().toString(36).slice(2,10).toUpperCase();
-    id = sh(`insert into suppliers (name, category, status, address_city, address_state, address_country, default_currency, code${adminUser?', created_by':''}) values (${q(g.name)},'hotel','ativo',${q(g.city)},${q(g.state)},${q(g.country)},${q(g.currency)}::currency_code,${q(code)}${adminUser?','+q(adminUser):''}) returning id;`);
+    id = sh(`with x as (insert into suppliers (name, category, status, address_city, address_state, address_country, default_currency, code${adminUser?', created_by':''}) values (${q(g.name)},'hotel','ativo',${q(g.city)},${q(g.state)},${q(g.country)},${q(g.currency)}::currency_code,${q(code)}${adminUser?','+q(adminUser):''}) returning id) select id from x;`);
     created++;
     console.log('CREATED', g.name, '->', id);
   } else { reused++; console.log('REUSED ', g.name, '->', id); }

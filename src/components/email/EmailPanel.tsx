@@ -17,7 +17,9 @@ import { useAuth } from "@/lib/auth";
 import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze } from "@/server/gmail.functions";
+import { gmailSync, gmailGet, gmailModify, gmailSend, emailAnalyze, emailAnalyzeLocal } from "@/server/gmail.functions";
+
+const isSeedId = (id: string | null | undefined) => !!id && id.startsWith("seed-");
 import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 import { toast } from "sonner";
 
@@ -57,6 +59,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const modifyFn = useServerFn(gmailModify);
   const sendFn = useServerFn(gmailSend);
   const analyzeFn = useServerFn(emailAnalyze);
+  const analyzeLocalFn = useServerFn(emailAnalyzeLocal);
 
   const [folder, setFolder] = useState<Folder>(mode === "lead" ? "withLead" : "inbox");
   const [search, setSearch] = useState("");
@@ -138,7 +141,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   }, [folder, leadId, mode]);
 
   useEffect(() => {
-    if (mode === "full") void doSync();
+    // Skip auto-sync to avoid 403 when no Gmail account is connected
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -149,7 +152,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
       toast.success(`${res.synced} e-mails`);
       await loadList(folder);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao sincronizar");
+      const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
+      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) {
+        toast.info("Nenhuma conta Gmail conectada");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setSyncing(false);
     }
@@ -162,6 +170,35 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     setLoadingBody(true);
     setShowCompose(null);
     try {
+      if (isSeedId(row.gmail_id)) {
+        // Build FullMessage shape from db row
+        const { data: fullRow } = await supabase
+          .from("emails")
+          .select("body_text, body_html, to_emails, thread_id, labels, snippet")
+          .eq("id", row.id)
+          .maybeSingle();
+        const localFull = {
+          id: row.gmail_id,
+          threadId: row.thread_id ?? "",
+          labelIds: (fullRow?.labels ?? row.labels ?? []) as string[],
+          snippet: (fullRow?.snippet ?? row.snippet ?? "") as string,
+          from: { name: row.from_name ?? "", email: row.from_email ?? "" },
+          to: ((fullRow?.to_emails ?? []) as string[]),
+          subject: row.subject ?? "",
+          date: row.received_at ?? undefined,
+          messageIdHeader: undefined,
+          references: undefined,
+          bodyHtml: (fullRow?.body_html ?? "") as string,
+          bodyText: (fullRow?.body_text ?? "") as string,
+          hasAttachments: false,
+        } as unknown as FullMessage;
+        setFull(localFull);
+        if (row.is_unread) {
+          await supabase.from("emails").update({ is_unread: false }).eq("id", row.id);
+          setEmails((prev) => prev.map((e) => (e.id === row.id ? { ...e, is_unread: false } : e)));
+        }
+        return;
+      }
       const m = await getFn({ data: { id: row.gmail_id } });
       setFull(m);
       if (row.is_unread) {
@@ -240,7 +277,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const archive = async () => {
     if (!selected) return;
     try {
-      await modifyFn({ data: { id: selected.gmail_id, removeLabelIds: ["INBOX"] } });
+      if (isSeedId(selected.gmail_id)) {
+        const newLabels = (selected.labels ?? []).filter((l) => l !== "INBOX");
+        await supabase.from("emails").update({ labels: newLabels }).eq("id", selected.id);
+      } else {
+        await modifyFn({ data: { id: selected.gmail_id, removeLabelIds: ["INBOX"] } });
+      }
       toast.success("OK");
       await loadList(folder);
       setSelectedId(null); setFull(null);
@@ -250,7 +292,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const trashIt = async () => {
     if (!selected) return;
     try {
-      await modifyFn({ data: { id: selected.gmail_id, trash: true } });
+      if (isSeedId(selected.gmail_id)) {
+        const labs = new Set<string>([...(selected.labels ?? []).filter((l) => l !== "INBOX"), "TRASH"]);
+        await supabase.from("emails").update({ labels: Array.from(labs) }).eq("id", selected.id);
+      } else {
+        await modifyFn({ data: { id: selected.gmail_id, trash: true } });
+      }
       toast.success("OK");
       await loadList(folder);
       setSelectedId(null); setFull(null);
@@ -261,13 +308,15 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     if (!selected) return;
     const wasUnread = selected.is_unread;
     try {
-      await modifyFn({
-        data: {
-          id: selected.gmail_id,
-          addLabelIds: wasUnread ? [] : ["UNREAD"],
-          removeLabelIds: wasUnread ? ["UNREAD"] : [],
-        },
-      });
+      if (!isSeedId(selected.gmail_id)) {
+        await modifyFn({
+          data: {
+            id: selected.gmail_id,
+            addLabelIds: wasUnread ? [] : ["UNREAD"],
+            removeLabelIds: wasUnread ? ["UNREAD"] : [],
+          },
+        });
+      }
       await supabase.from("emails").update({ is_unread: !wasUnread }).eq("id", selected.id);
       setEmails((prev) => prev.map((e) => (e.id === selected.id ? { ...e, is_unread: !wasUnread } : e)));
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
@@ -302,6 +351,10 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const sendCompose = async () => {
     if (!full) return;
     if (!composeTo.trim()) { toast.error("To?"); return; }
+    if (selected && isSeedId(selected.gmail_id)) {
+      toast.info("Email de teste — envio desabilitado");
+      return;
+    }
     setSending(true);
     try {
       await sendFn({
@@ -363,7 +416,9 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     if (!selected) return;
     setAnalyzing(true);
     try {
-      const r = await analyzeFn({ data: { gmail_id: selected.gmail_id } });
+      const r = isSeedId(selected.gmail_id)
+        ? await analyzeLocalFn({ data: { email_id: selected.id } })
+        : await analyzeFn({ data: { gmail_id: selected.gmail_id } });
       const s = (r.suggestion ?? {}) as Record<string, unknown>;
       setTriage({
         summary: (s.summary as string) || (s.notes as string) || selected.snippet || "",

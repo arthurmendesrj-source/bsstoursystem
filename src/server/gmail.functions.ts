@@ -227,6 +227,93 @@ export const gmailSync = createServerFn({ method: "POST" })
     return { synced: rows.length };
   });
 
+// ---------------- analyze a local (db-only / seed) email with AI ----------------
+export const emailAnalyzeLocal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { email_id: string }) => data)
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const { data: row, error } = await supabase
+      .from("emails")
+      .select("id, gmail_id, from_email, from_name, subject, snippet, body_text, body_html")
+      .eq("id", data.email_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row) throw new Error("Email not found");
+
+    const bodyForAi = ((row.body_text || (row.body_html ?? "").replace(/<[^>]+>/g, " ") || row.snippet || "") as string).slice(0, 8000);
+    const subject = row.subject ?? "";
+    const fromName = row.from_name ?? "";
+    const fromEmail = row.from_email ?? "";
+
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-3-flash-preview",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um assistente de uma operadora de turismo. Analise o e-mail recebido, gere um RESUMO curto em português (2-3 frases) e RECOMENDE uma ação ao operador: criar lead, criar atividade ou ignorar. Responda sempre via tool call.",
+          },
+          { role: "user", content: `De: ${fromName} <${fromEmail}>\nAssunto: ${subject}\n\n${bodyForAi}` },
+        ],
+        tools: [{
+          type: "function",
+          function: {
+            name: "extract_lead",
+            description: "Resume o e-mail, recomenda uma ação e extrai dados para criar um lead.",
+            parameters: {
+              type: "object",
+              properties: {
+                summary: { type: "string" },
+                suggested_action: { type: "string", enum: ["create_lead", "create_task", "ignore"] },
+                suggested_task_category: { type: ["string", "null"], enum: ["negocio", "suporte", null] },
+                suggested_task_priority: { type: ["string", "null"], enum: ["baixa", "media", "alta", null] },
+                suggested_task_title: { type: ["string", "null"] },
+                is_lead: { type: "boolean" },
+                intent: { type: "string", enum: ["cotacao", "duvida", "reclamacao", "outro"] },
+                customer_name: { type: ["string", "null"] },
+                customer_email: { type: ["string", "null"] },
+                customer_phone: { type: ["string", "null"] },
+                destination: { type: ["string", "null"] },
+                expected_travel_date: { type: ["string", "null"] },
+                pax: { type: ["integer", "null"] },
+                estimated_value: { type: ["number", "null"] },
+                currency: { type: ["string", "null"], enum: ["BRL", "USD", "EUR", null] },
+                notes: { type: ["string", "null"] },
+                next_action: { type: ["string", "null"] },
+              },
+              required: ["summary", "suggested_action", "is_lead", "intent"],
+              additionalProperties: false,
+            },
+          },
+        }],
+        tool_choice: { type: "function", function: { name: "extract_lead" } },
+      }),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      if (aiRes.status === 429) throw new Error("Limite de requisições da IA atingido. Tente novamente em instantes.");
+      if (aiRes.status === 402) throw new Error("Créditos da IA esgotados.");
+      throw new Error(`AI gateway ${aiRes.status}: ${errText}`);
+    }
+    const aiJson = await aiRes.json();
+    const toolCall = aiJson?.choices?.[0]?.message?.tool_calls?.[0];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let suggestion: any = {};
+    try { suggestion = toolCall?.function?.arguments ? JSON.parse(toolCall.function.arguments) : {}; } catch { suggestion = {}; }
+
+    await supabase.from("emails").update({ ai_suggestion: suggestion }).eq("id", row.id);
+
+    return { suggestion: suggestion as { [k: string]: unknown & {} }, from: { name: fromName, email: fromEmail }, subject };
+  });
+
 // ---------------- analyze with AI (returns suggestion only) ----------------
 export const emailAnalyze = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

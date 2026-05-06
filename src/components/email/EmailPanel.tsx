@@ -183,7 +183,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
           labelIds: (fullRow?.labels ?? row.labels ?? []) as string[],
           snippet: (fullRow?.snippet ?? row.snippet ?? "") as string,
           from: { name: row.from_name ?? "", email: row.from_email ?? "" },
-          to: ((fullRow?.to_emails ?? []) as string[]) ?? [],
+          to: ((fullRow?.to_emails ?? []) as string[]),
           subject: row.subject ?? "",
           date: row.received_at ?? undefined,
           messageIdHeader: undefined,

@@ -282,6 +282,7 @@ function BibliaPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Invoice</TableHead>
                   <TableHead className="min-w-[220px]">Serviço</TableHead>
                   <TableHead>Hotel</TableHead>
                   <TableHead>Motorista</TableHead>
@@ -291,7 +292,6 @@ function BibliaPage() {
                   <TableHead>P</TableHead>
                   <TableHead>Cidade</TableHead>
                   <TableHead className="text-center">Pax</TableHead>
-                  <TableHead>Fatura</TableHead>
                   <TableHead>Nome Pax</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>

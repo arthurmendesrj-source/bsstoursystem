@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [collapsed]);
 
-  const crmRoutes = ["/dashboard", "/leads", "/funnel", "/workspace", "/packages", "/assistant"];
+  const crmRoutes = ["/dashboard", "/leads", "/funnel", "/workspace", "/packages"];
   const isCrmActive = crmRoutes.some((r) => path === r || path.startsWith(r + "/"));
   const [crmOpen, setCrmOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;

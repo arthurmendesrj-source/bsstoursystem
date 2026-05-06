@@ -22,6 +22,7 @@ import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
+import { ServiceDialog } from "./ServiceDialog";
 
 type Mode = "proposal" | "invoice";
 
@@ -84,6 +85,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [docsRefresh, setDocsRefresh] = useState(0);
   const [flights, setFlights] = useState<FlightRow[]>([]);
   const [flightDialogOpen, setFlightDialogOpen] = useState(false);
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
 
   const loadFlights = async () => {
@@ -383,7 +385,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
             <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => addItem("service")}>
+          <Button variant="outline" size="sm" onClick={() => setServiceDialogOpen(true)}>
             <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>

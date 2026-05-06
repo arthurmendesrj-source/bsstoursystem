@@ -54,6 +54,31 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action: string = body.action;
+    const actorEmail = userData.user.email ?? null;
+
+    const audit = async (entry: {
+      action: string;
+      target_user_id?: string | null;
+      target_email?: string | null;
+      details?: Record<string, unknown>;
+      success?: boolean;
+      error_message?: string | null;
+    }) => {
+      try {
+        await admin.from("user_audit_log").insert({
+          action: entry.action,
+          actor_id: callerId,
+          actor_email: actorEmail,
+          target_user_id: entry.target_user_id ?? null,
+          target_email: entry.target_email ?? null,
+          details: entry.details ?? {},
+          success: entry.success ?? true,
+          error_message: entry.error_message ?? null,
+        });
+      } catch (e) {
+        console.warn("audit log failed", e);
+      }
+    };
 
     // Helper: get target roles
     const getRolesOf = async (uid: string): Promise<Set<AppRole>> => {
@@ -77,6 +102,17 @@ Deno.serve(async (req) => {
       return json({ users: out });
     }
 
+    if (action === "list_audit") {
+      const limit = Math.min(Number(body.limit ?? 100), 500);
+      const { data, error } = await admin
+        .from("user_audit_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) return json({ error: error.message }, 500);
+      return json({ entries: data ?? [] });
+    }
+
     if (action === "resend_invite") {
       const targetId = String(body.user_id ?? "");
       if (!targetId) return json({ error: "user_id obrigatório" }, 400);
@@ -91,6 +127,7 @@ Deno.serve(async (req) => {
       const redirectTo = req.headers.get("origin") ? `${req.headers.get("origin")}/` : undefined;
       const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, { redirectTo });
       if (error) return json({ error: error.message }, 400);
+      await audit({ action: "resend_invite", target_user_id: targetId, target_email: u.user.email });
       return json({ ok: true });
     }
 
@@ -120,6 +157,12 @@ Deno.serve(async (req) => {
         const rows = requestedRoles.map((role) => ({ user_id: invited.user!.id, role }));
         await admin.from("user_roles").insert(rows);
       }
+      await audit({
+        action: "invite",
+        target_user_id: invited.user.id,
+        target_email: email,
+        details: { roles: requestedRoles, full_name: fullName },
+      });
       return json({ ok: true, user_id: invited.user.id });
     }
 
@@ -134,10 +177,16 @@ Deno.serve(async (req) => {
         }
       }
       const ban_duration = action === "block" ? "876000h" : "none";
+      const { data: tgtUser } = await admin.auth.admin.getUserById(targetId);
       const { error } = await admin.auth.admin.updateUserById(targetId, {
         ban_duration,
       } as unknown as Record<string, unknown>);
       if (error) return json({ error: error.message }, 500);
+      await audit({
+        action,
+        target_user_id: targetId,
+        target_email: tgtUser?.user?.email ?? null,
+      });
       return json({ ok: true });
     }
 
@@ -156,10 +205,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Capture target email/info before deletion
+      const { data: tgtBefore } = await admin.auth.admin.getUserById(targetId);
+      const targetEmail = tgtBefore?.user?.email ?? null;
+
       // Validate reassign target exists
+      let reassignEmail: string | null = null;
       if (reassignTo) {
         const { data: tgt, error: tgtErr } = await admin.auth.admin.getUserById(reassignTo);
         if (tgtErr || !tgt.user) return json({ error: "Usuário de reatribuição não encontrado" }, 400);
+        reassignEmail = tgt.user.email ?? null;
       }
 
       if (reassignTo) {
@@ -214,6 +269,17 @@ Deno.serve(async (req) => {
       // 7) auth user
       const { error: delErr } = await admin.auth.admin.deleteUser(targetId);
       if (delErr) return json({ error: delErr.message }, 500);
+
+      await audit({
+        action: "delete",
+        target_user_id: targetId,
+        target_email: targetEmail,
+        details: {
+          reassigned_to: reassignTo,
+          reassigned_to_email: reassignEmail,
+          mode: reassignTo ? "reassign" : "cascade_delete",
+        },
+      });
 
       return json({ ok: true });
     }

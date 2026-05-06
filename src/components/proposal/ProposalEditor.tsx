@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useI18n } from "@/lib/i18n";
+import { usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -691,6 +692,11 @@ function ItemTable({
   onEdit?: (id: string) => void;
 }) {
   const { t } = useI18n();
+  const { canField } = usePermissions();
+  const showCost = canField("quotes", "unit_cost", "view");
+  const showMarkup = canField("quotes", "markup_pct", "view");
+  const editCost = canField("quotes", "unit_cost", "edit");
+  const editMarkup = canField("quotes", "markup_pct", "edit");
   const isHotel = kind === "hotel";
   if (rows.length === 0) {
     return (
@@ -716,8 +722,8 @@ function ItemTable({
                 <th className="text-left p-2 w-32">{t("serviceDate")}</th>
               )}
               <th className="text-left p-2 min-w-[280px]">{t("name")}</th>
-              {!readOnly && <th className="text-right p-2 w-28">{t("unitCost")} ({ccy})</th>}
-              {!readOnly && <th className="text-right p-2 w-20">{t("markup")} %</th>}
+              {!readOnly && showCost && <th className="text-right p-2 w-28">{t("unitCost")} ({ccy})</th>}
+              {!readOnly && showMarkup && <th className="text-right p-2 w-20">{t("markup")} %</th>}
               <th className="text-right p-2 w-28">{t("price")} ({ccy})</th>
               <th className="text-right p-2 w-20">{isHotel ? t("nights") : t("quantity")}</th>
               <th className="text-right p-2 w-32">{t("subtotal")} ({ccy})</th>
@@ -780,22 +786,24 @@ function ItemTable({
                       className="h-8 w-full min-w-[260px]"
                     />
                   </td>
-                  {!readOnly && (
+                  {!readOnly && showCost && (
                     <td className="p-2">
                       <Input
                         type="number" step="0.01"
                         value={it.unit_cost}
                         onChange={(e) => onChange(i, { unit_cost: Number(e.target.value) })}
+                        disabled={!editCost}
                         className="h-8 text-right"
                       />
                     </td>
                   )}
-                  {!readOnly && (
+                  {!readOnly && showMarkup && (
                     <td className="p-2">
                       <Input
                         type="number" step="0.1"
                         value={it.markup_pct}
                         onChange={(e) => onChange(i, { markup_pct: Number(e.target.value) })}
+                        disabled={!editMarkup}
                         className="h-8 text-right"
                       />
                     </td>

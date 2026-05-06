@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
+import { Can, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -45,6 +46,7 @@ function LeadsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const { format } = useCurrency();
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [open, setOpen] = useState(false);
@@ -93,6 +95,10 @@ function LeadsPage() {
     s === "qualificado" ? "bg-blue-500/10 text-blue-700" :
     "bg-slate-500/10 text-slate-700";
 
+  if (!can("leads", "view")) {
+    return <Card className="p-12 text-center text-muted-foreground">Sem permissão para visualizar Leads</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -100,6 +106,7 @@ function LeadsPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("leads")}</h1>
           <p className="text-muted-foreground">{leads.length} {t("leads").toLowerCase()}</p>
         </div>
+        <Can module="leads" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button>
@@ -129,6 +136,7 @@ function LeadsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </Can>
       </div>
 
       <Card>
@@ -155,7 +163,7 @@ function LeadsPage() {
                 <TableCell>{l.destination ?? "—"}</TableCell>
                 <TableCell>{l.estimated_value ? format(Number(l.estimated_value), l.currency as "BRL") : "—"}</TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
-                  <Select value={l.status} onValueChange={(v) => updateStatus(l.id, v)}>
+                  <Select value={l.status} onValueChange={(v) => updateStatus(l.id, v)} disabled={!can("leads", "edit")}>
                     <SelectTrigger className="h-8 w-36">
                       <Badge variant="outline" className={statusColor(l.status)}>{l.status}</Badge>
                     </SelectTrigger>

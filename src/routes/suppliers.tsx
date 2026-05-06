@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { Can, MaskedField, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -78,6 +79,7 @@ const emptyForm = {
 function SuppliersPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const [rows, setRows] = useState<Supplier[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -153,6 +155,10 @@ function SuppliersPage() {
     else { toast.success(t("saved")); load(); }
   };
 
+  if (!can("suppliers", "view")) {
+    return <Card className="p-12 text-center text-muted-foreground">Sem permissão para visualizar Fornecedores</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -161,7 +167,8 @@ function SuppliersPage() {
           <p className="text-muted-foreground">{filtered.length} / {rows.length}</p>
         </div>
         <div className="flex gap-2">
-          <BulkAIButtons />
+          <Can module="suppliers" action="create"><BulkAIButtons /></Can>
+          <Can module="suppliers" action="create">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("addManually")}</Button></DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -250,6 +257,7 @@ function SuppliersPage() {
             </form>
             </DialogContent>
           </Dialog>
+          </Can>
         </div>
       </div>
 
@@ -283,9 +291,11 @@ function SuppliersPage() {
             ) : filtered.map((s, i) => (
               <TableRow key={s.id} className={i % 2 === 0 ? "bg-muted/30" : ""}>
                 <TableCell>
+                  <Can module="suppliers" action="delete">
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name); }}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                  </Can>
                 </TableCell>
                 <TableCell className="font-semibold">{s.name}</TableCell>
                 <TableCell><Badge variant="outline">{t(CAT_LABEL[s.category])}</Badge></TableCell>
@@ -385,7 +395,9 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                   <Row k={t("website")} v={supplier.website} />
                   <Row k={t("address")} v={[supplier.address_city, supplier.address_country].filter(Boolean).join(", ") || null} />
                   <Row k={t("paymentTerms")} v={supplier.payment_terms} />
-                  <Row k={t("commission")} v={supplier.commission_pct != null ? `${supplier.commission_pct}%` : null} />
+                  {supplier.commission_pct != null && (
+                    <div className="flex gap-2"><span className="text-muted-foreground w-32 shrink-0">{t("commission")}</span><span className="flex-1"><MaskedField module="suppliers" field="commission_pct" value={`${supplier.commission_pct}%`} /></span></div>
+                  )}
                   <Row k={t("currency")} v={supplier.default_currency} />
                   <Row k={t("rating")} v={supplier.rating?.toString() ?? null} />
                   <Row k={t("tags")} v={supplier.tags?.join(", ") || null} />
@@ -405,7 +417,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                   {bookings.length === 0
                     ? <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
                     : <div className="space-y-2 mt-2">{bookings.map((b) => (
-                        <Card key={b.id} className="p-3 text-sm">{b.service_type ?? "—"} · {b.confirmation_code ?? "—"} · {b.currency} {Number(b.cost ?? 0).toFixed(2)}</Card>
+                        <Card key={b.id} className="p-3 text-sm">{b.service_type ?? "—"} · {b.confirmation_code ?? "—"} · {b.currency} <MaskedField module="bookings" field="cost" value={Number(b.cost ?? 0).toFixed(2)} /></Card>
                       ))}</div>}
                 </TabsContent>
                 <TabsContent value="emails">
@@ -440,7 +452,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                             <TableCell className="text-xs">{r.service_name}{r.category ? ` (${r.category})` : ""}</TableCell>
                             <TableCell className="text-xs">{r.city ?? "—"}</TableCell>
                             <TableCell className="text-xs">{r.pax_min ?? "—"}{r.pax_max ? `-${r.pax_max}` : ""}</TableCell>
-                            <TableCell className="text-right text-xs">{r.currency} {Number(r.unit_price).toFixed(2)}</TableCell>
+                            <TableCell className="text-right text-xs">{r.currency} <MaskedField module="supplier_rates" field="unit_price" value={Number(r.unit_price).toFixed(2)} /></TableCell>
                           </TableRow>
                         ))}
                       </TableBody></Table></div>}

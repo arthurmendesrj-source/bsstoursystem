@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
+import { Can, MaskedField, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -45,6 +46,7 @@ function BookingsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const { format } = useCurrency();
+  const { can } = usePermissions();
   const [rows, setRows] = useState<Booking[]>([]);
   const [customers, setCustomers] = useState<{ id: string; full_name: string }[]>([]);
   const [pkgs, setPkgs] = useState<{ id: string; name: string; base_price: number; base_currency: string }[]>([]);
@@ -127,6 +129,10 @@ function BookingsPage() {
     s === "concluida" ? "bg-slate-500/10 text-slate-700" :
     "bg-amber-500/10 text-amber-700";
 
+  if (!can("bookings", "view")) {
+    return <Card className="p-12 text-center text-muted-foreground">Sem permissão para visualizar Reservas</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -134,6 +140,7 @@ function BookingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("bookings")}</h1>
           <p className="text-muted-foreground">{rows.length}</p>
         </div>
+        <Can module="bookings" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
@@ -181,6 +188,7 @@ function BookingsPage() {
             </form>
           </DialogContent>
         </Dialog>
+        </Can>
       </div>
 
       <Card>
@@ -204,9 +212,11 @@ function BookingsPage() {
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
                 <TableCell>{pkgName(b.package_id)}</TableCell>
                 <TableCell>{b.departure_date ?? "—"}</TableCell>
-                <TableCell>{format(Number(b.total_amount), b.currency as "BRL")}</TableCell>
                 <TableCell>
-                  <Select value={b.status} onValueChange={(v) => updateStatus(b.id, v)}>
+                  <MaskedField module="bookings" field="total_amount" value={format(Number(b.total_amount), b.currency as "BRL")} />
+                </TableCell>
+                <TableCell>
+                  <Select value={b.status} onValueChange={(v) => updateStatus(b.id, v)} disabled={!can("bookings", "edit")}>
                     <SelectTrigger className="h-8 w-36">
                       <Badge variant="outline" className={statusColor(b.status)}>{b.status}</Badge>
                     </SelectTrigger>

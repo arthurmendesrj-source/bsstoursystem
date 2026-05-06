@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { getAdminIds } from "@/lib/hideAdmin";
 
 export const Route = createFileRoute("/alerts/history")({
   component: () => (

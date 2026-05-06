@@ -440,7 +440,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
         customer_id: selected.customer_id,
         due_date: taskForm.due_date || null,
         created_by: user.id,
-        assigned_to: user.id,
+        assigned_to: taskForm.assigned_to || user.id,
       });
       if (error) throw error;
       toast.success(t("taskCreated"));

@@ -292,7 +292,6 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
             <Input type="number" min={1} value={qty} onChange={(e) => setQty(Number(e.target.value))} className={errClass("qty")} />
           </div>
 
-          <div>
           {canViewCost && (
             <div>
               <Label className="text-xs">Total</Label>

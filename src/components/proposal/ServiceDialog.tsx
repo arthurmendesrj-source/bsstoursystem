@@ -104,12 +104,20 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     if (serviceOpts.some((o) => norm(o.label) === norm(trimmed))) return;
     const slug = slugify(trimmed);
     if (!slug) return;
+    const { data: existing } = await supabase
+      .from("ref_services")
+      .select("id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (existing) return;
     const { error } = await supabase
       .from("ref_services")
       .upsert({ name: trimmed, slug, category_id: null }, { onConflict: "slug", ignoreDuplicates: true });
     if (error) {
       console.warn("ref_services upsert failed:", error.message);
+      return;
     }
+    toast.success(`Novo serviço cadastrado: ${trimmed}`);
   };
 
   const ensureRefCity = async (name: string) => {

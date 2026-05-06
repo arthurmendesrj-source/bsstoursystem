@@ -129,6 +129,10 @@ function BookingsPage() {
     s === "concluida" ? "bg-slate-500/10 text-slate-700" :
     "bg-amber-500/10 text-amber-700";
 
+  if (!can("bookings", "view")) {
+    return <Card className="p-12 text-center text-muted-foreground">Sem permissão para visualizar Reservas</Card>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -136,6 +140,7 @@ function BookingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("bookings")}</h1>
           <p className="text-muted-foreground">{rows.length}</p>
         </div>
+        <Can module="bookings" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button></DialogTrigger>
           <DialogContent className="max-w-lg">

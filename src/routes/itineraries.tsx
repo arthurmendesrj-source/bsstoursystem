@@ -64,6 +64,7 @@ type Itinerary = {
   summary: string | null;
   processing_status: "pending" | "processing" | "ready" | "failed";
   processing_error: string | null;
+  language: string | null;
   created_at: string;
 };
 
@@ -97,6 +98,7 @@ function ItinerariesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tripType, setTripType] = useState<string>("all");
+  const [language, setLanguage] = useState<string>("all");
   const [semanticQuery, setSemanticQuery] = useState("");
   const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
   const [semanticBusy, setSemanticBusy] = useState(false);
@@ -136,6 +138,7 @@ function ItinerariesPage() {
   const filtered = rows.filter((r) => {
     if (semanticIds && !semanticIds.includes(r.id)) return false;
     if (tripType !== "all" && r.trip_type !== tripType) return false;
+    if (language !== "all" && r.language !== language) return false;
     if (search) {
       const q = search.toLowerCase();
       const hay = [
@@ -432,7 +435,7 @@ function ItinerariesPage() {
       )}
 
       <Card className="p-4 space-y-3">
-        <div className="grid gap-2 md:grid-cols-[1fr,200px,1fr,auto]">
+        <div className="grid gap-2 md:grid-cols-[1fr,180px,160px,1fr,auto]">
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -453,6 +456,17 @@ function ItinerariesPage() {
                   {t.l}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os idiomas</SelectItem>
+              <SelectItem value="en">Inglês</SelectItem>
+              <SelectItem value="es">Espanhol</SelectItem>
+              <SelectItem value="ru">Russo</SelectItem>
             </SelectContent>
           </Select>
           <div className="relative">

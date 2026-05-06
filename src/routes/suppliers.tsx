@@ -415,7 +415,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                   {bookings.length === 0
                     ? <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
                     : <div className="space-y-2 mt-2">{bookings.map((b) => (
-                        <Card key={b.id} className="p-3 text-sm">{b.service_type ?? "—"} · {b.confirmation_code ?? "—"} · {b.currency} {Number(b.cost ?? 0).toFixed(2)}</Card>
+                        <Card key={b.id} className="p-3 text-sm">{b.service_type ?? "—"} · {b.confirmation_code ?? "—"} · {b.currency} <MaskedField module="bookings" field="cost" value={Number(b.cost ?? 0).toFixed(2)} /></Card>
                       ))}</div>}
                 </TabsContent>
                 <TabsContent value="emails">

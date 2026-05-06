@@ -77,6 +77,11 @@ function fmtDate(d?: string | null) {
 
 export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
+  const { can } = usePermissions();
+  const canEdit = can("quotes", "edit");
+  const canDelete = can("quotes", "delete");
+  const canApprove = can("quotes", "approve");
+  const canCreateBooking = can("bookings", "create");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<QuoteRow | null>(null);

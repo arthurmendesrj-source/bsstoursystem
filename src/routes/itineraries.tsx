@@ -137,6 +137,7 @@ function ItinerariesPage() {
   const filtered = rows.filter((r) => {
     if (semanticIds && !semanticIds.includes(r.id)) return false;
     if (tripType !== "all" && r.trip_type !== tripType) return false;
+    if (language !== "all" && r.language !== language) return false;
     if (search) {
       const q = search.toLowerCase();
       const hay = [

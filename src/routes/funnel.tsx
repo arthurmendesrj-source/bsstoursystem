@@ -48,7 +48,7 @@ type Filter = "all" | "risk" | "overdue";
 function FunnelPage() {
   const { t } = useI18n();
   const { format } = useCurrency();
-  const { viewAs, readOnly } = useViewAs();
+  const { viewAs } = useViewAs();
   const targetUserId = viewAs?.user_id ?? null;
   const [leads, setLeads] = useState<Lead[]>([]);
   const [lastByLead, setLastByLead] = useState<Record<string, string>>({});
@@ -99,7 +99,7 @@ function FunnelPage() {
   }, [leads, slaByLead, filter]);
 
   const onDrop = async (status: string) => {
-    if (!dragId || readOnly) return;
+    if (!dragId) return;
     const { error } = await supabase.from("leads").update({ status: status as "novo" }).eq("id", dragId);
     if (error) toast.error(error.message);
     else setLeads((cur) => cur.map((l) => (l.id === dragId ? { ...l, status } : l)));
@@ -148,9 +148,9 @@ function FunnelPage() {
                     return (
                       <Card
                         key={l.id}
-                        draggable={!readOnly}
-                        onDragStart={() => !readOnly && setDragId(l.id)}
-                        className={readOnly ? "p-3 hover:shadow-md" : "cursor-move p-3 hover:shadow-md"}
+                        draggable
+                        onDragStart={() => setDragId(l.id)}
+                        className="cursor-move p-3 hover:shadow-md"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <Link to="/leads/$leadId" params={{ leadId: l.id }} className="text-sm font-medium hover:underline truncate">

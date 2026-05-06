@@ -292,6 +292,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const removeItem = async (idx: number) => {
     const it = items[idx];
     if (it.id && !it.id.startsWith("new-")) {
+      if (!canEdit && !canDelete) { toast.error("Sem permissão"); return; }
       await supabase.from("quote_items").delete().eq("id", it.id);
     }
     setItems((arr) => arr.filter((_, i) => i !== idx));

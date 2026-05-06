@@ -134,10 +134,22 @@ Deno.serve(async (req) => {
       .update({ processing_status: "processing", processing_error: null })
       .eq("id", itineraryId);
 
-    // 1. Download
-    const { data: blob, error: dlErr } = await supabase.storage.from("itineraries").download(it.storage_path);
-    if (dlErr || !blob) throw new Error(`download: ${dlErr?.message}`);
-    let buf: ArrayBuffer | null = await blob.arrayBuffer();
+    // 1. Download via signed URL + fetch (more robust than .download() for large/odd-named files)
+    let buf: ArrayBuffer | null = null;
+    try {
+      const { data: signed, error: signErr } = await supabase.storage
+        .from("itineraries")
+        .createSignedUrl(it.storage_path, 60);
+      if (signErr || !signed?.signedUrl) throw new Error(signErr?.message || "no signed url");
+      const resp = await fetch(signed.signedUrl);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      buf = await resp.arrayBuffer();
+    } catch (e) {
+      // fallback to SDK download
+      const { data: blob, error: dlErr } = await supabase.storage.from("itineraries").download(it.storage_path);
+      if (dlErr || !blob) throw new Error(`download: ${(e as Error).message} / ${dlErr?.message ?? "no blob"}`);
+      buf = await blob.arrayBuffer();
+    }
 
     // 2. Extract text
     let text = await extractTextFromFile(buf!, it.file_format);

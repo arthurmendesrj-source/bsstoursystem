@@ -112,6 +112,8 @@ Deno.serve(async (req) => {
       if (error) return json({ error: error.message }, 500);
       return json({ entries: data ?? [] });
     }
+
+    if (action === "resend_invite") {
       const targetId = String(body.user_id ?? "");
       if (!targetId) return json({ error: "user_id obrigatório" }, 400);
       const { data: u, error: gErr } = await admin.auth.admin.getUserById(targetId);

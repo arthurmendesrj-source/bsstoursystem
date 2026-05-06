@@ -124,8 +124,12 @@ function SlaPanel() {
     reloadEscalations();
     // Carrega vendedores (perfis com role 'vendedor' ou todos os profiles para selecionar)
     (async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name");
-      setSellers((data ?? []) as { user_id: string; full_name: string | null }[]);
+      const [{ data }, { data: rls }] = await Promise.all([
+        supabase.from("profiles").select("user_id, full_name"),
+        supabase.from("user_roles").select("user_id, role"),
+      ]);
+      const filtered = filterAdmins((data ?? []) as { user_id: string; full_name: string | null }[], (rls ?? []) as { user_id: string; role: string }[]);
+      setSellers(filtered);
     })();
   }, [isAdmin]);
 

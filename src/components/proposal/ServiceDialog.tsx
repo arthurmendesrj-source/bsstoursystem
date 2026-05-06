@@ -63,13 +63,13 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
 
   useEffect(() => {
     if (!open) return;
-    setDate(format(new Date(), "yyyy-MM-dd"));
-    setCity("");
-    setService("");
-    setGuideType("");
-    setPax(1);
-    setTotal("");
-    setNotes("");
+    setDate(initial?.item_date || format(new Date(), "yyyy-MM-dd"));
+    setCity(initial?.city ?? "");
+    setService(initial?.description ?? "");
+    setGuideType(initial?.guide_type ?? "");
+    setPax(initial?.pax ?? 1);
+    setTotal(initial?.total != null ? String(initial.total) : "");
+    setNotes(initial?.notes ?? "");
     setErrors({});
     (async () => {
       const [cRes, sRes] = await Promise.all([
@@ -79,7 +79,8 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
       setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
       setServiceOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
     })();
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id]);
 
   const dateObj = date ? new Date(date + "T00:00:00") : undefined;
 

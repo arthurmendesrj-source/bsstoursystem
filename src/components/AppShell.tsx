@@ -21,7 +21,9 @@ import {
   Library,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   BarChart3,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";

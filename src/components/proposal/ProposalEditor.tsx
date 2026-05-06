@@ -434,7 +434,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
             <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
+          <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
             <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>

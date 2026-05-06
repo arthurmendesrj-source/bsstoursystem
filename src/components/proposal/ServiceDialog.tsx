@@ -106,9 +106,9 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     if (!slug) return;
     const { error } = await supabase
       .from("ref_services")
-      .insert({ name: trimmed, slug, category_id: null });
-    if (error && !/duplicate|unique/i.test(error.message)) {
-      console.warn("ref_services insert failed:", error.message);
+      .upsert({ name: trimmed, slug, category_id: null }, { onConflict: "slug", ignoreDuplicates: true });
+    if (error) {
+      console.warn("ref_services upsert failed:", error.message);
     }
   };
 
@@ -120,9 +120,9 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     if (!slug) return;
     const { error } = await supabase
       .from("ref_cities")
-      .insert({ name: trimmed, slug });
-    if (error && !/duplicate|unique/i.test(error.message)) {
-      console.warn("ref_cities insert failed:", error.message);
+      .upsert({ name: trimmed, slug }, { onConflict: "slug", ignoreDuplicates: true });
+    if (error) {
+      console.warn("ref_cities upsert failed:", error.message);
     }
   };
 

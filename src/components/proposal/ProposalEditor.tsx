@@ -23,6 +23,7 @@ import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
 import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
+import { HotelDialog, type HotelInitial } from "./HotelDialog";
 
 type Mode = "proposal" | "invoice";
 
@@ -88,6 +89,33 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceInitial | null>(null);
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
+  const [hotelDialogOpen, setHotelDialogOpen] = useState(false);
+  const [editingHotel, setEditingHotel] = useState<HotelInitial | null>(null);
+
+  const openEditHotel = async (id: string) => {
+    const { data, error } = await supabase
+      .from("quote_items")
+      .select("id,item_date,check_out,city,description,category,meal_plan,rooms,total,notes")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) {
+      toast.error(error?.message ?? "Erro ao carregar hotel");
+      return;
+    }
+    setEditingHotel({
+      id: data.id,
+      item_date: data.item_date,
+      check_out: data.check_out,
+      city: data.city,
+      description: data.description,
+      category: data.category,
+      meal_plan: data.meal_plan,
+      rooms: data.rooms,
+      total: data.total != null ? Number(data.total) : null,
+      notes: data.notes,
+    });
+    setHotelDialogOpen(true);
+  };
 
   const openEditService = async (id: string) => {
     const { data, error } = await supabase
@@ -406,7 +434,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
             <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
+          <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
             <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
@@ -511,7 +539,10 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         ccy={ccy}
         readOnly={readOnly}
         onChange={updateItem}
-        onRemove={removeItem}
+        onRemove={(idx) => {
+          if (confirm("Tem certeza que deseja excluir este hotel?")) removeItem(idx);
+        }}
+        onEdit={(id) => openEditHotel(id)}
       />
 
       <ItemTable
@@ -591,6 +622,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         quoteId={quoteId}
         defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
         initial={editingService}
+        onSaved={load}
+      />
+
+      <HotelDialog
+        open={hotelDialogOpen}
+        onOpenChange={(o) => { setHotelDialogOpen(o); if (!o) setEditingHotel(null); }}
+        quoteId={quoteId}
+        defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
+        initial={editingHotel}
         onSaved={load}
       />
 

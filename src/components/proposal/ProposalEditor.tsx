@@ -409,7 +409,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
             <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setServiceDialogOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
             <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
@@ -522,6 +522,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         readOnly={readOnly}
         onChange={updateItem}
         onRemove={removeItem}
+        onEdit={(id) => openEditService(id)}
       />
 
       <div className="rounded-md border">
@@ -584,9 +585,10 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
       <ServiceDialog
         open={serviceDialogOpen}
-        onOpenChange={setServiceDialogOpen}
+        onOpenChange={(o) => { setServiceDialogOpen(o); if (!o) setEditingService(null); }}
         quoteId={quoteId}
         defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
+        initial={editingService}
         onSaved={load}
       />
 

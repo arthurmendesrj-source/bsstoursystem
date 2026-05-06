@@ -156,7 +156,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   };
 
   const removeFlight = async (id: string) => {
-    if (!canEdit && !canDelete) { toast.error(t("noPermission") ?? "Sem permissão"); return; }
+    if (!canEdit && !canDelete) { toast.error("Sem permissão"); return; }
     const { error } = await supabase.from("quote_flights").delete().eq("id", id);
     if (error) {
       toast.error(error.message);

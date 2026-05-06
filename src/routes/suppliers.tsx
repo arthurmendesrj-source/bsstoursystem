@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Eye, Star } from "lucide-react";
+import { Plus, Search, Eye, Star, Sparkles, FileText, Loader2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -153,8 +153,10 @@ function SuppliersPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("suppliers")}</h1>
           <p className="text-muted-foreground">{filtered.length} / {rows.length}</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("addManually")}</Button></DialogTrigger>
+        <div className="flex gap-2">
+          <BulkAIButtons />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("addManually")}</Button></DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{t("new")} {t("suppliers")}</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-4">

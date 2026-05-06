@@ -659,15 +659,19 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
 
       <div className="rounded-md border p-4 space-y-1.5 bg-muted/20">
-        {!readOnly && (
+        {!readOnly && viewCostFields && (
           <>
             <Row label={t("costSubtotal")} value={fmt(totals.costSubtotal, ccy)} muted />
+          </>
+        )}
+        {!readOnly && viewMarkupTotals && (
+          <>
             <Row label={t("markupTotal")} value={fmt(totals.markupTotal, ccy)} muted />
             <Separator className="my-1" />
           </>
         )}
         <Row label={t("totalPrice")} value={fmt(totals.subtotal, ccy)} />
-        <Row label={t("bankFee")} value={fmt(totals.bankFee, ccy)} muted />
+        {viewDiscount && <Row label={t("bankFee")} value={fmt(totals.bankFee, ccy)} muted />}
         <Separator className="my-1" />
         <Row label={t("totalToPay")} value={fmt(totals.total, ccy)} bold />
       </div>

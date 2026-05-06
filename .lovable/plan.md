@@ -1,30 +1,20 @@
-## Plano: Desvincular Google e limpar emails
+## Plano: Desconectar todas as contas Gmail do projeto
 
 ### O que será feito
 
-1. **Apagar emails reais do Google** da tabela `public.emails`
-   - Manter apenas os 50 emails de teste (`gmail_id LIKE 'seed-2026-%'`)
-   - Remover todos os outros registros (sincronizados via Gmail API)
+1. **Desconectar TODAS as conexões Gmail vinculadas ao projeto**
+   - `arthurmendesrj@gmail.com`
+   - `booking@adatours.com`
+   - Usar `standard_connectors--disconnect` para cada uma — remove os secrets `GOOGLE_MAIL_API_KEY` e `GOOGLE_MAIL_API_KEY_1` do projeto
+   - As conexões continuam existindo no workspace, apenas deixam de estar vinculadas a este projeto
 
-2. **Desvincular contas Google dos usuários**
-   - Limpar tokens/credenciais armazenados (tabelas tipo `gmail_accounts`, `google_tokens`, `user_integrations` ou similar — preciso confirmar o nome exato)
-   - Remover qualquer referência de conexão Gmail nos perfis dos usuários
+2. **Garantir que apenas os 50 emails de teste permaneçam**
+   - Conferir `public.emails` e apagar qualquer registro que não seja `gmail_id LIKE 'seed-2026-%'`
+   - Os 50 seeds (`seed-2026-1` a `seed-2026-50`) ficam preservados
 
-3. **Limpar dados relacionados** (se existirem)
-   - Histórico de sincronização (`sync_state`, `gmail_sync`, etc.)
-   - Labels/threads importados do Gmail real
+3. **Efeito no app**
+   - Botões/funções de sync, envio e análise via Gmail (`src/server/gmail.functions.ts`) vão falhar com "GOOGLE_MAIL_API_KEY is not configured" até alguém reconectar
+   - A inbox renderizada lê da tabela `emails` — continuará mostrando só os 50 fakes
+   - Nenhum código será removido (só desvinculação de credenciais); se quiser também esconder a UI de Gmail, me diga
 
-### Antes de executar preciso confirmar
-
-Como a busca de schema do Supabase falhou agora, ao implementar vou:
-- Listar tabelas existentes (`information_schema.tables`)
-- Identificar quais armazenam tokens/conexões Google
-- Executar `DELETE` nas tabelas corretas
-
-### Importante
-
-- Os 50 emails seed (`seed-2026-1` até `seed-2026-50`) serão **preservados**
-- A operação é **destrutiva e irreversível** — todos os emails sincronizados do Gmail real serão perdidos
-- Após executar, os usuários precisarão reconectar o Google se quiserem sincronizar novamente
-
-Confirma que posso prosseguir?
+Confirma que posso prosseguir com a desconexão das duas contas?

@@ -299,6 +299,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 items-center justify-end gap-2 border-b border-border bg-card px-4 md:px-6">
+          <AssistantFab />
           <NotificationBell />
           <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
             <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>

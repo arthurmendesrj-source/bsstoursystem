@@ -96,7 +96,7 @@ function LeadsPage() {
     "bg-slate-500/10 text-slate-700";
 
   if (!can("leads", "view")) {
-    return <Card className="p-12 text-center text-muted-foreground">{t("noPermission") ?? "Sem permissão para visualizar Leads"}</Card>;
+    return <Card className="p-12 text-center text-muted-foreground">Sem permissão para visualizar Leads</Card>;
   }
 
   return (

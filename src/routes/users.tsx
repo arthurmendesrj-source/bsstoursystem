@@ -253,32 +253,13 @@ function UsersPage() {
                         </AlertDialog>
                       )}
                       {acts && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" title="Excluir">
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Excluir usuário definitivamente?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação remove o usuário e <strong>todos os dados vinculados</strong>:
-                                leads, clientes, orçamentos, reservas, interações, conversas de IA, notificações e permissões.
-                                Não pode ser desfeita.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                onClick={() => handleDelete(p.user_id)}
-                              >
-                                Excluir
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <DeleteUserDialog
+                          targetId={p.user_id}
+                          targetName={p.full_name ?? authInfo[p.user_id]?.email ?? "—"}
+                          candidates={profiles.filter((x) => x.user_id !== p.user_id)}
+                          authInfo={authInfo}
+                          onConfirm={(reassignTo) => handleDelete(p.user_id, reassignTo)}
+                        />
                       )}
                     </div>
                   </TableCell>

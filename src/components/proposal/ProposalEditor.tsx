@@ -89,6 +89,33 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<ServiceInitial | null>(null);
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
+  const [hotelDialogOpen, setHotelDialogOpen] = useState(false);
+  const [editingHotel, setEditingHotel] = useState<HotelInitial | null>(null);
+
+  const openEditHotel = async (id: string) => {
+    const { data, error } = await supabase
+      .from("quote_items")
+      .select("id,item_date,check_out,city,description,category,meal_plan,rooms,total,notes")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) {
+      toast.error(error?.message ?? "Erro ao carregar hotel");
+      return;
+    }
+    setEditingHotel({
+      id: data.id,
+      item_date: data.item_date,
+      check_out: data.check_out,
+      city: data.city,
+      description: data.description,
+      category: data.category,
+      meal_plan: data.meal_plan,
+      rooms: data.rooms,
+      total: data.total != null ? Number(data.total) : null,
+      notes: data.notes,
+    });
+    setHotelDialogOpen(true);
+  };
 
   const openEditService = async (id: string) => {
     const { data, error } = await supabase

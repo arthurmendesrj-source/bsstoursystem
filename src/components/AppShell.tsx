@@ -165,6 +165,19 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {t("slaSettingsMenu")}
                 </Link>
               )}
+              {isAdmin && (
+                <Link
+                  to="/settings/permissions"
+                  className={cn(
+                    "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
+                    path.startsWith("/settings/permissions")
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  Permissões
+                </Link>
+              )}
             </>
           )}
         </nav>

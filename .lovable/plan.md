@@ -1,62 +1,79 @@
-## Objetivo
+# Controle de alçada por perfil (5 papéis)
 
-Processar os ZIPs anexados (HOTEIS_… e 2027…) em duas fases sequenciais:
+## Papéis
+`admin`, `diretor`, `gerente`, `supervisor`, `operador` — substituem o enum `app_role` atual (`admin`, `vendedor`, `operacional`, `financeiro`).
 
-1. **Fase 1 — Upload**: enviar todos os PDFs para o bucket `supplier-docs` sem criar fornecedores ainda.
-2. **Fase 2 — Análise e cadastro**: ler cada PDF com IA (Lovable AI / `google/gemini-2.5-flash`), extrair dados do hotel e criar/atualizar `suppliers` (categoria `hotel`), vinculando o documento já enviado.
+Migração de usuários existentes:
+- `admin` → `admin`
+- `operacional` → `gerente`
+- `vendedor` → `supervisor`
+- `financeiro` → `diretor`
 
-Aproveita a infraestrutura existente: bucket `supplier-docs`, tabela `supplier_documents`, `suppliers` (enum `hotel`) e o padrão de extração já implementado em `supabase/functions/extract-supplier-contacts`.
+## Modelo de permissões (granularidade por campo)
 
----
+Três tabelas novas:
 
-## Fase 1 — Upload em massa (executar agora)
+1. `permission_modules` — catálogo de módulos do app (leads, customers, suppliers, supplier_rates, supplier_documents, quotes, quote_items, bookings, booking_suppliers, packages, itineraries, activities, emails, users, sla_settings, exchange_rates, etc.). Cada módulo declara campos sensíveis (ex.: `quote_items.unit_cost`, `quote_items.markup_pct`, `booking_suppliers.cost`, `supplier_rates.unit_price`).
 
-Script `code--exec` (Node/TS one-off, sem UI):
+2. `role_module_permissions` — por (role, module): `can_view`, `can_create`, `can_edit`, `can_delete`, `can_approve`.
 
-1. Descompactar `/tmp/hoteis.zip` e `/tmp/2027.zip` em `/tmp/hoteis_unzipped/`.
-2. Iterar recursivamente todos os `.pdf` (ignorar `.png`, pastas vazias, `image00*`).
-3. Para cada PDF, derivar metadados pelo path:
-   - `country` = primeiro segmento após `HOTEIS /<ano>/` (BRASIL, ARGENTINA, PERU, CHILE…)
-   - `city` = segundo segmento (FOZ DE IGUACU, BUZIOS…)
-   - `hotel_folder` = terceiro segmento quando existir (ex: `KA BRU`, `LABORIE 2025e2026`)
-   - `year` = pasta `2025`/`2026`/`2027`
-   - `filename` (limpo) e `storage_path` único: `pending/<uuid>-<slug(filename)>.pdf`
-4. Upload para `storage://supplier-docs/<storage_path>` via `supabaseAdmin` (service role).
-5. Gravar uma fila intermediária em `/mnt/documents/hoteis_upload_manifest.json` com a lista de uploads + metadados extraídos do path. **Nada é inserido em `suppliers` ou `supplier_documents` ainda** — assim você pode revisar antes da Fase 2.
-6. Ao final, retornar um resumo: quantos uploads OK, quantos falharam, total de bytes.
+3. `role_field_permissions` — por (role, module, field): `can_view`, `can_edit`. Usado para mascarar campos sensíveis (custos, markup, margens) na UI.
 
-Saída: arquivo `hoteis_upload_manifest.json` em `/mnt/documents/` (downloadable) + tabela resumo no chat.
+Tudo editável em tela; só `admin` (Desenvolvedor) gerencia papéis e a matriz.
 
----
+## Matriz padrão (semente)
 
-## Fase 2 — Análise e criação de fornecedores (após você aprovar a Fase 1)
+```text
+Módulo                  Admin  Diretor  Gerente  Superv.  Operador
+Leads                   CRUD   CRUD     CRUD     CRU      RU(seus)
+Customers               CRUD   CRUD     CRUD     CRU      R
+Quotes                  CRUD   CRUD     CRUD     CRU      R(sem custo)
+  .unit_cost/markup     ver    ver      ver      ver      OCULTO
+Bookings                CRUD   CRUD     CRUD     CRU      RU
+  booking_suppliers.cost ver   ver      ver      ver      OCULTO
+Suppliers + rates+docs  CRUD   CRUD     CRUD     R        R
+  supplier_rates.cost   ver    ver      ver      OCULTO   OCULTO
+Packages/Itineraries    CRUD   CRUD     CRUD     R        R
+Activities/Email        CRUD   CRUD     CRUD     CRU      CRU(seus)
+Financeiro/Exchange     CRUD   CRUD     R        —        —
+SLA settings            CRUD   R        R        —        —
+Users + permissões      CRUD   —        —        —        —
+```
+(R=ver, C=criar, U=editar, D=excluir; livre edição depois pela tela)
 
-Script separado que lê o manifest:
+## Aplicação
 
-1. Para cada PDF:
-   - Baixar do storage, extrair texto com `unpdf` (mesmo padrão da edge function existente).
-   - Chamar Lovable AI (`google/gemini-2.5-flash`) com tool-calling para devolver JSON estruturado:
-     - `hotel_name`, `trade_name`, `address_city`, `address_state`, `address_country`, `email`, `phone`, `whatsapp`, `website`, `default_currency` (BRL/USD/ARS…), `notes` (resumo), `tax_id` se houver.
-   - Fallback: se IA não retornar nome, usar nome do arquivo + cidade.
-2. **Dedup por nome normalizado + cidade** (slug). Antes de inserir, buscar `suppliers` com `category='hotel'` e nome similar — se existir, reaproveitar o id (não duplicar).
-3. Inserir/atualizar em `suppliers` com `category='hotel'`, `status='ativo'`.
-4. Mover o PDF em storage de `pending/<...>` para `<supplier_id>/<...>` e inserir `supplier_documents` (kind=`tarifario`, year, original_filename, file_format=`pdf`).
-5. Gravar log final em `/mnt/documents/hoteis_import_report.json` com mapping arquivo → supplier_id, e contagens (criados / reaproveitados / falharam).
+### Backend (RLS)
+- Função `has_module_permission(_user_id, _module, _action)` SECURITY DEFINER consulta `user_roles` × `role_module_permissions`.
+- Reescrever políticas RLS de cada tabela usando essa função (substituindo `is_admin` / `has_role(...)` específicos).
+- Trigger `enforce_field_permissions` em UPDATE: bloqueia mudança de campos sem `can_edit` para o papel do usuário (defesa em profundidade além do mascaramento na UI).
+- View `v_quote_items_safe`, `v_booking_suppliers_safe`, `v_supplier_rates_safe` que zera/oculta colunas de custo conforme `role_field_permissions` (consultadas via server function quando o cliente pede dados "mascarados").
 
-Sem migração de banco — todas as colunas necessárias já existem.
+### Frontend
+- `src/lib/permissions.tsx`: `PermissionsProvider` carrega matriz do usuário 1× no login; expõe `can(module, action)` e `canField(module, field, action)`.
+- Hook `useCan()` e componente `<Can module="quotes" action="edit">…</Can>` para esconder botões/menus.
+- `<MaskedField module="quote_items" field="unit_cost" value={…} />` que renderiza `•••` quando sem permissão de ver.
+- AppShell esconde itens de menu sem `view`.
+- Telas existentes (Leads, Quotes, Bookings, Suppliers, Users, Settings, etc.) recebem guards `can(...)` em botões Criar/Editar/Excluir.
 
----
+### Tela de administração
+Nova rota `/settings/permissions` (só `admin`):
+- Aba **Papéis**: lista 5 papéis (read-only).
+- Aba **Matriz por módulo**: grid Módulo × Papel com checkboxes ver/criar/editar/excluir/aprovar.
+- Aba **Campos sensíveis**: por módulo, lista os campos catalogados com checkboxes ver/editar por papel.
+- Salvar via server function `updateRolePermissions` (admin-only).
 
-## Observações técnicas
+Tela `/users` ganha seleção entre os 5 novos papéis e fica restrita a `admin`.
 
-- `psql` está disponível, mas as inserções usarão `supabase-js` com service role para respeitar triggers (`set_supplier_code` gera o código automaticamente).
-- IA usa `LOVABLE_API_KEY` (já configurada) — sem custo de API key adicional.
-- Total: ~76 PDFs, ~50 MB. Upload em paralelo limitado (concorrência 5) para não estourar limites.
-- Fica fora do escopo: criação de tarifas (`supplier_rates`) — isso é um passo posterior usando `extract-supplier-rates` que já existe.
+## Migração SQL (resumo)
+1. `ALTER TYPE app_role ADD VALUE 'diretor' / 'gerente' / 'supervisor' / 'operador'`.
+2. UPDATE `user_roles` mapeando antigos → novos.
+3. Remover valores antigos do enum (recriar enum + cast).
+4. Criar 3 tabelas + RLS (só admin gerencia, todos autenticados leem própria matriz).
+5. Seed com a matriz padrão acima.
+6. Substituir políticas RLS das tabelas de domínio pela nova função.
 
----
-
-## Perguntas antes de iniciar a Fase 1
-
-1. Devo separar fornecedores **por hotel individual** (cada PDF = 1 fornecedor) ou **agrupar PDFs do mesmo hotel** (ex.: VIVAZ CATARATAS 2025 + 2026 + 2027 viram 1 fornecedor com 3 documentos)? Recomendo agrupar.
-2. Para PDFs que listam **vários hotéis** (ex: `Hoteis Casa Andina PERU 2026.pdf`, `Sonesta TODO PERU`, `Wholesales`), devo criar **um fornecedor por hotel listado dentro do PDF** ou **um único fornecedor "rede"** (Casa Andina, Sonesta)? Recomendo um por rede + notas com lista de unidades.
+## Entrega em fases
+- **Fase 1**: enum + migração de usuários + tabelas de permissão + seed + função `has_module_permission` + tela `/settings/permissions` + `PermissionsProvider`/`<Can>`.
+- **Fase 2**: aplicar `<Can>` e `<MaskedField>` em Leads, Quotes, Bookings, Suppliers, Users, Settings (esconder botões e mascarar custos).
+- **Fase 3**: trocar políticas RLS de cada tabela de domínio pela nova função + trigger de campos.

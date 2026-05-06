@@ -30,7 +30,7 @@ type ProfileRow = {
 };
 type RoleRow = { user_id: string; role: AppRole };
 
-const ROLES: AppRole[] = ["admin", "vendedor", "operacional", "financeiro"];
+const ROLES: AppRole[] = ["admin", "diretor", "gerente", "supervisor", "operador"];
 
 function UsersPage() {
   const { t } = useI18n();

@@ -1064,6 +1064,33 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_modules: {
+        Row: {
+          created_at: string
+          description: string | null
+          key: string
+          label: string
+          sensitive_fields: Json
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          key: string
+          label: string
+          sensitive_fields?: Json
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          key?: string
+          label?: string
+          sensitive_fields?: Json
+          sort_order?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1487,6 +1514,88 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "ref_service_categories"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_field_permissions: {
+        Row: {
+          can_edit: boolean
+          can_view: boolean
+          field_key: string
+          id: string
+          module_key: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_view?: boolean
+          field_key: string
+          id?: string
+          module_key: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_view?: boolean
+          field_key?: string
+          id?: string
+          module_key?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_field_permissions_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "permission_modules"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      role_module_permissions: {
+        Row: {
+          can_approve: boolean
+          can_create: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          id: string
+          module_key: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+        }
+        Insert: {
+          can_approve?: boolean
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          id?: string
+          module_key: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Update: {
+          can_approve?: boolean
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          id?: string
+          module_key?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_module_permissions_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "permission_modules"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -2141,6 +2250,10 @@ export type Database = {
         Args: { _entity: string; _user_id: string }
         Returns: string
       }
+      has_module_permission: {
+        Args: { _action: string; _module: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2172,7 +2285,15 @@ export type Database = {
       unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "vendedor" | "operacional" | "financeiro"
+      app_role:
+        | "admin"
+        | "vendedor"
+        | "operacional"
+        | "financeiro"
+        | "diretor"
+        | "gerente"
+        | "supervisor"
+        | "operador"
       booking_status:
         | "pre_reserva"
         | "confirmada"
@@ -2339,7 +2460,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "vendedor", "operacional", "financeiro"],
+      app_role: [
+        "admin",
+        "vendedor",
+        "operacional",
+        "financeiro",
+        "diretor",
+        "gerente",
+        "supervisor",
+        "operador",
+      ],
       booking_status: [
         "pre_reserva",
         "confirmada",

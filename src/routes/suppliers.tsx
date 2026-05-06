@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Eye, Star, Sparkles, FileText, Loader2 } from "lucide-react";
+import { Plus, Search, Eye, Star, Sparkles, FileText, Loader2, Pencil, Trash2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,13 @@ function SuppliersPage() {
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Excluir "${name}"?`)) return;
+    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); load(); }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -247,27 +254,12 @@ function SuppliersPage() {
       </div>
 
       <Card className="p-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative flex-1 min-w-[200px]">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">{t("suppliers")}</h2>
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder={t("search")} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-8" />
           </div>
-          <Select value={filterCat} onValueChange={setFilterCat}>
-            <SelectTrigger className="w-44"><SelectValue placeholder={t("category")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("all")}</SelectItem>
-              {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{t(CAT_LABEL[c])}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-44"><SelectValue placeholder={t("status")} /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t("all")}</SelectItem>
-              <SelectItem value="ativo">{t("statusActive")}</SelectItem>
-              <SelectItem value="inativo">{t("statusInactive")}</SelectItem>
-              <SelectItem value="homologacao">{t("statusHomologation")}</SelectItem>
-            </SelectContent>
-          </Select>
         </div>
       </Card>
 
@@ -275,31 +267,37 @@ function SuppliersPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-12"></TableHead>
               <TableHead>{t("name")}</TableHead>
               <TableHead>{t("category")}</TableHead>
-              <TableHead>{t("city")}</TableHead>
+              <TableHead>Código da Cidade</TableHead>
+              <TableHead>Código do país</TableHead>
+              <TableHead>Telefone</TableHead>
               <TableHead>{t("email")}</TableHead>
-              <TableHead>{t("status")}</TableHead>
-              <TableHead>{t("rating")}</TableHead>
               <TableHead className="w-12"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
-            ) : filtered.map((s) => (
-              <TableRow key={s.id} className="cursor-pointer" onClick={() => setSelected(s)}>
-                <TableCell className="font-medium">{s.name}</TableCell>
-                <TableCell><Badge variant="outline">{t(CAT_LABEL[s.category])}</Badge></TableCell>
-                <TableCell>{[s.address_city, s.address_country].filter(Boolean).join(", ") || "—"}</TableCell>
-                <TableCell>{s.email ?? "—"}</TableCell>
+              <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+            ) : filtered.map((s, i) => (
+              <TableRow key={s.id} className={i % 2 === 0 ? "bg-muted/30" : ""}>
                 <TableCell>
-                  <Badge variant={s.status === "ativo" ? "default" : s.status === "inativo" ? "secondary" : "outline"}>
-                    {s.status === "ativo" ? t("statusActive") : s.status === "inativo" ? t("statusInactive") : t("statusHomologation")}
-                  </Badge>
+                  <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name); }}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </TableCell>
-                <TableCell>{s.rating ? <span className="inline-flex items-center gap-1"><Star className="h-3 w-3 fill-current" />{s.rating}</span> : "—"}</TableCell>
-                <TableCell><Eye className="h-4 w-4 text-muted-foreground" /></TableCell>
+                <TableCell className="font-semibold">{s.name}</TableCell>
+                <TableCell><Badge variant="outline">{t(CAT_LABEL[s.category])}</Badge></TableCell>
+                <TableCell>{s.address_city ?? ""}</TableCell>
+                <TableCell>{s.address_country ?? ""}</TableCell>
+                <TableCell>{s.phone ?? ""}</TableCell>
+                <TableCell>{s.email ?? ""}</TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => setSelected(s)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

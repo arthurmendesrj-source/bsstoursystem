@@ -352,6 +352,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
       next_action: prefill?.next_action ?? "",
       status: "novo",
       create_customer: true,
+      assigned_to: prefill?.assigned_to ?? "",
     });
     setAiNote(note ?? null);
     setAiOpen(true);

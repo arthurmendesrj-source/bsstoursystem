@@ -272,7 +272,7 @@ function ItinerariesPage() {
     setJobs((prev) => [...dupJobs, ...newJobs, ...prev]);
 
     // Concurrency 2 (process-itinerary is memory-heavy)
-    const queue = valid.map((f, idx) => ({ file: f, jobId: newJobs[idx].id }));
+    const queue = unique.map((f, idx) => ({ file: f, jobId: newJobs[idx].id }));
     const CONCURRENCY = 2;
     const workers = Array.from({ length: CONCURRENCY }, async () => {
       while (queue.length) {

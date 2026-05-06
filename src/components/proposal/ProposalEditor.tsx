@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import {
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
+import { FlightDialog, type FlightRow } from "./FlightDialog";
 
 type Mode = "proposal" | "invoice";
 
@@ -81,6 +82,32 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [dictating, setDictating] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [docsRefresh, setDocsRefresh] = useState(0);
+  const [flights, setFlights] = useState<FlightRow[]>([]);
+  const [flightDialogOpen, setFlightDialogOpen] = useState(false);
+  const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
+
+  const loadFlights = async () => {
+    const { data } = await supabase
+      .from("quote_flights")
+      .select("*")
+      .eq("quote_id", quoteId)
+      .order("flight_date", { ascending: true });
+    setFlights((data ?? []) as FlightRow[]);
+  };
+
+  const removeFlight = async (id: string) => {
+    const { error } = await supabase.from("quote_flights").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    loadFlights();
+  };
+
+  useEffect(() => {
+    loadFlights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteId]);
 
   const load = async () => {
     setLoading(true);
@@ -359,6 +386,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => addItem("service")}>
             <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
           </Button>
+          <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
+            <Plane className="h-4 w-4 mr-1" /> Adicionar voo
+          </Button>
           <Button size="sm" onClick={save} disabled={saving}>
             <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
           </Button>
@@ -467,6 +497,65 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onChange={updateItem}
         onRemove={removeItem}
       />
+
+      <div className="rounded-md border">
+        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+          <div className="text-sm font-medium flex items-center gap-2"><Plane className="h-4 w-4" /> Voos</div>
+          <Button size="sm" variant="outline" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-1" /> Adicionar voo
+          </Button>
+        </div>
+        {flights.length === 0 ? (
+          <div className="p-3 text-sm text-muted-foreground">Nenhum voo cadastrado.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/20 text-xs">
+                <tr>
+                  <th className="text-left px-3 py-2">Data</th>
+                  <th className="text-left px-3 py-2">Voo</th>
+                  <th className="text-left px-3 py-2">De → Para</th>
+                  <th className="text-left px-3 py-2">Partida</th>
+                  <th className="text-left px-3 py-2">Chegada</th>
+                  <th className="text-right px-3 py-2">Pax</th>
+                  <th className="text-right px-3 py-2">Total</th>
+                  <th className="px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {flights.map((f) => (
+                  <tr key={f.id} className="border-t">
+                    <td className="px-3 py-2">{fmtDate(f.flight_date)}</td>
+                    <td className="px-3 py-2 font-mono">{f.flight_number}</td>
+                    <td className="px-3 py-2">{f.from_code} → {f.to_code}</td>
+                    <td className="px-3 py-2">{f.departure_time?.slice(0, 5)}</td>
+                    <td className="px-3 py-2">{f.arrival_time?.slice(0, 5) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">{f.pax}</td>
+                    <td className="px-3 py-2 text-right">{f.total != null ? fmt(Number(f.total), ccy) : "—"}</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      <Button size="icon" variant="ghost" onClick={() => { setEditingFlight(f); setFlightDialogOpen(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" onClick={() => f.id && removeFlight(f.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <FlightDialog
+        open={flightDialogOpen}
+        onOpenChange={setFlightDialogOpen}
+        quoteId={quoteId}
+        initial={editingFlight}
+        onSaved={loadFlights}
+      />
+
 
       <div className="rounded-md border p-4 space-y-1.5 bg-muted/20">
         {!readOnly && (

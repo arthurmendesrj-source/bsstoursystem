@@ -1195,6 +1195,65 @@ export type Database = {
           },
         ]
       }
+      quote_flights: {
+        Row: {
+          arrival_time: string | null
+          created_at: string
+          created_by: string | null
+          departure_time: string
+          flight_date: string
+          flight_number: string
+          from_code: string
+          id: string
+          notes: string | null
+          pax: number
+          quote_id: string
+          to_code: string
+          total: number | null
+          updated_at: string
+        }
+        Insert: {
+          arrival_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          departure_time: string
+          flight_date: string
+          flight_number: string
+          from_code: string
+          id?: string
+          notes?: string | null
+          pax?: number
+          quote_id: string
+          to_code: string
+          total?: number | null
+          updated_at?: string
+        }
+        Update: {
+          arrival_time?: string | null
+          created_at?: string
+          created_by?: string | null
+          departure_time?: string
+          flight_date?: string
+          flight_number?: string
+          from_code?: string
+          id?: string
+          notes?: string | null
+          pax?: number
+          quote_id?: string
+          to_code?: string
+          total?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_flights_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           category: string | null

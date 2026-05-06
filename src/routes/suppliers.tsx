@@ -316,18 +316,32 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
   const [contacts, setContacts] = useState<any[]>([]);
   const [emails, setEmails] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [rates, setRates] = useState<any[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = async () => {
     if (!supplier) return;
-    (async () => {
-      const [c, e, b] = await Promise.all([
-        supabase.from("supplier_contacts").select("*").eq("supplier_id", supplier.id).order("is_primary", { ascending: false }),
-        supabase.from("emails").select("id,subject,from_email,received_at").eq("supplier_id", supplier.id).order("received_at", { ascending: false }).limit(20),
-        supabase.from("booking_suppliers").select("id,service_type,confirmation_code,cost,currency,status,booking_id").eq("supplier_id", supplier.id).order("created_at", { ascending: false }).limit(20),
-      ]);
-      setContacts(c.data ?? []); setEmails(e.data ?? []); setBookings(b.data ?? []);
-    })();
-  }, [supplier]);
+    const [c, e, b, d, r] = await Promise.all([
+      supabase.from("supplier_contacts").select("*").eq("supplier_id", supplier.id).order("is_primary", { ascending: false }),
+      supabase.from("emails").select("id,subject,from_email,received_at").eq("supplier_id", supplier.id).order("received_at", { ascending: false }).limit(20),
+      supabase.from("booking_suppliers").select("id,service_type,confirmation_code,cost,currency,status,booking_id").eq("supplier_id", supplier.id).order("created_at", { ascending: false }).limit(20),
+      supabase.from("supplier_documents").select("*").eq("supplier_id", supplier.id).order("created_at", { ascending: false }),
+      supabase.from("supplier_rates").select("*").eq("supplier_id", supplier.id).order("city").limit(200),
+    ]);
+    setContacts(c.data ?? []); setEmails(e.data ?? []); setBookings(b.data ?? []);
+    setDocs(d.data ?? []); setRates(r.data ?? []);
+  };
+  useEffect(() => { reload(); }, [supplier]);
+
+  const runAI = async (fn: "extract-supplier-contacts" | "extract-supplier-rates") => {
+    if (!supplier) return;
+    setBusy(fn);
+    const { data, error } = await supabase.functions.invoke(fn, { body: { supplier_id: supplier.id } });
+    setBusy(null);
+    if (error) toast.error(error.message);
+    else { toast.success(`${data?.processed ?? 0} doc(s) processado(s)`); reload(); }
+  };
 
   return (
     <Sheet open={!!supplier} onOpenChange={(o) => !o && onClose()}>

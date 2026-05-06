@@ -722,8 +722,8 @@ function ItemTable({
                 <th className="text-left p-2 w-32">{t("serviceDate")}</th>
               )}
               <th className="text-left p-2 min-w-[280px]">{t("name")}</th>
-              {!readOnly && <th className="text-right p-2 w-28">{t("unitCost")} ({ccy})</th>}
-              {!readOnly && <th className="text-right p-2 w-20">{t("markup")} %</th>}
+              {!readOnly && showCost && <th className="text-right p-2 w-28">{t("unitCost")} ({ccy})</th>}
+              {!readOnly && showMarkup && <th className="text-right p-2 w-20">{t("markup")} %</th>}
               <th className="text-right p-2 w-28">{t("price")} ({ccy})</th>
               <th className="text-right p-2 w-20">{isHotel ? t("nights") : t("quantity")}</th>
               <th className="text-right p-2 w-32">{t("subtotal")} ({ccy})</th>

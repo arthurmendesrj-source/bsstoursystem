@@ -1,72 +1,28 @@
-## Plano: enriquecer fornecedores cadastrados
+## Importar fornecedores do Beglobber
 
-3 etapas, executadas em sequência. Cada uma é independente — se algo falhar parcialmente, as demais não são afetadas.
+Você colou ~100 fornecedores do `adatours.beglobber.com/suppliers` (a página exige login Google, então não consegui buscar direto — copy/paste é o caminho).
 
----
+### Passos
 
-### 1. Storage: subir tarifários originais
+1. **Parse do texto colado** — script Node converte cada linha em registro:
+   - `name`, `address_city` (código IATA: RIO, MAO, GUA…), `address_country` (BR, MX, PE…), `phone`, `email`.
+   - Trata múltiplos telefones/emails separados por `;` (mantém o primeiro, demais vão para `notes`).
+   - Limpa lixo: `@nenhum`, `nenhum@nenhum`, `naotem@naotem`, `.` viram `NULL`.
 
-**Migration:** criar bucket privado `supplier-docs` + RLS (read/write para autenticados, delete admin/operacional).
+2. **Dedup contra os 437 existentes**:
+   - Match por (a) email exato, (b) phone normalizado (só dígitos), ou (c) nome normalizado (lower, sem acento, sem espaços).
+   - Se já existe → **atualiza** campos vazios (preenche email/phone/cidade se estiverem nulos no banco).
+   - Se não existe → **insere** novo com `category='outro'`, `status='ativo'`, `default_currency='BRL'`, `created_by` = seu user_id.
 
-**Nova tabela `supplier_documents`:**
-- `id`, `supplier_id` (uuid), `storage_path` (text), `original_filename`, `file_format`, `file_size_bytes`, `language` (pt/en/es/ru/fr), `year` (2026), `kind` ('tarifario'|'descritivo'|'foto'), `uploaded_by`, `created_at`
-- RLS análogo ao bucket
+3. **Mapeamento de país** — converte códigos para nomes consistentes:
+   - BR→Brasil, MX→México, PE→Peru, AR→Argentina, CR→Costa Rica, CO→Colômbia, BO→Bolívia, BZ→Belize, CL→Chile, GT→Guatemala, PA→Panamá, UY→Uruguai, CU→Cuba, CE→Equador, COL→Colômbia.
 
-**Script de upload** (`/tmp/forn/upload_docs.ts` via bun + service role):
-- Percorre `/tmp/forn/FORNECEDORES/2026/**/*` (PDF/XLSX/XLS/PNG/JPG/DOCX)
-- Mapeia cada arquivo ao `supplier_id` correto via heurística (path contém token presente em `notes` do supplier — ex.: `RIO DE JANEIRO/HELISIGHT` → supplier "Helisight")
-- Faz upload para `supplier-docs/{supplier_code}/{filename}` e cria linha em `supplier_documents`
-- Detecta idioma pelo nome (RUSSIAN/ENGLISH/PORTUGU…)
-- Pula se já existe (`storage_path` único)
+4. **Relatório final** no chat: X inseridos, Y atualizados, Z ignorados (duplicados sem alterações), com lista dos nomes em cada bucket para você revisar.
 
-Estimado: ~70 arquivos.
+### Observações
 
----
+- O `code` (ex: SF0526) é gerado automaticamente pelo trigger `set_supplier_code`.
+- Não importo `iata_code` para `address_city` literalmente porque o campo `address_city` espera nome — vou colocar o código IATA em `iata_code` (campo correto da tabela) e deixar `address_city` em branco para enriquecer depois.
+- Linhas claramente quebradas (ex: "Sérgio Luiz" com email no campo phone) são corrigidas heuristicamente: se o "phone" tem `@`, troca com o email.
 
-### 2. Contatos via IA (Lovable AI)
-
-**Edge function `extract-supplier-contacts`** (verify_jwt=false, chamada via UI button):
-- Para cada `supplier_documents` PDF/DOCX do supplier, baixa do storage
-- Envia conteúdo (extraído com `pdf-parse` simples / texto bruto) para `google/gemini-2.5-flash` via Lovable AI Gateway pedindo JSON: `{name, role, email, phone, whatsapp, website}[]`
-- Insere resultados em `supplier_contacts` (dedup por email/phone+supplier_id)
-- Atualiza `suppliers.email`/`phone`/`website` se vazios e houver contato primário detectado
-- Loga em `activity_log`
-
-**UI:** na página `/suppliers`, botão "Extrair contatos com IA" (admin/op) que dispara a function via `supabase.functions.invoke` e mostra progresso (toast).
-
----
-
-### 3. Tarifas detalhadas
-
-**Nova tabela `supplier_rates`:**
-- `id`, `supplier_id`, `document_id` (FK lógico para supplier_documents), `service_name` (text), `service_type` (transfer|tour|hotel|restaurant|outro), `city`, `category` (privativo|regular|vip|standard), `language` (guia)
-- `pax_min`, `pax_max` (faixa de pax)
-- `unit_price` (numeric), `currency`, `unit` (per_person|per_group|per_vehicle|per_night)
-- `valid_from`, `valid_until` (date)
-- `raw_excerpt` (text — trecho original p/ auditoria)
-- `created_at`, `created_by`
-- RLS: leitura autenticada; escrita owner/admin/op
-
-**Edge function `extract-supplier-rates`**:
-- Para cada documento de tarifário (PDF/XLSX), extrai texto/células
-- Envia em chunks para `google/gemini-2.5-pro` (melhor para tabelas) com schema JSON estrito
-- Insere em `supplier_rates` em batches de 100, ligando ao supplier+document
-- Marca `supplier_documents.processed_at` para evitar reprocessar
-
-**UI:** botão "Importar tarifas com IA" por fornecedor + tab "Tarifas" mostrando `supplier_rates` em tabela com filtros (cidade, tipo, faixa pax).
-
----
-
-### Ordem de execução
-1. Migration (bucket + 2 tabelas + RLS)
-2. Script de upload de arquivos (etapa 1)
-3. Edge function de contatos + UI button (etapa 2)
-4. Edge function de tarifas + UI tab (etapa 3)
-
-### Riscos / observações
-- Heurística de mapeamento path→supplier pode falhar em 2-3 nomes; vou logar não-mapeados num CSV para revisão manual
-- IA pode alucinar preços; o `raw_excerpt` permite auditoria
-- Custo Lovable AI: ~70 docs × ~3k tokens = baixo (Flash para contatos, Pro só para tarifas tabulares)
-- Não vou criar contatos manualmente sem fonte — apenas o que a IA conseguir extrair dos PDFs
-
-Posso aprovar e prosseguir?
+Aprovar para eu rodar o import?

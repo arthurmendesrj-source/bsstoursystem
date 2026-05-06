@@ -458,6 +458,17 @@ function ItinerariesPage() {
               ))}
             </SelectContent>
           </Select>
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os idiomas</SelectItem>
+              <SelectItem value="en">Inglês</SelectItem>
+              <SelectItem value="es">Espanhol</SelectItem>
+              <SelectItem value="ru">Russo</SelectItem>
+            </SelectContent>
+          </Select>
           <div className="relative">
             <Sparkles className="absolute left-2 top-2.5 h-4 w-4 text-primary" />
             <Input

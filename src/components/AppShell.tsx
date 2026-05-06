@@ -34,7 +34,8 @@ import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isAdmin, hasRole, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { isAdmin, hasRole } = useEffectiveAuth();
   const { viewAs, exitViewAs } = useViewAs();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const { t, lang, setLang } = useI18n();

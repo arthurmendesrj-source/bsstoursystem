@@ -69,8 +69,29 @@ Deno.serve(async (req) => {
         email: u.email,
         banned_until: (u as unknown as { banned_until?: string }).banned_until ?? null,
         last_sign_in_at: u.last_sign_in_at,
+        invited_at: (u as unknown as { invited_at?: string }).invited_at ?? null,
+        confirmed_at: u.confirmed_at ?? null,
+        email_confirmed_at: u.email_confirmed_at ?? null,
+        created_at: u.created_at ?? null,
       }));
       return json({ users: out });
+    }
+
+    if (action === "resend_invite") {
+      const targetId = String(body.user_id ?? "");
+      if (!targetId) return json({ error: "user_id obrigatório" }, 400);
+      const { data: u, error: gErr } = await admin.auth.admin.getUserById(targetId);
+      if (gErr || !u.user?.email) return json({ error: gErr?.message ?? "Usuário sem e-mail" }, 400);
+      if (!isAdmin) {
+        const targetRoles = await getRolesOf(targetId);
+        if ([...targetRoles].some((r) => PROTECTED_ROLES.includes(r))) {
+          return json({ error: "Sem permissão" }, 403);
+        }
+      }
+      const redirectTo = req.headers.get("origin") ? `${req.headers.get("origin")}/` : undefined;
+      const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, { redirectTo });
+      if (error) return json({ error: error.message }, 400);
+      return json({ ok: true });
     }
 
     if (action === "invite") {

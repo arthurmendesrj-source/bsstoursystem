@@ -32,7 +32,8 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, hasRole, signOut } = useAuth();
+  const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const { t, lang, setLang } = useI18n();
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();

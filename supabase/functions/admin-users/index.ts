@@ -146,6 +146,12 @@ Deno.serve(async (req) => {
         const rows = requestedRoles.map((role) => ({ user_id: invited.user!.id, role }));
         await admin.from("user_roles").insert(rows);
       }
+      await audit({
+        action: "invite",
+        target_user_id: invited.user.id,
+        target_email: email,
+        details: { roles: requestedRoles, full_name: fullName },
+      });
       return json({ ok: true, user_id: invited.user.id });
     }
 

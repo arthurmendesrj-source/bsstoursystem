@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useCurrency } from "@/lib/currency";
 import { Can, usePermissions } from "@/lib/permissions";
 import { useSubordinates } from "@/lib/hierarchy";

@@ -166,10 +166,16 @@ Deno.serve(async (req) => {
         }
       }
       const ban_duration = action === "block" ? "876000h" : "none";
+      const { data: tgtUser } = await admin.auth.admin.getUserById(targetId);
       const { error } = await admin.auth.admin.updateUserById(targetId, {
         ban_duration,
       } as unknown as Record<string, unknown>);
       if (error) return json({ error: error.message }, 500);
+      await audit({
+        action,
+        target_user_id: targetId,
+        target_email: tgtUser?.user?.email ?? null,
+      });
       return json({ ok: true });
     }
 

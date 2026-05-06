@@ -28,6 +28,7 @@ import { Route as BibliaRouteImport } from './routes/biblia'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SuppliersRatesValidationRouteImport } from './routes/suppliers.rates-validation'
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
@@ -135,6 +136,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SuppliersRatesValidationRoute =
+  SuppliersRatesValidationRouteImport.update({
+    id: '/rates-validation',
+    path: '/rates-validation',
+    getParentRoute: () => SuppliersRoute,
+  } as any)
 const SettingsTemplatesRoute = SettingsTemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -210,7 +217,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/suppliers': typeof SuppliersRoute
+  '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
@@ -221,6 +228,7 @@ export interface FileRoutesByFullPath {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -242,7 +250,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/suppliers': typeof SuppliersRoute
+  '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
@@ -253,6 +261,7 @@ export interface FileRoutesByTo {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -275,7 +284,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/suppliers': typeof SuppliersRoute
+  '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
@@ -286,6 +295,7 @@ export interface FileRoutesById {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -320,6 +330,7 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/suppliers/rates-validation'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/suppliers/rates-validation'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/suppliers/rates-validation'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -406,7 +419,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityAuditRoute: typeof SecurityAuditRoute
   SettingsRoute: typeof SettingsRouteWithChildren
-  SuppliersRoute: typeof SuppliersRoute
+  SuppliersRoute: typeof SuppliersRouteWithChildren
   UsersRoute: typeof UsersRoute
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
@@ -550,6 +563,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/suppliers/rates-validation': {
+      id: '/suppliers/rates-validation'
+      path: '/rates-validation'
+      fullPath: '/suppliers/rates-validation'
+      preLoaderRoute: typeof SuppliersRatesValidationRouteImport
+      parentRoute: typeof SuppliersRoute
+    }
     '/settings/templates': {
       id: '/settings/templates'
       path: '/templates'
@@ -671,6 +691,18 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
   SettingsRouteChildren,
 )
 
+interface SuppliersRouteChildren {
+  SuppliersRatesValidationRoute: typeof SuppliersRatesValidationRoute
+}
+
+const SuppliersRouteChildren: SuppliersRouteChildren = {
+  SuppliersRatesValidationRoute: SuppliersRatesValidationRoute,
+}
+
+const SuppliersRouteWithChildren = SuppliersRoute._addFileChildren(
+  SuppliersRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActivitiesRoute: ActivitiesRoute,
@@ -688,7 +720,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityAuditRoute: SecurityAuditRoute,
   SettingsRoute: SettingsRouteWithChildren,
-  SuppliersRoute: SuppliersRoute,
+  SuppliersRoute: SuppliersRouteWithChildren,
   UsersRoute: UsersRoute,
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,

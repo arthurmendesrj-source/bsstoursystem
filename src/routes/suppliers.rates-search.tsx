@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { MaskedField } from "@/lib/permissions";
 
 export const Route = createFileRoute("/suppliers/rates-search")({
   head: () => ({
@@ -258,7 +259,7 @@ function RatesSearchPage() {
                   <TableCell>{r.service_type && <Badge variant="outline">{r.service_type}</Badge>}</TableCell>
                   <TableCell>{r.pax_min}{r.pax_max && r.pax_max !== r.pax_min ? `-${r.pax_max}` : ""}</TableCell>
                   <TableCell className="text-xs">{r.unit}</TableCell>
-                  <TableCell className="text-right font-mono">{Number(r.unit_price).toFixed(2)} {r.currency}</TableCell>
+                  <TableCell className="text-right font-mono"><MaskedField module="supplier_rates" field="unit_price" value={`${Number(r.unit_price).toFixed(2)} ${r.currency}`} /></TableCell>
                   <TableCell className="text-xs text-muted-foreground">{supplierName(r.supplier_id)}</TableCell>
                 </TableRow>
               ))}

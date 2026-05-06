@@ -1,23 +1,24 @@
-# Finalizar Assistente IA
+# Botão único do Assistente IA no header
 
-O núcleo do Assistente IA já foi construído (banco, prompt, ferramentas, endpoint de streaming, página `/assistant`, componente de chat e FAB). Falta apenas **plugar tudo no shell da aplicação** para ficar acessível.
+Consolidar o acesso ao Assistente IA em **um único botão** posicionado no header, à esquerda do sino de notificações.
 
-## O que falta
+## Alterações
 
-### 1. `src/components/AppShell.tsx`
-- Adicionar item **"Assistente IA"** na sidebar logo abaixo de **Email** (ícone `Sparkles`, rota `/assistant`).
-- Adicionar **"Assistente IA"** também como subitem dentro do grupo CRM (após Pacotes).
-- Renderizar `<AssistantFab />` globalmente dentro do shell autenticado, escondendo-o quando a rota atual já for `/assistant` (para não duplicar o chat).
+### `src/components/AppShell.tsx`
+- **Remover** o item "Assistente IA" da lista `items` (sidebar principal).
+- **Remover** o item "Assistente IA" de `crmChildren` (subitem do CRM).
+- **Remover** `/assistant` de `crmRoutes`.
+- **Remover** a renderização do `<AssistantFab />` no final do shell.
+- **Adicionar**, no header (linha do `NotificationBell`), um botão ícone (`Sparkles`) imediatamente **antes** do `<NotificationBell />`. Esse botão abre o mesmo `Sheet` lateral do assistente.
 
-### 2. Verificações finais
-- Confirmar que a rota `/assistant` aparece em `routeTree.gen.ts` (gerado automaticamente pelo plugin do TanStack).
-- Conferir que o build passa sem erros de TypeScript (o import do `toast` já foi corrigido para `sonner`).
-- Smoke test rápido: abrir `/assistant`, criar uma conversa, enviar uma mensagem e ver o streaming responder.
+### `src/components/assistant/AssistantFab.tsx`
+- Refatorar para exportar também um componente `AssistantHeaderButton` (ou renomear o FAB para um botão genérico de header) que renderiza apenas o botão + `Sheet` com o `AssistantChat` dentro, sem o posicionamento `fixed bottom-right`.
+- Manter a lógica de abrir/fechar e o conteúdo do chat.
 
-## Detalhes técnicos
+### Rota `/assistant`
+- A rota dedicada continua existindo e acessível via URL direta (não some), apenas deixa de aparecer na sidebar. Útil para sessões longas em tela cheia.
 
-- O FAB usa um `Sheet` lateral; para evitar conflito visual na própria página do assistente, usar `useLocation()` do `@tanstack/react-router` e condicionalmente não renderizar quando `pathname === "/assistant"`.
-- O item de sidebar segue o mesmo padrão dos demais (`NavLink` com `activeProps`).
-- Nenhuma alteração de schema, backend ou lógica é necessária — apenas UI/montagem.
-
-Após esses ajustes o Assistente IA estará 100% funcional e acessível pelos três pontos acordados (sidebar dedicada, subitem do CRM e FAB global).
+## Resultado
+- Sidebar: sem qualquer entrada de Assistente IA.
+- Header: ícone `Sparkles` à esquerda do sino, abrindo o chat em um sheet lateral em qualquer página autenticada.
+- Sem FAB flutuante.

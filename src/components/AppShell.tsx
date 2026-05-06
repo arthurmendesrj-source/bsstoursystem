@@ -24,7 +24,6 @@ import {
   ChevronDown,
   BarChart3,
   LayoutGrid,
-  Sparkles,
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { useAuth } from "@/lib/auth";
@@ -57,7 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [collapsed]);
 
-  const crmRoutes = ["/dashboard", "/leads", "/funnel", "/workspace", "/packages", "/assistant"];
+  const crmRoutes = ["/dashboard", "/leads", "/funnel", "/workspace", "/packages"];
   const isCrmActive = crmRoutes.some((r) => path === r || path.startsWith(r + "/"));
   const [crmOpen, setCrmOpen] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -80,12 +79,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
     { to: "/workspace", label: "Atendimento", icon: Briefcase },
     { to: "/packages", label: t("packages"), icon: Package },
-    { to: "/assistant", label: "Assistente IA", icon: Sparkles },
   ];
 
   const items = [
     { to: "/email", label: t("email"), icon: Mail },
-    { to: "/assistant", label: "Assistente IA", icon: Sparkles },
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },
     { to: "/customers", label: t("customers"), icon: Users },
@@ -301,6 +298,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 items-center justify-end gap-2 border-b border-border bg-card px-4 md:px-6">
+          <AssistantFab />
           <NotificationBell />
           <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
             <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
@@ -342,7 +340,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
         <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
       </div>
-      {path !== "/assistant" && <AssistantFab />}
     </div>
   );
 }

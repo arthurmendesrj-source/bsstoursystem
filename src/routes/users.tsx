@@ -86,7 +86,16 @@ function UsersPage() {
           <TableBody>
             {profiles.map((p) => (
               <TableRow key={p.id}>
-                <TableCell className="font-medium">{p.full_name ?? "—"}</TableCell>
+                <TableCell className="font-medium">
+                  <Link
+                    to="/users/$userId/permissions"
+                    params={{ userId: p.user_id }}
+                    className="inline-flex items-center gap-2 hover:underline"
+                  >
+                    <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+                    {p.full_name ?? "—"}
+                  </Link>
+                </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap gap-1">
                     {userRoles(p.user_id).length === 0 && <span className="text-xs text-muted-foreground">—</span>}

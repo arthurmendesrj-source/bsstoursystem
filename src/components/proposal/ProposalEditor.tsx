@@ -306,6 +306,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const save = async () => {
     if (!quote) return;
+    if (!canEdit) { toast.error("Sem permissão para salvar"); return; }
     setSaving(true);
     const totalsNow = computeTotals(items, bankFee);
 
@@ -355,6 +356,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const approve = async () => {
     if (!quote) return;
+    if (!canApprove) { toast.error("Sem permissão para aprovar"); return; }
     await save();
     const { error } = await supabase.from("quotes").update({ status: "aprovada" }).eq("id", quote.id);
     if (error) return toast.error(error.message);
@@ -365,6 +367,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const convertToBooking = async () => {
     if (!quote) return;
+    if (!canCreateBooking) { toast.error("Sem permissão para criar reserva"); return; }
     if (!confirm(t("convertQuoteConfirm"))) return;
     // Check if a booking already exists for this quote
     const { data: existing } = await supabase

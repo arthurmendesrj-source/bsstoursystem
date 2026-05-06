@@ -34,6 +34,7 @@ import { Route as SuppliersRatesSearchRouteImport } from './routes/suppliers.rat
 import { Route as SuppliersRatesImportRouteImport } from './routes/suppliers.rates-import'
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
+import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as BookingsBookingIdRouteImport } from './routes/bookings_.$bookingId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
@@ -170,6 +171,11 @@ const SettingsSlaRoute = SettingsSlaRouteImport.update({
   path: '/sla',
   getParentRoute: () => SettingsRoute,
 } as any)
+const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
+  id: '/permissions',
+  path: '/permissions',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
@@ -244,6 +250,7 @@ export interface FileRoutesByFullPath {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
@@ -280,6 +287,7 @@ export interface FileRoutesByTo {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
@@ -317,6 +325,7 @@ export interface FileRoutesById {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings_/$bookingId': typeof BookingsBookingIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
+  '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
@@ -355,6 +364,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/leads/$leadId'
+    | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
     | '/suppliers/rates-import'
@@ -391,6 +401,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/leads/$leadId'
+    | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
     | '/suppliers/rates-import'
@@ -427,6 +438,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings_/$bookingId'
     | '/leads/$leadId'
+    | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
     | '/suppliers/rates-import'
@@ -641,6 +653,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsSlaRouteImport
       parentRoute: typeof SettingsRoute
     }
+    '/settings/permissions': {
+      id: '/settings/permissions'
+      path: '/permissions'
+      fullPath: '/settings/permissions'
+      preLoaderRoute: typeof SettingsPermissionsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/leads/$leadId': {
       id: '/leads/$leadId'
       path: '/$leadId'
@@ -735,11 +754,13 @@ const LeadsRouteChildren: LeadsRouteChildren = {
 const LeadsRouteWithChildren = LeadsRoute._addFileChildren(LeadsRouteChildren)
 
 interface SettingsRouteChildren {
+  SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
+  SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,
 }

@@ -159,17 +159,19 @@ function SlaPanel() {
 
     setLoading(true);
     (async () => {
-      const [{ data: ld }, { data: pf }] = await Promise.all([
+      const [{ data: ld }, { data: pf }, { data: rls }] = await Promise.all([
         supabase
           .from("leads")
           .select("id,status,created_at,created_by,assigned_to")
           .gte("created_at", since.toISOString()),
         supabase.from("profiles").select("user_id,full_name,daily_followup_goal"),
+        supabase.from("user_roles").select("user_id, role"),
       ]);
       const leadsRows = (ld ?? []) as LeadRow[];
       setLeads(leadsRows);
+      const filteredPf = filterAdmins((pf ?? []) as ProfileRow[], (rls ?? []) as { user_id: string; role: string }[]);
       const profMap = new Map<string, ProfileRow>();
-      for (const p of (pf ?? []) as ProfileRow[]) profMap.set(p.user_id, p);
+      for (const p of filteredPf) profMap.set(p.user_id, p);
       setProfiles(profMap);
 
       const ids = leadsRows.map((l) => l.id);

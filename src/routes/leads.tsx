@@ -155,7 +155,7 @@ function LeadsPage() {
             </form>
           </DialogContent>
         </Dialog>
-        </Can>
+        </Can>}
       </div>
 
       <Card>

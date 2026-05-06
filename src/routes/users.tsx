@@ -134,10 +134,10 @@ function UsersPage() {
     }
   };
 
-  const handleDelete = async (uid: string) => {
+  const handleDelete = async (uid: string, reassignTo?: string | null) => {
     try {
-      await callAdminUsers("delete", { user_id: uid });
-      toast.success("Usuário excluído");
+      await callAdminUsers("delete", { user_id: uid, reassign_to: reassignTo || null });
+      toast.success(reassignTo ? "Usuário excluído (dados reatribuídos)" : "Usuário excluído");
       load();
     } catch (e) {
       toast.error((e as Error).message);

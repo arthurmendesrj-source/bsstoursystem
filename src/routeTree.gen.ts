@@ -20,6 +20,7 @@ import { Route as PackagesRouteImport } from './routes/packages'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ItinerariesRouteImport } from './routes/itineraries'
+import { Route as GerencialRouteImport } from './routes/gerencial'
 import { Route as FunnelRouteImport } from './routes/funnel'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -38,6 +39,7 @@ import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
 import { Route as PermissionsAuditFinancialRouteImport } from './routes/permissions-audit.financial'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
+import { Route as GerencialUserIdRouteImport } from './routes/gerencial.$userId'
 import { Route as BookingsBookingIdRouteImport } from './routes/bookings_.$bookingId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
@@ -101,6 +103,11 @@ const LeadsRoute = LeadsRouteImport.update({
 const ItinerariesRoute = ItinerariesRouteImport.update({
   id: '/itineraries',
   path: '/itineraries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GerencialRoute = GerencialRouteImport.update({
+  id: '/gerencial',
+  path: '/gerencial',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FunnelRoute = FunnelRouteImport.update({
@@ -195,6 +202,11 @@ const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => LeadsRoute,
 } as any)
+const GerencialUserIdRoute = GerencialUserIdRouteImport.update({
+  id: '/$userId',
+  path: '/$userId',
+  getParentRoute: () => GerencialRoute,
+} as any)
 const BookingsBookingIdRoute = BookingsBookingIdRouteImport.update({
   id: '/bookings_/$bookingId',
   path: '/bookings/$bookingId',
@@ -253,6 +265,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
+  '/gerencial': typeof GerencialRouteWithChildren
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
@@ -269,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
+  '/gerencial/$userId': typeof GerencialUserIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
@@ -293,6 +307,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
+  '/gerencial': typeof GerencialRouteWithChildren
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
@@ -309,6 +324,7 @@ export interface FileRoutesByTo {
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
+  '/gerencial/$userId': typeof GerencialUserIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
@@ -334,6 +350,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
+  '/gerencial': typeof GerencialRouteWithChildren
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
@@ -350,6 +367,7 @@ export interface FileRoutesById {
   '/alerts/preferences': typeof AlertsPreferencesRoute
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings_/$bookingId': typeof BookingsBookingIdRoute
+  '/gerencial/$userId': typeof GerencialUserIdRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
@@ -376,6 +394,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email'
     | '/funnel'
+    | '/gerencial'
     | '/itineraries'
     | '/leads'
     | '/login'
@@ -392,6 +411,7 @@ export interface FileRouteTypes {
     | '/alerts/preferences'
     | '/alerts/sla'
     | '/bookings/$bookingId'
+    | '/gerencial/$userId'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
     | '/settings/permissions'
@@ -416,6 +436,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email'
     | '/funnel'
+    | '/gerencial'
     | '/itineraries'
     | '/leads'
     | '/login'
@@ -432,6 +453,7 @@ export interface FileRouteTypes {
     | '/alerts/preferences'
     | '/alerts/sla'
     | '/bookings/$bookingId'
+    | '/gerencial/$userId'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
     | '/settings/permissions'
@@ -456,6 +478,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/email'
     | '/funnel'
+    | '/gerencial'
     | '/itineraries'
     | '/leads'
     | '/login'
@@ -472,6 +495,7 @@ export interface FileRouteTypes {
     | '/alerts/preferences'
     | '/alerts/sla'
     | '/bookings_/$bookingId'
+    | '/gerencial/$userId'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
     | '/settings/permissions'
@@ -497,6 +521,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   EmailRoute: typeof EmailRoute
   FunnelRoute: typeof FunnelRoute
+  GerencialRoute: typeof GerencialRouteWithChildren
   ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -592,6 +617,13 @@ declare module '@tanstack/react-router' {
       path: '/itineraries'
       fullPath: '/itineraries'
       preLoaderRoute: typeof ItinerariesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gerencial': {
+      id: '/gerencial'
+      path: '/gerencial'
+      fullPath: '/gerencial'
+      preLoaderRoute: typeof GerencialRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/funnel': {
@@ -720,6 +752,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadsLeadIdRouteImport
       parentRoute: typeof LeadsRoute
     }
+    '/gerencial/$userId': {
+      id: '/gerencial/$userId'
+      path: '/$userId'
+      fullPath: '/gerencial/$userId'
+      preLoaderRoute: typeof GerencialUserIdRouteImport
+      parentRoute: typeof GerencialRoute
+    }
     '/bookings_/$bookingId': {
       id: '/bookings_/$bookingId'
       path: '/bookings/$bookingId'
@@ -803,6 +842,18 @@ const AlertsRouteChildren: AlertsRouteChildren = {
 const AlertsRouteWithChildren =
   AlertsRoute._addFileChildren(AlertsRouteChildren)
 
+interface GerencialRouteChildren {
+  GerencialUserIdRoute: typeof GerencialUserIdRoute
+}
+
+const GerencialRouteChildren: GerencialRouteChildren = {
+  GerencialUserIdRoute: GerencialUserIdRoute,
+}
+
+const GerencialRouteWithChildren = GerencialRoute._addFileChildren(
+  GerencialRouteChildren,
+)
+
 interface LeadsRouteChildren {
   LeadsLeadIdRoute: typeof LeadsLeadIdRoute
 }
@@ -868,6 +919,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   EmailRoute: EmailRoute,
   FunnelRoute: FunnelRoute,
+  GerencialRoute: GerencialRouteWithChildren,
   ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,
@@ -888,3 +940,12 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

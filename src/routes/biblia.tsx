@@ -151,7 +151,7 @@ function BibliaPage() {
       if (fromS && (r.activity_date ?? "") < fromS) return false;
       if (toS && (r.activity_date ?? "") > toS) return false;
       if (s) {
-        const hay = `${r.description ?? ""} ${r.city ?? ""} ${r.pax_name ?? ""} ${r.invoice_code ?? ""}`.toLowerCase();
+        const hay = `${r.description ?? ""} ${r.city ?? ""} ${r.pax_name ?? ""} ${r.invoice_code ?? ""} ${(r as any).hotel ?? ""} ${(r as any).driver ?? ""} ${(r as any).supplier ?? ""} ${(r as any).guide ?? ""}`.toLowerCase();
         if (!hay.includes(s)) return false;
       }
       return true;

@@ -212,9 +212,11 @@ function BookingsPage() {
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
                 <TableCell>{pkgName(b.package_id)}</TableCell>
                 <TableCell>{b.departure_date ?? "—"}</TableCell>
-                <TableCell>{format(Number(b.total_amount), b.currency as "BRL")}</TableCell>
                 <TableCell>
-                  <Select value={b.status} onValueChange={(v) => updateStatus(b.id, v)}>
+                  <MaskedField module="bookings" field="total_amount" value={format(Number(b.total_amount), b.currency as "BRL")} />
+                </TableCell>
+                <TableCell>
+                  <Select value={b.status} onValueChange={(v) => updateStatus(b.id, v)} disabled={!can("bookings", "edit")}>
                     <SelectTrigger className="h-8 w-36">
                       <Badge variant="outline" className={statusColor(b.status)}>{b.status}</Badge>
                     </SelectTrigger>

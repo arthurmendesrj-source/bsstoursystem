@@ -15,6 +15,7 @@ import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SecurityAuditRouteImport } from './routes/security-audit'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PermissionsAuditRouteImport } from './routes/permissions-audit'
 import { Route as PackagesRouteImport } from './routes/packages'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadsRouteImport } from './routes/leads'
@@ -73,6 +74,11 @@ const SecurityAuditRoute = SecurityAuditRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PermissionsAuditRoute = PermissionsAuditRouteImport.update({
+  id: '/permissions-audit',
+  path: '/permissions-audit',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PackagesRoute = PackagesRouteImport.update({
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
+  '/permissions-audit': typeof PermissionsAuditRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
+  '/permissions-audit': typeof PermissionsAuditRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -313,6 +321,7 @@ export interface FileRoutesById {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/packages': typeof PackagesRoute
+  '/permissions-audit': typeof PermissionsAuditRoute
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
   '/settings': typeof SettingsRouteWithChildren
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/login'
     | '/packages'
+    | '/permissions-audit'
     | '/reset-password'
     | '/security-audit'
     | '/settings'
@@ -389,6 +399,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/login'
     | '/packages'
+    | '/permissions-audit'
     | '/reset-password'
     | '/security-audit'
     | '/settings'
@@ -426,6 +437,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/login'
     | '/packages'
+    | '/permissions-audit'
     | '/reset-password'
     | '/security-audit'
     | '/settings'
@@ -464,6 +476,7 @@ export interface RootRouteChildren {
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
   PackagesRoute: typeof PackagesRoute
+  PermissionsAuditRoute: typeof PermissionsAuditRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityAuditRoute: typeof SecurityAuditRoute
   SettingsRoute: typeof SettingsRouteWithChildren
@@ -518,6 +531,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/permissions-audit': {
+      id: '/permissions-audit'
+      path: '/permissions-audit'
+      fullPath: '/permissions-audit'
+      preLoaderRoute: typeof PermissionsAuditRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/packages': {
@@ -801,6 +821,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,
   PackagesRoute: PackagesRoute,
+  PermissionsAuditRoute: PermissionsAuditRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityAuditRoute: SecurityAuditRoute,
   SettingsRoute: SettingsRouteWithChildren,

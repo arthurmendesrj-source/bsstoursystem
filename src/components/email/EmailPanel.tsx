@@ -80,6 +80,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     expected_travel_date: "", notes: "", next_action: "",
     status: "novo",
     create_customer: true,
+    assigned_to: "",
   });
   const [aiNote, setAiNote] = useState<string | null>(null);
 

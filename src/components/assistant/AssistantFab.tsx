@@ -30,13 +30,15 @@ export function AssistantFab() {
 
   return (
     <>
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:scale-105 transition-transform"
         aria-label="Abrir assistente IA"
+        title="Assistente IA"
       >
-        <Sparkles className="h-6 w-6" />
-      </button>
+        <Sparkles className="h-5 w-5 text-primary" />
+      </Button>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col">
           <SheetHeader className="px-4 py-3 border-b flex-row items-center justify-between space-y-0">
@@ -55,3 +57,4 @@ export function AssistantFab() {
     </>
   );
 }
+

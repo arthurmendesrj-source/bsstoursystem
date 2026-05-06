@@ -2316,6 +2316,7 @@ export type Database = {
         Args: { _entity: string; _user_id: string }
         Returns: string
       }
+      get_subordinates: { Args: { _user_id: string }; Returns: string[] }
       has_field_permission: {
         Args: {
           _action: string
@@ -2337,6 +2338,10 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_subordinate_of: {
+        Args: { _manager: string; _target: string }
+        Returns: boolean
+      }
       match_itineraries: {
         Args: {
           match_count?: number
@@ -2354,6 +2359,11 @@ export type Database = {
           title: string
           trip_type: string
         }[]
+      }
+      max_role_rank: { Args: { _user_id: string }; Returns: number }
+      role_rank: {
+        Args: { _role: Database["public"]["Enums"]["app_role"] }
+        Returns: number
       }
       slugify: { Args: { _t: string }; Returns: string }
       slugify_text: { Args: { input: string }; Returns: string }

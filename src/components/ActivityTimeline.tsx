@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAdminIds } from "@/lib/hideAdmin";
 import { useI18n } from "@/lib/i18n";
 import { Plus, Edit3, ArrowRightLeft, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";

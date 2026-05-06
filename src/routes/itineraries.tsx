@@ -97,6 +97,7 @@ function ItinerariesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [tripType, setTripType] = useState<string>("all");
+  const [language, setLanguage] = useState<string>("all");
   const [semanticQuery, setSemanticQuery] = useState("");
   const [semanticIds, setSemanticIds] = useState<string[] | null>(null);
   const [semanticBusy, setSemanticBusy] = useState(false);

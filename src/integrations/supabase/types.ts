@@ -1327,6 +1327,89 @@ export type Database = {
           },
         ]
       }
+      ref_cities: {
+        Row: {
+          country: string | null
+          created_at: string
+          id: string
+          name: string
+          slug: string
+          state: string | null
+        }
+        Insert: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+          state?: string | null
+        }
+        Update: {
+          country?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+          state?: string | null
+        }
+        Relationships: []
+      }
+      ref_service_categories: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      ref_services: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ref_services_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "ref_service_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sla_escalations: {
         Row: {
           created_at: string
@@ -1508,7 +1591,9 @@ export type Database = {
       supplier_rates: {
         Row: {
           category: string | null
+          category_id: string | null
           city: string | null
+          city_id: string | null
           created_at: string
           created_by: string | null
           currency: Database["public"]["Enums"]["currency_code"]
@@ -1518,6 +1603,7 @@ export type Database = {
           pax_max: number | null
           pax_min: number | null
           raw_excerpt: string | null
+          service_id: string | null
           service_name: string
           service_type: string | null
           supplier_id: string
@@ -1529,7 +1615,9 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          category_id?: string | null
           city?: string | null
+          city_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: Database["public"]["Enums"]["currency_code"]
@@ -1539,6 +1627,7 @@ export type Database = {
           pax_max?: number | null
           pax_min?: number | null
           raw_excerpt?: string | null
+          service_id?: string | null
           service_name: string
           service_type?: string | null
           supplier_id: string
@@ -1550,7 +1639,9 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          category_id?: string | null
           city?: string | null
+          city_id?: string | null
           created_at?: string
           created_by?: string | null
           currency?: Database["public"]["Enums"]["currency_code"]
@@ -1560,6 +1651,7 @@ export type Database = {
           pax_max?: number | null
           pax_min?: number | null
           raw_excerpt?: string | null
+          service_id?: string | null
           service_name?: string
           service_type?: string | null
           supplier_id?: string
@@ -1571,10 +1663,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "supplier_rates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "ref_service_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_rates_city_id_fkey"
+            columns: ["city_id"]
+            isOneToOne: false
+            referencedRelation: "ref_cities"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "supplier_rates_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
             referencedRelation: "supplier_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_rates_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "ref_services"
             referencedColumns: ["id"]
           },
           {

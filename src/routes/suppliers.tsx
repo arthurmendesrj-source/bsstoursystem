@@ -291,9 +291,11 @@ function SuppliersPage() {
             ) : filtered.map((s, i) => (
               <TableRow key={s.id} className={i % 2 === 0 ? "bg-muted/30" : ""}>
                 <TableCell>
+                  <Can module="suppliers" action="delete">
                   <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleDelete(s.id, s.name); }}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
+                  </Can>
                 </TableCell>
                 <TableCell className="font-semibold">{s.name}</TableCell>
                 <TableCell><Badge variant="outline">{t(CAT_LABEL[s.category])}</Badge></TableCell>

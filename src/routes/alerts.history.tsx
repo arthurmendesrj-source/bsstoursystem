@@ -76,13 +76,14 @@ function NotificationHistoryPage() {
       // Carrega nomes dos usuários (apenas admin vê outros)
       if (isAdmin && list.length) {
         const ids = Array.from(new Set(list.map((r) => r.user_id)));
-        const { data: profs } = await supabase
-          .from("profiles")
-          .select("user_id,full_name")
-          .in("user_id", ids);
+        const [{ data: profs }, { data: rls }] = await Promise.all([
+          supabase.from("profiles").select("user_id,full_name").in("user_id", ids),
+          supabase.from("user_roles").select("user_id, role").in("user_id", ids),
+        ]);
+        const adminIds = getAdminIds((rls ?? []) as { user_id: string; role: string }[]);
         const map: Record<string, string> = {};
         for (const p of (profs ?? []) as ProfileRow[]) {
-          if (p.user_id) map[p.user_id] = p.full_name ?? "—";
+          if (p.user_id) map[p.user_id] = adminIds.has(p.user_id) ? "Sistema" : (p.full_name ?? "—");
         }
         setProfiles(map);
       }

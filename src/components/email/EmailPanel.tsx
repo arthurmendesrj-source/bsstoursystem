@@ -59,6 +59,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const modifyFn = useServerFn(gmailModify);
   const sendFn = useServerFn(gmailSend);
   const analyzeFn = useServerFn(emailAnalyze);
+  const analyzeLocalFn = useServerFn(emailAnalyzeLocal);
 
   const [folder, setFolder] = useState<Folder>(mode === "lead" ? "withLead" : "inbox");
   const [search, setSearch] = useState("");

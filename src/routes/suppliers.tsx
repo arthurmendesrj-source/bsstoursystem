@@ -417,6 +417,36 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                         <Card key={e.id} className="p-3 text-sm">{e.subject ?? "(sem assunto)"} — {e.from_email}</Card>
                       ))}</div>}
                 </TabsContent>
+                <TabsContent value="docs">
+                  {docs.length === 0
+                    ? <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
+                    : <div className="space-y-2 mt-2">{docs.map((d) => (
+                        <Card key={d.id} className="p-3 text-sm flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{d.original_filename}</div>
+                            <div className="text-xs text-muted-foreground">{d.file_format?.toUpperCase()} · {d.kind}{d.language ? ` · ${d.language}` : ""}{d.rates_extracted_at ? " · ✓ tarifas" : ""}{d.contacts_extracted_at ? " · ✓ contatos" : ""}</div>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={async () => {
+                            const { data } = await supabase.storage.from("supplier-docs").createSignedUrl(d.storage_path, 60);
+                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                          }}>Abrir</Button>
+                        </Card>
+                      ))}</div>}
+                </TabsContent>
+                <TabsContent value="rates">
+                  {rates.length === 0
+                    ? <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
+                    : <div className="mt-2 max-h-[60vh] overflow-y-auto"><Table><TableHeader><TableRow><TableHead>Serviço</TableHead><TableHead>Cidade</TableHead><TableHead>Pax</TableHead><TableHead className="text-right">Preço</TableHead></TableRow></TableHeader><TableBody>
+                        {rates.map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell className="text-xs">{r.service_name}{r.category ? ` (${r.category})` : ""}</TableCell>
+                            <TableCell className="text-xs">{r.city ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.pax_min ?? "—"}{r.pax_max ? `-${r.pax_max}` : ""}</TableCell>
+                            <TableCell className="text-right text-xs">{r.currency} {Number(r.unit_price).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody></Table></div>}
+                </TabsContent>
               </Tabs>
             </div>
           </>

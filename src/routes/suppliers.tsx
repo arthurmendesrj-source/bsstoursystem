@@ -400,3 +400,27 @@ function Row({ k, v }: { k: string; v: string | null | undefined }) {
   if (!v) return null;
   return <div className="flex gap-2"><span className="text-muted-foreground w-32 shrink-0">{k}</span><span className="flex-1">{v}</span></div>;
 }
+
+function BulkAIButtons() {
+  const [loading, setLoading] = useState<"contacts" | "rates" | null>(null);
+  const run = async (kind: "contacts" | "rates") => {
+    setLoading(kind);
+    const fn = kind === "contacts" ? "extract-supplier-contacts" : "extract-supplier-rates";
+    const { data, error } = await supabase.functions.invoke(fn, { body: { all: true } });
+    setLoading(null);
+    if (error) toast.error(error.message);
+    else toast.success(`${data?.processed ?? 0} documentos processados`);
+  };
+  return (
+    <>
+      <Button variant="outline" disabled={!!loading} onClick={() => run("contacts")}>
+        {loading === "contacts" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+        IA: Contatos
+      </Button>
+      <Button variant="outline" disabled={!!loading} onClick={() => run("rates")}>
+        {loading === "rates" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+        IA: Tarifas
+      </Button>
+    </>
+  );
+}

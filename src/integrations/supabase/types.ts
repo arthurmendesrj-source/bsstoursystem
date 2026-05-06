@@ -1261,12 +1261,14 @@ export type Database = {
           city: string | null
           created_at: string
           description: string
+          guide_type: string | null
           id: string
           item_date: string | null
           kind: string
           markup_pct: number
           meal_plan: string | null
           nights: number | null
+          notes: string | null
           pax: number | null
           quantity: number
           quote_id: string
@@ -1282,12 +1284,14 @@ export type Database = {
           city?: string | null
           created_at?: string
           description: string
+          guide_type?: string | null
           id?: string
           item_date?: string | null
           kind?: string
           markup_pct?: number
           meal_plan?: string | null
           nights?: number | null
+          notes?: string | null
           pax?: number | null
           quantity?: number
           quote_id: string
@@ -1303,12 +1307,14 @@ export type Database = {
           city?: string | null
           created_at?: string
           description?: string
+          guide_type?: string | null
           id?: string
           item_date?: string | null
           kind?: string
           markup_pct?: number
           meal_plan?: string | null
           nights?: number | null
+          notes?: string | null
           pax?: number | null
           quantity?: number
           quote_id?: string

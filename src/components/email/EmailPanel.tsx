@@ -50,6 +50,7 @@ export type EmailPanelProps = {
 export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelProps) {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { subordinates } = useSubordinates();
 
   const syncFn = useServerFn(gmailSync);
   const getFn = useServerFn(gmailGet);

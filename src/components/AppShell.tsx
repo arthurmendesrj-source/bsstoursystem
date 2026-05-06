@@ -72,15 +72,19 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [crmOpen]);
 
-  const items = [
+  const crmChildren = [
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { to: "/leads", label: t("leads"), icon: UserPlus },
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
+    { to: "/workspace", label: "Atendimento", icon: Briefcase },
+    { to: "/packages", label: t("packages"), icon: Package },
+  ];
+
+  const items = [
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },
     { to: "/customers", label: t("customers"), icon: Users },
     { to: "/suppliers", label: t("suppliers"), icon: Building2 },
-    { to: "/packages", label: t("packages"), icon: Package },
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },
     { to: "/biblia", label: t("bibliaMenu"), icon: BookOpen },
     { to: "/itineraries", label: "Roteiros (IA)", icon: Library },

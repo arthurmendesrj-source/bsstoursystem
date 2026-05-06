@@ -62,11 +62,13 @@ function RootComponent() {
     <I18nProvider>
       <CurrencyProvider>
         <AuthProvider>
-          <PermissionsProvider>
-            <Outlet />
-            <PermissionFieldHighlighter />
-            <Toaster />
-          </PermissionsProvider>
+          <ViewAsProvider>
+            <PermissionsProvider>
+              <Outlet />
+              <PermissionFieldHighlighter />
+              <Toaster />
+            </PermissionsProvider>
+          </ViewAsProvider>
         </AuthProvider>
       </CurrencyProvider>
     </I18nProvider>

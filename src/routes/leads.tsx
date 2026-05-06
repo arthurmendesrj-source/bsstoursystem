@@ -48,10 +48,11 @@ function LeadsPage() {
   const { user } = useAuth();
   const { format } = useCurrency();
   const { can } = usePermissions();
+  const { subordinates } = useSubordinates();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
 
   const load = async () => {
     const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false });

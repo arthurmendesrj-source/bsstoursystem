@@ -99,7 +99,7 @@ function FunnelPage() {
   }, [leads, slaByLead, filter]);
 
   const onDrop = async (status: string) => {
-    if (!dragId) return;
+    if (!dragId || readOnly) return;
     const { error } = await supabase.from("leads").update({ status: status as "novo" }).eq("id", dragId);
     if (error) toast.error(error.message);
     else setLeads((cur) => cur.map((l) => (l.id === dragId ? { ...l, status } : l)));

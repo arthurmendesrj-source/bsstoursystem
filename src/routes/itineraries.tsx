@@ -64,6 +64,7 @@ type Itinerary = {
   summary: string | null;
   processing_status: "pending" | "processing" | "ready" | "failed";
   processing_error: string | null;
+  language: string | null;
   created_at: string;
 };
 

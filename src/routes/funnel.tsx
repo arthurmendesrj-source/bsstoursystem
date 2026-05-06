@@ -148,9 +148,9 @@ function FunnelPage() {
                     return (
                       <Card
                         key={l.id}
-                        draggable
-                        onDragStart={() => setDragId(l.id)}
-                        className="cursor-move p-3 hover:shadow-md"
+                        draggable={!readOnly}
+                        onDragStart={() => !readOnly && setDragId(l.id)}
+                        className={readOnly ? "p-3 hover:shadow-md" : "cursor-move p-3 hover:shadow-md"}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <Link to="/leads/$leadId" params={{ leadId: l.id }} className="text-sm font-medium hover:underline truncate">

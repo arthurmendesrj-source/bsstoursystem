@@ -54,6 +54,31 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const action: string = body.action;
+    const actorEmail = userData.user.email ?? null;
+
+    const audit = async (entry: {
+      action: string;
+      target_user_id?: string | null;
+      target_email?: string | null;
+      details?: Record<string, unknown>;
+      success?: boolean;
+      error_message?: string | null;
+    }) => {
+      try {
+        await admin.from("user_audit_log").insert({
+          action: entry.action,
+          actor_id: callerId,
+          actor_email: actorEmail,
+          target_user_id: entry.target_user_id ?? null,
+          target_email: entry.target_email ?? null,
+          details: entry.details ?? {},
+          success: entry.success ?? true,
+          error_message: entry.error_message ?? null,
+        });
+      } catch (e) {
+        console.warn("audit log failed", e);
+      }
+    };
 
     // Helper: get target roles
     const getRolesOf = async (uid: string): Promise<Set<AppRole>> => {

@@ -1953,7 +1953,101 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_supplier_rates_duplicates: {
+        Row: {
+          category: string | null
+          city: string | null
+          language: string | null
+          occurrences: number | null
+          pax_max: number | null
+          pax_min: number | null
+          prices: number[] | null
+          rate_ids: string[] | null
+          service_name: string | null
+          supplier_id: string | null
+          unit: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_supplier_rates_issues: {
+        Row: {
+          category: string | null
+          city: string | null
+          currency: Database["public"]["Enums"]["currency_code"] | null
+          id: string | null
+          issues: string[] | null
+          pax_max: number | null
+          pax_min: number | null
+          service_name: string | null
+          supplier_id: string | null
+          unit_price: number | null
+        }
+        Insert: {
+          category?: string | null
+          city?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"] | null
+          id?: string | null
+          issues?: never
+          pax_max?: number | null
+          pax_min?: number | null
+          service_name?: string | null
+          supplier_id?: string | null
+          unit_price?: number | null
+        }
+        Update: {
+          category?: string | null
+          city?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"] | null
+          id?: string | null
+          issues?: never
+          pax_max?: number | null
+          pax_min?: number | null
+          service_name?: string | null
+          supplier_id?: string | null
+          unit_price?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_supplier_rates_validation: {
+        Row: {
+          empty_city: number | null
+          empty_service: number | null
+          pax_invalid: number | null
+          supplier_id: string | null
+          suspicious_long_category: number | null
+          suspicious_pax_min: number | null
+          total: number | null
+          unmapped_category: number | null
+          unmapped_city: number | null
+          unmapped_service: number | null
+          zero_price: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       _notify_apikey: { Args: never; Returns: string }

@@ -1443,6 +1443,149 @@ export type Database = {
           },
         ]
       }
+      supplier_documents: {
+        Row: {
+          contacts_extracted_at: string | null
+          created_at: string
+          file_format: string
+          file_size_bytes: number | null
+          id: string
+          kind: string
+          language: string | null
+          notes: string | null
+          original_filename: string
+          rates_extracted_at: string | null
+          storage_path: string
+          supplier_id: string
+          updated_at: string
+          uploaded_by: string | null
+          year: number | null
+        }
+        Insert: {
+          contacts_extracted_at?: string | null
+          created_at?: string
+          file_format: string
+          file_size_bytes?: number | null
+          id?: string
+          kind?: string
+          language?: string | null
+          notes?: string | null
+          original_filename: string
+          rates_extracted_at?: string | null
+          storage_path: string
+          supplier_id: string
+          updated_at?: string
+          uploaded_by?: string | null
+          year?: number | null
+        }
+        Update: {
+          contacts_extracted_at?: string | null
+          created_at?: string
+          file_format?: string
+          file_size_bytes?: number | null
+          id?: string
+          kind?: string
+          language?: string | null
+          notes?: string | null
+          original_filename?: string
+          rates_extracted_at?: string | null
+          storage_path?: string
+          supplier_id?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_documents_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_rates: {
+        Row: {
+          category: string | null
+          city: string | null
+          created_at: string
+          created_by: string | null
+          currency: Database["public"]["Enums"]["currency_code"]
+          document_id: string | null
+          id: string
+          language: string | null
+          pax_max: number | null
+          pax_min: number | null
+          raw_excerpt: string | null
+          service_name: string
+          service_type: string | null
+          supplier_id: string
+          unit: string | null
+          unit_price: number
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"]
+          document_id?: string | null
+          id?: string
+          language?: string | null
+          pax_max?: number | null
+          pax_min?: number | null
+          raw_excerpt?: string | null
+          service_name: string
+          service_type?: string | null
+          supplier_id: string
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          category?: string | null
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"]
+          document_id?: string | null
+          id?: string
+          language?: string | null
+          pax_max?: number | null
+          pax_min?: number | null
+          raw_excerpt?: string | null
+          service_name?: string
+          service_type?: string | null
+          supplier_id?: string
+          unit?: string | null
+          unit_price?: number
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_rates_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_rates_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address_city: string | null

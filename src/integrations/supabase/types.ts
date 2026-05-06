@@ -2247,6 +2247,45 @@ export type Database = {
           },
         ]
       }
+      user_audit_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          error_message: string | null
+          id: string
+          success: boolean
+          target_email: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          id?: string
+          success?: boolean
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          error_message?: string | null
+          id?: string
+          success?: boolean
+          target_email?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
       user_field_permissions: {
         Row: {
           can_edit: boolean | null

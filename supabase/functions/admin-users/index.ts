@@ -102,7 +102,16 @@ Deno.serve(async (req) => {
       return json({ users: out });
     }
 
-    if (action === "resend_invite") {
+    if (action === "list_audit") {
+      const limit = Math.min(Number(body.limit ?? 100), 500);
+      const { data, error } = await admin
+        .from("user_audit_log")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) return json({ error: error.message }, 500);
+      return json({ entries: data ?? [] });
+    }
       const targetId = String(body.user_id ?? "");
       if (!targetId) return json({ error: "user_id obrigatório" }, 400);
       const { data: u, error: gErr } = await admin.auth.admin.getUserById(targetId);

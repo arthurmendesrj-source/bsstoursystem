@@ -123,7 +123,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Briefcase className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t("workspace")}</span>}
           </Link>
-          {showManagerial && (
+          {showManagerial && !viewAs && (
             <Link to="/gerencial" className={itemClass(path === "/gerencial" || path.startsWith("/gerencial/"))} title={collapsed ? "Gerencial" : undefined}>
               <BarChart3 className="h-4 w-4 shrink-0" />
               {!collapsed && <span className="truncate">Gerencial</span>}

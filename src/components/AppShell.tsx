@@ -243,6 +243,27 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SelectContent>
           </Select>
         </header>
+        {viewAs && (
+          <div className="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm md:px-6">
+            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <Eye className="h-4 w-4" />
+              <span>
+                Visualizando como <strong>{viewAs.full_name}</strong> ({viewAs.role}) — modo somente leitura
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 border-amber-500/50 bg-background/60 text-xs"
+              onClick={() => {
+                exitViewAs();
+                navigate({ to: "/gerencial" });
+              }}
+            >
+              Sair da visualização
+            </Button>
+          </div>
+        )}
         <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
       </div>
     </div>

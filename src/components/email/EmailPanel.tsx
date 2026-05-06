@@ -170,6 +170,35 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     setLoadingBody(true);
     setShowCompose(null);
     try {
+      if (isSeedId(row.gmail_id)) {
+        // Build FullMessage shape from db row
+        const { data: fullRow } = await supabase
+          .from("emails")
+          .select("body_text, body_html, to_emails, thread_id, labels, snippet")
+          .eq("id", row.id)
+          .maybeSingle();
+        const localFull = {
+          id: row.gmail_id,
+          threadId: row.thread_id ?? "",
+          labelIds: (fullRow?.labels ?? row.labels ?? []) as string[],
+          snippet: (fullRow?.snippet ?? row.snippet ?? "") as string,
+          from: { name: row.from_name ?? "", email: row.from_email ?? "" },
+          to: ((fullRow?.to_emails ?? []) as string[]) ?? [],
+          subject: row.subject ?? "",
+          date: row.received_at ?? undefined,
+          messageIdHeader: undefined,
+          references: undefined,
+          bodyHtml: (fullRow?.body_html ?? "") as string,
+          bodyText: (fullRow?.body_text ?? "") as string,
+          hasAttachments: false,
+        } as unknown as FullMessage;
+        setFull(localFull);
+        if (row.is_unread) {
+          await supabase.from("emails").update({ is_unread: false }).eq("id", row.id);
+          setEmails((prev) => prev.map((e) => (e.id === row.id ? { ...e, is_unread: false } : e)));
+        }
+        return;
+      }
       const m = await getFn({ data: { id: row.gmail_id } });
       setFull(m);
       if (row.is_unread) {

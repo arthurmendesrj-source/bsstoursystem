@@ -259,6 +259,17 @@ Deno.serve(async (req) => {
       const { error: delErr } = await admin.auth.admin.deleteUser(targetId);
       if (delErr) return json({ error: delErr.message }, 500);
 
+      await audit({
+        action: "delete",
+        target_user_id: targetId,
+        target_email: targetEmail,
+        details: {
+          reassigned_to: reassignTo,
+          reassigned_to_email: reassignEmail,
+          mode: reassignTo ? "reassign" : "cascade_delete",
+        },
+      });
+
       return json({ ok: true });
     }
 

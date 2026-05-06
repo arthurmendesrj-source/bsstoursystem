@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Eye, Star } from "lucide-react";
+import { Plus, Search, Eye, Star, Sparkles, FileText, Loader2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -153,8 +153,10 @@ function SuppliersPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("suppliers")}</h1>
           <p className="text-muted-foreground">{filtered.length} / {rows.length}</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("addManually")}</Button></DialogTrigger>
+        <div className="flex gap-2">
+          <BulkAIButtons />
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("addManually")}</Button></DialogTrigger>
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader><DialogTitle>{t("new")} {t("suppliers")}</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-4">
@@ -239,8 +241,9 @@ function SuppliersPage() {
 
               <Button type="submit" className="w-full">{t("save")}</Button>
             </form>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="p-4">
@@ -313,30 +316,60 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
   const [contacts, setContacts] = useState<any[]>([]);
   const [emails, setEmails] = useState<any[]>([]);
   const [bookings, setBookings] = useState<any[]>([]);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [rates, setRates] = useState<any[]>([]);
+  const [busy, setBusy] = useState<string | null>(null);
 
-  useEffect(() => {
+  const reload = async () => {
     if (!supplier) return;
-    (async () => {
-      const [c, e, b] = await Promise.all([
-        supabase.from("supplier_contacts").select("*").eq("supplier_id", supplier.id).order("is_primary", { ascending: false }),
-        supabase.from("emails").select("id,subject,from_email,received_at").eq("supplier_id", supplier.id).order("received_at", { ascending: false }).limit(20),
-        supabase.from("booking_suppliers").select("id,service_type,confirmation_code,cost,currency,status,booking_id").eq("supplier_id", supplier.id).order("created_at", { ascending: false }).limit(20),
-      ]);
-      setContacts(c.data ?? []); setEmails(e.data ?? []); setBookings(b.data ?? []);
-    })();
-  }, [supplier]);
+    const [c, e, b, d, r] = await Promise.all([
+      supabase.from("supplier_contacts").select("*").eq("supplier_id", supplier.id).order("is_primary", { ascending: false }),
+      supabase.from("emails").select("id,subject,from_email,received_at").eq("supplier_id", supplier.id).order("received_at", { ascending: false }).limit(20),
+      supabase.from("booking_suppliers").select("id,service_type,confirmation_code,cost,currency,status,booking_id").eq("supplier_id", supplier.id).order("created_at", { ascending: false }).limit(20),
+      supabase.from("supplier_documents").select("*").eq("supplier_id", supplier.id).order("created_at", { ascending: false }),
+      supabase.from("supplier_rates").select("*").eq("supplier_id", supplier.id).order("city").limit(200),
+    ]);
+    setContacts(c.data ?? []); setEmails(e.data ?? []); setBookings(b.data ?? []);
+    setDocs(d.data ?? []); setRates(r.data ?? []);
+  };
+  useEffect(() => { reload(); }, [supplier]);
+
+  const runAI = async (fn: "extract-supplier-contacts" | "extract-supplier-rates") => {
+    if (!supplier) return;
+    setBusy(fn);
+    const { data, error } = await supabase.functions.invoke(fn, { body: { supplier_id: supplier.id } });
+    setBusy(null);
+    if (error) toast.error(error.message);
+    else { toast.success(`${data?.processed ?? 0} doc(s) processado(s)`); reload(); }
+  };
 
   return (
     <Sheet open={!!supplier} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         {supplier && (
           <>
-            <SheetHeader><SheetTitle>{supplier.name}</SheetTitle></SheetHeader>
+            <SheetHeader>
+              <SheetTitle className="flex items-center justify-between gap-2">
+                <span>{supplier.name}</span>
+                <span className="flex gap-1">
+                  <Button size="sm" variant="outline" disabled={!!busy} onClick={() => runAI("extract-supplier-contacts")}>
+                    {busy === "extract-supplier-contacts" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                    <span className="ml-1 text-xs">Contatos</span>
+                  </Button>
+                  <Button size="sm" variant="outline" disabled={!!busy} onClick={() => runAI("extract-supplier-rates")}>
+                    {busy === "extract-supplier-rates" ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+                    <span className="ml-1 text-xs">Tarifas</span>
+                  </Button>
+                </span>
+              </SheetTitle>
+            </SheetHeader>
             <div className="mt-4">
               <Tabs defaultValue="info">
-                <TabsList className="grid grid-cols-4 w-full">
+                <TabsList className="grid grid-cols-6 w-full">
                   <TabsTrigger value="info">{t("details")}</TabsTrigger>
                   <TabsTrigger value="contacts">{t("contacts")}</TabsTrigger>
+                  <TabsTrigger value="docs">Docs ({docs.length})</TabsTrigger>
+                  <TabsTrigger value="rates">Tarifas ({rates.length})</TabsTrigger>
                   <TabsTrigger value="bookings">{t("bookings")}</TabsTrigger>
                   <TabsTrigger value="emails">{t("email")}</TabsTrigger>
                 </TabsList>
@@ -384,6 +417,36 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                         <Card key={e.id} className="p-3 text-sm">{e.subject ?? "(sem assunto)"} — {e.from_email}</Card>
                       ))}</div>}
                 </TabsContent>
+                <TabsContent value="docs">
+                  {docs.length === 0
+                    ? <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
+                    : <div className="space-y-2 mt-2">{docs.map((d) => (
+                        <Card key={d.id} className="p-3 text-sm flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{d.original_filename}</div>
+                            <div className="text-xs text-muted-foreground">{d.file_format?.toUpperCase()} · {d.kind}{d.language ? ` · ${d.language}` : ""}{d.rates_extracted_at ? " · ✓ tarifas" : ""}{d.contacts_extracted_at ? " · ✓ contatos" : ""}</div>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={async () => {
+                            const { data } = await supabase.storage.from("supplier-docs").createSignedUrl(d.storage_path, 60);
+                            if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                          }}>Abrir</Button>
+                        </Card>
+                      ))}</div>}
+                </TabsContent>
+                <TabsContent value="rates">
+                  {rates.length === 0
+                    ? <div className="py-8 text-center text-sm text-muted-foreground">{t("noData")}</div>
+                    : <div className="mt-2 max-h-[60vh] overflow-y-auto"><Table><TableHeader><TableRow><TableHead>Serviço</TableHead><TableHead>Cidade</TableHead><TableHead>Pax</TableHead><TableHead className="text-right">Preço</TableHead></TableRow></TableHeader><TableBody>
+                        {rates.map((r) => (
+                          <TableRow key={r.id}>
+                            <TableCell className="text-xs">{r.service_name}{r.category ? ` (${r.category})` : ""}</TableCell>
+                            <TableCell className="text-xs">{r.city ?? "—"}</TableCell>
+                            <TableCell className="text-xs">{r.pax_min ?? "—"}{r.pax_max ? `-${r.pax_max}` : ""}</TableCell>
+                            <TableCell className="text-right text-xs">{r.currency} {Number(r.unit_price).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody></Table></div>}
+                </TabsContent>
               </Tabs>
             </div>
           </>
@@ -396,4 +459,28 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
 function Row({ k, v }: { k: string; v: string | null | undefined }) {
   if (!v) return null;
   return <div className="flex gap-2"><span className="text-muted-foreground w-32 shrink-0">{k}</span><span className="flex-1">{v}</span></div>;
+}
+
+function BulkAIButtons() {
+  const [loading, setLoading] = useState<"contacts" | "rates" | null>(null);
+  const run = async (kind: "contacts" | "rates") => {
+    setLoading(kind);
+    const fn = kind === "contacts" ? "extract-supplier-contacts" : "extract-supplier-rates";
+    const { data, error } = await supabase.functions.invoke(fn, { body: { all: true } });
+    setLoading(null);
+    if (error) toast.error(error.message);
+    else toast.success(`${data?.processed ?? 0} documentos processados`);
+  };
+  return (
+    <>
+      <Button variant="outline" disabled={!!loading} onClick={() => run("contacts")}>
+        {loading === "contacts" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+        IA: Contatos
+      </Button>
+      <Button variant="outline" disabled={!!loading} onClick={() => run("rates")}>
+        {loading === "rates" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+        IA: Tarifas
+      </Button>
+    </>
+  );
 }

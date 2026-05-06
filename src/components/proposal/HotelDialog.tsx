@@ -293,9 +293,12 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
           </div>
 
           <div>
-            <Label className="text-xs">Total</Label>
-            <Input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          </div>
+          {canViewCost && (
+            <div>
+              <Label className="text-xs">Total</Label>
+              <Input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} disabled={!canEditCost} />
+            </div>
+          )}
 
           <div>
             <Label className="text-xs">Notas</Label>

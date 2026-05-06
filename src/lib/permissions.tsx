@@ -18,6 +18,15 @@ type FieldRow = {
   role: AppRole; module_key: string; field_key: string;
   can_view: boolean; can_edit: boolean;
 };
+type UserModuleRow = {
+  user_id: string; module_key: string;
+  can_view: boolean | null; can_create: boolean | null; can_edit: boolean | null;
+  can_delete: boolean | null; can_approve: boolean | null;
+};
+type UserFieldRow = {
+  user_id: string; module_key: string; field_key: string;
+  can_view: boolean | null; can_edit: boolean | null;
+};
 
 type Ctx = {
   loading: boolean;
@@ -32,17 +41,23 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { roles, user, isAdmin } = useAuth();
   const [mods, setMods] = useState<ModuleRow[]>([]);
   const [fields, setFields] = useState<FieldRow[]>([]);
+  const [userMods, setUserMods] = useState<UserModuleRow[]>([]);
+  const [userFields, setUserFields] = useState<UserFieldRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    if (!user) { setMods([]); setFields([]); setLoading(false); return; }
+    if (!user) { setMods([]); setFields([]); setUserMods([]); setUserFields([]); setLoading(false); return; }
     setLoading(true);
-    const [m, f] = await Promise.all([
+    const [m, f, um, uf] = await Promise.all([
       supabase.from("role_module_permissions").select("*"),
       supabase.from("role_field_permissions").select("*"),
+      supabase.from("user_module_permissions").select("*").eq("user_id", user.id),
+      supabase.from("user_field_permissions").select("*").eq("user_id", user.id),
     ]);
     setMods((m.data as ModuleRow[]) ?? []);
     setFields((f.data as FieldRow[]) ?? []);
+    setUserMods((um.data as UserModuleRow[]) ?? []);
+    setUserFields((uf.data as UserFieldRow[]) ?? []);
     setLoading(false);
   };
 
@@ -50,6 +65,16 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const can = (module: string, action: Action) => {
     if (isAdmin) return true;
+    // Override individual tem prioridade
+    const ovr = userMods.find((u) => u.module_key === module);
+    if (ovr) {
+      const v = action === "view" ? ovr.can_view :
+                action === "create" ? ovr.can_create :
+                action === "edit" ? ovr.can_edit :
+                action === "delete" ? ovr.can_delete :
+                action === "approve" ? ovr.can_approve : null;
+      if (v !== null && v !== undefined) return v;
+    }
     if (!roles.length) return false;
     return mods.some((p) => roles.includes(p.role) && p.module_key === module && (
       action === "view" ? p.can_view :
@@ -62,9 +87,14 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   const canField = (module: string, field: string, action: "view" | "edit") => {
     if (isAdmin) return true;
-    if (!roles.length) return action === "view"; // sem papel: não bloqueia view por padrão
+    const ovr = userFields.find((u) => u.module_key === module && u.field_key === field);
+    if (ovr) {
+      const v = action === "view" ? ovr.can_view : ovr.can_edit;
+      if (v !== null && v !== undefined) return v;
+    }
+    if (!roles.length) return action === "view";
     const rows = fields.filter((f) => roles.includes(f.role) && f.module_key === module && f.field_key === field);
-    if (rows.length === 0) return true; // campo não catalogado = liberado
+    if (rows.length === 0) return true;
     return rows.some((r) => action === "view" ? r.can_view : r.can_edit);
   };
 

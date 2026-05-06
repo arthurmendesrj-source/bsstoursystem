@@ -1,66 +1,30 @@
-# Replica completa da tela do usuário no modo espelho
+## Problema
 
-## Diagnóstico
+Ao criar um lead em modo espelho (Admin/Diretor/Gerente agindo como subordinado), o código é gerado com as iniciais do gestor logado (ex.: `AB030526`) em vez das iniciais do subordinado dono da operação (ex.: `SK030526`).
 
-Hoje, ao clicar num usuário no Gerencial, o app navega para `/dashboard` e mostra o banner amarelo, mas a **barra lateral (sidebar) e os itens de menu continuam baseados no usuário logado (gestor)**. Pior: o menu "Gerencial" some, e o usuário fica com a sensação de que "só o Dashboard apareceu", porque:
+## Causa
 
-1. Não há sinalização de que ele *pode* clicar nos outros itens (Leads, Funil, Atividades, etc.) — os dados ali ainda eram do gestor até as últimas correções, então parecia "não funcionar".
-2. A sidebar reflete os **papéis do gestor**, não os do alvo. Itens administrativos (Usuários, Auditoria, Configurações > Permissões/SLA) aparecem quando o gestor é admin, mesmo se o alvo for um operador. Isso quebra a ilusão de "estou logado como ele".
-3. Em telas mais estreitas a sidebar `md:flex` simplesmente não aparece, e não há menu mobile/hamburguer — então em viewport reduzida o usuário só vê o conteúdo da rota atual.
+A trigger `set_lead_code` chama `generate_entity_code('lead', COALESCE(NEW.created_by, auth.uid()))`. Como o RLS de `leads` exige `auth.uid() = created_by`, o `created_by` sempre carrega o id do gestor — então as iniciais vêm do `profiles.full_name` do gestor.
 
-O objetivo agora é: **quando o gestor está em modo espelho, o app deve parecer 100% a tela daquele usuário** — sidebar visível, com exatamente os itens que aquele usuário veria, toolbar, banner identificando, e navegação livre por todas as abas.
+## Solução
 
-## Plano
+Usar o **destinatário/responsável** (`assigned_to`) como base para as iniciais e a sequência mensal, caindo de volta para `created_by` quando não houver `assigned_to`.
 
-### 1. `src/lib/viewAs.tsx` — carregar papéis do alvo
+### 1. Migration — atualizar geração do código
 
-- Adicionar fetch dos `user_roles` do `viewAs.user_id` (quando impersonando) e expor `targetRoles: AppRole[]` no contexto.
-- Cachear na sessionStorage junto com o target para não piscar a UI ao recarregar.
+- `set_lead_code`: usar `COALESCE(NEW.assigned_to, NEW.created_by, auth.uid())` como `_user_id`.
+- `generate_entity_code('lead', ...)`: contar a sequência mensal por `assigned_to` (e não `created_by`) quando entidade = `lead`, para que o número (`01`, `02`, …) também siga a carteira do operador. Customers/suppliers ficam inalterados.
 
-### 2. `src/lib/auth.tsx` ou helper novo `useEffectiveRoles()`
+### 2. Tarefas (`tasks`)
 
-- Criar hook `useEffectiveAuth()` que devolve `{ userId, roles, isAdmin, hasRole }` baseado no alvo da impersonação se houver, senão no usuário real.
-- Lógica:
-  ```ts
-  const { user, roles: realRoles, isAdmin: realIsAdmin, hasRole: realHasRole } = useAuth();
-  const { viewAs, targetRoles } = useViewAs();
-  if (!viewAs) return { userId: user?.id, roles: realRoles, isAdmin: realIsAdmin, hasRole: realHasRole };
-  return {
-    userId: viewAs.user_id,
-    roles: targetRoles,
-    isAdmin: targetRoles.includes("admin"),
-    hasRole: (r) => targetRoles.includes(r),
-  };
-  ```
+A tabela `tasks` não possui coluna `code`, então não há código a corrigir. A criação já grava `assigned_to = effectiveId` no modo espelho — comportamento mantido. Nenhuma alteração necessária.
 
-### 3. `src/components/AppShell.tsx` — renderizar como o alvo
+### 3. Sem mudanças de RLS
 
-- Trocar `useAuth()` (para gating de menu) por `useEffectiveAuth()`. O `signOut` continua vindo de `useAuth()` (gestor real).
-- Resultado: sidebar mostra itens conforme o papel do alvo (operador não vê "Usuários", admin vê tudo, etc.).
-- Cabeçalho: mostrar nome do alvo no canto + badge "Espelho" ao lado do email.
-- Banner amarelo: continuar, com texto "Sessão espelhada de **Fulano** (papel) — agindo como este usuário" + botão "Sair da visualização".
-- "Gerencial" continua oculto durante a impersonação (evita loop).
-- **Adicionar botão hamburguer** (`md:hidden`) para abrir a sidebar como Sheet em viewports menores, garantindo que o menu nunca fique invisível.
+`created_by` continua sendo o gestor real (exigido pelo RLS atual), mas o código passa a refletir o subordinado. O banner de "Sessão espelhada" e a auditoria por `created_by` permanecem intactos.
 
-### 4. Reforçar `useEffectiveUser()` nas rotas restantes
+## Critério de aceite
 
-Já foi feito em `dashboard`, `funnel`, `leads`, `activities`, `bookings`. Falta:
-- `customers.tsx`
-- `alerts.tsx` (passar `effectiveId` para `useLeadAlerts`)
-- `workspace.tsx`
-- `email/EmailPanel.tsx`
-- `itineraries.tsx` se relevante
-
-Padrão: query usa `effectiveId`; inserts gravam `created_by/assigned_to = effectiveId` (mantendo `created_by = auth.uid()` quando RLS exigir).
-
-### 5. RLS (verificação, sem mudança planejada)
-
-Rodar o linter de Supabase após as mudanças. Se algum INSERT falhar por exigir `created_by = auth.uid()`, ajustar a policy daquela tabela para permitir `is_admin(auth.uid()) OR is_subordinate_of(target, auth.uid())`. Não há mudança preventiva — só reativa.
-
-## Critérios de aceitação
-
-- Clicar num usuário no Gerencial → app inteiro vira a "tela dele": sidebar com os itens que **ele** veria, todas as abas navegáveis, dados filtrados por ele.
-- Sidebar permanece visível (ou acessível via hamburguer em telas pequenas).
-- Banner amarelo identifica claramente "sessão espelhada" + botão sair.
-- Operações (criar lead/tarefa/reserva) gravam com o usuário-alvo como dono.
-- Sair da visualização restaura instantaneamente a visão do gestor (com "Gerencial" de volta no menu).
+- Gestor "AB" cria lead em modo espelho do subordinado "SK" → código gerado começa com `SK` e usa a sequência mensal de leads do `SK`.
+- Lead criado normalmente (sem espelho, sem `assigned_to`) → código com iniciais do criador (comportamento atual preservado).
+- Lead criado com `assigned_to` apontando para outro operador (mesmo sem espelho) → código segue o `assigned_to`.

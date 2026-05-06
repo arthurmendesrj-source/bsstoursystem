@@ -1880,6 +1880,7 @@ export type Database = {
           trip_type: string
         }[]
       }
+      slugify: { Args: { _t: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "vendedor" | "operacional" | "financeiro"

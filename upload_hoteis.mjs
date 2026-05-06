@@ -59,20 +59,15 @@ async function worker() {
       const parts = rel.split("/").filter(Boolean);
       // Expected: HOTEIS / <year> / <country> / <city> / [hotel_folder] / file.pdf
       // OR (2027 zip): 2027 / <country> / <city> / file.pdf
-      let year, country, city, hotelFolder, fname;
-      if (parts[0].toLowerCase().startsWith("hoteis")) {
-        const [, y, co, ci, ...rest] = parts;
-        year = y; country = co; city = ci;
-        fname = rest.pop();
-        hotelFolder = rest.length ? rest.join(" / ") : null;
-      } else {
-        year = parts[0];
-        country = parts[1];
-        city = parts[2];
-        const rest = parts.slice(3);
-        fname = rest.pop();
-        hotelFolder = rest.length ? rest.join(" / ") : null;
-      }
+      // Strip leading "HOTEIS" if present
+      const segs = parts[0].toLowerCase().startsWith("hoteis") ? parts.slice(1) : parts;
+      // Now expected: <year> / <country> / [city] / [hotel_folder...] / file.pdf
+      const fname = segs[segs.length - 1];
+      const middle = segs.slice(0, -1);
+      const year = middle[0] || null;
+      const country = middle[1] || null;
+      const city = middle[2] || null;
+      const hotelFolder = middle.length > 3 ? middle.slice(3).join(" / ") : null;
       const baseName = path.basename(fname, ".pdf");
       const uniqueId = crypto.randomBytes(4).toString("hex");
       const storagePath = `pending/${uniqueId}-${slugify(baseName)}.pdf`;

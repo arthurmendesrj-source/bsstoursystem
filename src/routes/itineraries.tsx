@@ -337,7 +337,8 @@ function ItinerariesPage() {
         .catch((err) => console.warn("process-itinerary kickoff failed", err));
     } catch (e: any) {
       let msg = e?.message ?? String(e);
-      if (/memory limit/i.test(msg)) msg = "Documento muito grande — tente dividir";
+      if (/duplicate key|itineraries_unique_per_user/i.test(msg)) msg = "Já existe — duplicado ignorado";
+      else if (/memory limit/i.test(msg)) msg = "Documento muito grande — tente dividir";
       if (msg.length > 140) msg = msg.slice(0, 140) + "…";
       updateJob(jobId, { status: "failed", error: msg });
     }

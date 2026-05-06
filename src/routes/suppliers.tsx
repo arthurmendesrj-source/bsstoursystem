@@ -241,8 +241,9 @@ function SuppliersPage() {
 
               <Button type="submit" className="w-full">{t("save")}</Button>
             </form>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <Card className="p-4">

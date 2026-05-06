@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useI18n } from "@/lib/i18n";
-import { usePermissions } from "@/lib/permissions";
+import { Can, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -77,6 +77,11 @@ function fmtDate(d?: string | null) {
 
 export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
+  const { can } = usePermissions();
+  const canEdit = can("quotes", "edit");
+  const canDelete = can("quotes", "delete");
+  const canApprove = can("quotes", "approve");
+  const canCreateBooking = can("bookings", "create");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<QuoteRow | null>(null);
@@ -151,6 +156,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   };
 
   const removeFlight = async (id: string) => {
+    if (!canEdit && !canDelete) { toast.error("Sem permissão"); return; }
     const { error } = await supabase.from("quote_flights").delete().eq("id", id);
     if (error) {
       toast.error(error.message);
@@ -286,6 +292,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const removeItem = async (idx: number) => {
     const it = items[idx];
     if (it.id && !it.id.startsWith("new-")) {
+      if (!canEdit && !canDelete) { toast.error("Sem permissão"); return; }
       await supabase.from("quote_items").delete().eq("id", it.id);
     }
     setItems((arr) => arr.filter((_, i) => i !== idx));
@@ -299,6 +306,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const save = async () => {
     if (!quote) return;
+    if (!canEdit) { toast.error("Sem permissão para salvar"); return; }
     setSaving(true);
     const totalsNow = computeTotals(items, bankFee);
 
@@ -348,6 +356,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const approve = async () => {
     if (!quote) return;
+    if (!canApprove) { toast.error("Sem permissão para aprovar"); return; }
     await save();
     const { error } = await supabase.from("quotes").update({ status: "aprovada" }).eq("id", quote.id);
     if (error) return toast.error(error.message);
@@ -358,6 +367,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const convertToBooking = async () => {
     if (!quote) return;
+    if (!canCreateBooking) { toast.error("Sem permissão para criar reserva"); return; }
     if (!confirm(t("convertQuoteConfirm"))) return;
     // Check if a booking already exists for this quote
     const { data: existing } = await supabase
@@ -402,7 +412,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   }
 
   const isClosed = quote.status === "aprovada";
-  const readOnly = false; // invoice and approved proposals are now fully editable
+  const readOnly = !canEdit;
   const invoiceCode = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
 
   const hotels = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "hotel");
@@ -427,32 +437,39 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             </Badge>
           )}
           <span className="text-sm text-muted-foreground">#{quote.id.slice(0, 8)}</span>
+          {!canEdit && (
+            <Badge variant="outline" className="text-xs">somente leitura</Badge>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
-            <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
-          </Button>
+          <Can module="quotes" action="edit">
+            <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
+              <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
+            </Button>
+          </Can>
           <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
             <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
-            <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
-            <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
-            <Plane className="h-4 w-4 mr-1" /> Adicionar voo
-          </Button>
-          <Button size="sm" onClick={save} disabled={saving}>
-            <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
-          </Button>
-          {mode === "proposal" && quote.status !== "aprovada" && (
+          <Can module="quotes" action="edit">
+            <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
+              <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
+              <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
+              <Plane className="h-4 w-4 mr-1" /> Adicionar voo
+            </Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
+            </Button>
+          </Can>
+          {mode === "proposal" && quote.status !== "aprovada" && canApprove && (
             <Button size="sm" variant="default" onClick={approve}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
             </Button>
           )}
-          {isClosed && (
+          {isClosed && canCreateBooking && (
             <Button size="sm" variant="default" onClick={convertToBooking}>
               <CalendarCheck className="h-4 w-4 mr-1" /> {t("convertToBooking")}
             </Button>

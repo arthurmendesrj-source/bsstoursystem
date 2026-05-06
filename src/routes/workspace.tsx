@@ -33,6 +33,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { usePermissions } from "@/lib/permissions";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -598,6 +599,8 @@ function ProposalsTab({
 }) {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { can } = usePermissions();
+  const canCreateQuote = can("quotes", "create");
   const { format: fmtCurrency } = useCurrency();
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -607,6 +610,7 @@ function ProposalsTab({
 
   const createNew = async () => {
     if (!user) return;
+    if (!canCreateQuote) { toast.error("Sem permissão para criar proposta"); return; }
     setCreating(true);
     const { data, error } = await supabase
       .from("quotes")
@@ -628,7 +632,7 @@ function ProposalsTab({
 
   return (
     <div className="space-y-3">
-      {mode === "proposal" && (
+      {mode === "proposal" && canCreateQuote && (
         <div className="flex justify-end">
           <Button size="sm" onClick={createNew} disabled={creating}>
             <Plus className="h-4 w-4 mr-1" /> {t("newProposal")}

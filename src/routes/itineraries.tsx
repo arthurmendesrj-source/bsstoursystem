@@ -435,7 +435,7 @@ function ItinerariesPage() {
       )}
 
       <Card className="p-4 space-y-3">
-        <div className="grid gap-2 md:grid-cols-[1fr,200px,1fr,auto]">
+        <div className="grid gap-2 md:grid-cols-[1fr,180px,160px,1fr,auto]">
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input

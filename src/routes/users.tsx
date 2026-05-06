@@ -49,8 +49,9 @@ function UsersPage() {
       supabase.from("profiles").select("id,user_id,full_name"),
       supabase.from("user_roles").select("user_id,role"),
     ]);
-    setProfiles(p.data ?? []);
-    setRoles((r.data as RoleRow[]) ?? []);
+    const allRoles = (r.data as RoleRow[]) ?? [];
+    setProfiles(filterAdmins(p.data ?? [], allRoles));
+    setRoles(allRoles);
   };
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
 

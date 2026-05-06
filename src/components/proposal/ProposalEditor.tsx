@@ -22,7 +22,7 @@ import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
-import { ServiceDialog } from "./ServiceDialog";
+import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
 
 type Mode = "proposal" | "invoice";
 
@@ -86,7 +86,31 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [flights, setFlights] = useState<FlightRow[]>([]);
   const [flightDialogOpen, setFlightDialogOpen] = useState(false);
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceInitial | null>(null);
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
+
+  const openEditService = async (id: string) => {
+    const { data, error } = await supabase
+      .from("quote_items")
+      .select("id,item_date,city,description,guide_type,pax,total,notes")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) {
+      toast.error(error?.message ?? "Erro ao carregar serviço");
+      return;
+    }
+    setEditingService({
+      id: data.id,
+      item_date: data.item_date,
+      city: data.city,
+      description: data.description,
+      guide_type: data.guide_type,
+      pax: data.pax,
+      total: data.total != null ? Number(data.total) : null,
+      notes: data.notes,
+    });
+    setServiceDialogOpen(true);
+  };
 
   const loadFlights = async () => {
     const { data } = await supabase

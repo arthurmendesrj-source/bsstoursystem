@@ -211,7 +211,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </nav>
         <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
-          {!collapsed && <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">{user?.email}</div>}
+          {!collapsed && (
+            <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">
+              {viewAs ? (
+                <>
+                  <div className="font-medium text-amber-600 dark:text-amber-400">Espelho: {viewAs.full_name}</div>
+                  <div className="text-[10px] opacity-70">Logado como {user?.email}</div>
+                </>
+              ) : (
+                user?.email
+              )}
+            </div>
+          )}
           <Button
             variant="ghost"
             className={cn(collapsed ? "w-full justify-center px-0" : "w-full justify-start")}

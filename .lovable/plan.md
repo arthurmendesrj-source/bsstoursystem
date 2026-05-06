@@ -1,40 +1,30 @@
-## Distribuição final dos 50 emails
+## Plano: Desvincular Google e limpar emails
 
-Confirmado os 3 usuários existem com emails:
-- Alexandra Ermolaeva → `alexandra.ermolaeva@sim.local`
-- Mikhail Kutuzov → `mikhail.kutuzov@sim.local`
-- Agrafena Svetlova → `agrafena.svetlova@sim.local`
+### O que será feito
 
-### Categoria 1 — B2B clientes (20) → metade Alexandra / metade Agrafena
-- **Alexandra (10)**: 1, 3, 5, 7, 9, 11, 13, 15, 17, 19
-- **Agrafena (10)**: 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
+1. **Apagar emails reais do Google** da tabela `public.emails`
+   - Manter apenas os 50 emails de teste (`gmail_id LIKE 'seed-2026-%'`)
+   - Remover todos os outros registros (sincronizados via Gmail API)
 
-### Categoria 2 — Operacionais internos (20: emails 21-40) → metade Alexandra / metade Mikhail
-- **Alexandra (10)**: 21, 23, 25, 27, 29, 31, 33, 35, 37, 39
-- **Mikhail (10)**: 22, 24, 26, 28, 30, 32, 34, 36, 38, 40
+2. **Desvincular contas Google dos usuários**
+   - Limpar tokens/credenciais armazenados (tabelas tipo `gmail_accounts`, `google_tokens`, `user_integrations` ou similar — preciso confirmar o nome exato)
+   - Remover qualquer referência de conexão Gmail nos perfis dos usuários
 
-### Categoria 3 — Diretoria (10: emails 41-50) → todos Agrafena
-- **Agrafena (10)**: 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
+3. **Limpar dados relacionados** (se existirem)
+   - Histórico de sincronização (`sync_state`, `gmail_sync`, etc.)
+   - Labels/threads importados do Gmail real
 
-### Totais por caixa
-- Alexandra: 20 emails (10 B2B + 10 operacionais)
-- Mikhail: 10 emails (10 operacionais)
-- Agrafena: 20 emails (10 B2B + 10 diretoria)
+### Antes de executar preciso confirmar
 
-## Implementação
+Como a busca de schema do Supabase falhou agora, ao implementar vou:
+- Listar tabelas existentes (`information_schema.tables`)
+- Identificar quais armazenam tokens/conexões Google
+- Executar `DELETE` nas tabelas corretas
 
-"Caixa de entrada" será marcada via `to_emails` (array contendo o email do usuário-dono). Sem mudança de schema.
+### Importante
 
-Insert único com 50 linhas em `public.emails`:
-- `gmail_id`: `seed-2026-{n}` (único)
-- `from_email`, `from_name` extraídos do remetente
-- `subject`, `body_text`, `snippet` (primeiros ~140 chars)
-- `to_emails`: `ARRAY['<email_dono>']`
-- `received_at`: datas escalonadas em fev/mar 2026
-- `is_unread: true`, `labels: ['INBOX']`
+- Os 50 emails seed (`seed-2026-1` até `seed-2026-50`) serão **preservados**
+- A operação é **destrutiva e irreversível** — todos os emails sincronizados do Gmail real serão perdidos
+- Após executar, os usuários precisarão reconectar o Google se quiserem sincronizar novamente
 
-Após o insert, cada usuário verá apenas seus emails filtrando `to_emails @> ARRAY[<seu_email>]` na UI (a tabela já tem RLS que permite SELECT a autenticados; o filtro é feito no client).
-
-## Próximo passo
-
-Aprove e eu executo o INSERT em massa dos 50 registros.
+Confirma que posso prosseguir?

@@ -61,7 +61,8 @@ async function worker() {
       // OR (2027 zip): 2027 / <country> / <city> / file.pdf
       let year, country, city, hotelFolder, fname;
       if (parts[0].toLowerCase().startsWith("hoteis")) {
-        [, year, country, city, ...rest] = parts;
+        const [, y, co, ci, ...rest] = parts;
+        year = y; country = co; city = ci;
         fname = rest.pop();
         hotelFolder = rest.length ? rest.join(" / ") : null;
       } else {

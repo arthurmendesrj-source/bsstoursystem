@@ -46,6 +46,7 @@ function LeadsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const { format } = useCurrency();
+  const { can } = usePermissions();
   const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [open, setOpen] = useState(false);

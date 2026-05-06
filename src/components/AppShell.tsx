@@ -24,11 +24,13 @@ import {
   BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
+import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {

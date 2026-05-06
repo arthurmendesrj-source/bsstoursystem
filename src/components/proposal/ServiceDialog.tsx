@@ -26,15 +26,27 @@ const GUIDE_TYPES = [
   "Other",
 ];
 
+export type ServiceInitial = {
+  id: string;
+  item_date?: string | null;
+  city?: string | null;
+  description?: string | null;
+  guide_type?: string | null;
+  pax?: number | null;
+  total?: number | null;
+  notes?: string | null;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   quoteId: string;
   defaultMarkupPct?: number;
+  initial?: ServiceInitial | null;
   onSaved: () => void;
 };
 
-export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, onSaved }: Props) {
+export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
   const { user } = useAuth();
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [city, setCity] = useState("");
@@ -51,13 +63,13 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
 
   useEffect(() => {
     if (!open) return;
-    setDate(format(new Date(), "yyyy-MM-dd"));
-    setCity("");
-    setService("");
-    setGuideType("");
-    setPax(1);
-    setTotal("");
-    setNotes("");
+    setDate(initial?.item_date || format(new Date(), "yyyy-MM-dd"));
+    setCity(initial?.city ?? "");
+    setService(initial?.description ?? "");
+    setGuideType(initial?.guide_type ?? "");
+    setPax(initial?.pax ?? 1);
+    setTotal(initial?.total != null ? String(initial.total) : "");
+    setNotes(initial?.notes ?? "");
     setErrors({});
     (async () => {
       const [cRes, sRes] = await Promise.all([
@@ -67,7 +79,8 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
       setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
       setServiceOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
     })();
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initial?.id]);
 
   const dateObj = date ? new Date(date + "T00:00:00") : undefined;
 
@@ -85,7 +98,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     setSaving(true);
     const totalNum = total === "" ? null : Number(total);
     const unitCost = totalNum != null && pax > 0 ? +(totalNum / pax).toFixed(2) : 0;
-    const unitPrice = unitCost; // cost = price by default; markup applied via field later
+    const unitPrice = unitCost;
     const payload = {
       quote_id: quoteId,
       kind: "service",
@@ -101,13 +114,15 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
       guide_type: guideType || null,
       notes: notes || null,
     };
-    const { error } = await supabase.from("quote_items").insert(payload);
+    const { error } = initial?.id
+      ? await supabase.from("quote_items").update(payload).eq("id", initial.id)
+      : await supabase.from("quote_items").insert(payload);
     setSaving(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success("Serviço adicionado");
+    toast.success(initial?.id ? "Serviço atualizado" : "Serviço adicionado");
     onSaved();
     onOpenChange(false);
   };
@@ -118,7 +133,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adicionar serviço</DialogTitle>
+          <DialogTitle>{initial?.id ? "Editar serviço" : "Adicionar serviço"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>

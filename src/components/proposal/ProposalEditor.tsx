@@ -22,7 +22,7 @@ import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocDialog } from "./GenerateDocDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
-import { ServiceDialog } from "./ServiceDialog";
+import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
 
 type Mode = "proposal" | "invoice";
 
@@ -86,7 +86,31 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [flights, setFlights] = useState<FlightRow[]>([]);
   const [flightDialogOpen, setFlightDialogOpen] = useState(false);
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [editingService, setEditingService] = useState<ServiceInitial | null>(null);
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
+
+  const openEditService = async (id: string) => {
+    const { data, error } = await supabase
+      .from("quote_items")
+      .select("id,item_date,city,description,guide_type,pax,total,notes")
+      .eq("id", id)
+      .maybeSingle();
+    if (error || !data) {
+      toast.error(error?.message ?? "Erro ao carregar serviço");
+      return;
+    }
+    setEditingService({
+      id: data.id,
+      item_date: data.item_date,
+      city: data.city,
+      description: data.description,
+      guide_type: data.guide_type,
+      pax: data.pax,
+      total: data.total != null ? Number(data.total) : null,
+      notes: data.notes,
+    });
+    setServiceDialogOpen(true);
+  };
 
   const loadFlights = async () => {
     const { data } = await supabase
@@ -385,7 +409,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="outline" size="sm" onClick={() => addItem("hotel")}>
             <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setServiceDialogOpen(true)}>
+          <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
             <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
           </Button>
           <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
@@ -498,6 +522,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         readOnly={readOnly}
         onChange={updateItem}
         onRemove={removeItem}
+        onEdit={(id) => openEditService(id)}
       />
 
       <div className="rounded-md border">
@@ -560,9 +585,10 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
       <ServiceDialog
         open={serviceDialogOpen}
-        onOpenChange={setServiceDialogOpen}
+        onOpenChange={(o) => { setServiceDialogOpen(o); if (!o) setEditingService(null); }}
         quoteId={quoteId}
         defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
+        initial={editingService}
         onSaved={load}
       />
 
@@ -611,6 +637,7 @@ function ItemTable({
   readOnly,
   onChange,
   onRemove,
+  onEdit,
 }: {
   title: string;
   kind: ProposalItemKind;
@@ -619,6 +646,7 @@ function ItemTable({
   readOnly: boolean;
   onChange: (idx: number, patch: Partial<ItemRow>) => void;
   onRemove: (idx: number) => void;
+  onEdit?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const isHotel = kind === "hotel";
@@ -742,7 +770,12 @@ function ItemTable({
                   </td>
                   <td className="p-2 text-right font-medium tabular-nums">{sub.toFixed(2)}</td>
                   {!readOnly && (
-                    <td className="p-2 text-right">
+                    <td className="p-2 text-right whitespace-nowrap">
+                      {onEdit && !it.id.startsWith("new-") && (
+                        <Button size="icon" variant="ghost" onClick={() => onEdit(it.id)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => onRemove(i)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

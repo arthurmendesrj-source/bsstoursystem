@@ -33,6 +33,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/componen
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { usePermissions } from "@/lib/permissions";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

@@ -21,6 +21,7 @@ import {
   Library,
   ChevronLeft,
   ChevronRight,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useI18n, type Lang } from "@/lib/i18n";

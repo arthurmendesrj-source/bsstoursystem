@@ -96,10 +96,34 @@ function PermissionsPage() {
     });
   };
 
+  // Edit-gating: editor não pode conceder o que ele próprio não tem.
+  // Admin sempre pode (editorCan/editorCanField já retornam true para admin).
+  const actionToKey: Record<typeof ACTIONS[number]["key"], Action> = {
+    can_view: "view", can_create: "create", can_edit: "edit", can_delete: "delete", can_approve: "approve",
+  };
+  const canGrantMod = (mk: string, action: typeof ACTIONS[number]["key"]) =>
+    editorCan(mk, actionToKey[action]);
+  const canGrantField = (mk: string, fk: string, action: "can_view" | "can_edit") =>
+    editorCanField(mk, fk, action === "can_view" ? "view" : "edit");
+
   const save = async () => {
     setSaving(true);
-    const m = await supabase.from("role_module_permissions").upsert(moduleRows, { onConflict: "role,module_key" });
-    const f = await supabase.from("role_field_permissions").upsert(fieldRows, { onConflict: "role,module_key,field_key" });
+    // Defesa em profundidade: filtra do payload qualquer linha que viole o edit-gating.
+    const safeMods = moduleRows.map((row) => ({
+      ...row,
+      can_view: row.can_view && canGrantMod(row.module_key, "can_view"),
+      can_create: row.can_create && canGrantMod(row.module_key, "can_create"),
+      can_edit: row.can_edit && canGrantMod(row.module_key, "can_edit"),
+      can_delete: row.can_delete && canGrantMod(row.module_key, "can_delete"),
+      can_approve: row.can_approve && canGrantMod(row.module_key, "can_approve"),
+    }));
+    const safeFields = fieldRows.map((row) => ({
+      ...row,
+      can_view: row.can_view && canGrantField(row.module_key, row.field_key, "can_view"),
+      can_edit: row.can_edit && canGrantField(row.module_key, row.field_key, "can_edit"),
+    }));
+    const m = await supabase.from("role_module_permissions").upsert(safeMods, { onConflict: "role,module_key" });
+    const f = await supabase.from("role_field_permissions").upsert(safeFields, { onConflict: "role,module_key,field_key" });
     setSaving(false);
     if (m.error || f.error) { toast.error(m.error?.message ?? f.error?.message ?? "Erro"); return; }
     toast.success("Permissões salvas");

@@ -141,7 +141,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   }, [folder, leadId, mode]);
 
   useEffect(() => {
-    if (mode === "full") void doSync();
+    // Skip auto-sync to avoid 403 when no Gmail account is connected
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -152,7 +152,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
       toast.success(`${res.synced} e-mails`);
       await loadList(folder);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao sincronizar");
+      const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
+      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) {
+        toast.info("Nenhuma conta Gmail conectada");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setSyncing(false);
     }

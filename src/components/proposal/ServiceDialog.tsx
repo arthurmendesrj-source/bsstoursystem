@@ -92,10 +92,30 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     return Object.keys(e).length === 0;
   };
 
+  const slugify = (s: string) =>
+    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
+      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  const ensureRefService = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    if (serviceOpts.some((o) => norm(o.label) === norm(trimmed))) return;
+    const slug = slugify(trimmed);
+    if (!slug) return;
+    const { error } = await supabase
+      .from("ref_services")
+      .insert({ name: trimmed, slug, category_id: null });
+    if (error && !/duplicate|unique/i.test(error.message)) {
+      console.warn("ref_services insert failed:", error.message);
+    }
+  };
+
   const save = async () => {
     if (!user) return;
     if (!validate()) return;
     setSaving(true);
+    await ensureRefService(service);
     const totalNum = total === "" ? null : Number(total);
     const unitCost = totalNum != null && pax > 0 ? +(totalNum / pax).toFixed(2) : 0;
     const unitPrice = unitCost;

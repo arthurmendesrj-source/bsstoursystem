@@ -31,6 +31,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuppliersReferencesRouteImport } from './routes/suppliers.references'
 import { Route as SuppliersRatesValidationRouteImport } from './routes/suppliers.rates-validation'
 import { Route as SuppliersRatesSearchRouteImport } from './routes/suppliers.rates-search'
+import { Route as SuppliersRatesImportRouteImport } from './routes/suppliers.rates-import'
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
@@ -154,6 +155,11 @@ const SuppliersRatesSearchRoute = SuppliersRatesSearchRouteImport.update({
   path: '/rates-search',
   getParentRoute: () => SuppliersRoute,
 } as any)
+const SuppliersRatesImportRoute = SuppliersRatesImportRouteImport.update({
+  id: '/rates-import',
+  path: '/rates-import',
+  getParentRoute: () => SuppliersRoute,
+} as any)
 const SettingsTemplatesRoute = SettingsTemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
@@ -275,6 +282,7 @@ export interface FileRoutesByTo {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
@@ -311,6 +319,7 @@ export interface FileRoutesById {
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
@@ -348,6 +357,7 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
@@ -383,6 +393,7 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
@@ -418,6 +429,7 @@ export interface FileRouteTypes {
     | '/leads/$leadId'
     | '/settings/sla'
     | '/settings/templates'
+    | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
@@ -608,6 +620,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersRatesSearchRouteImport
       parentRoute: typeof SuppliersRoute
     }
+    '/suppliers/rates-import': {
+      id: '/suppliers/rates-import'
+      path: '/rates-import'
+      fullPath: '/suppliers/rates-import'
+      preLoaderRoute: typeof SuppliersRatesImportRouteImport
+      parentRoute: typeof SuppliersRoute
+    }
     '/settings/templates': {
       id: '/settings/templates'
       path: '/templates'
@@ -730,12 +749,14 @@ const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
 )
 
 interface SuppliersRouteChildren {
+  SuppliersRatesImportRoute: typeof SuppliersRatesImportRoute
   SuppliersRatesSearchRoute: typeof SuppliersRatesSearchRoute
   SuppliersRatesValidationRoute: typeof SuppliersRatesValidationRoute
   SuppliersReferencesRoute: typeof SuppliersReferencesRoute
 }
 
 const SuppliersRouteChildren: SuppliersRouteChildren = {
+  SuppliersRatesImportRoute: SuppliersRatesImportRoute,
   SuppliersRatesSearchRoute: SuppliersRatesSearchRoute,
   SuppliersRatesValidationRoute: SuppliersRatesValidationRoute,
   SuppliersReferencesRoute: SuppliersReferencesRoute,

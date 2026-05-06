@@ -151,7 +151,7 @@ function BibliaPage() {
       if (fromS && (r.activity_date ?? "") < fromS) return false;
       if (toS && (r.activity_date ?? "") > toS) return false;
       if (s) {
-        const hay = `${r.description ?? ""} ${r.city ?? ""} ${r.pax_name ?? ""} ${r.invoice_code ?? ""}`.toLowerCase();
+        const hay = `${r.description ?? ""} ${r.city ?? ""} ${r.pax_name ?? ""} ${r.invoice_code ?? ""} ${(r as any).hotel ?? ""} ${(r as any).driver ?? ""} ${(r as any).supplier ?? ""} ${(r as any).guide ?? ""}`.toLowerCase();
         if (!hay.includes(s)) return false;
       }
       return true;
@@ -274,54 +274,70 @@ function BibliaPage() {
       </Card>
 
       <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-3">
+          <CardTitle className="text-base">Tráfego</CardTitle>
+        </CardHeader>
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Invoice</TableHead>
-                <TableHead>Pax</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Cidade</TableHead>
-                <TableHead>Data</TableHead>
-                <TableHead>Hora</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">Carregando...</TableCell></TableRow>
-              ) : filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">Nenhuma atividade encontrada</TableCell></TableRow>
-              ) : filtered.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-xs font-mono">
-                    {r.booking_id ? (
-                      <Link to="/bookings/$bookingId" params={{ bookingId: r.booking_id }} className="text-primary hover:underline">
-                        {r.invoice_code ?? r.booking_id.slice(0, 8)}
-                      </Link>
-                    ) : (r.invoice_code ?? "—")}
-                  </TableCell>
-                  <TableCell className="text-sm">{r.pax_name ?? "—"}</TableCell>
-                  <TableCell><Badge variant="secondary" className="text-xs">{r.kind}</Badge></TableCell>
-                  <TableCell className="max-w-[260px] truncate text-sm" title={r.description ?? ""}>{r.description ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{r.city ?? "—"}</TableCell>
-                  <TableCell className="text-sm">{r.activity_date ? format(new Date(r.activity_date + "T00:00:00"), "dd/MM/yyyy") : "—"}</TableCell>
-                  <TableCell className="text-sm font-mono">{r.activity_time?.slice(0, 5) ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline" className={cn("text-xs", statusBadge(r.status))}>{r.status}</Badge></TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(r); setDialogOpen(true); }}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteRow(r.id)}>
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[220px]">Serviço</TableHead>
+                  <TableHead>Hotel</TableHead>
+                  <TableHead>Motorista</TableHead>
+                  <TableHead>Fornecedor</TableHead>
+                  <TableHead>Guia</TableHead>
+                  <TableHead>Data</TableHead>
+                  <TableHead>P</TableHead>
+                  <TableHead>Cidade</TableHead>
+                  <TableHead className="text-center">Pax</TableHead>
+                  <TableHead>Fatura</TableHead>
+                  <TableHead>Nome Pax</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={13} className="text-center text-sm text-muted-foreground py-6">Carregando...</TableCell></TableRow>
+                ) : filtered.length === 0 ? (
+                  <TableRow><TableCell colSpan={13} className="text-center text-sm text-muted-foreground py-6">Nenhuma atividade encontrada</TableCell></TableRow>
+                ) : filtered.map((r, idx) => {
+                  const a = r as any;
+                  return (
+                  <TableRow key={r.id} className={cn(idx % 2 === 0 ? "bg-cyan-50/50 dark:bg-cyan-950/10" : "")}>
+                    <TableCell className="max-w-[260px] text-sm font-medium" title={r.description ?? ""}>{r.description ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{a.hotel ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{a.driver ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{a.supplier ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{a.guide ?? "—"}</TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{r.activity_date ? format(new Date(r.activity_date + "T00:00:00"), "dd-MM-yyyy") : "—"}</TableCell>
+                    <TableCell className="text-sm font-mono whitespace-nowrap">{r.activity_time?.slice(0, 5) ?? "—"}</TableCell>
+                    <TableCell className="text-sm">{r.city ?? "—"}</TableCell>
+                    <TableCell className="text-sm text-center">{a.pax_count ?? "—"}</TableCell>
+                    <TableCell className="text-xs font-mono whitespace-nowrap">
+                      {r.booking_id ? (
+                        <Link to="/bookings/$bookingId" params={{ bookingId: r.booking_id }} className="text-primary hover:underline">
+                          {r.invoice_code ?? r.booking_id.slice(0, 8)}
+                        </Link>
+                      ) : (r.invoice_code ?? "—")}
+                    </TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">{r.pax_name ?? "—"}</TableCell>
+                    <TableCell><Badge variant="outline" className={cn("text-xs", statusBadge(r.status))}>{r.status}</Badge></TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditing(r); setDialogOpen(true); }}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => deleteRow(r.id)}>
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

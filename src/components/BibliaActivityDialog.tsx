@@ -19,6 +19,11 @@ export type ActivityRow = {
   booking_id?: string | null;
   invoice_code?: string | null;
   pax_name?: string | null;
+  pax_count?: number | null;
+  hotel?: string | null;
+  driver?: string | null;
+  supplier?: string | null;
+  guide?: string | null;
   kind: string;
   description?: string | null;
   city?: string | null;
@@ -71,6 +76,11 @@ export function BibliaActivityDialog({
       booking_id: row.booking_id || null,
       invoice_code: row.invoice_code || null,
       pax_name: row.pax_name || null,
+      pax_count: row.pax_count ?? null,
+      hotel: row.hotel || null,
+      driver: row.driver || null,
+      supplier: row.supplier || null,
+      guide: row.guide || null,
       kind: row.kind,
       description: row.description || null,
       city: row.city || null,
@@ -99,16 +109,67 @@ export function BibliaActivityDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{row.id ? "Editar atividade" : "Nova atividade"}</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-1">
-            <Label>Cód. Invoice</Label>
-            <Input value={row.invoice_code ?? ""} onChange={(e) => setRow({ ...row, invoice_code: e.target.value })} placeholder="IN..." />
+          <div className="col-span-2">
+            <Label>Serviço</Label>
+            <Input value={row.description ?? ""} onChange={(e) => setRow({ ...row, description: e.target.value })} placeholder="Ex.: Excursão HD ao Pão de Açúcar..." />
           </div>
-          <div className="col-span-1">
+          <div>
+            <Label>Hotel</Label>
+            <Input value={row.hotel ?? ""} onChange={(e) => setRow({ ...row, hotel: e.target.value })} />
+          </div>
+          <div>
+            <Label>Motorista</Label>
+            <Input value={row.driver ?? ""} onChange={(e) => setRow({ ...row, driver: e.target.value })} />
+          </div>
+          <div>
+            <Label>Fornecedor</Label>
+            <Input value={row.supplier ?? ""} onChange={(e) => setRow({ ...row, supplier: e.target.value })} />
+          </div>
+          <div>
+            <Label>Guia</Label>
+            <Input value={row.guide ?? ""} onChange={(e) => setRow({ ...row, guide: e.target.value })} />
+          </div>
+          <div>
+            <Label>Data</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className={cn("w-full justify-start font-normal", !dateObj && "text-muted-foreground")}>
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateObj ? format(dateObj, "dd/MM/yyyy") : "—"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar mode="single" selected={dateObj} onSelect={(d) => setRow({ ...row, activity_date: d ? format(d, "yyyy-MM-dd") : null })} initialFocus className="p-3 pointer-events-auto" />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div>
+            <Label>Hora (P)</Label>
+            <Input type="time" value={row.activity_time ?? ""} onChange={(e) => setRow({ ...row, activity_time: e.target.value })} />
+          </div>
+          <div>
+            <Label>Cidade</Label>
+            <Input value={row.city ?? ""} onChange={(e) => setRow({ ...row, city: e.target.value })} />
+          </div>
+          <div>
+            <Label>Pax (qtd)</Label>
+            <Input
+              type="number"
+              min={0}
+              value={row.pax_count ?? ""}
+              onChange={(e) => setRow({ ...row, pax_count: e.target.value === "" ? null : Number(e.target.value) })}
+            />
+          </div>
+          <div>
+            <Label>Fatura</Label>
+            <Input value={row.invoice_code ?? ""} onChange={(e) => setRow({ ...row, invoice_code: e.target.value })} placeholder="INNI..." />
+          </div>
+          <div className="col-span-2">
             <Label>Nome Pax</Label>
             <Input value={row.pax_name ?? ""} onChange={(e) => setRow({ ...row, pax_name: e.target.value })} />
           </div>
@@ -130,33 +191,7 @@ export function BibliaActivityDialog({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label>Data</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn("w-full justify-start font-normal", !dateObj && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateObj ? format(dateObj, "dd/MM/yyyy") : "—"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={dateObj} onSelect={(d) => setRow({ ...row, activity_date: d ? format(d, "yyyy-MM-dd") : null })} initialFocus className="p-3 pointer-events-auto" />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div>
-            <Label>Hora</Label>
-            <Input type="time" value={row.activity_time ?? ""} onChange={(e) => setRow({ ...row, activity_time: e.target.value })} />
-          </div>
           <div className="col-span-2">
-            <Label>Descrição</Label>
-            <Input value={row.description ?? ""} onChange={(e) => setRow({ ...row, description: e.target.value })} />
-          </div>
-          <div>
-            <Label>Cidade</Label>
-            <Input value={row.city ?? ""} onChange={(e) => setRow({ ...row, city: e.target.value })} />
-          </div>
-          <div>
             <Label>ID Reserva (opcional)</Label>
             <Input value={row.booking_id ?? ""} onChange={(e) => setRow({ ...row, booking_id: e.target.value })} placeholder="uuid" />
           </div>

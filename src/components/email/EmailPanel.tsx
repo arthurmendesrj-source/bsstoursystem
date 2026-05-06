@@ -440,7 +440,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
         customer_id: selected.customer_id,
         due_date: taskForm.due_date || null,
         created_by: user.id,
-        assigned_to: user.id,
+        assigned_to: taskForm.assigned_to || user.id,
       });
       if (error) throw error;
       toast.success(t("taskCreated"));
@@ -786,6 +786,23 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
               <Label>{t("notes")}</Label>
               <Textarea rows={3} value={leadForm.notes} onChange={(e) => setLeadForm({ ...leadForm, notes: e.target.value })} />
             </div>
+            {subordinates.length > 0 && (
+              <div className="col-span-2">
+                <Label>Atribuir a</Label>
+                <Select
+                  value={leadForm.assigned_to || "self"}
+                  onValueChange={(v) => setLeadForm({ ...leadForm, assigned_to: v === "self" ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Eu mesmo</SelectItem>
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="col-span-2 flex items-center gap-2">
               <Checkbox
                 id="create_customer_panel"
@@ -887,7 +904,24 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
                   <SelectItem value="alta">{t("priorityHigh")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            {subordinates.length > 0 && (
+              <div className="col-span-2">
+                <Label>Responsável</Label>
+                <Select
+                  value={taskForm.assigned_to || "self"}
+                  onValueChange={(v) => setTaskForm({ ...taskForm, assigned_to: v === "self" ? "" : v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Eu mesmo</SelectItem>
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
             <div className="col-span-2">
               <Label>{t("taskDueDate")}</Label>
               <Input

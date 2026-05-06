@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { LEAD_SLA_DAYS } from "@/lib/leadSla";
+import { filterAdmins } from "@/lib/hideAdmin";
 
 export const Route = createFileRoute("/alerts/sla")({
   component: () => (

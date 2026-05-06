@@ -412,7 +412,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   }
 
   const isClosed = quote.status === "aprovada";
-  const readOnly = false; // invoice and approved proposals are now fully editable
+  const readOnly = !canEdit;
   const invoiceCode = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
 
   const hotels = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "hotel");
@@ -437,32 +437,39 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             </Badge>
           )}
           <span className="text-sm text-muted-foreground">#{quote.id.slice(0, 8)}</span>
+          {!canEdit && (
+            <Badge variant="outline" className="text-xs">somente leitura</Badge>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
-            <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
-          </Button>
+          <Can module="quotes" action="edit">
+            <Button variant="outline" size="sm" onClick={() => setDictating((v) => !v)}>
+              <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
+            </Button>
+          </Can>
           <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
             <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
-            <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
-            <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
-            <Plane className="h-4 w-4 mr-1" /> Adicionar voo
-          </Button>
-          <Button size="sm" onClick={save} disabled={saving}>
-            <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
-          </Button>
-          {mode === "proposal" && quote.status !== "aprovada" && (
+          <Can module="quotes" action="edit">
+            <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
+              <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
+              <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
+              <Plane className="h-4 w-4 mr-1" /> Adicionar voo
+            </Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
+            </Button>
+          </Can>
+          {mode === "proposal" && quote.status !== "aprovada" && canApprove && (
             <Button size="sm" variant="default" onClick={approve}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
             </Button>
           )}
-          {isClosed && (
+          {isClosed && canCreateBooking && (
             <Button size="sm" variant="default" onClick={convertToBooking}>
               <CalendarCheck className="h-4 w-4 mr-1" /> {t("convertToBooking")}
             </Button>

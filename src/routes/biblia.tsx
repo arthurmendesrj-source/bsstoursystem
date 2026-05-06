@@ -282,6 +282,7 @@ function BibliaPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Invoice</TableHead>
                   <TableHead className="min-w-[220px]">Serviço</TableHead>
                   <TableHead>Hotel</TableHead>
                   <TableHead>Motorista</TableHead>
@@ -291,7 +292,6 @@ function BibliaPage() {
                   <TableHead>P</TableHead>
                   <TableHead>Cidade</TableHead>
                   <TableHead className="text-center">Pax</TableHead>
-                  <TableHead>Fatura</TableHead>
                   <TableHead>Nome Pax</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
@@ -306,6 +306,13 @@ function BibliaPage() {
                   const a = r as any;
                   return (
                   <TableRow key={r.id} className={cn(idx % 2 === 0 ? "bg-cyan-50/50 dark:bg-cyan-950/10" : "")}>
+                    <TableCell className="text-xs font-mono whitespace-nowrap">
+                      {r.booking_id ? (
+                        <Link to="/bookings/$bookingId" params={{ bookingId: r.booking_id }} className="text-primary hover:underline">
+                          {r.invoice_code ?? r.booking_id.slice(0, 8)}
+                        </Link>
+                      ) : (r.invoice_code ?? "—")}
+                    </TableCell>
                     <TableCell className="max-w-[260px] text-sm font-medium" title={r.description ?? ""}>{r.description ?? "—"}</TableCell>
                     <TableCell className="text-sm">{a.hotel ?? "—"}</TableCell>
                     <TableCell className="text-sm">{a.driver ?? "—"}</TableCell>
@@ -315,13 +322,6 @@ function BibliaPage() {
                     <TableCell className="text-sm font-mono whitespace-nowrap">{r.activity_time?.slice(0, 5) ?? "—"}</TableCell>
                     <TableCell className="text-sm">{r.city ?? "—"}</TableCell>
                     <TableCell className="text-sm text-center">{a.pax_count ?? "—"}</TableCell>
-                    <TableCell className="text-xs font-mono whitespace-nowrap">
-                      {r.booking_id ? (
-                        <Link to="/bookings/$bookingId" params={{ bookingId: r.booking_id }} className="text-primary hover:underline">
-                          {r.invoice_code ?? r.booking_id.slice(0, 8)}
-                        </Link>
-                      ) : (r.invoice_code ?? "—")}
-                    </TableCell>
                     <TableCell className="text-sm whitespace-nowrap">{r.pax_name ?? "—"}</TableCell>
                     <TableCell><Badge variant="outline" className={cn("text-xs", statusBadge(r.status))}>{r.status}</Badge></TableCell>
                     <TableCell className="text-right whitespace-nowrap">

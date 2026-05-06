@@ -134,6 +134,18 @@ function LeadsPage() {
                   <SelectContent>{STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
+              {subordinates.length > 0 && (
+                <div>
+                  <Label>Atribuir a</Label>
+                  <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Eu mesmo</SelectItem>
+                      {subordinates.map((s) => <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <Button type="submit" className="w-full">{t("save")}</Button>
             </form>
           </DialogContent>

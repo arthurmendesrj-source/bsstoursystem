@@ -351,6 +351,10 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const sendCompose = async () => {
     if (!full) return;
     if (!composeTo.trim()) { toast.error("To?"); return; }
+    if (selected && isSeedId(selected.gmail_id)) {
+      toast.info("Email de teste — envio desabilitado");
+      return;
+    }
     setSending(true);
     try {
       await sendFn({

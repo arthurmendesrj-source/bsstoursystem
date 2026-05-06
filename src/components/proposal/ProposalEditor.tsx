@@ -637,6 +637,7 @@ function ItemTable({
   readOnly,
   onChange,
   onRemove,
+  onEdit,
 }: {
   title: string;
   kind: ProposalItemKind;
@@ -645,6 +646,7 @@ function ItemTable({
   readOnly: boolean;
   onChange: (idx: number, patch: Partial<ItemRow>) => void;
   onRemove: (idx: number) => void;
+  onEdit?: (id: string) => void;
 }) {
   const { t } = useI18n();
   const isHotel = kind === "hotel";
@@ -768,7 +770,12 @@ function ItemTable({
                   </td>
                   <td className="p-2 text-right font-medium tabular-nums">{sub.toFixed(2)}</td>
                   {!readOnly && (
-                    <td className="p-2 text-right">
+                    <td className="p-2 text-right whitespace-nowrap">
+                      {onEdit && !it.id.startsWith("new-") && (
+                        <Button size="icon" variant="ghost" onClick={() => onEdit(it.id)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => onRemove(i)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>

@@ -24,7 +24,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { useViewAs } from "@/lib/viewAs";
+import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,7 +34,8 @@ import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { user, isAdmin, hasRole, signOut } = useAuth();
+  const { user, signOut } = useAuth();
+  const { isAdmin, hasRole } = useEffectiveAuth();
   const { viewAs, exitViewAs } = useViewAs();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const { t, lang, setLang } = useI18n();
@@ -210,7 +211,18 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </nav>
         <div className={cn("border-t border-sidebar-border", collapsed ? "p-2" : "p-3")}>
-          {!collapsed && <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">{user?.email}</div>}
+          {!collapsed && (
+            <div className="mb-2 truncate px-3 text-xs text-sidebar-foreground/60">
+              {viewAs ? (
+                <>
+                  <div className="font-medium text-amber-600 dark:text-amber-400">Espelho: {viewAs.full_name}</div>
+                  <div className="text-[10px] opacity-70">Logado como {user?.email}</div>
+                </>
+              ) : (
+                user?.email
+              )}
+            </div>
+          )}
           <Button
             variant="ghost"
             className={cn(collapsed ? "w-full justify-center px-0" : "w-full justify-start")}

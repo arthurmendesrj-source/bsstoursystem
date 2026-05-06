@@ -51,6 +51,9 @@ const slugify = (s: string) =>
 
 export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
   const { user } = useAuth();
+  const { canField } = usePermissions();
+  const canEditCost = canField("quotes", "unit_cost", "edit");
+  const canViewCost = canField("quotes", "unit_cost", "view");
   const today = format(new Date(), "yyyy-MM-dd");
   const [checkIn, setCheckIn] = useState<string>(today);
   const [checkOut, setCheckOut] = useState<string>(today);

@@ -135,6 +135,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             </>
           )}
+          <Link to="/permissions-audit" className={itemClass(path.startsWith("/permissions-audit"))} title={collapsed ? "Minhas permissões" : undefined}>
+            <Shield className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="truncate">Minhas permissões</span>}
+          </Link>
           <Link to="/settings" className={itemClass(path === "/settings")} title={collapsed ? t("settings") : undefined}>
             <Settings className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t("settings")}</span>}

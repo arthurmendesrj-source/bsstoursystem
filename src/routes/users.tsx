@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useI18n } from "@/lib/i18n";
 import { useAuth, type AppRole } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { filterAdmins } from "@/lib/hideAdmin";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/users")({
@@ -48,8 +49,9 @@ function UsersPage() {
       supabase.from("profiles").select("id,user_id,full_name"),
       supabase.from("user_roles").select("user_id,role"),
     ]);
-    setProfiles(p.data ?? []);
-    setRoles((r.data as RoleRow[]) ?? []);
+    const allRoles = (r.data as RoleRow[]) ?? [];
+    setProfiles(filterAdmins(p.data ?? [], allRoles));
+    setRoles(allRoles);
   };
   useEffect(() => { if (isAdmin) load(); }, [isAdmin]);
 

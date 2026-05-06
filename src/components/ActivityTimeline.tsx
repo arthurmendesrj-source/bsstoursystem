@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { getAdminIds } from "@/lib/hideAdmin";
 import { useI18n } from "@/lib/i18n";
 import { Plus, Edit3, ArrowRightLeft, Clock } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -52,10 +53,14 @@ export function ActivityTimeline({ entityType, entityId }: { entityType: EntityT
       setEntries(list);
       const ids = Array.from(new Set(list.map((e) => e.actor_id).filter(Boolean))) as string[];
       if (ids.length) {
-        const { data: profs } = await supabase.from("profiles").select("user_id, full_name").in("user_id", ids);
+        const [{ data: profs }, { data: rls }] = await Promise.all([
+          supabase.from("profiles").select("user_id, full_name").in("user_id", ids),
+          supabase.from("user_roles").select("user_id, role").in("user_id", ids),
+        ]);
+        const adminIds = getAdminIds((rls ?? []) as { user_id: string; role: string }[]);
         const map: Record<string, string> = {};
         (profs ?? []).forEach((p: { user_id: string; full_name: string | null }) => {
-          map[p.user_id] = p.full_name ?? "";
+          map[p.user_id] = adminIds.has(p.user_id) ? "Sistema" : (p.full_name ?? "");
         });
         if (!cancelled) setActors(map);
       }

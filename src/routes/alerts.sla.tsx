@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { LEAD_SLA_DAYS } from "@/lib/leadSla";
+import { filterAdmins } from "@/lib/hideAdmin";
 
 export const Route = createFileRoute("/alerts/sla")({
   component: () => (
@@ -124,8 +125,12 @@ function SlaPanel() {
     reloadEscalations();
     // Carrega vendedores (perfis com role 'vendedor' ou todos os profiles para selecionar)
     (async () => {
-      const { data } = await supabase.from("profiles").select("user_id, full_name");
-      setSellers((data ?? []) as { user_id: string; full_name: string | null }[]);
+      const [{ data }, { data: rls }] = await Promise.all([
+        supabase.from("profiles").select("user_id, full_name"),
+        supabase.from("user_roles").select("user_id, role"),
+      ]);
+      const filtered = filterAdmins((data ?? []) as { user_id: string; full_name: string | null }[], (rls ?? []) as { user_id: string; role: string }[]);
+      setSellers(filtered);
     })();
   }, [isAdmin]);
 
@@ -154,17 +159,19 @@ function SlaPanel() {
 
     setLoading(true);
     (async () => {
-      const [{ data: ld }, { data: pf }] = await Promise.all([
+      const [{ data: ld }, { data: pf }, { data: rls }] = await Promise.all([
         supabase
           .from("leads")
           .select("id,status,created_at,created_by,assigned_to")
           .gte("created_at", since.toISOString()),
         supabase.from("profiles").select("user_id,full_name,daily_followup_goal"),
+        supabase.from("user_roles").select("user_id, role"),
       ]);
       const leadsRows = (ld ?? []) as LeadRow[];
       setLeads(leadsRows);
+      const filteredPf = filterAdmins((pf ?? []) as ProfileRow[], (rls ?? []) as { user_id: string; role: string }[]);
       const profMap = new Map<string, ProfileRow>();
-      for (const p of (pf ?? []) as ProfileRow[]) profMap.set(p.user_id, p);
+      for (const p of filteredPf) profMap.set(p.user_id, p);
       setProfiles(profMap);
 
       const ids = leadsRows.map((l) => l.id);

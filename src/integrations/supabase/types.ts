@@ -906,14 +906,19 @@ export type Database = {
           created_at: string
           created_by: string
           description: string | null
+          driver: string | null
+          guide: string | null
+          hotel: string | null
           id: string
           invoice_code: string | null
           kind: string
           notes: string | null
+          pax_count: number | null
           pax_name: string | null
           quote_item_id: string | null
           source: string
           status: string
+          supplier: string | null
           updated_at: string
         }
         Insert: {
@@ -924,14 +929,19 @@ export type Database = {
           created_at?: string
           created_by: string
           description?: string | null
+          driver?: string | null
+          guide?: string | null
+          hotel?: string | null
           id?: string
           invoice_code?: string | null
           kind?: string
           notes?: string | null
+          pax_count?: number | null
           pax_name?: string | null
           quote_item_id?: string | null
           source?: string
           status?: string
+          supplier?: string | null
           updated_at?: string
         }
         Update: {
@@ -942,14 +952,19 @@ export type Database = {
           created_at?: string
           created_by?: string
           description?: string | null
+          driver?: string | null
+          guide?: string | null
+          hotel?: string | null
           id?: string
           invoice_code?: string | null
           kind?: string
           notes?: string | null
+          pax_count?: number | null
           pax_name?: string | null
           quote_item_id?: string | null
           source?: string
           status?: string
+          supplier?: string | null
           updated_at?: string
         }
         Relationships: []

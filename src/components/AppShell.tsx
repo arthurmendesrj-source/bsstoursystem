@@ -81,6 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const items = [
+    { to: "/email", label: t("email"), icon: Mail },
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },
     { to: "/customers", label: t("customers"), icon: Users },
@@ -88,7 +89,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },
     { to: "/biblia", label: t("bibliaMenu"), icon: BookOpen },
     { to: "/itineraries", label: "Roteiros (IA)", icon: Library },
-    { to: "/email", label: t("email"), icon: Mail },
   ];
 
   const handleSignOut = async () => {

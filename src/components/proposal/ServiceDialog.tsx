@@ -26,15 +26,27 @@ const GUIDE_TYPES = [
   "Other",
 ];
 
+export type ServiceInitial = {
+  id: string;
+  item_date?: string | null;
+  city?: string | null;
+  description?: string | null;
+  guide_type?: string | null;
+  pax?: number | null;
+  total?: number | null;
+  notes?: string | null;
+};
+
 type Props = {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   quoteId: string;
   defaultMarkupPct?: number;
+  initial?: ServiceInitial | null;
   onSaved: () => void;
 };
 
-export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, onSaved }: Props) {
+export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
   const { user } = useAuth();
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [city, setCity] = useState("");

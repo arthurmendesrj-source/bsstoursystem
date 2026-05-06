@@ -410,6 +410,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
       priority: prefill?.priority ?? "media",
       description: prefill?.description ?? selected.snippet ?? "",
       due_date: prefill?.due_date ?? "",
+      assigned_to: prefill?.assigned_to ?? "",
     });
     setTriageOpen(false);
     setTaskOpen(true);

@@ -46,6 +46,7 @@ function BookingsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
   const { format } = useCurrency();
+  const { can } = usePermissions();
   const [rows, setRows] = useState<Booking[]>([]);
   const [customers, setCustomers] = useState<{ id: string; full_name: string }[]>([]);
   const [pkgs, setPkgs] = useState<{ id: string; name: string; base_price: number; base_currency: string }[]>([]);

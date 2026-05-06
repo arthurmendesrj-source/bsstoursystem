@@ -143,8 +143,12 @@ Deno.serve(async (req) => {
 
     if (action === "delete") {
       const targetId = String(body.user_id ?? "");
+      const reassignTo = body.reassign_to ? String(body.reassign_to) : null;
       if (!targetId) return json({ error: "user_id obrigatório" }, 400);
       if (targetId === callerId) return json({ error: "Não é possível excluir a si mesmo" }, 400);
+      if (reassignTo && reassignTo === targetId) {
+        return json({ error: "Reatribuição inválida: mesmo usuário" }, 400);
+      }
       if (!isAdmin) {
         const targetRoles = await getRolesOf(targetId);
         if ([...targetRoles].some((r) => PROTECTED_ROLES.includes(r))) {
@@ -152,23 +156,36 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Cleanup user-owned data
-      // 1) quote_items / quote_flights for quotes owned by user
-      const { data: quotes } = await admin.from("quotes").select("id").eq("created_by", targetId);
-      const quoteIds = (quotes ?? []).map((q) => q.id);
-      if (quoteIds.length > 0) {
-        await admin.from("quote_items").delete().in("quote_id", quoteIds);
-        await admin.from("quote_flights").delete().in("quote_id", quoteIds);
-        await admin.from("quote_documents").delete().in("quote_id", quoteIds);
+      // Validate reassign target exists
+      if (reassignTo) {
+        const { data: tgt, error: tgtErr } = await admin.auth.admin.getUserById(reassignTo);
+        if (tgtErr || !tgt.user) return json({ error: "Usuário de reatribuição não encontrado" }, 400);
       }
-      await admin.from("quotes").delete().eq("created_by", targetId);
 
-      // 2) bookings, leads, customers, interactions
-      await admin.from("bookings").delete().eq("created_by", targetId);
-      await admin.from("leads").delete().eq("created_by", targetId);
-      await admin.from("leads").delete().eq("assigned_to", targetId);
-      await admin.from("customers").delete().eq("created_by", targetId);
-      await admin.from("interactions").delete().eq("created_by", targetId);
+      if (reassignTo) {
+        // Reassign ownership of leads, customers, quotes, bookings to another user
+        await admin.from("quotes").update({ created_by: reassignTo }).eq("created_by", targetId);
+        await admin.from("bookings").update({ created_by: reassignTo }).eq("created_by", targetId);
+        await admin.from("leads").update({ created_by: reassignTo }).eq("created_by", targetId);
+        await admin.from("leads").update({ assigned_to: reassignTo }).eq("assigned_to", targetId);
+        await admin.from("customers").update({ created_by: reassignTo }).eq("created_by", targetId);
+        await admin.from("interactions").update({ created_by: reassignTo }).eq("created_by", targetId);
+      } else {
+        // Cleanup user-owned data (cascade delete)
+        const { data: quotes } = await admin.from("quotes").select("id").eq("created_by", targetId);
+        const quoteIds = (quotes ?? []).map((q) => q.id);
+        if (quoteIds.length > 0) {
+          await admin.from("quote_items").delete().in("quote_id", quoteIds);
+          await admin.from("quote_flights").delete().in("quote_id", quoteIds);
+          await admin.from("quote_documents").delete().in("quote_id", quoteIds);
+        }
+        await admin.from("quotes").delete().eq("created_by", targetId);
+        await admin.from("bookings").delete().eq("created_by", targetId);
+        await admin.from("leads").delete().eq("created_by", targetId);
+        await admin.from("leads").delete().eq("assigned_to", targetId);
+        await admin.from("customers").delete().eq("created_by", targetId);
+        await admin.from("interactions").delete().eq("created_by", targetId);
+      }
 
       // 3) user-scoped auxiliary
       await admin.from("notification_logs").delete().eq("user_id", targetId);

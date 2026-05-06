@@ -416,7 +416,9 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     if (!selected) return;
     setAnalyzing(true);
     try {
-      const r = await analyzeFn({ data: { gmail_id: selected.gmail_id } });
+      const r = isSeedId(selected.gmail_id)
+        ? await analyzeLocalFn({ data: { email_id: selected.id } })
+        : await analyzeFn({ data: { gmail_id: selected.gmail_id } });
       const s = (r.suggestion ?? {}) as Record<string, unknown>;
       setTriage({
         summary: (s.summary as string) || (s.notes as string) || selected.snippet || "",

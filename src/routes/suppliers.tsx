@@ -79,6 +79,7 @@ const emptyForm = {
 function SuppliersPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const [rows, setRows] = useState<Supplier[]>([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);

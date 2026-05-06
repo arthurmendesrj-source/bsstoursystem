@@ -48,15 +48,19 @@ type Filter = "all" | "risk" | "overdue";
 function FunnelPage() {
   const { t } = useI18n();
   const { format } = useCurrency();
+  const { viewAs, readOnly } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const [leads, setLeads] = useState<Lead[]>([]);
   const [lastByLead, setLastByLead] = useState<Record<string, string>>({});
   const [dragId, setDragId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
   const load = async () => {
-    const { data } = await supabase
+    let q = supabase
       .from("leads")
       .select("id,name,destination,estimated_value,currency,status,updated_at,next_action_date");
+    if (targetUserId) q = q.eq("assigned_to", targetUserId);
+    const { data } = await q;
     setLeads((data as Lead[]) ?? []);
     const { data: ints } = await supabase
       .from("interactions")
@@ -71,7 +75,7 @@ function FunnelPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const slaByLead = useMemo(() => {
     const m: Record<string, LeadSlaInfo> = {};

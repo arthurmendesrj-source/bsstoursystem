@@ -1,43 +1,28 @@
-## Causa do erro
+## Diagnóstico
 
-Os 50 emails da caixa são **fakes** (gmail_id `seed-2026-XX`) e moram só no banco. Mas `EmailPanel` chama o Gmail API de verdade em três pontos:
+A query em `EmailPanel.loadList` (linha 123) traz `*` da tabela `emails` sem filtrar pelo destinatário, então qualquer usuário vê todos os 50 emails. Além disso, a distribuição atual no banco não segue a regra desejada.
 
-- `gmailSync` (botão "Sincronizar") — abre tela
-- `gmailGet` (ao clicar em um email para abrir o corpo)
-- `emailAnalyze` (botão "Triagem com IA")
+## Plano
 
-Como as contas Gmail foram desconectadas, o gateway responde **403 `project_not_authorized`**. Resultado: nada abre e a triagem falha.
+### 1. Redistribuir os 50 emails seed (UPDATE no banco via tool insert)
 
-## O que ajustar (sem mexer em UI/visual, só lógica)
+Reatribuir `to_emails` dos seeds 01–50 conforme a regra:
 
-### 1. `EmailPanel.tsx` — abrir email seed direto do banco
-Em `select(row)`: se `row.gmail_id` começa com `seed-`, montar o `FullMessage` a partir das colunas que já existem em `public.emails` (`from_email`, `from_name`, `to_emails`, `subject`, `received_at`, `body_text`, `body_html`, `snippet`, `thread_id`, `labels`) — sem chamar `gmailGet`. Pular também o `modifyFn` (marcar como lido) e atualizar só localmente via `supabase.from('emails').update({ is_unread:false })`.
+- **Alexandra Ermolaeva** (`alexandra.ermolaeva@sim.local`) → seeds 01,03,05,07,09,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39 (20 emails)
+- **Agrafena Svetlova** (`agrafena.svetlova@sim.local`) → seeds 02,04,06,08,10,12,14,16,18,20,41,42,43,44,45,46,47,48,49,50 (20 emails)
+- **Mikhail Kutuzov** (`mikhail.kutuzov@sim.local`) → seeds 22,24,26,28,30,32,34,36,38,40 (10 emails)
 
-### 2. `EmailPanel.tsx` — triagem com IA para emails seed
-Em `analyze()`: se `selected.gmail_id` começa com `seed-`, chamar uma nova server function `emailAnalyzeLocal({ email_id })` que:
-- lê a linha da tabela `emails`
-- monta o prompt com `from_email`, `subject`, `body_text || snippet`
-- chama o Lovable AI Gateway (`google/gemini-3-flash-preview`) com o mesmo tool `extract_lead` já usado em `emailAnalyze`
-- grava `ai_suggestion` na tabela e retorna a sugestão
+### 2. Filtrar a inbox pelo email do usuário logado
 
-Reaproveita 90% do código do `emailAnalyze` atual — só troca a fonte do conteúdo (banco em vez do Gmail).
+Em `src/components/email/EmailPanel.tsx`:
+- Buscar o email do usuário atual via `supabase.auth.getUser()` (uma vez, em `useEffect`, guardar em estado).
+- Em `loadList`, quando `mode !== "lead"`, adicionar `query.contains("to_emails", [currentUserEmail])`.
 
-### 3. `EmailPanel.tsx` — botão Sincronizar
-Quando não há Gmail conectado, `gmailSync` sempre vai falhar. Opções:
-- (a) Esconder o botão se não houver Gmail (não temos como detectar do client → ruim)
-- (b) Tratar o 403 silenciosamente — mostrar toast "Nenhuma conta Gmail conectada" em vez do erro técnico
-- (c) Remover o `doSync()` automático no `useEffect` inicial
-
-**Sugiro (b) + (c)**: para não disparar erro ao abrir a página, e dar uma mensagem amigável quando o usuário clica em Sincronizar.
-
-### 4. Ações destrutivas (arquivar/lixeira/responder/encaminhar) em emails seed
-Essas chamam Gmail API e vão dar 403. Como são emails fake de teste:
-- Para arquivar/lixeira em seed: atualizar só o array `labels` no banco (adicionar `TRASH`, remover `INBOX`)
-- Reply/forward: bloquear com toast "Email de teste — envio desabilitado"
+Resultado: cada usuário vê apenas os emails da sua própria caixa (Alexandra 20, Agrafena 20, Mikhail 10).
 
 ### Não vou mexer
-- Layout/visual da inbox
-- Lógica para emails reais (caso reconecte Gmail no futuro, tudo continua funcionando)
-- Tabelas, RLS, migrações
+- Layout/visual da inbox.
+- RLS, migrações, tabelas.
+- Lógica de triagem com IA, sync Gmail, ações em emails seed (já corrigidas anteriormente).
 
 Confirma que posso aplicar?

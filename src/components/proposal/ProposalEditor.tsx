@@ -77,11 +77,16 @@ function fmtDate(d?: string | null) {
 
 export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, onSaved, onClose }: Props) {
   const { t } = useI18n();
-  const { can } = usePermissions();
+  const { can, canField } = usePermissions();
   const canEdit = can("quotes", "edit");
   const canDelete = can("quotes", "delete");
   const canApprove = can("quotes", "approve");
   const canCreateBooking = can("bookings", "create");
+  const editMarkupPct = canField("quotes", "markup_pct", "edit");
+  const editDiscount = canField("quotes", "discount", "edit");
+  const viewDiscount = canField("quotes", "discount", "view");
+  const viewCostFields = canField("quotes", "unit_cost", "view");
+  const viewMarkupTotals = canField("quotes", "markup_pct", "view");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [quote, setQuote] = useState<QuoteRow | null>(null);
@@ -527,10 +532,10 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               step="0.1"
               value={quote.default_markup_pct}
               onChange={(e) => setQuote({ ...quote, default_markup_pct: Number(e.target.value) })}
-              disabled={readOnly}
+              disabled={readOnly || !editMarkupPct}
               className="h-9"
             />
-            {!readOnly && (
+            {!readOnly && editMarkupPct && (
               <Button type="button" size="sm" variant="outline" onClick={applyDefaultMarkup} title={t("applyDefaultMarkup")}>
                 ↻
               </Button>
@@ -544,7 +549,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             step="0.01"
             value={bankFee}
             onChange={(e) => setBankFee(Number(e.target.value))}
-            disabled={readOnly}
+            disabled={readOnly || !editDiscount}
             className="h-9"
           />
         </div>
@@ -654,15 +659,19 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
 
       <div className="rounded-md border p-4 space-y-1.5 bg-muted/20">
-        {!readOnly && (
+        {!readOnly && viewCostFields && (
           <>
             <Row label={t("costSubtotal")} value={fmt(totals.costSubtotal, ccy)} muted />
+          </>
+        )}
+        {!readOnly && viewMarkupTotals && (
+          <>
             <Row label={t("markupTotal")} value={fmt(totals.markupTotal, ccy)} muted />
             <Separator className="my-1" />
           </>
         )}
         <Row label={t("totalPrice")} value={fmt(totals.subtotal, ccy)} />
-        <Row label={t("bankFee")} value={fmt(totals.bankFee, ccy)} muted />
+        {viewDiscount && <Row label={t("bankFee")} value={fmt(totals.bankFee, ccy)} muted />}
         <Separator className="my-1" />
         <Row label={t("totalToPay")} value={fmt(totals.total, ccy)} bold />
       </div>

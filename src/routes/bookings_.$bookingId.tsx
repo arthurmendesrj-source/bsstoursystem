@@ -17,6 +17,7 @@ import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { MaskedField } from "@/lib/permissions";
 
 export const Route = createFileRoute("/bookings_/$bookingId")({
   component: () => (
@@ -202,7 +203,7 @@ function BookingDetailPage() {
           <div>
             <h1 className="text-2xl font-bold">{customerName || t("bookings")}</h1>
             <p className="text-sm text-muted-foreground">
-              {booking.departure_date ?? "—"} · {format(Number(booking.total_amount), booking.currency as "BRL")} · <Badge variant="outline">{booking.status}</Badge>
+              {booking.departure_date ?? "—"} · <MaskedField module="bookings" field="total_amount" value={format(Number(booking.total_amount), booking.currency as "BRL")} /> · <Badge variant="outline">{booking.status}</Badge>
             </p>
           </div>
         </div>
@@ -241,7 +242,7 @@ function BookingDetailPage() {
                   <div className="min-w-0">
                     <div className="font-medium">{item.description}</div>
                     <div className="text-xs text-muted-foreground">
-                      {item.kind} · {t("quantity") || "Qtd"}: {item.quantity} · {format(Number(item.total), booking.currency as "BRL")}
+                      {item.kind} · {t("quantity") || "Qtd"}: {item.quantity} · <MaskedField module="quotes" field="total_amount" value={format(Number(item.total), booking.currency as "BRL")} />
                     </div>
                   </div>
                   <Badge variant="outline" className={statusBadge}>

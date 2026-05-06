@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/lib/permissions";
 
 const GUIDE_TYPES = [
   "English Guide",
@@ -48,6 +49,9 @@ type Props = {
 
 export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
   const { user } = useAuth();
+  const { canField } = usePermissions();
+  const canEditCost = canField("quotes", "unit_cost", "edit");
+  const canViewCost = canField("quotes", "unit_cost", "view");
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
   const [city, setCity] = useState("");
   const [service, setService] = useState("");
@@ -237,10 +241,12 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
             {errors.pax && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
 
-          <div>
-            <Label className="text-xs">Total</Label>
-            <Input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} />
-          </div>
+          {canViewCost && (
+            <div>
+              <Label className="text-xs">Total</Label>
+              <Input type="number" step="0.01" value={total} onChange={(e) => setTotal(e.target.value)} disabled={!canEditCost} />
+            </div>
+          )}
 
           <div>
             <Label className="text-xs">Notas</Label>

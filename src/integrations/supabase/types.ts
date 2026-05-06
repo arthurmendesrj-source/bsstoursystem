@@ -2172,7 +2172,15 @@ export type Database = {
       unaccent: { Args: { "": string }; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "vendedor" | "operacional" | "financeiro"
+      app_role:
+        | "admin"
+        | "vendedor"
+        | "operacional"
+        | "financeiro"
+        | "diretor"
+        | "gerente"
+        | "supervisor"
+        | "operador"
       booking_status:
         | "pre_reserva"
         | "confirmada"
@@ -2339,7 +2347,16 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "vendedor", "operacional", "financeiro"],
+      app_role: [
+        "admin",
+        "vendedor",
+        "operacional",
+        "financeiro",
+        "diretor",
+        "gerente",
+        "supervisor",
+        "operador",
+      ],
       booking_status: [
         "pre_reserva",
         "confirmada",

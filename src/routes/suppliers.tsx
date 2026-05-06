@@ -146,6 +146,13 @@ function SuppliersPage() {
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Excluir "${name}"?`)) return;
+    const { error } = await supabase.from("suppliers").delete().eq("id", id);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); load(); }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

@@ -21,7 +21,9 @@ import {
   Library,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   BarChart3,
+  LayoutGrid,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
@@ -53,15 +55,36 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [collapsed]);
 
-  const items = [
+  const crmRoutes = ["/dashboard", "/leads", "/funnel", "/workspace", "/packages"];
+  const isCrmActive = crmRoutes.some((r) => path === r || path.startsWith(r + "/"));
+  const [crmOpen, setCrmOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("sidebar:group:crm");
+    if (saved === null) return true;
+    return saved === "1";
+  });
+  useEffect(() => {
+    if (isCrmActive) setCrmOpen(true);
+  }, [isCrmActive]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("sidebar:group:crm", crmOpen ? "1" : "0");
+    }
+  }, [crmOpen]);
+
+  const crmChildren = [
     { to: "/dashboard", label: t("dashboard"), icon: LayoutDashboard },
     { to: "/leads", label: t("leads"), icon: UserPlus },
     { to: "/funnel", label: t("funnel"), icon: KanbanSquare },
+    { to: "/workspace", label: "Atendimento", icon: Briefcase },
+    { to: "/packages", label: t("packages"), icon: Package },
+  ];
+
+  const items = [
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },
     { to: "/customers", label: t("customers"), icon: Users },
     { to: "/suppliers", label: t("suppliers"), icon: Building2 },
-    { to: "/packages", label: t("packages"), icon: Package },
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },
     { to: "/biblia", label: t("bibliaMenu"), icon: BookOpen },
     { to: "/itineraries", label: "Roteiros (IA)", icon: Library },
@@ -106,6 +129,51 @@ export function AppShell({ children }: { children: ReactNode }) {
           {!collapsed && <div className="flex-1 truncate font-semibold text-sidebar-foreground">{t("appName")}</div>}
         </div>
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+          {/* CRM group */}
+          <button
+            type="button"
+            onClick={() => {
+              if (collapsed) {
+                setCollapsed(false);
+                setCrmOpen(true);
+              } else {
+                setCrmOpen((o) => !o);
+              }
+            }}
+            className={cn(itemClass(isCrmActive), "w-full")}
+            title={collapsed ? "CRM" : undefined}
+          >
+            <LayoutGrid className="h-4 w-4 shrink-0" />
+            {!collapsed && (
+              <>
+                <span className="flex-1 truncate text-left">CRM</span>
+                <ChevronDown
+                  className={cn("h-4 w-4 shrink-0 transition-transform", crmOpen ? "rotate-0" : "-rotate-90")}
+                />
+              </>
+            )}
+          </button>
+          {!collapsed && crmOpen &&
+            crmChildren.map((it) => {
+              const active = path === it.to || (it.to === "/workspace" && path.startsWith("/leads/")) || path.startsWith(it.to + "/");
+              const Icon = it.icon;
+              return (
+                <Link
+                  key={it.to}
+                  to={it.to}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{it.label}</span>
+                </Link>
+              );
+            })}
+
           {items.map((it) => {
             const active = path === it.to || path.startsWith(it.to + "/");
             const Icon = it.icon;
@@ -116,14 +184,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          <Link
-            to="/workspace"
-            className={itemClass(path === "/workspace" || path.startsWith("/leads/"))}
-            title={collapsed ? t("workspace") : undefined}
-          >
-            <Briefcase className="h-4 w-4 shrink-0" />
-            {!collapsed && <span className="truncate">{t("workspace")}</span>}
-          </Link>
           {showManagerial && !viewAs && (
             <Link to="/gerencial" className={itemClass(path === "/gerencial" || path.startsWith("/gerencial/"))} title={collapsed ? "Gerencial" : undefined}>
               <BarChart3 className="h-4 w-4 shrink-0" />

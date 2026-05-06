@@ -194,10 +194,16 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Capture target email/info before deletion
+      const { data: tgtBefore } = await admin.auth.admin.getUserById(targetId);
+      const targetEmail = tgtBefore?.user?.email ?? null;
+
       // Validate reassign target exists
+      let reassignEmail: string | null = null;
       if (reassignTo) {
         const { data: tgt, error: tgtErr } = await admin.auth.admin.getUserById(reassignTo);
         if (tgtErr || !tgt.user) return json({ error: "Usuário de reatribuição não encontrado" }, 400);
+        reassignEmail = tgt.user.email ?? null;
       }
 
       if (reassignTo) {

@@ -1,57 +1,44 @@
-## Página de Usuários — Convidar / Bloquear / Excluir (Admin + Diretor)
+## Objetivo
 
-### Acesso
-Hoje a página `/users` é acessível só para **admin**. Vou ampliar para **admin OU diretor**:
-- Em `src/lib/auth.tsx`: expor `isDirector` (checa role `diretor`) e `canManageUsers = isAdmin || isDirector`.
-- Em `src/routes/users.tsx`: trocar guard `isAdmin` por `canManageUsers`.
+Popular a tabela `emails` com 30 mensagens (20 B2B + 10 internas), distribuídas entre as caixas de Alexandra Ermolaeva, Mikhail Kutuzov e Agrafena Svetlova.
 
-### Backend — Edge Function `admin-users`
-Nova edge function (`supabase/functions/admin-users/index.ts`, `verify_jwt = true`) com 3 ações via POST `{ action, ... }`:
+## Decisões (assumidas como padrão pois você pulou as perguntas)
 
-1. **`invite`** — `{ email, full_name?, roles?: AppRole[] }`
-   - Valida com zod (email válido, full_name ≤100, roles ⊂ lista).
-   - Verifica se chamador tem role `admin` ou `diretor` (consulta `user_roles` com service role).
-   - **Diretor não pode convidar admin nem outro diretor** (apenas gerente/supervisor/operador). Admin pode tudo.
-   - Usa `supabase.auth.admin.inviteUserByEmail(email, { data: { full_name } })` → envia e-mail de convite.
-   - Insere roles em `user_roles` para o novo `user.id`.
+- **Faltam 20 emails** dos 50 mencionados. Vou seguir apenas com os 30 enviados nesta leva. Se quiser os outros 20, basta colar depois.
+- **Usuários já existem** no sistema (confirmado: Alexandra, Mikhail e Agrafena estão em `profiles`).
+- **"Caixa de entrada" por usuário**: como a tabela `emails` é compartilhada e não tem coluna de owner, vou marcar a propriedade colocando o **email do usuário no campo `to_emails`** (sem mudança de schema). Cada usuário verá seus emails filtrando por `to_emails @> ARRAY['<seu_email>']`.
 
-2. **`block`** / **`unblock`** — `{ user_id, blocked: boolean }`
-   - Mesmo guard de permissão. Diretor não pode bloquear admin/diretor.
-   - Usa `supabase.auth.admin.updateUserById(user_id, { ban_duration: blocked ? "876000h" : "none" })` (≈100 anos = bloqueio efetivo; "none" remove).
-   - Retorna estado atualizado.
+## Distribuição
 
-3. **`delete`** — `{ user_id }`
-   - Guard idem. Não permite excluir a si mesmo nem admin (se chamador é diretor).
-   - Limpa dados vinculados em ordem segura: `quote_items`/`quote_flights` → `quotes` (do user), `bookings`, `leads`, `customers`, `interactions`, `notification_logs`, `notification_preferences`, `push_subscriptions`, `lead_alert_snoozes`, `ai_conversations` (cascata msgs), `user_module_permissions`, `user_field_permissions`, `user_roles`, `profiles`.
-   - Por fim `supabase.auth.admin.deleteUser(user_id)`.
+### B2B — 20 emails (clientes solicitando programas turísticos)
+- **Alexandra Ermolaeva** (10): emails 1, 3, 5, 7, 9, 11, 13, 15, 17, 19
+- **Agrafena Svetlova** (10): emails 2, 4, 6, 8, 10, 12, 14, 16, 18, 20
 
-### Frontend — `src/routes/users.tsx`
+### Internos — 10 emails (21–30)
+Classificação por natureza:
+- **Diretoria → Agrafena Svetlova** (4): 24 (Finanças/aprovação), 25 (Qualidade/auditoria), 27 (RH/contratação), 30 (Compras/cotação)
+- **Operacional → divididos 3/3 entre Alexandra e Mikhail**:
+  - Alexandra (3): 21 (briefing guias), 26 (marketing/feira), 28 (TI/manutenção)
+  - Mikhail (3): 22 (reservas hotéis), 23 (logística equipamentos), 29 (segurança/protocolo)
 
-Adicionar:
-- **Botão "Convidar usuário"** no topo → abre `Dialog` com:
-  - campo Email (obrigatório, validação zod)
-  - campo Nome (opcional)
-  - multi-select de papéis iniciais (filtrado conforme permissão do chamador)
-  - botão "Enviar convite" → chama edge function, toast de sucesso, recarrega lista.
+## Implementação
 
-- **Coluna "Status"** mostrando se usuário está bloqueado (badge "Bloqueado" vermelho). Para isso a função `admin-users` ganha uma 4ª action **`list`** que retorna `[{ user_id, banned_until }]` — chamada junto com `load()`.
+1. Buscar via edge function (admin-users existente, ação custom ou nova `seed_emails`) os emails reais de auth.users dos 3 usuários — necessário porque psql não acessa schema `auth`.
+2. Alternativa mais simples: criar uma migration/função SECURITY DEFINER que retorna emails dos 3 user_ids, ou rodar um script único via edge function que faz INSERT direto.
+3. Para cada um dos 30 emails, inserir em `public.emails` com:
+   - `gmail_id`: identificador sintético único (ex: `seed-2026-{n}`)
+   - `from_email`, `from_name`, `subject`, `body_text`, `snippet`, `received_at`
+   - `to_emails`: array com o email do usuário-dono
+   - `is_unread: true`, `labels: ['INBOX']`
 
-- **Coluna "Ações"** ganha 2 botões com ícones:
-  - 🚫 **Bloquear / Desbloquear** (toggle, com `AlertDialog` de confirmação)
-  - 🗑️ **Excluir** (`AlertDialog` com aviso forte; lista os dados que serão removidos)
+## Detalhes técnicos
 
-- Diretor **não vê** botões de bloquear/excluir em linhas de admin/diretor (filtro client-side; servidor revalida).
+```text
+emails table — sem owner_id, ownership inferida via to_emails[]
+RLS atual permite SELECT a todos autenticados (filtro será no client/UI)
+gmail_id é NOT NULL e único — usar prefixo "seed-" para identificar
+```
 
-### Filtro de hideAdmin
-Mantém `filterAdmins` em produção; em dev admin aparece. Isso já existe.
+## Próximo passo
 
-### Texto de rodapé
-Atualizar mensagem informando que o convite envia e-mail automático e que o usuário define a senha pelo link recebido.
-
-### Resumo de arquivos
-- `src/lib/auth.tsx` — adicionar `isDirector`, `canManageUsers`
-- `src/routes/users.tsx` — UI completa (convite + bloquear + excluir + coluna status)
-- `supabase/functions/admin-users/index.ts` — nova edge function
-- `supabase/config.toml` — registrar função (verify_jwt = true)
-
-Sem mudanças de schema no banco.
+Confirme e eu executo: (a) obtenho os 3 emails reais via função SECURITY DEFINER e (b) faço bulk insert dos 30 registros.

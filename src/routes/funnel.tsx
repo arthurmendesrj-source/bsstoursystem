@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18n } from "@/lib/i18n";
 import { useCurrency } from "@/lib/currency";
+import { useViewAs } from "@/lib/viewAs";
 import { supabase } from "@/integrations/supabase/client";
 import { computeLeadSla, type LeadSlaInfo } from "@/lib/leadSla";
 import { toast } from "sonner";
@@ -47,15 +48,19 @@ type Filter = "all" | "risk" | "overdue";
 function FunnelPage() {
   const { t } = useI18n();
   const { format } = useCurrency();
+  const { viewAs, readOnly } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const [leads, setLeads] = useState<Lead[]>([]);
   const [lastByLead, setLastByLead] = useState<Record<string, string>>({});
   const [dragId, setDragId] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
 
   const load = async () => {
-    const { data } = await supabase
+    let q = supabase
       .from("leads")
       .select("id,name,destination,estimated_value,currency,status,updated_at,next_action_date");
+    if (targetUserId) q = q.eq("assigned_to", targetUserId);
+    const { data } = await q;
     setLeads((data as Lead[]) ?? []);
     const { data: ints } = await supabase
       .from("interactions")
@@ -70,7 +75,7 @@ function FunnelPage() {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const slaByLead = useMemo(() => {
     const m: Record<string, LeadSlaInfo> = {};
@@ -94,7 +99,7 @@ function FunnelPage() {
   }, [leads, slaByLead, filter]);
 
   const onDrop = async (status: string) => {
-    if (!dragId) return;
+    if (!dragId || readOnly) return;
     const { error } = await supabase.from("leads").update({ status: status as "novo" }).eq("id", dragId);
     if (error) toast.error(error.message);
     else setLeads((cur) => cur.map((l) => (l.id === dragId ? { ...l, status } : l)));
@@ -143,9 +148,9 @@ function FunnelPage() {
                     return (
                       <Card
                         key={l.id}
-                        draggable
-                        onDragStart={() => setDragId(l.id)}
-                        className="cursor-move p-3 hover:shadow-md"
+                        draggable={!readOnly}
+                        onDragStart={() => !readOnly && setDragId(l.id)}
+                        className={readOnly ? "p-3 hover:shadow-md" : "cursor-move p-3 hover:shadow-md"}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <Link to="/leads/$leadId" params={{ leadId: l.id }} className="text-sm font-medium hover:underline truncate">

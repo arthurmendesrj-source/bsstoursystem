@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, type AppRole } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useSubordinates } from "@/lib/hierarchy";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,6 +43,7 @@ const FUNNEL_KEYS = ["novo", "qualificado", "cotacao", "proposta", "fechado", "p
 
 function GerencialPage() {
   const { user, isAdmin, hasRole, loading: authLoading } = useAuth();
+  const { enterViewAs } = useViewAs();
   const { subordinates, loading: subLoading } = useSubordinates();
   const { format } = useCurrency();
   const navigate = useNavigate();
@@ -258,7 +260,14 @@ function GerencialPage() {
                 <TableRow><TableCell colSpan={9} className="text-center text-sm text-muted-foreground py-6">Sem usuários</TableCell></TableRow>
               )}
               {filtered.map((s) => (
-                <TableRow key={s.user_id} className="cursor-pointer" onClick={() => navigate({ to: "/gerencial/$userId", params: { userId: s.user_id } })}>
+                <TableRow
+                  key={s.user_id}
+                  className="cursor-pointer"
+                  onClick={() => {
+                    enterViewAs({ user_id: s.user_id, full_name: s.full_name, role: s.role });
+                    navigate({ to: "/dashboard" });
+                  }}
+                >
                   <TableCell className="font-medium">{s.full_name}</TableCell>
                   <TableCell><Badge variant="secondary">{s.role}</Badge></TableCell>
                   <TableCell className="text-right">{s.leadsActive}</TableCell>
@@ -267,9 +276,9 @@ function GerencialPage() {
                   <TableCell className="text-right">{s.tasksPending}</TableCell>
                   <TableCell className="text-right">{s.tasksOverdue > 0 ? <span className="text-rose-600">{s.tasksOverdue}</span> : 0}</TableCell>
                   <TableCell className="text-right">{s.emailsUnread}</TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <Link to="/gerencial/$userId" params={{ userId: s.user_id }} className="inline-flex items-center text-primary text-xs">
-                      Ver <ChevronRight className="h-3 w-3" />
+                      Relatório <ChevronRight className="h-3 w-3" />
                     </Link>
                   </TableCell>
                 </TableRow>

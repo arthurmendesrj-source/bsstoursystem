@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/lib/i18n";
 import { useCurrency } from "@/lib/currency";
+import { useViewAs } from "@/lib/viewAs";
 import { supabase } from "@/integrations/supabase/client";
 import { computeLeadSla } from "@/lib/leadSla";
 
@@ -31,17 +32,25 @@ type AtRiskLead = {
 function Dashboard() {
   const { t } = useI18n();
   const { format } = useCurrency();
+  const { viewAs } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const [stats, setStats] = useState({ leads: 0, quotes: 0, bookings: 0, revenue: 0, atRisk: 0 });
   const [atRisk, setAtRisk] = useState<AtRiskLead[]>([]);
 
   useEffect(() => {
     (async () => {
+      const leadsBase = supabase.from("leads").select("id", { count: "exact", head: true }).not("status", "in", "(fechado,perdido)");
+      const quotesBase = supabase.from("quotes").select("id", { count: "exact", head: true }).in("status", ["rascunho", "enviada"]);
+      const bookingsBase = supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "confirmada");
+      const revBase = supabase.from("bookings").select("total_amount").eq("status", "confirmada");
+      const openLeadsBase = supabase.from("leads").select("id,name,status,updated_at,next_action_date").not("status", "in", "(fechado,perdido)");
+
       const [leads, quotes, bookings, revQ, openLeads, ints] = await Promise.all([
-        supabase.from("leads").select("id", { count: "exact", head: true }).not("status", "in", "(fechado,perdido)"),
-        supabase.from("quotes").select("id", { count: "exact", head: true }).in("status", ["rascunho", "enviada"]),
-        supabase.from("bookings").select("id", { count: "exact", head: true }).eq("status", "confirmada"),
-        supabase.from("bookings").select("total_amount").eq("status", "confirmada"),
-        supabase.from("leads").select("id,name,status,updated_at,next_action_date").not("status", "in", "(fechado,perdido)"),
+        targetUserId ? leadsBase.eq("assigned_to", targetUserId) : leadsBase,
+        targetUserId ? quotesBase.eq("created_by", targetUserId) : quotesBase,
+        targetUserId ? bookingsBase.eq("created_by", targetUserId) : bookingsBase,
+        targetUserId ? revBase.eq("created_by", targetUserId) : revBase,
+        targetUserId ? openLeadsBase.eq("assigned_to", targetUserId) : openLeadsBase,
         supabase.from("interactions").select("lead_id, occurred_at").order("occurred_at", { ascending: false }),
       ]);
 
@@ -75,7 +84,7 @@ function Dashboard() {
       });
       setAtRisk(risk.slice(0, 5));
     })();
-  }, []);
+  }, [targetUserId]);
 
   const cards = [
     { label: t("totalLeads"), value: stats.leads, icon: UserPlus, color: "text-blue-600" },

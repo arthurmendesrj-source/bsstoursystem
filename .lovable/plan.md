@@ -1,65 +1,75 @@
-## Objetivo
-Criar uma aba **Gerencial** (somente leitura) para **Admin, Diretor e Gerente** consultarem a performance dos seus subordinados — com visão **consolidada** e **drill-down por usuário** (atividades, leads, e-mails, dashboard, funil).
+## Modo "Visualizar como usuário" (impersonação visual)
 
-## Acesso
-Visível no menu lateral apenas se `isAdmin || hasRole('diretor') || hasRole('gerente')`. Demais papéis: redirect para `/dashboard`. Lista de usuários vem do hook existente `useSubordinates()` (admin → todos; diretor → gerente+supervisor+operador; gerente → supervisor+operador).
+Ao clicar em um usuário no /gerencial, o app inteiro passa a mostrar os dados daquele usuário (leads, tarefas, e-mails, dashboard, funil), mantendo você logado na sua conta. Você continua sendo o autor real de qualquer ação administrativa (reatribuir lead, marcar tarefa concluída), mas a navegação simula a experiência dele.
 
-## Rotas (novas)
+### 1. Contexto global de impersonação
 
-### `/gerencial` — Visão consolidada
-Cabeçalho com filtros globais:
-- Período (7d / 30d / 90d / customizado)
-- Filtro por papel (todos / gerente / supervisor / operador)
-- Busca por nome
+Criar `src/lib/viewAs.tsx` com `ViewAsProvider` e hook `useViewAs()`:
+- Estado: `{ viewAsUserId, viewAsName, viewAsRole }` persistido em `sessionStorage`.
+- Métodos: `enterViewAs(user)`, `exitViewAs()`.
+- Guard de segurança no provider: só ativa se o usuário logado for admin/diretor/gerente E o alvo estiver em `useSubordinates()`. Caso contrário, limpa.
+- Helper `effectiveUserId()` que retorna `viewAsUserId ?? auth.user.id`.
 
-**KPIs agregados** (somando todos os subordinados no período):
-- Leads novos / em andamento / fechados / perdidos
-- Taxa de conversão (fechados ÷ total)
-- Receita confirmada (bookings)
-- Tarefas pendentes / vencidas / concluídas
-- E-mails recebidos / não lidos
-- Leads em risco SLA
+Montar o provider em `src/router.tsx` (ou no `__root.tsx`) dentro do `AuthProvider`.
 
-**Mini-funil consolidado** (mesmos status do `/funnel` somando todos subordinados).
+### 2. Banner global de impersonação
 
-**Tabela ranking de usuários** — uma linha por subordinado com:
-| Nome | Papel | Leads ativos | Convertidos | Receita | Tarefas pendentes | Tarefas vencidas | E-mails não lidos | SLA risco |
+Em `src/components/AppShell.tsx`, renderizar um banner fixo no topo quando `viewAsUserId` estiver ativo:
+- Texto: "Visualizando como **{nome}** ({papel}) — modo somente leitura".
+- Botão "Sair da visualização" → `exitViewAs()` + redireciona para `/gerencial`.
+- Cor de destaque (`bg-amber-500/15 border-amber-500/40`) para deixar evidente.
 
-Cada linha clicável → `/gerencial/$userId`.
+### 3. Disparo da impersonação no Gerencial
 
-### `/gerencial/$userId` — Visão individual
-Header com nome/papel do usuário + botão "voltar".
+Em `src/routes/gerencial.tsx`, na linha do ranking:
+- Trocar a navegação de `/gerencial/$userId` por: `enterViewAs({user_id, full_name, role})` e em seguida `navigate({ to: "/dashboard" })`.
+- Manter um link "Ver detalhes" pequeno que continua indo a `/gerencial/$userId` (relatório consolidado read-only já existente).
 
-Abas internas (Tabs do shadcn):
-1. **Dashboard** — mesmos KPIs do `/dashboard`, mas filtrados por `assigned_to = userId OR created_by = userId`.
-2. **Funil** — pipeline de leads desse usuário (reutiliza lógica do `/funnel`).
-3. **Leads** — tabela read-only dos leads atribuídos/criados por ele (sem botões de edit/criar).
-4. **Atividades** — lista de tarefas (`operations_activities`) onde `created_by = userId`.
-5. **E-mails** — e-mails da `emails` table relacionados a leads desse usuário (read-only, sem responder).
+### 4. Filtragem das páginas pelo usuário visualizado
 
-Todos os componentes em **modo somente leitura**: nenhum botão "Novo", "Editar", "Excluir" — apenas consulta.
+Em cada rota relevante, ler `useViewAs()` e usar `effectiveUserId()` no lugar de `user.id` ao montar as queries Supabase:
+- `src/routes/dashboard.tsx`
+- `src/routes/funnel.tsx`
+- `src/routes/leads.tsx` (filtrar por `assigned_to`)
+- `src/routes/leads.$leadId.tsx` (apenas exibir; ocultar botões de edição quando em viewAs — ver §5)
+- `src/routes/activities.tsx`
+- `src/routes/email.tsx` (filtrar por `lead_id` dos leads do usuário; Gmail OAuth permanece o do gestor — e-mails exibidos vêm da tabela `emails` filtrada)
+- `src/routes/bookings.tsx`, `src/routes/customers.tsx`, `src/routes/itineraries.tsx`, `src/routes/workspace.tsx` quando aplicável.
 
-## Arquivos a criar
-- `src/routes/gerencial.tsx` — layout/index com KPIs consolidados + tabela de ranking.
-- `src/routes/gerencial.$userId.tsx` — view individual com Tabs.
-- `src/components/gerencial/ConsolidatedKpis.tsx` — cards de KPI agregados.
-- `src/components/gerencial/UserRankingTable.tsx` — tabela ordenável.
-- `src/components/gerencial/UserDashboardView.tsx` — KPIs filtrados por user.
-- `src/components/gerencial/UserFunnelView.tsx` — funil filtrado.
-- `src/components/gerencial/UserLeadsView.tsx` — tabela read-only de leads.
-- `src/components/gerencial/UserActivitiesView.tsx` — tabela read-only de tarefas.
-- `src/components/gerencial/UserEmailsView.tsx` — lista read-only de e-mails.
-- `src/lib/managerial.ts` — helpers de query (agregações por user_id, no período).
+RLS continua garantindo o acesso (admin/diretor/gerente já enxergam subordinados). Nenhuma migration necessária.
 
-## Arquivos a editar
-- `src/components/AppShell.tsx` — adicionar item "Gerencial" no menu (visível apenas para admin/diretor/gerente).
-- `src/lib/i18n.tsx` — chave `managerial` / `Gerencial`.
+### 5. Modo somente-leitura + ações administrativas
 
-## Sem mudanças de banco
-Todas as RLS atuais já permitem que admin/diretor/gerente leiam leads/atividades/emails dos subordinados via `is_subordinate_of`. Nenhuma migração necessária.
+Criar helper `useReadOnly()` em `viewAs.tsx`: `readOnly = !!viewAsUserId`.
 
-## Fora do escopo
-- Edição/criação/distribuição em massa nesta aba (já existe nos módulos próprios).
-- Exportação CSV (pode vir depois).
-- Gráficos avançados — nesta primeira versão usamos cards numéricos + tabelas + funil simples.
-- Comparação entre períodos / metas individuais.
+Regra geral nas páginas filtradas:
+- Esconder botões de **criar**, **editar**, **excluir**, **enviar e-mail**, **adicionar nota**, **upload**.
+- Manter visíveis e funcionais somente as **ações administrativas** que o gestor já tem permissão:
+  - Reatribuir lead (campo `assigned_to`).
+  - Marcar tarefa como concluída / reabrir.
+- Inputs editáveis recebem `disabled={readOnly && !isAdminAction}`.
+
+Implementação prática: passar `readOnly` para componentes de detalhe (`LeadDetail`, `TaskUpdatesPanel`, `EmailPanel`, etc.) e condicionar a renderização dos botões.
+
+### 6. Navegação e proteções
+
+- `AuthGate` permanece exigindo login do gestor real.
+- Se `viewAsUserId` apontar para um id que sumiu da lista de subordinados (mudança de hierarquia), `ViewAsProvider` chama `exitViewAs()` automaticamente.
+- O menu "Gerencial" continua visível durante a impersonação para permitir trocar de usuário ou sair.
+
+### 7. Auditoria
+
+Toda escrita continua usando `auth.uid()` real do gestor, então o `activity_log` registra corretamente quem executou a ação. Opcional: adicionar `viewing_as` no payload de notas/atividades em uma iteração futura.
+
+### Arquivos a criar
+- `src/lib/viewAs.tsx`
+
+### Arquivos a editar
+- `src/router.tsx` ou `src/routes/__root.tsx` (montar provider)
+- `src/components/AppShell.tsx` (banner)
+- `src/routes/gerencial.tsx` (disparar impersonação)
+- `src/routes/dashboard.tsx`, `funnel.tsx`, `leads.tsx`, `leads.$leadId.tsx`, `activities.tsx`, `email.tsx`, `bookings.tsx`, `customers.tsx`, `itineraries.tsx`, `workspace.tsx` (usar `effectiveUserId` + `readOnly`)
+
+### Fora do escopo
+- Login real (sessão Supabase) na conta do subordinado.
+- Migrations de RLS (políticas atuais já permitem leitura pelo gestor).

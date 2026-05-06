@@ -24,15 +24,18 @@ import {
   BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
+import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, isAdmin, hasRole, signOut } = useAuth();
+  const { viewAs, exitViewAs } = useViewAs();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const { t, lang, setLang } = useI18n();
   const { currency, setCurrency } = useCurrency();
@@ -240,6 +243,27 @@ export function AppShell({ children }: { children: ReactNode }) {
             </SelectContent>
           </Select>
         </header>
+        {viewAs && (
+          <div className="flex items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm md:px-6">
+            <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+              <Eye className="h-4 w-4" />
+              <span>
+                Visualizando como <strong>{viewAs.full_name}</strong> ({viewAs.role}) — modo somente leitura
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 border-amber-500/50 bg-background/60 text-xs"
+              onClick={() => {
+                exitViewAs();
+                navigate({ to: "/gerencial" });
+              }}
+            >
+              Sair da visualização
+            </Button>
+          </div>
+        )}
         <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
       </div>
     </div>

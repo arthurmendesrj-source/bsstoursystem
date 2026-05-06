@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useCurrency } from "@/lib/currency";
 import { Can, usePermissions } from "@/lib/permissions";
 import { useSubordinates } from "@/lib/hierarchy";
@@ -46,6 +47,8 @@ const STATUSES = ["novo", "qualificado", "cotacao", "proposta", "fechado", "perd
 function LeadsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { viewAs, readOnly } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const { format } = useCurrency();
   const { can } = usePermissions();
   const { subordinates } = useSubordinates();
@@ -55,11 +58,13 @@ function LeadsPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
+    let q = supabase.from("leads").select("*").order("created_at", { ascending: false });
+    if (targetUserId) q = q.eq("assigned_to", targetUserId);
+    const { data } = await q;
     setLeads((data as Lead[]) ?? []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +113,7 @@ function LeadsPage() {
           <h1 className="text-3xl font-bold tracking-tight">{t("leads")}</h1>
           <p className="text-muted-foreground">{leads.length} {t("leads").toLowerCase()}</p>
         </div>
-        <Can module="leads" action="create">
+        {!readOnly && <Can module="leads" action="create">
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button>

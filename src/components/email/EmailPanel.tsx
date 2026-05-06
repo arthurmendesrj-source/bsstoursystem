@@ -277,7 +277,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const archive = async () => {
     if (!selected) return;
     try {
-      await modifyFn({ data: { id: selected.gmail_id, removeLabelIds: ["INBOX"] } });
+      if (isSeedId(selected.gmail_id)) {
+        const newLabels = (selected.labels ?? []).filter((l) => l !== "INBOX");
+        await supabase.from("emails").update({ labels: newLabels }).eq("id", selected.id);
+      } else {
+        await modifyFn({ data: { id: selected.gmail_id, removeLabelIds: ["INBOX"] } });
+      }
       toast.success("OK");
       await loadList(folder);
       setSelectedId(null); setFull(null);
@@ -287,7 +292,12 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   const trashIt = async () => {
     if (!selected) return;
     try {
-      await modifyFn({ data: { id: selected.gmail_id, trash: true } });
+      if (isSeedId(selected.gmail_id)) {
+        const labs = new Set<string>([...(selected.labels ?? []).filter((l) => l !== "INBOX"), "TRASH"]);
+        await supabase.from("emails").update({ labels: Array.from(labs) }).eq("id", selected.id);
+      } else {
+        await modifyFn({ data: { id: selected.gmail_id, trash: true } });
+      }
       toast.success("OK");
       await loadList(folder);
       setSelectedId(null); setFull(null);
@@ -298,13 +308,15 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     if (!selected) return;
     const wasUnread = selected.is_unread;
     try {
-      await modifyFn({
-        data: {
-          id: selected.gmail_id,
-          addLabelIds: wasUnread ? [] : ["UNREAD"],
-          removeLabelIds: wasUnread ? ["UNREAD"] : [],
-        },
-      });
+      if (!isSeedId(selected.gmail_id)) {
+        await modifyFn({
+          data: {
+            id: selected.gmail_id,
+            addLabelIds: wasUnread ? [] : ["UNREAD"],
+            removeLabelIds: wasUnread ? ["UNREAD"] : [],
+          },
+        });
+      }
       await supabase.from("emails").update({ is_unread: !wasUnread }).eq("id", selected.id);
       setEmails((prev) => prev.map((e) => (e.id === selected.id ? { ...e, is_unread: !wasUnread } : e)));
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }

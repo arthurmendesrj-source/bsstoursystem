@@ -24,7 +24,9 @@ import {
   ChevronDown,
   BarChart3,
   LayoutGrid,
+  Sparkles,
 } from "lucide-react";
+import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { useAuth } from "@/lib/auth";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";

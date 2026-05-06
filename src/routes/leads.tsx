@@ -47,6 +47,8 @@ const STATUSES = ["novo", "qualificado", "cotacao", "proposta", "fechado", "perd
 function LeadsPage() {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { viewAs, readOnly } = useViewAs();
+  const targetUserId = viewAs?.user_id ?? null;
   const { format } = useCurrency();
   const { can } = usePermissions();
   const { subordinates } = useSubordinates();
@@ -56,11 +58,13 @@ function LeadsPage() {
   const [form, setForm] = useState({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
 
   const load = async () => {
-    const { data } = await supabase.from("leads").select("*").order("created_at", { ascending: false });
+    let q = supabase.from("leads").select("*").order("created_at", { ascending: false });
+    if (targetUserId) q = q.eq("assigned_to", targetUserId);
+    const { data } = await q;
     setLeads((data as Lead[]) ?? []);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -13,7 +13,9 @@ type ViewAsCtx = {
   exitViewAs: () => void;
   /** Returns the user id whose data should be shown (impersonated id or your own). */
   effectiveUserId: () => string | undefined;
-  /** True while impersonating — UI must stay read-only except admin-level actions. */
+  /** True while impersonating — UI shows banner; ações ainda permitidas (modo espelho). */
+  isImpersonating: boolean;
+  /** Deprecated: mantido por compat — sempre false no modo espelho. */
   readOnly: boolean;
 };
 
@@ -35,7 +37,6 @@ export function ViewAsProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  // Clear if the logged-in user can no longer impersonate, or is impersonating themselves.
   useEffect(() => {
     if (!user) {
       setViewAs(null);
@@ -68,7 +69,8 @@ export function ViewAsProvider({ children }: { children: ReactNode }) {
         enterViewAs,
         exitViewAs,
         effectiveUserId,
-        readOnly: !!viewAs,
+        isImpersonating: !!viewAs,
+        readOnly: false,
       }}
     >
       {children}
@@ -80,4 +82,16 @@ export function useViewAs() {
   const ctx = useContext(Ctx);
   if (!ctx) throw new Error("useViewAs must be used within ViewAsProvider");
   return ctx;
+}
+
+/** Hook ergonômico: devolve o id efetivo (alvo da impersonação ou usuário logado). */
+export function useEffectiveUser() {
+  const { user } = useAuth();
+  const { viewAs } = useViewAs();
+  return {
+    id: viewAs?.user_id ?? user?.id,
+    isImpersonating: !!viewAs,
+    target: viewAs,
+    realUserId: user?.id,
+  };
 }

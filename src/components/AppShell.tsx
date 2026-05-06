@@ -24,7 +24,7 @@ import {
   BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { useViewAs } from "@/lib/viewAs";
+import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

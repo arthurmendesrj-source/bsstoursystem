@@ -6,6 +6,7 @@ import { PermissionsProvider } from "@/lib/permissions";
 import { I18nProvider } from "@/lib/i18n";
 import { CurrencyProvider } from "@/lib/currency";
 import { Toaster } from "@/components/ui/sonner";
+import { PermissionFieldHighlighter } from "@/components/PermissionFieldHighlighter";
 
 function NotFoundComponent() {
   return (
@@ -62,6 +63,7 @@ function RootComponent() {
         <AuthProvider>
           <PermissionsProvider>
             <Outlet />
+            <PermissionFieldHighlighter />
             <Toaster />
           </PermissionsProvider>
         </AuthProvider>

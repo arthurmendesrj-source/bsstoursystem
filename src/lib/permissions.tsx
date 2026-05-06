@@ -97,5 +97,10 @@ export function MaskedField({
   module, field, value, mask = "•••",
 }: { module: ModuleKey | string; field: string; value: ReactNode; mask?: ReactNode }) {
   const { canField } = usePermissions();
-  return <>{canField(module, field, "view") ? value : mask}</>;
+  const visible = canField(module, field, "view");
+  return (
+    <span data-perm-field={`${module}.${field}`} data-perm-masked={visible ? "0" : "1"}>
+      {visible ? value : mask}
+    </span>
+  );
 }

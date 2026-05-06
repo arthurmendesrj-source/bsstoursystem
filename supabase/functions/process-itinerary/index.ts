@@ -86,12 +86,13 @@ async function extractMetadata(apiKey: string, text: string) {
   return JSON.parse(args);
 }
 
-async function embedBatch(apiKey: string, inputs: string[]): Promise<number[][]> {
+async function embedBatch(apiKey: string, inputs: string[]): Promise<number[][] | null> {
   const resp = await fetch(EMBED_URL, {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: EMBED_MODEL, input: inputs }),
   });
+  if (resp.status === 404) return null; // embeddings not available -> skip semantic indexing
   if (!resp.ok) throw new Error(`embed ${resp.status}: ${await resp.text()}`);
   const data = await resp.json();
   return data.data.map((d: any) => d.embedding);

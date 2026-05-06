@@ -231,16 +231,48 @@ function ItinerariesPage() {
       return;
     }
 
-    const newJobs: UploadJob[] = valid.map((f) => ({
+    // ---- Detectar duplicados (mesmo nome + tamanho) ----
+    const { data: existing } = await supabase
+      .from("itineraries")
+      .select("original_filename,file_size_bytes")
+      .eq("created_by", user.id);
+    const existingKeys = new Set(
+      (existing ?? []).map((r) => `${r.original_filename}::${r.file_size_bytes ?? ""}`),
+    );
+    const seenInBatch = new Set<string>();
+    const unique: File[] = [];
+    const duplicates: File[] = [];
+    for (const f of valid) {
+      const key = `${f.name}::${f.size}`;
+      if (existingKeys.has(key) || seenInBatch.has(key)) {
+        duplicates.push(f);
+      } else {
+        seenInBatch.add(key);
+        unique.push(f);
+      }
+    }
+    if (duplicates.length > 0) {
+      toast.warning(`${duplicates.length} arquivo(s) duplicado(s) ignorado(s)`);
+    }
+    if (unique.length === 0) return;
+
+    const dupJobs: UploadJob[] = duplicates.map((f) => ({
+      id: crypto.randomUUID(),
+      filename: f.name,
+      size: f.size,
+      status: "failed",
+      error: "Já existe — duplicado ignorado",
+    }));
+    const newJobs: UploadJob[] = unique.map((f) => ({
       id: crypto.randomUUID(),
       filename: f.name,
       size: f.size,
       status: "queued",
     }));
-    setJobs((prev) => [...newJobs, ...prev]);
+    setJobs((prev) => [...dupJobs, ...newJobs, ...prev]);
 
     // Concurrency 2 (process-itinerary is memory-heavy)
-    const queue = valid.map((f, idx) => ({ file: f, jobId: newJobs[idx].id }));
+    const queue = unique.map((f, idx) => ({ file: f, jobId: newJobs[idx].id }));
     const CONCURRENCY = 2;
     const workers = Array.from({ length: CONCURRENCY }, async () => {
       while (queue.length) {
@@ -305,7 +337,8 @@ function ItinerariesPage() {
         .catch((err) => console.warn("process-itinerary kickoff failed", err));
     } catch (e: any) {
       let msg = e?.message ?? String(e);
-      if (/memory limit/i.test(msg)) msg = "Documento muito grande — tente dividir";
+      if (/duplicate key|itineraries_unique_per_user/i.test(msg)) msg = "Já existe — duplicado ignorado";
+      else if (/memory limit/i.test(msg)) msg = "Documento muito grande — tente dividir";
       if (msg.length > 140) msg = msg.slice(0, 140) + "…";
       updateJob(jobId, { status: "failed", error: msg });
     }

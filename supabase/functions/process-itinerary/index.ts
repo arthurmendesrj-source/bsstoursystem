@@ -150,13 +150,16 @@ Deno.serve(async (req) => {
     // 3. Metadata (uses only first 12k chars)
     const meta = await extractMetadata(LOVABLE_API_KEY, text);
 
-    // 4+5. Chunk, embed and insert in small streamed batches to keep memory low
+    // 4+5. Chunk, embed and insert in small streamed batches to keep memory low.
+    // If embeddings endpoint is unavailable (404), skip semantic indexing — text search still works.
     await supabase.from("itinerary_chunks").delete().eq("itinerary_id", itineraryId);
     const chunks = chunkText(text);
+    let embeddingsAvailable = true;
     let pendingRows: Array<{ itinerary_id: string; chunk_index: number; content: string; embedding: any }> = [];
-    for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
+    for (let i = 0; i < chunks.length && embeddingsAvailable; i += EMBED_BATCH) {
       const batch = chunks.slice(i, i + EMBED_BATCH);
       const embs = await embedBatch(LOVABLE_API_KEY, batch);
+      if (embs === null) { embeddingsAvailable = false; break; }
       for (let j = 0; j < batch.length; j++) {
         pendingRows.push({
           itinerary_id: itineraryId!,
@@ -175,6 +178,9 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from("itinerary_chunks").insert(pendingRows);
       if (error) throw new Error(`chunks: ${error.message}`);
       pendingRows = [];
+    }
+    if (!embeddingsAvailable) {
+      console.warn("embeddings endpoint unavailable; saved metadata only (no semantic search for this doc)");
     }
 
     await supabase.from("itineraries").update({

@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n, type TKey } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { Can, MaskedField, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 

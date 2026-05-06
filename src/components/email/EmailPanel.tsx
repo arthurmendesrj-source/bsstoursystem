@@ -486,7 +486,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
           status: leadForm.status as "novo",
           customer_id: cId,
           created_by: user.id,
-          assigned_to: user.id,
+          assigned_to: leadForm.assigned_to || user.id,
         })
         .select("id").single();
       if (lErr) throw lErr;

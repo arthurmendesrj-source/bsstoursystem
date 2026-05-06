@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, type AppRole } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useSubordinates } from "@/lib/hierarchy";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";

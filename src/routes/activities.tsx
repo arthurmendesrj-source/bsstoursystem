@@ -57,6 +57,7 @@ type LeadLite = { id: string; code: string | null; name: string; destination?: s
 function ActivitiesPage() {
   const { t } = useI18n();
   const { user, isAdmin } = useAuth();
+  const { subordinates } = useSubordinates();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [leadsMap, setLeadsMap] = useState<Record<string, LeadLite>>({});
@@ -79,6 +80,7 @@ function ActivitiesPage() {
     priority: "media" as "baixa" | "media" | "alta",
     category: "suporte" as "negocio" | "suporte",
     lead_id: "",
+    assigned_to: "",
   });
   const [leadOptions, setLeadOptions] = useState<LeadLite[]>([]);
 

@@ -2084,6 +2084,72 @@ export type Database = {
           },
         ]
       }
+      user_field_permissions: {
+        Row: {
+          can_edit: boolean | null
+          can_view: boolean | null
+          field_key: string
+          id: string
+          module_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          field_key: string
+          id?: string
+          module_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          field_key?: string
+          id?: string
+          module_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_module_permissions: {
+        Row: {
+          can_approve: boolean | null
+          can_create: boolean | null
+          can_delete: boolean | null
+          can_edit: boolean | null
+          can_view: boolean | null
+          id: string
+          module_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_approve?: boolean | null
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          id?: string
+          module_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_approve?: boolean | null
+          can_create?: boolean | null
+          can_delete?: boolean | null
+          can_edit?: boolean | null
+          can_view?: boolean | null
+          id?: string
+          module_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2249,6 +2315,15 @@ export type Database = {
       generate_entity_code: {
         Args: { _entity: string; _user_id: string }
         Returns: string
+      }
+      has_field_permission: {
+        Args: {
+          _action: string
+          _field: string
+          _module: string
+          _user_id: string
+        }
+        Returns: boolean
       }
       has_module_permission: {
         Args: { _action: string; _module: string; _user_id: string }

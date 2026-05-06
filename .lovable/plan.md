@@ -1,44 +1,40 @@
 ## Objetivo
+Ao clicar no nome de um usuário em `/users`, abrir a tela de **permissões daquele usuário específico**, permitindo configurar/editar o acesso individual (override sobre o que o papel já dá).
 
-Pré-configurar permissões por papel com perfil **conservador (mínimo)** e adicionar **edit-gating** na tela de Permissões: ninguém pode conceder a outros um acesso que ele próprio não tem (admin sem restrição).
+## Modelo de dados (override por usuário)
 
-## 1) Defaults conservadores (migration de dados)
+Hoje as permissões são só por papel (`role_module_permissions` + `role_field_permissions`). Vou adicionar duas novas tabelas de override individual:
 
-Aplicar via migration `INSERT … ON CONFLICT DO NOTHING` em `role_module_permissions` e `role_field_permissions` para os papéis `diretor`, `gerente`, `supervisor`, `operador`. `admin` é tratado em código (acesso total) — não precisa de linhas.
+- **`user_module_permissions`** — `user_id`, `module_key`, `can_view`, `can_create`, `can_edit`, `can_delete`, `can_approve`. Cada coluna booleana é nullable: `null` = "herda do papel", `true/false` = override explícito.
+- **`user_field_permissions`** — `user_id`, `module_key`, `field_key`, `can_view` (nullable), `can_edit` (nullable). Mesma lógica de herança.
 
-Por papel, em todos os módulos do catálogo (`leads, customers, quotes, bookings, suppliers, supplier_rates, supplier_documents, packages, itineraries, activities, emails, financial, sla, users`):
+RLS:
+- Admin gerencia tudo.
+- Usuário lê apenas as próprias linhas.
 
-- **diretor / gerente / supervisor / operador** → `can_view = true` apenas em: `leads, customers, quotes, bookings, suppliers, packages, itineraries, activities, emails`. Demais módulos e ações (`create/edit/delete/approve`) ficam `false`.
-- **financial, sla, users, supplier_rates, supplier_documents** → tudo `false` para não-admin.
+Função SQL `has_module_permission` será atualizada para considerar override individual primeiro; se `null`, cai no papel; admin sempre passa.
 
-Campos sensíveis (`role_field_permissions`) — para todos os papéis não-admin, em todos os campos catalogados em `permission_modules.sensitive_fields` (custo, markup, comissão, descontos, total, unit_price, etc.):
-- `can_view = false`, `can_edit = false` → tudo mascarado por padrão.
+## Mudanças no frontend
 
-Resultado: papéis novos enxergam o básico, sem nada financeiro/sensível, sem poder criar/editar. Admin libera manualmente conforme necessário.
-
-## 2) Edit-gating na tela de Permissões (`src/routes/settings.permissions.tsx`)
-
-Hoje só admin abre a tela. Vamos manter, mas preparar para o futuro (quando outros papéis tiverem `users.edit`):
-
-- Carregar as permissões do **usuário atual** via `usePermissions()` (`can`, `canField`).
-- Para cada checkbox **de módulo** (`role × módulo × ação`): `disabled` se `!can(módulo, ação)` (admin sempre pode).
-- Para cada checkbox **de campo sensível** (`role × módulo × campo × view|edit`): `disabled` se `!canField(módulo, campo, "view"|"edit")`.
-- Linha do `admin` continua sempre desabilitada (não editável).
-- Tooltip nos checkboxes desabilitados: "Você não pode conceder um acesso que não possui."
-- No `save()`, defesa em profundidade: filtrar do payload qualquer linha que viole a regra antes do upsert (evita burlar via DevTools — RLS de admin já protege hoje, mas mantemos consistência quando abrirmos a tela a outros papéis).
-
-## 3) Indicador visual
-
-Adicionar uma legenda no topo da aba "Por módulo" e "Campos sensíveis":
-> "Checkboxes em cinza não podem ser alterados porque você não possui esse acesso."
-
-## Fora de escopo
-
-- Não atribuir papéis às 4 contas de simulação (você fará em `/users`).
-- Não mexer em RLS do banco — as policies já usam `has_module_permission` / `is_admin`.
-- Não alterar o catálogo `permission_modules`.
+1. **`/users`** — nome do usuário vira link → navega para `/users/$userId/permissions`.
+2. **Nova rota `/users/$userId/permissions`** (admin-only):
+   - Header: nome + papéis atuais do usuário.
+   - Aba "Por módulo" e "Campos sensíveis", mesmo layout da matriz atual, mas com **3 estados** por checkbox:
+     - **Herdado do papel** (cinza/indeterminado, mostra valor calculado)
+     - **Permitir** (✓ override)
+     - **Bloquear** (✗ override)
+   - Botão "Resetar para o papel" por linha (apaga override).
+   - Mesma lógica de **edit-gating**: o editor não pode conceder o que ele próprio não tem.
+3. **`src/lib/permissions.tsx`** — `PermissionsProvider` carrega também os overrides do usuário logado e aplica precedência: admin > override individual > papel.
 
 ## Detalhes técnicos
 
-- Migration: somente `INSERT … ON CONFLICT (role, module_key) DO NOTHING` e `INSERT … ON CONFLICT (role, module_key, field_key) DO NOTHING`. Não sobrescreve customizações que você já tenha feito.
-- Edit-gating é puramente client-side + filtro no save; a fonte de verdade da segurança continua sendo RLS + `has_module_permission` no Postgres.
+- Migration cria as 2 tabelas + RLS + atualiza `has_module_permission(user, module, action)` para checar `user_module_permissions` antes de `role_module_permissions`.
+- Nova função `has_field_permission(user, module, field, action)` (caso ainda não exista) com mesma lógica de precedência.
+- Componente `<GatedTriCheckbox>` substitui `<GatedCheckbox>` na nova rota; ciclo de clique: herdado → permitir → bloquear → herdado.
+- `/users` ganha `<Link to="/users/$userId/permissions">` no nome (ícone de engrenagem ao lado também).
+
+## Fora de escopo
+- Não muda `/settings/permissions` (continua sendo a matriz por papel = padrão).
+- Não muda papéis dos 4 usuários simulados — você continua atribuindo em `/users`.
+- Não cria UI de auditoria de overrides (já existe `/permissions-audit` que pode ser estendido depois).

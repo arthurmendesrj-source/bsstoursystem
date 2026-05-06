@@ -450,7 +450,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
                             <TableCell className="text-xs">{r.service_name}{r.category ? ` (${r.category})` : ""}</TableCell>
                             <TableCell className="text-xs">{r.city ?? "—"}</TableCell>
                             <TableCell className="text-xs">{r.pax_min ?? "—"}{r.pax_max ? `-${r.pax_max}` : ""}</TableCell>
-                            <TableCell className="text-right text-xs">{r.currency} {Number(r.unit_price).toFixed(2)}</TableCell>
+                            <TableCell className="text-right text-xs">{r.currency} <MaskedField module="supplier_rates" field="unit_price" value={Number(r.unit_price).toFixed(2)} /></TableCell>
                           </TableRow>
                         ))}
                       </TableBody></Table></div>}

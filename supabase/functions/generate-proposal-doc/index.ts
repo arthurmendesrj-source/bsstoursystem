@@ -218,6 +218,7 @@ const CONTENT_TOOL = {
       properties: {
         title: { type: "string" },
         subtitle: { type: "string" },
+        executive_summary: { type: "string", description: "Resumo executivo curto (2-4 frases) listando hotéis, voos e principais experiências vendidas." },
         intro: { type: "string", description: "Welcome paragraph (2-4 sentences)." },
         days: {
           type: "array",

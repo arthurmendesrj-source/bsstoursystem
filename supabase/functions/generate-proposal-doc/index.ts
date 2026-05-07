@@ -749,7 +749,8 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       }
     }
 
-    // Pricing
+    // Pricing (only on executive/combined)
+    if (isExecutive) {
     children.push(P(""));
     children.push(P(L.pricing, { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
 

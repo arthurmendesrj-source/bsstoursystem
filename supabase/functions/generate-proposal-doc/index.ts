@@ -1008,7 +1008,8 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       .trim()
       .replace(/\s+/g, "_")
       .slice(0, 60) || "proposal";
-    const fileName = `${safeTitle}_${Date.now()}.docx`;
+    const docPrefix = docType === "tour_program" ? "programa-turistico" : docType === "combined" ? "proposta-completa" : "proposta-executiva";
+    const fileName = `${docPrefix}_${safeTitle}_${Date.now()}.docx`;
     const path = `${userId}/${quoteId}/${fileName}`;
 
     const { error: upErr } = await admin.storage

@@ -570,6 +570,16 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
             </Button>
           </Can>
+          {mode === "proposal" && (
+            <Button size="sm" variant="secondary" onClick={proposeSendProposal} disabled={pricingSummary.blocks.length > 0}>
+              <Send className="h-4 w-4 mr-1" /> Propor envio
+            </Button>
+          )}
+          {mode === "proposal" && isClosed && (
+            <Button size="sm" variant="secondary" onClick={proposeCreateInvoice} disabled={pricingSummary.blocks.length > 0}>
+              <Receipt className="h-4 w-4 mr-1" /> Propor invoice
+            </Button>
+          )}
           {mode === "proposal" && quote.status !== "aprovada" && canApprove && (
             <Button size="sm" variant="default" onClick={approve}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}

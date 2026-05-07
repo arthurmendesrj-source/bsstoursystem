@@ -243,6 +243,9 @@ export function AiProgramAssistantDialog({
                             <div key={i} className="text-xs border rounded-md p-2">
                               <span className="font-medium">{f.from} → {f.to}</span>
                               {f.date && <span className="text-muted-foreground"> · {f.date}</span>}
+                              {((f as any).departure_time || (f as any).arrival_time) && (
+                                <span className="text-muted-foreground"> · {(f as any).departure_time ?? "—"}→{(f as any).arrival_time ?? "—"}</span>
+                              )}
                               {f.class && <Badge variant="outline" className="ml-2 text-[10px]">{f.class}</Badge>}
                             </div>
                           ))}

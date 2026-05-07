@@ -291,6 +291,28 @@ const CONTENT_TOOL = {
         inclusions: { type: "array", items: { type: "string" } },
         exclusions: { type: "array", items: { type: "string" } },
         notes: { type: "array", items: { type: "string" } },
+        tour_program: {
+          type: "object",
+          description: "Conteúdo promocional do programa turístico (sem preços). Preencher quando solicitado.",
+          properties: {
+            intro: { type: "string", description: "Parágrafo de abertura promocional do pacote (3-5 frases)." },
+            cities: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  country: { type: "string" },
+                  short_description: { type: "string" },
+                  highlights: { type: "array", items: { type: "string" } },
+                },
+                required: ["name", "short_description"],
+              },
+            },
+            inclusions_narrative: { type: "string", description: "Texto descritivo apresentando hotéis, voos e serviços de forma promocional, sem valores." },
+            closing: { type: "string", description: "Chamada final inspiracional convidando o cliente a embarcar." },
+          },
+        },
       },
       required: ["title", "intro", "inclusions", "exclusions"],
     },
@@ -368,12 +390,15 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const quoteId: string = body.quote_id;
+    const docType: "executive" | "tour_program" | "combined" = ["executive","tour_program","combined"].includes(body.doc_type) ? body.doc_type : "executive";
     const priceMode: PriceMode = body.price_mode ?? "detailed";
     const format: "docx" | "pdf" = body.format === "pdf" ? "pdf" : "docx";
     const lang: Lang = (body.language ?? "en") as Lang;
     const tone: string = body.tone ?? "inspirational";
     const includeItinerary: boolean = body.include_itinerary !== false;
     const includeSchedule: boolean = body.include_schedule !== false;
+    const includeCityHighlights: boolean = body.include_city_highlights !== false;
+    const includeItemDescriptions: boolean = body.include_item_descriptions !== false;
     const briefing: string = String(body.briefing ?? "").slice(0, 2000).trim();
     const L = LABELS[lang] ?? LABELS.en;
 
@@ -476,6 +501,14 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
               includeItinerary
                 ? "Include a detailed day-by-day narrative."
                 : "Skip the day-by-day; only return title, subtitle, intro, inclusions, exclusions, notes."
+            }\n\nDocument type requested: ${docType}.\n${
+              docType === "tour_program" || docType === "combined"
+                ? `Also fill the 'tour_program' object with: a promotional 'intro' (3-5 sentences), 'cities' array (one per distinct destination city with short_description${includeCityHighlights ? " and 3-5 highlights" : ""}), 'inclusions_narrative' (a flowing promotional paragraph${includeItemDescriptions ? " describing each hotel, flight and signature service" : ""} — DO NOT include any prices or monetary values), and a 'closing' inspirational call-to-action.`
+                : ""
+            }${
+              docType === "executive" || docType === "combined"
+                ? "\nAlso provide 'executive_summary' (2-4 sentences listing hotels, flights, main experiences sold)."
+                : ""
             }`,
           },
         ],
@@ -551,15 +584,59 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
     children.push(P(""));
     if (content.intro) children.push(P(content.intro, { size: 22 }));
 
-    // Executive summary (descritivo dos produtos vendidos)
-    if (content.executive_summary) {
+    const isExecutive = docType === "executive" || docType === "combined";
+    const isProgram = docType === "tour_program" || docType === "combined";
+
+    // ===== TOUR PROGRAM SECTION (promotional, no prices) =====
+    if (isProgram && content.tour_program && typeof content.tour_program === "object") {
+      const tp = content.tour_program;
+      children.push(P(""));
+      children.push(P("Programa Turístico", { bold: true, size: 32, heading: HeadingLevel.HEADING_1 }));
+      if (tp.intro) children.push(P(String(tp.intro), { size: 22 }));
+
+      if (Array.isArray(tp.cities) && tp.cities.length > 0) {
+        children.push(P(""));
+        children.push(P("Destinos", { bold: true, size: 26, heading: HeadingLevel.HEADING_2 }));
+        for (const c of tp.cities) {
+          const head = `${c.name ?? ""}${c.country ? ` — ${c.country}` : ""}`;
+          children.push(P(head, { bold: true, size: 24, heading: HeadingLevel.HEADING_3 }));
+          if (c.short_description) children.push(P(String(c.short_description), { size: 22 }));
+          if (includeCityHighlights && Array.isArray(c.highlights) && c.highlights.length > 0) {
+            for (const h of c.highlights) {
+              children.push(new Paragraph({
+                bullet: { level: 0 },
+                children: [new TextRun({ text: String(h), font: "Arial", size: 22 })],
+              }));
+            }
+          }
+          children.push(P(""));
+        }
+      }
+
+      if (includeItemDescriptions && tp.inclusions_narrative) {
+        children.push(P("O que está incluído na sua viagem", { bold: true, size: 26, heading: HeadingLevel.HEADING_2 }));
+        children.push(P(String(tp.inclusions_narrative), { size: 22 }));
+      }
+
+      if (tp.closing) {
+        children.push(P(""));
+        children.push(P(String(tp.closing), { size: 22 }));
+      }
+
+      if (docType === "combined") {
+        children.push(new Paragraph({ children: [new PageBreak()] }));
+      }
+    }
+
+    // Executive summary (descritivo dos produtos vendidos) - only for executive/combined
+    if (isExecutive && content.executive_summary) {
       children.push(P(""));
       children.push(P("Descritivo Executivo", { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
       children.push(P(String(content.executive_summary), { size: 22 }));
     }
 
     // Cronograma consolidado (datas + horários)
-    if (includeSchedule) {
+    if (isExecutive && includeSchedule) {
       // Build flat schedule from items + flights
       const { data: flightsRaw } = await admin
         .from("quote_flights")
@@ -672,7 +749,8 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       }
     }
 
-    // Pricing
+    // Pricing (only on executive/combined)
+    if (isExecutive) {
     children.push(P(""));
     children.push(P(L.pricing, { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
 
@@ -759,6 +837,7 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
         }),
       );
     }
+    } // end isExecutive pricing
 
     // Helpers for sub-blocks
     const bullet = (text: string) =>
@@ -929,7 +1008,8 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       .trim()
       .replace(/\s+/g, "_")
       .slice(0, 60) || "proposal";
-    const fileName = `${safeTitle}_${Date.now()}.docx`;
+    const docPrefix = docType === "tour_program" ? "programa-turistico" : docType === "combined" ? "proposta-completa" : "proposta-executiva";
+    const fileName = `${docPrefix}_${safeTitle}_${Date.now()}.docx`;
     const path = `${userId}/${quoteId}/${fileName}`;
 
     const { error: upErr } = await admin.storage

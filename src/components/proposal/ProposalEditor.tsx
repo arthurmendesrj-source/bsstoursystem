@@ -21,7 +21,7 @@ import {
   type ProposalItemKind,
 } from "@/lib/proposal-totals";
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
-import { ExecutiveProposalDialog } from "./ExecutiveProposalDialog";
+import { GenerateDocumentDialog } from "./GenerateDocumentDialog";
 import { AiProgramAssistantDialog } from "./AiProgramAssistantDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
@@ -560,7 +560,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             <Sparkles className="h-4 w-4 mr-1" /> Assistente IA
           </Button>
           <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-            <FileCheck className="h-4 w-4 mr-1" /> Gerar Proposta Executiva
+            <FileText className="h-4 w-4 mr-1" /> Gerar Documento
           </Button>
           <Can module="quotes" action="edit">
             <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
@@ -610,7 +610,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         />
       )}
 
-      <ExecutiveProposalDialog
+      <GenerateDocumentDialog
         quoteId={quoteId}
         open={genOpen}
         onOpenChange={setGenOpen}

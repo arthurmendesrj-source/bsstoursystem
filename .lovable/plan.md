@@ -1,154 +1,127 @@
-## Roteiro do vídeo demo — versão ampliada
+## Diagnóstico do vídeo atual
 
-### Regras de tempo
-- **Cada frame/screenshot = 3 segundos** (90 frames a 30fps)
-- **Cards de transição entre papéis** = 2s (60 frames)
-- IA destacada com chip animado **"⚡ IA"** + legenda em negrito iniciada com `IA:`
-- Todos os fluxos partem de **emails já existentes** na caixa de entrada (sem criar emails novos)
+Os PNGs foram analisados:
+- **Diretor**: nunca chegou a logar — todos os shots dele estão na tela `/login`. Por isso nenhum lead foi criado por ele.
+- **Gerente / Operador**: a sessão da Alexandra ficou "presa" — o re-login do Operador não trocou usuário (mesmo footer `alexandra.ermolaeva`).
+- **Coordenador**: travou em "Carregando…".
 
-### Cálculo total de duração
+Causa raiz: `capture.mjs` usa um único contexto de browser e não aguarda o login real concluir antes de seguir os shots. Além disso, o roteiro hoje **assume** dados que não existem (lead criado pelo diretor, lead aprovado pelo gerente etc.) — quando o passo anterior falha, o resto do roteiro vira lixo.
 
-| Bloco | Frames (shots) | Segundos |
-|---|---|---|
-| Card Diretor | — | 2 |
-| Diretor — Fluxo A (Atividade pessoal) | 6 | 18 |
-| Diretor — Fluxo B (Triagem → Lead p/ Gerente) | 7 | 21 |
-| Card Gerente | — | 2 |
-| Gerente — Fluxo A (continuar lead do Diretor → proposta aprovada) | 9 | 27 |
-| Gerente — Fluxo B (Triagem email pequeno → Lead p/ Operador) | 6 | 18 |
-| Card Operador | — | 2 |
-| Operador — Continuar lead do Gerente → proposta aprovada | 8 | 24 |
-| Card Coordenador | — | 2 |
-| Coordenador — Operação pós-aprovação (invoice, reserva, voucher, bíblia) | 9 | 27 |
-| **Total** | **45 shots + 4 cards** | **≈ 2 min 43 s** |
+## Reformulação completa
+
+### Princípios
+1. **Cada papel = contexto de browser isolado** (`browser.createBrowserContext()`), descartado ao fim. Zera cookies/localStorage entre papéis.
+2. **Login validado**: após submit, aguardar `location.pathname !== '/login'` **e** seletor estável da sidebar visível. Se falhar em 30s, **abortar tudo** com erro explícito (não seguir gerando frames-lixo).
+3. **Roteiro guiado por dados reais**:
+   - Antes de gravar, **ler de fato a inbox de cada usuário** via `supabase` (service role) com `WHERE recipient_user_id = ?`.
+   - Selecionar emails reais para cada fluxo. Se faltar email adequado para algum papel, **semear** 1 email `DEMO —` específico para aquele papel (script de seed roda antes do capture).
+4. **IDs encadeados**: o ID do lead criado pelo Diretor é capturado da URL (`/leads/$id`) e injetado no fluxo do Gerente. Mesmo para Gerente→Operador e leads aprovados→Coordenador.
+5. **Cada ação executada de fato** (não só "navegar e printar"): clicar botões reais (Triagem IA, Gerar orçamento IA, Preencher com IA, Gerar programa, Gerar invoice, Gerar Bíblia, Sugerir mensagem). Screenshot **após** a ação completar (toast de sucesso ou novo estado visível).
+6. **IA sempre que possível**: cada papel usa pelo menos 2 botões de IA reais. Onde o botão visual ainda não existe (Gerar invoice, Gerar Bíblia, Sugerir mensagem ao fornecedor, Gerar orçamento no header do lead, Gerar programa turístico no itinerário), adicionar **stubs visuais** que disparam ação real existente + toast "⚡ IA processou" — sem mudar regra de negócio.
 
 ---
 
-## 1. DIRETOR — Agrafena Svetlova (azul `#6366f1`)
+## Roteiro definitivo (encadeado por dados)
 
-### Fluxo A — Atividade pessoal (6 shots / 18s)
-Email já existente: tipo administrativo / interno (ex.: "Reunião de fechamento mensal").
+### Pré-flight (antes do capture)
+- `seed.mjs`:
+  1. Lê inbox de cada user. Para cada papel, garante 1 email pendente:
+     - **Diretor** (Agrafena): 1 email administrativo + 1 email de cotação grande (família, Portugal).
+     - **Gerente** (Alexandra): 1 email de cotação simples (bate-volta) — só será usado se ela ainda não tiver um email de cotação.
+  2. Verifica que existem fornecedores cadastrados (para a IA preencher proposta).
+  3. Sanity check: faz `signInWithPassword` em **headless node** com os 4 emails+`Sim@12345` antes de abrir browser. Se algum falhar, aborta com mensagem clara.
 
-| # | Tela | Ação | IA | Legenda |
-|---|---|---|---|---|
-| 1 | `/email` | Abre inbox | — | "Diretor abre a caixa de entrada" |
-| 2 | EmailPanel | Abre email administrativo | — | "Email interno selecionado" |
-| 3 | dialog Triagem | Aciona **Triagem IA** | ✅ | "**IA:** assunto interno, sugere criar atividade" |
-| 4 | form Atividade | Confirma — atividade auto-preenchida, atribuída a si mesmo | ✅ | "**IA:** atividade pré-preenchida" |
-| 5 | `/activities` | Executa a atividade (marca subitens) | — | "Diretor executa a atividade" |
-| 6 | activity card | Marca como **Concluída** | — | "Atividade finalizada" |
+### Diretor — Agrafena (azul `#6366f1`) — 13 shots
+**Fluxo A — Email interno → atividade pessoal (6)**
+1. `/login` → preencher → submit (não conta como shot)
+2. `/email` inbox visível
+3. abre email administrativo
+4. clica **Triagem IA** → diálogo aberto com classificação "interna/atividade" ⚡
+5. clica "Criar atividade" → form pré-preenchido pela IA ⚡
+6. salva atividade → toast sucesso
+7. `/activities` → atividade visível, marca como concluída
 
-### Fluxo B — Triagem de cotação → Lead para Gerente (7 shots / 21s)
-Email já existente: pedido de cotação (ex.: "Família Volkov — Portugal 6 dias").
+**Fluxo B — Email cotação → triagem → lead → atribui Gerente (7)**
+8. volta `/email`, abre email de cotação grande
+9. **Triagem IA** classifica como "cotação" ⚡
+10. clica "Criar Lead" → form pré-preenchido pela IA (cliente, destino, pax, datas, valor) ⚡
+11. seleciona Gerente Alexandra como assignee
+12. salva → **captura `leadId` da URL** (`/leads/{id}`)
+13. screenshot do lead recém-criado
 
-| # | Tela | Ação | IA | Legenda |
-|---|---|---|---|---|
-| 1 | `/email` | Volta à inbox | — | "Novo email de cliente" |
-| 2 | EmailPanel | Abre email de cotação | — | "Solicitação de cotação aberta" |
-| 3 | dialog Triagem | Aciona **Triagem IA** | ✅ | "**IA:** classifica como cotação" |
-| 4 | resultado IA | IA recomenda **Criar Lead** | ✅ | "**IA recomenda:** gerar Lead" |
-| 5 | form Lead | Lead pré-preenchido (cliente, destino, pax, datas, valor estimado) | ✅ | "**IA:** lead pré-preenchido" |
-| 6 | select assignee | Atribui ao **Gerente Alexandra** | — | "Atribuído à Gerente Alexandra" |
-| 7 | `/leads` | Lead criado e visível na fila | — | "Lead encaminhado" |
+### Gerente — Alexandra (verde `#10b981`) — 15 shots
+**Fluxo A — Continuar lead do Diretor (`leadId` capturado) (9)**
+14. login Alexandra → `/leads`
+15. abre lead criado pelo Diretor
+16. clica **Gerar orçamento com IA** ⚡ (stub: cria proposta vazia + toast)
+17. ProposalEditor aberto
+18. **Preencher com IA (DictateItemsPanel)** ⚡ — gera itens reais (hotel/transfer/tour)
+19. aba Itinerário → **Gerar programa turístico com IA** ⚡ (stub: chama edge `process-itinerary`)
+20. **GenerateDocDialog** → preview do PDF
+21. clica Enviar → status muda para "Enviada"
+22. marca lead como **Aprovada/Ganha**
 
----
+**Fluxo B — Triagem email simples → lead p/ Operador (6)**
+23. `/email` inbox
+24. abre email de cotação simples
+25. **Triagem IA** ⚡
+26. "Criar Lead" pré-preenchido (valor menor) ⚡
+27. atribui ao Operador Sergei → salva → captura novo `leadId`
+28. `/leads` confirmação
 
-## 2. GERENTE — Alexandra Ermolaeva (verde `#10b981`)
+### Operador — Sergei (laranja `#f59e0b`) — 8 shots
+29. login Sergei → `/leads`
+30. abre lead criado pelo Gerente (id capturado)
+31. **Gerar orçamento com IA** ⚡
+32. **Preencher com IA** ⚡
+33. **Gerar programa turístico com IA** ⚡
+34. GenerateDocDialog preview ⚡
+35. Enviar ao cliente
+36. marca como Aprovada
 
-### Fluxo A — Dar continuidade ao Lead do Diretor → Proposta aprovada (9 shots / 27s)
+### Coordenador — Mikhail (vermelho `#ef4444`) — 9 shots
+Atua sobre os 2 leads aprovados (Volkov + bate-volta).
+37. login Mikhail → `/bookings`
+38. abre booking #1 (Volkov)
+39. **Gerar invoice com IA** ⚡ (stub que abre dialog de invoice + toast)
+40. **Sugerir mensagem ao fornecedor com IA** ⚡ (stub via assistant)
+41. anexa vouchers (mock confirmado)
+42. **Gerar Bíblia da viagem com IA** ⚡ (chama `BibliaActivityDialog` real)
+43. fecha booking #1
+44. abre booking #2 → repete invoice+bíblia rápido ⚡
+45. lista `/bookings` com ambas "Pronta para viagem"
 
-| # | Tela | Ação | IA | Legenda |
-|---|---|---|---|---|
-| 1 | `/leads` | Abre lista, vê lead recebido | — | "Gerente recebe novo lead" |
-| 2 | `/leads/$id` | Abre o lead | — | "Analisa briefing do cliente" |
-| 3 | header do lead | Clica **Gerar orçamento com IA** | ✅ | "**IA:** monta orçamento base" |
-| 4 | ProposalEditor | Itens sugeridos pela IA (hotel, transfer, tours) | ✅ | "**IA:** itens sugeridos" |
-| 5 | DictateItemsPanel | Clica **Preencher proposta com IA** | ✅ | "**IA:** preenche fornecedores e valores" |
-| 6 | aba Itinerário | Clica **Gerar programa turístico com IA** | ✅ | "**IA:** programa dia-a-dia (6 dias)" |
-| 7 | GenerateDocDialog | Pré-visualiza PDF da proposta | ✅ | "Proposta finalizada" |
-| 8 | botão Enviar | Envia proposta ao cliente | — | "Proposta enviada" |
-| 9 | status | Marca como **Aprovada** (cliente aceitou) | — | "Cliente aprovou a proposta" |
-
-### Fluxo B — Triagem email pequeno → Lead para Operador (6 shots / 18s)
-Email já existente: cotação simples / valor menor (ex.: "Bate-volta São Paulo–Campos do Jordão, casal").
-
-| # | Tela | Ação | IA | Legenda |
-|---|---|---|---|---|
-| 1 | `/email` | Abre inbox | — | "Gerente abre inbox" |
-| 2 | EmailPanel | Abre email de cotação simples | — | "Pedido de baixo valor" |
-| 3 | dialog Triagem | **Triagem IA** | ✅ | "**IA:** cotação de baixo valor" |
-| 4 | form Lead | Lead pré-preenchido + valor estimado baixo | ✅ | "**IA:** lead simplificado" |
-| 5 | select assignee | Atribui ao **Operador Sergei** | — | "Encaminha ao Operador" |
-| 6 | `/leads` | Lead atribuído | — | "Lead direcionado ao Operador" |
-
----
-
-## 3. OPERADOR — Sergei Koroliov (laranja `#f59e0b`)
-
-### Fluxo único — Continuar lead do Gerente → Proposta aprovada (8 shots / 24s)
-
-| # | Tela | Ação | IA | Legenda |
-|---|---|---|---|---|
-| 1 | `/leads` | Abre lista, vê lead recebido | — | "Operador recebe lead simples" |
-| 2 | `/leads/$id` | Abre lead | — | "Analisa pedido" |
-| 3 | header | Clica **Gerar orçamento com IA** | ✅ | "**IA:** orçamento gerado" |
-| 4 | DictateItemsPanel | **Preencher proposta com IA** | ✅ | "**IA:** itens completos" |
-| 5 | aba Itinerário | **Gerar programa turístico com IA** | ✅ | "**IA:** programa montado" |
-| 6 | GenerateDocDialog | Preview PDF | ✅ | "Proposta pronta" |
-| 7 | Enviar | Envia ao cliente | — | "Proposta enviada" |
-| 8 | status | Marca **Aprovada** | — | "Aprovada pelo cliente" |
+**Total: 45 shots × 3s + 4 cards × 2s ≈ 2:23** (ajustável)
 
 ---
 
-## 4. COORDENADOR — Mikhail Kutuzov (vermelho `#ef4444`)
+## Implementação técnica
 
-### Fluxo único — Operação pós-aprovação dos 2 leads (9 shots / 27s)
-Atua sobre os **dois leads aprovados** (Gerente e Operador) — mostra o ciclo completo.
+### Arquivos a (re)escrever
+1. `/tmp/demo-runner/seed.mjs` — sanity de credenciais + seed de emails se necessário (usa `service_role`).
+2. `/tmp/demo-runner/flows.mjs` — roteiro com **placeholders** para IDs encadeados (`<DIRECTOR_LEAD_ID>`, `<MANAGER_LEAD_ID>`).
+3. `/tmp/demo-runner/capture.mjs` — reescrita completa:
+   - função `loginAs(email)` com waitForFunction de pathname e seletor sidebar
+   - contexto isolado por papel
+   - executa cliques reais e aguarda toast/seletor pós-ação
+   - extrai `leadId` da URL e injeta nos fluxos seguintes
+   - se qualquer login falhar → `process.exit(1)` (não gera vídeo lixo)
+4. `src/components/leads/AiBudgetButton.tsx`, `src/components/proposal/AiItineraryButton.tsx`, `src/components/booking/AiInvoiceButton.tsx`, `src/components/booking/AiBibliaButton.tsx`, `src/components/booking/AiSupplierMessageButton.tsx` — stubs visuais com chip "⚡ IA" que disparam ação real existente.
+5. `/tmp/remotion/src/MainVideo.tsx` — mantém estrutura atual; só recebe novo `frames.json`.
 
-| # | Tela | Ação | IA | Legenda |
-|---|---|---|---|---|
-| 1 | `/bookings` | Abre fila de aprovados | — | "Coordenador abre reservas aprovadas" |
-| 2 | booking #1 (Volkov) | Abre reserva | — | "Reserva da família Volkov" |
-| 3 | aba Invoice | Clica **Gerar invoice com IA** | ✅ | "**IA:** invoice gerado" |
-| 4 | aba Reserva fornecedor | **Sugerir mensagem ao fornecedor com IA** + envia | ✅ | "**IA:** redige pedido aos fornecedores" |
-| 5 | aba Vouchers | Anexa vouchers confirmados | — | "Vouchers anexados" |
-| 6 | aba Bíblia | Clica **Gerar Bíblia da viagem com IA** (programa + contatos + horários) | ✅ | "**IA:** Bíblia da viagem montada" |
-| 7 | botão Fechar reserva | Fecha booking #1 | — | "Reserva #1 finalizada" |
-| 8 | booking #2 (Campos do Jordão) | Repete invoice + voucher + bíblia (acelerado, 1 shot) | ✅ | "**IA:** segunda reserva concluída" |
-| 9 | `/bookings` (lista) | Ambas reservas com status "Pronta para viagem" | — | "Operação concluída — clientes prontos" |
+### Pipeline
+```
+seed.mjs  →  capture.mjs (45 PNGs + frames.json)  →  remotion render  →  /mnt/documents/demo-fluxo.mp4
+```
 
----
-
-## Destaques de IA no vídeo (chip "⚡ IA")
-1. Triagem de email (Diretor x2, Gerente x1)
-2. Atividade auto-preenchida (Diretor)
-3. Lead pré-preenchido (Diretor, Gerente)
-4. Orçamento base (Gerente, Operador)
-5. Preenchimento de proposta com fornecedores (Gerente, Operador)
-6. Programa turístico dia-a-dia (Gerente, Operador)
-7. Invoice (Coordenador)
-8. Mensagem ao fornecedor (Coordenador)
-9. Bíblia da viagem (Coordenador)
-
-→ **9 momentos de IA** ao longo do vídeo, cobrindo todo o ciclo comercial + operacional.
+### Salvaguardas
+- Verificação visual automática: comparar hash do PNG do `/login` com cada shot capturado; se algum shot `≥ shot 2` for igual ao login → abortar.
+- Rodar `seed.mjs` standalone primeiro para validar credenciais antes de gastar tempo no capture.
 
 ---
 
-## Pré-condições (já existem na base ou precisam ser semeadas)
-- ✅ 4 emails existentes na inbox do Diretor (administrativo + cotação Volkov) e Gerente (cotação simples). **Confirmar com você** se já há emails adequados — caso contrário, semeio 3 emails fictícios prefixados `DEMO —` antes da gravação.
-- Botões com IA já existentes: Triagem (`EmailPanel`), Gerar doc (`GenerateDocDialog`), Ditar itens (`DictateItemsPanel`).
-- Botões com IA que **podem precisar de stub visual** (apenas para a demo, sem alterar lógica): "Gerar orçamento com IA" no header do lead, "Gerar programa turístico com IA" na aba itinerário, "Gerar invoice com IA", "Gerar Bíblia com IA", "Sugerir mensagem ao fornecedor com IA". Posso adicionar esses botões como stubs que disparam ação real existente + um toast "IA processou" — sem mudar regra de negócio.
+## Confirmações antes de executar
 
-## Pipeline de produção (após aprovação deste roteiro)
-1. `flows.mjs` — declara os 45 shots literais acima (selectors, captions, aiBadge).
-2. `capture.mjs` (puppeteer-core + `/bin/chromium`) — loga cada papel com `Sim@12345`, percorre os shots, salva PNGs em `/tmp/demo/`.
-3. `MainVideo.tsx` (Remotion) — lê `frames.json`, renderiza cada shot por **90 frames** com Ken Burns, legenda e chip IA quando `aiBadge:true`; cards de transição de **60 frames** entre papéis.
-4. Render → `/mnt/documents/demo-fluxo.mp4` (1920×1080, 30fps, ~2:43).
-5. Cleanup SQL opcional para registros `DEMO —`.
-
----
-
-**Confirmações antes de codar**:
-1. Ok adicionar os botões-stub de IA listados acima (Gerar orçamento, programa, invoice, bíblia, mensagem fornecedor)?
-2. Ok semear emails `DEMO —` se não houver emails adequados na inbox?
-3. Mantém duração de **~2:43** (45 shots × 3s + cards) ou prefere mais curto/comprimido?
+1. Ok eu **adicionar os 5 botões-stub** de IA (Gerar orçamento, Programa, Invoice, Bíblia, Mensagem ao fornecedor) — sem alterar lógica de negócio?
+2. Ok **semear emails `DEMO —`** se a inbox real de algum usuário não tiver email adequado para o fluxo?
+3. Manter ~2:23 de duração ou prefere comprimir (ex.: 2s por shot = ~1:40)?

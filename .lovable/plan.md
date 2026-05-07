@@ -1,127 +1,192 @@
-## Diagnóstico do vídeo atual
+## Problema confirmado
 
-Os PNGs foram analisados:
-- **Diretor**: nunca chegou a logar — todos os shots dele estão na tela `/login`. Por isso nenhum lead foi criado por ele.
-- **Gerente / Operador**: a sessão da Alexandra ficou "presa" — o re-login do Operador não trocou usuário (mesmo footer `alexandra.ermolaeva`).
-- **Coordenador**: travou em "Carregando…".
+O vídeo atual não está instrutivo porque o script só navega para rotas e tira screenshot. Quando o roteiro tem várias etapas na mesma tela, por exemplo `/email` ou `/itineraries`, a imagem fica igual. Isso cria frames repetidos e não mostra o passo a passo real.
 
-Causa raiz: `capture.mjs` usa um único contexto de browser e não aguarda o login real concluir antes de seguir os shots. Além disso, o roteiro hoje **assume** dados que não existem (lead criado pelo diretor, lead aprovado pelo gerente etc.) — quando o passo anterior falha, o resto do roteiro vira lixo.
+## Objetivo
 
-## Reformulação completa
+Refazer a captura desde o início para que cada frame represente uma ação visual diferente e verificável:
 
-### Princípios
-1. **Cada papel = contexto de browser isolado** (`browser.createBrowserContext()`), descartado ao fim. Zera cookies/localStorage entre papéis.
-2. **Login validado**: após submit, aguardar `location.pathname !== '/login'` **e** seletor estável da sidebar visível. Se falhar em 30s, **abortar tudo** com erro explícito (não seguir gerando frames-lixo).
-3. **Roteiro guiado por dados reais**:
-   - Antes de gravar, **ler de fato a inbox de cada usuário** via `supabase` (service role) com `WHERE recipient_user_id = ?`.
-   - Selecionar emails reais para cada fluxo. Se faltar email adequado para algum papel, **semear** 1 email `DEMO —` específico para aquele papel (script de seed roda antes do capture).
-4. **IDs encadeados**: o ID do lead criado pelo Diretor é capturado da URL (`/leads/$id`) e injetado no fluxo do Gerente. Mesmo para Gerente→Operador e leads aprovados→Coordenador.
-5. **Cada ação executada de fato** (não só "navegar e printar"): clicar botões reais (Triagem IA, Gerar orçamento IA, Preencher com IA, Gerar programa, Gerar invoice, Gerar Bíblia, Sugerir mensagem). Screenshot **após** a ação completar (toast de sucesso ou novo estado visível).
-6. **IA sempre que possível**: cada papel usa pelo menos 2 botões de IA reais. Onde o botão visual ainda não existe (Gerar invoice, Gerar Bíblia, Sugerir mensagem ao fornecedor, Gerar orçamento no header do lead, Gerar programa turístico no itinerário), adicionar **stubs visuais** que disparam ação real existente + toast "⚡ IA processou" — sem mudar regra de negócio.
+- abrir email real da caixa de entrada;
+- acionar triagem por IA;
+- criar atividade ou lead a partir do email;
+- avançar lead entre Diretor, Gerente, Operador e Coordenador;
+- usar IA para orçamento, proposta, programa turístico, invoice, voucher/Bíblia e mensagens operacionais;
+- tirar screenshot somente depois de a tela mudar ou a ação aparecer concluída.
 
----
+## Plano de correção
 
-## Roteiro definitivo (encadeado por dados)
+### 1. Trocar captura por rota por captura por ação
 
-### Pré-flight (antes do capture)
-- `seed.mjs`:
-  1. Lê inbox de cada user. Para cada papel, garante 1 email pendente:
-     - **Diretor** (Agrafena): 1 email administrativo + 1 email de cotação grande (família, Portugal).
-     - **Gerente** (Alexandra): 1 email de cotação simples (bate-volta) — só será usado se ela ainda não tiver um email de cotação.
-  2. Verifica que existem fornecedores cadastrados (para a IA preencher proposta).
-  3. Sanity check: faz `signInWithPassword` em **headless node** com os 4 emails+`Sim@12345` antes de abrir browser. Se algum falhar, aborta com mensagem clara.
+Substituir o modelo atual:
 
-### Diretor — Agrafena (azul `#6366f1`) — 13 shots
-**Fluxo A — Email interno → atividade pessoal (6)**
-1. `/login` → preencher → submit (não conta como shot)
-2. `/email` inbox visível
-3. abre email administrativo
-4. clica **Triagem IA** → diálogo aberto com classificação "interna/atividade" ⚡
-5. clica "Criar atividade" → form pré-preenchido pela IA ⚡
-6. salva atividade → toast sucesso
-7. `/activities` → atividade visível, marca como concluída
-
-**Fluxo B — Email cotação → triagem → lead → atribui Gerente (7)**
-8. volta `/email`, abre email de cotação grande
-9. **Triagem IA** classifica como "cotação" ⚡
-10. clica "Criar Lead" → form pré-preenchido pela IA (cliente, destino, pax, datas, valor) ⚡
-11. seleciona Gerente Alexandra como assignee
-12. salva → **captura `leadId` da URL** (`/leads/{id}`)
-13. screenshot do lead recém-criado
-
-### Gerente — Alexandra (verde `#10b981`) — 15 shots
-**Fluxo A — Continuar lead do Diretor (`leadId` capturado) (9)**
-14. login Alexandra → `/leads`
-15. abre lead criado pelo Diretor
-16. clica **Gerar orçamento com IA** ⚡ (stub: cria proposta vazia + toast)
-17. ProposalEditor aberto
-18. **Preencher com IA (DictateItemsPanel)** ⚡ — gera itens reais (hotel/transfer/tour)
-19. aba Itinerário → **Gerar programa turístico com IA** ⚡ (stub: chama edge `process-itinerary`)
-20. **GenerateDocDialog** → preview do PDF
-21. clica Enviar → status muda para "Enviada"
-22. marca lead como **Aprovada/Ganha**
-
-**Fluxo B — Triagem email simples → lead p/ Operador (6)**
-23. `/email` inbox
-24. abre email de cotação simples
-25. **Triagem IA** ⚡
-26. "Criar Lead" pré-preenchido (valor menor) ⚡
-27. atribui ao Operador Sergei → salva → captura novo `leadId`
-28. `/leads` confirmação
-
-### Operador — Sergei (laranja `#f59e0b`) — 8 shots
-29. login Sergei → `/leads`
-30. abre lead criado pelo Gerente (id capturado)
-31. **Gerar orçamento com IA** ⚡
-32. **Preencher com IA** ⚡
-33. **Gerar programa turístico com IA** ⚡
-34. GenerateDocDialog preview ⚡
-35. Enviar ao cliente
-36. marca como Aprovada
-
-### Coordenador — Mikhail (vermelho `#ef4444`) — 9 shots
-Atua sobre os 2 leads aprovados (Volkov + bate-volta).
-37. login Mikhail → `/bookings`
-38. abre booking #1 (Volkov)
-39. **Gerar invoice com IA** ⚡ (stub que abre dialog de invoice + toast)
-40. **Sugerir mensagem ao fornecedor com IA** ⚡ (stub via assistant)
-41. anexa vouchers (mock confirmado)
-42. **Gerar Bíblia da viagem com IA** ⚡ (chama `BibliaActivityDialog` real)
-43. fecha booking #1
-44. abre booking #2 → repete invoice+bíblia rápido ⚡
-45. lista `/bookings` com ambas "Pronta para viagem"
-
-**Total: 45 shots × 3s + 4 cards × 2s ≈ 2:23** (ajustável)
-
----
-
-## Implementação técnica
-
-### Arquivos a (re)escrever
-1. `/tmp/demo-runner/seed.mjs` — sanity de credenciais + seed de emails se necessário (usa `service_role`).
-2. `/tmp/demo-runner/flows.mjs` — roteiro com **placeholders** para IDs encadeados (`<DIRECTOR_LEAD_ID>`, `<MANAGER_LEAD_ID>`).
-3. `/tmp/demo-runner/capture.mjs` — reescrita completa:
-   - função `loginAs(email)` com waitForFunction de pathname e seletor sidebar
-   - contexto isolado por papel
-   - executa cliques reais e aguarda toast/seletor pós-ação
-   - extrai `leadId` da URL e injeta nos fluxos seguintes
-   - se qualquer login falhar → `process.exit(1)` (não gera vídeo lixo)
-4. `src/components/leads/AiBudgetButton.tsx`, `src/components/proposal/AiItineraryButton.tsx`, `src/components/booking/AiInvoiceButton.tsx`, `src/components/booking/AiBibliaButton.tsx`, `src/components/booking/AiSupplierMessageButton.tsx` — stubs visuais com chip "⚡ IA" que disparam ação real existente.
-5. `/tmp/remotion/src/MainVideo.tsx` — mantém estrutura atual; só recebe novo `frames.json`.
-
-### Pipeline
-```
-seed.mjs  →  capture.mjs (45 PNGs + frames.json)  →  remotion render  →  /mnt/documents/demo-fluxo.mp4
+```text
+goto('/email') -> screenshot
+goto('/email') -> screenshot
+goto('/email') -> screenshot
 ```
 
-### Salvaguardas
-- Verificação visual automática: comparar hash do PNG do `/login` com cada shot capturado; se algum shot `≥ shot 2` for igual ao login → abortar.
-- Rodar `seed.mjs` standalone primeiro para validar credenciais antes de gastar tempo no capture.
+por um modelo de ações reais:
 
----
+```text
+abrir /email
+clicar no email correto
+aguardar painel/detalhe abrir
+screenshot
+clicar em Triagem IA
+aguardar resultado IA aparecer
+screenshot
+clicar em Criar Lead ou Criar Atividade
+aguardar formulário/modal preenchido
+screenshot
+salvar/atribuir
+aguardar confirmação
+screenshot
+```
 
-## Confirmações antes de executar
+### 2. Criar um executor de etapas com validação visual
 
-1. Ok eu **adicionar os 5 botões-stub** de IA (Gerar orçamento, Programa, Invoice, Bíblia, Mensagem ao fornecedor) — sem alterar lógica de negócio?
-2. Ok **semear emails `DEMO —`** se a inbox real de algum usuário não tiver email adequado para o fluxo?
-3. Manter ~2:23 de duração ou prefere comprimir (ex.: 2s por shot = ~1:40)?
+Cada etapa do roteiro terá:
+
+- usuário/role;
+- ação real a executar;
+- seletor ou texto esperado após a ação;
+- legenda do frame;
+- marcação se usou IA;
+- validação contra duplicata visual.
+
+Se uma etapa não mudar a tela, o script não deve aceitar a captura como válida. Ele deve tentar uma ação alternativa, como abrir detalhe, modal, aba, dropdown, scroll controlado ou destacar o elemento correto.
+
+### 3. Ler emails reais antes da gravação
+
+Antes de capturar, o script deve consultar os emails existentes por usuário e escolher os emails que vão dirigir o roteiro:
+
+- Diretor: email administrativo interno para criar atividade própria;
+- Diretor: email de solicitação de cotação para criar lead da Gerente;
+- Gerente: lead criado pelo Diretor;
+- Gerente: email de cotação menor para criar lead do Operador;
+- Operador: lead criado pela Gerente;
+- Coordenador: leads aprovados para executar parte operacional.
+
+Se algum email obrigatório não existir, o script deve parar e informar o que falta, ou criar um email demo claramente marcado como `DEMO`, se isso for aprovado no fluxo de implementação.
+
+### 4. Garantir isolamento e login por usuário
+
+Manter a parte que funcionou:
+
+- contexto de navegador separado para cada usuário;
+- sessão isolada por Diretor, Gerente, Operador e Coordenador;
+- validação de login antes da primeira captura;
+- abortar o usuário se cair na tela de login.
+
+### 5. Registrar o encadeamento real dos dados
+
+O roteiro deve guardar IDs criados durante a execução:
+
+```text
+Diretor cria Lead A -> Gerente abre Lead A
+Gerente aprova Lead A -> Coordenador opera Lead A
+Gerente cria Lead B -> Operador abre Lead B
+Operador aprova Lead B -> Coordenador opera Lead B
+```
+
+Isso evita um usuário abrir dados antigos ou errados.
+
+### 6. Usar IA de forma visível
+
+Para cada ponto de IA, a captura precisa mostrar algo concreto:
+
+- botão/ação de IA acionado;
+- estado de processamento;
+- resultado preenchido;
+- toast ou painel com resposta da IA.
+
+Se a UI atual não tiver estado visual suficiente, adicionar pequenos elementos de demonstração na própria tela, como painel “Resultado da IA”, preenchimento progressivo ou confirmação visível. Sem isso, o screenshot continuará parecendo igual.
+
+### 7. Controle de qualidade antes do vídeo
+
+Antes de renderizar o MP4:
+
+- gerar todas as capturas;
+- calcular hash/percepção visual das imagens;
+- listar frames duplicados;
+- reprovar automaticamente se houver duplicatas consecutivas relevantes;
+- gerar uma folha de conferência com miniaturas para você revisar;
+- só depois renderizar o vídeo final com 3 segundos por frame.
+
+## Roteiro instrutivo revisado
+
+### Diretor
+
+1. Entra no dashboard.
+2. Abre caixa de entrada.
+3. Abre email administrativo interno.
+4. Usa IA para triagem do email.
+5. IA cria/preenche atividade para o próprio Diretor.
+6. Diretor salva/conclui a atividade.
+7. Volta à caixa de entrada.
+8. Abre email de solicitação de cotação.
+9. Usa IA para triagem da cotação.
+10. IA extrai dados e recomenda criação de lead.
+11. Lead é criado/preenchido.
+12. Lead é atribuído à Gerente.
+13. Confirma encaminhamento.
+
+### Gerente
+
+14. Abre lead recebido do Diretor.
+15. Analisa briefing.
+16. Usa IA para gerar orçamento.
+17. IA sugere serviços, fornecedores e valores.
+18. IA monta programa turístico.
+19. Gerente revisa proposta.
+20. Proposta é enviada.
+21. Proposta é marcada como aprovada.
+22. Gerente abre inbox.
+23. Abre email de cotação de menor valor.
+24. Usa IA para triagem.
+25. IA cria lead simplificado.
+26. Gerente atribui lead ao Operador.
+27. Confirma encaminhamento.
+
+### Operador
+
+28. Abre lead recebido da Gerente.
+29. Analisa pedido.
+30. Usa IA para orçamento automático.
+31. IA completa itens e fornecedores.
+32. IA monta programa turístico.
+33. Operador revisa proposta.
+34. Envia proposta.
+35. Marca proposta como aprovada.
+
+### Coordenador
+
+36. Abre lista de operações/reservas aprovadas.
+37. Abre operação do lead aprovado da Gerente.
+38. Usa IA para gerar invoice.
+39. Gera/organiza reserva.
+40. Gera voucher.
+41. Usa IA para Bíblia da viagem.
+42. Usa IA para mensagem aos fornecedores.
+43. Finaliza primeira operação.
+44. Repete operação no lead aprovado pelo Operador.
+45. Confirma operação concluída.
+
+## Entregáveis da implementação
+
+- Script de captura refeito por ações reais.
+- Arquivo `frames.json` com as etapas e validações.
+- Capturas novas sem repetição relevante.
+- Folha de conferência com miniaturas para revisão antes do vídeo.
+- Depois da sua aprovação visual, renderização do vídeo final com 3 segundos por frame.
+
+## Critério de aceite
+
+O vídeo só será considerado pronto se:
+
+- cada usuário estiver logado corretamente;
+- cada etapa mostrar uma mudança visual clara;
+- as ações forem baseadas nos emails/leads reais;
+- as etapas com IA mostrarem resultado visível da IA;
+- não houver blocos de frames repetidos como no teste atual;
+- você puder revisar as capturas antes do MP4 final.

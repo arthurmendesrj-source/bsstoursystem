@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil, Send, Receipt, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil, Send, Receipt, AlertTriangle, ShieldCheck, Sparkles } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
 } from "@/lib/proposal-totals";
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocDialog } from "./GenerateDocDialog";
+import { AiProgramAssistantDialog } from "./AiProgramAssistantDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
 import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
@@ -96,6 +97,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [bankFee, setBankFee] = useState(0);
   const [dictating, setDictating] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
+  const [aiAssistOpen, setAiAssistOpen] = useState(false);
   const [docsRefresh, setDocsRefresh] = useState(0);
   const [flights, setFlights] = useState<FlightRow[]>([]);
   const [flightDialogOpen, setFlightDialogOpen] = useState(false);
@@ -554,8 +556,8 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               <Mic className="h-4 w-4 mr-1" /> {t("dictateItems")}
             </Button>
           </Can>
-          <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-            <FileText className="h-4 w-4 mr-1" /> {t("generateDocument")}
+          <Button variant="default" size="sm" onClick={() => setAiAssistOpen(true)} className="bg-gradient-to-r from-primary to-primary/80">
+            <Sparkles className="h-4 w-4 mr-1" /> Assistente IA
           </Button>
           <Can module="quotes" action="edit">
             <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
@@ -610,6 +612,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         open={genOpen}
         onOpenChange={setGenOpen}
         onGenerated={() => setDocsRefresh((n) => n + 1)}
+      />
+
+      <AiProgramAssistantDialog
+        leadId={leadId}
+        quoteId={quoteId}
+        open={aiAssistOpen}
+        onOpenChange={setAiAssistOpen}
+        onApplied={() => { void load(); onSaved?.(); }}
+        onOpenDoc={() => { setAiAssistOpen(false); setGenOpen(true); }}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border bg-muted/30">

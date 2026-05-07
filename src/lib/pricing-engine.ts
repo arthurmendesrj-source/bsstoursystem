@@ -100,7 +100,20 @@ export function requiredApprovalForDiscount(discountPct: number): ApprovalLevel 
   return "none";
 }
 
-export function summarizePricing(items: PricingBreakdown[]) {
+export type PricingSummary = {
+  cost: number;
+  markup: number;
+  taxes: number;
+  fees: number;
+  discount: number;
+  total: number;
+  marginAmount: number;
+  margin: number;
+  blocks: string[];
+  warnings: string[];
+};
+
+export function summarizePricing(items: PricingBreakdown[]): PricingSummary {
   const totals = items.reduce(
     (acc, it) => {
       acc.cost += it.costSubtotal;
@@ -116,7 +129,12 @@ export function summarizePricing(items: PricingBreakdown[]) {
   const marginAmount = totals.total - totals.cost - totals.taxes;
   const margin = totals.total > 0 ? marginAmount / totals.total : 0;
   return {
-    ...Object.fromEntries(Object.entries(totals).map(([k, v]) => [k, +v.toFixed(2)])),
+    cost: +totals.cost.toFixed(2),
+    markup: +totals.markup.toFixed(2),
+    taxes: +totals.taxes.toFixed(2),
+    fees: +totals.fees.toFixed(2),
+    discount: +totals.discount.toFixed(2),
+    total: +totals.total.toFixed(2),
     marginAmount: +marginAmount.toFixed(2),
     margin: +margin.toFixed(4),
     blocks: items.flatMap((i) => i.blocks),

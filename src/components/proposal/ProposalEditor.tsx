@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil } from "lucide-react";
+import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil, Send, Receipt, AlertTriangle, ShieldCheck } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { useI18n } from "@/lib/i18n";
 import { Can, usePermissions } from "@/lib/permissions";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
   computeTotals,
   diffNights,
@@ -25,6 +26,7 @@ import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
 import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
 import { HotelDialog, type HotelInitial } from "./HotelDialog";
+import { priceItem, summarizePricing, type PricingCategory } from "@/lib/pricing-engine";
 
 type Mode = "proposal" | "invoice";
 
@@ -226,6 +228,106 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const totals = useMemo(() => computeTotals(items, bankFee), [items, bankFee]);
   const ccy = quote?.currency ?? "USD";
+
+  const pricingSummary = useMemo(() => {
+    const breakdowns = items.map((it) => {
+      const cat: PricingCategory = it.kind === "hotel" ? "hotel" : "service";
+      return priceItem({
+        category: cat,
+        unit_cost: Number(it.unit_cost) || 0,
+        quantity: Number(it.quantity) || 0,
+        markup_pct: Number(it.markup_pct) || 0,
+      });
+    });
+    return summarizePricing(breakdowns);
+  }, [items]);
+
+  const enqueueAiAction = async (
+    action_type: "propose_send_proposal" | "propose_create_invoice",
+    payload: Record<string, unknown>,
+  ) => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) { toast.error("Sessão expirada"); return; }
+    // Reuse or create a "system" conversation for proposal actions
+    const sysTitle = "Sistema — Propostas";
+    let convId: string | null = null;
+    const { data: existing } = await supabase
+      .from("ai_conversations")
+      .select("id")
+      .eq("user_id", uid)
+      .eq("title", sysTitle)
+      .maybeSingle();
+    if (existing?.id) {
+      convId = existing.id;
+    } else {
+      const { data: created, error: cErr } = await supabase
+        .from("ai_conversations")
+        .insert({ user_id: uid, title: sysTitle })
+        .select("id")
+        .single();
+      if (cErr || !created) { toast.error(cErr?.message ?? "Erro ao criar conversa"); return; }
+      convId = created.id;
+    }
+    const { error } = await supabase.from("ai_pending_actions").insert([{
+      user_id: uid,
+      conversation_id: convId,
+      action_type,
+      payload: payload as never,
+      status: "pending",
+    }]);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Ação enfileirada no Inbox IA");
+  };
+
+  const proposeSendProposal = async () => {
+    if (!quote) return;
+    if (pricingSummary.blocks.length > 0) {
+      toast.error(`Bloqueado: ${pricingSummary.blocks[0]}`);
+      return;
+    }
+    await save();
+    await enqueueAiAction("propose_send_proposal", {
+      quote_id: quote.id,
+      lead_id: leadId,
+      lead_code: leadCode,
+      customer_id: customerId,
+      currency: quote.currency,
+      total: pricingSummary.total,
+      margin_pct: +(Number(pricingSummary.margin) * 100).toFixed(2),
+      items_count: items.length,
+      valid_until: quote.valid_until,
+      warnings: pricingSummary.warnings,
+    });
+  };
+
+  const proposeCreateInvoice = async () => {
+    if (!quote) return;
+    if (pricingSummary.blocks.length > 0) {
+      toast.error(`Bloqueado: ${pricingSummary.blocks[0]}`);
+      return;
+    }
+    await enqueueAiAction("propose_create_invoice", {
+      quote_id: quote.id,
+      lead_id: leadId,
+      customer_id: customerId,
+      currency: quote.currency,
+      subtotal: pricingSummary.cost + pricingSummary.markup,
+      fees: pricingSummary.fees + bankFee,
+      taxes: pricingSummary.taxes,
+      total: pricingSummary.total + bankFee,
+      items: items.map((it) => ({
+        kind: it.kind,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: lineUnitPrice(it.unit_cost, it.markup_pct),
+        total: lineSubtotal(it.unit_cost, it.markup_pct, it.quantity),
+        item_date: it.item_date,
+        check_out: it.check_out ?? null,
+      })),
+    });
+  };
+
 
   const updateItem = (idx: number, patch: Partial<ItemRow>) => {
     setItems((arr) =>
@@ -469,6 +571,16 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
             </Button>
           </Can>
+          {mode === "proposal" && (
+            <Button size="sm" variant="secondary" onClick={proposeSendProposal} disabled={pricingSummary.blocks.length > 0}>
+              <Send className="h-4 w-4 mr-1" /> Propor envio
+            </Button>
+          )}
+          {mode === "proposal" && isClosed && (
+            <Button size="sm" variant="secondary" onClick={proposeCreateInvoice} disabled={pricingSummary.blocks.length > 0}>
+              <Receipt className="h-4 w-4 mr-1" /> Propor invoice
+            </Button>
+          )}
           {mode === "proposal" && quote.status !== "aprovada" && canApprove && (
             <Button size="sm" variant="default" onClick={approve}>
               <CheckCircle2 className="h-4 w-4 mr-1" /> {t("approveProposal")}
@@ -657,6 +769,28 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onSaved={load}
       />
 
+
+      {!readOnly && viewMarkupTotals && (pricingSummary.blocks.length > 0 || pricingSummary.warnings.length > 0) && (
+        <div className={cn(
+          "rounded-md border p-3 space-y-1.5 text-sm",
+          pricingSummary.blocks.length > 0 ? "border-destructive/50 bg-destructive/5" : "border-amber-500/50 bg-amber-500/5"
+        )}>
+          <div className="flex items-center gap-2 font-medium">
+            {pricingSummary.blocks.length > 0 ? (
+              <><AlertTriangle className="h-4 w-4 text-destructive" /> Bloqueios de pricing</>
+            ) : (
+              <><ShieldCheck className="h-4 w-4 text-amber-600" /> Avisos de margem</>
+            )}
+            <Badge variant="outline" className="ml-auto">
+              Margem {(pricingSummary.margin * 100).toFixed(1)}%
+            </Badge>
+          </div>
+          <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+            {pricingSummary.blocks.map((b, i) => <li key={`b${i}`} className="text-destructive">{b}</li>)}
+            {pricingSummary.warnings.map((w, i) => <li key={`w${i}`}>{w}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div className="rounded-md border p-4 space-y-1.5 bg-muted/20">
         {!readOnly && viewCostFields && (

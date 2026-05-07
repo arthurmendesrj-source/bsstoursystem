@@ -90,7 +90,12 @@ export async function applyProgramToQuote(
       rooms: h.rooms || 1,
       item_date: h.check_in || null,
       check_out: h.check_out || null,
-      notes: h.notes || null,
+      notes: [
+        h.check_in_time || h.check_out_time
+          ? `Check-in ${h.check_in_time || "15:00"} · Check-out ${h.check_out_time || "11:00"}`
+          : null,
+        h.notes || null,
+      ].filter(Boolean).join(" · ") || null,
     });
     needCost++;
   }

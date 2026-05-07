@@ -228,6 +228,106 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const totals = useMemo(() => computeTotals(items, bankFee), [items, bankFee]);
   const ccy = quote?.currency ?? "USD";
 
+  const pricingSummary = useMemo(() => {
+    const breakdowns = items.map((it) => {
+      const cat: PricingCategory = it.kind === "hotel" ? "hotel" : "service";
+      return priceItem({
+        category: cat,
+        unit_cost: Number(it.unit_cost) || 0,
+        quantity: Number(it.quantity) || 0,
+        markup_pct: Number(it.markup_pct) || 0,
+      });
+    });
+    return summarizePricing(breakdowns);
+  }, [items]);
+
+  const enqueueAiAction = async (
+    action_type: "propose_send_proposal" | "propose_create_invoice",
+    payload: Record<string, unknown>,
+  ) => {
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) { toast.error("Sessão expirada"); return; }
+    // Reuse or create a "system" conversation for proposal actions
+    const sysTitle = "Sistema — Propostas";
+    let convId: string | null = null;
+    const { data: existing } = await supabase
+      .from("ai_conversations")
+      .select("id")
+      .eq("user_id", uid)
+      .eq("title", sysTitle)
+      .maybeSingle();
+    if (existing?.id) {
+      convId = existing.id;
+    } else {
+      const { data: created, error: cErr } = await supabase
+        .from("ai_conversations")
+        .insert({ user_id: uid, title: sysTitle })
+        .select("id")
+        .single();
+      if (cErr || !created) { toast.error(cErr?.message ?? "Erro ao criar conversa"); return; }
+      convId = created.id;
+    }
+    const { error } = await supabase.from("ai_pending_actions").insert({
+      user_id: uid,
+      conversation_id: convId,
+      action_type,
+      payload,
+      status: "pending",
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success("Ação enfileirada no Inbox IA");
+  };
+
+  const proposeSendProposal = async () => {
+    if (!quote) return;
+    if (pricingSummary.blocks.length > 0) {
+      toast.error(`Bloqueado: ${pricingSummary.blocks[0]}`);
+      return;
+    }
+    await save();
+    await enqueueAiAction("propose_send_proposal", {
+      quote_id: quote.id,
+      lead_id: leadId,
+      lead_code: leadCode,
+      customer_id: customerId,
+      currency: quote.currency,
+      total: pricingSummary.total,
+      margin_pct: +(Number(pricingSummary.margin) * 100).toFixed(2),
+      items_count: items.length,
+      valid_until: quote.valid_until,
+      warnings: pricingSummary.warnings,
+    });
+  };
+
+  const proposeCreateInvoice = async () => {
+    if (!quote) return;
+    if (pricingSummary.blocks.length > 0) {
+      toast.error(`Bloqueado: ${pricingSummary.blocks[0]}`);
+      return;
+    }
+    await enqueueAiAction("propose_create_invoice", {
+      quote_id: quote.id,
+      lead_id: leadId,
+      customer_id: customerId,
+      currency: quote.currency,
+      subtotal: pricingSummary.cost + pricingSummary.markup,
+      fees: pricingSummary.fees + bankFee,
+      taxes: pricingSummary.taxes,
+      total: pricingSummary.total + bankFee,
+      items: items.map((it) => ({
+        kind: it.kind,
+        description: it.description,
+        quantity: it.quantity,
+        unit_price: lineUnitPrice(it.unit_cost, it.markup_pct),
+        total: lineSubtotal(it.unit_cost, it.markup_pct, it.quantity),
+        item_date: it.item_date,
+        check_out: it.check_out ?? null,
+      })),
+    });
+  };
+
+
   const updateItem = (idx: number, patch: Partial<ItemRow>) => {
     setItems((arr) =>
       arr.map((it, i) => {

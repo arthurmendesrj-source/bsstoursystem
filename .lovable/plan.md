@@ -1,89 +1,96 @@
-# Assistente de IA na aba Proposta
 
-Substituir o botão **Gerar Documento** (atual `GenerateDocDialog`) por um **Assistente de IA de Programa Turístico** integrado ao editor de propostas. Ele lê todo o contexto do lead, propõe um programa completo e permite refinar via chat antes de aplicar à proposta.
+## Objetivo
 
-## 1. Novo componente: `AiProgramAssistantDialog.tsx`
+1. Quando a IA gera o programa, já trazer **datas concretas** (check-in/check-out de hotéis, datas de voos e horários por serviço) — derivadas do período do lead/quote.
+2. Renomear o botão **"Gerar .docx"** para **"Gerar Proposta Executiva"** e abrir um dialog com novas opções:
+   - Modo de preço: **Valor por item** (item a item + total) ou **Valor total** (somente total).
+   - Formato: **DOCX** ou **PDF**.
+   - Inclui descritivo curto dos produtos vendidos + cronograma com horários.
 
-Substitui o atual dialog. Layout em 2 colunas (desktop) / abas (mobile):
+## 1. Datas e horários no Programa IA
 
-**Esquerda — Contexto coletado (read-only, editável)**
-- Lead: nome, destino(s), datas, pax (adultos/crianças), orçamento, idioma, perfil (lua de mel/família/luxo/corporativo).
-- Últimas interações + e-mails (`interactions`, `gmail_messages` se existir) — últimos 20 itens resumidos pela IA.
-- Itens já adicionados na cotação atual.
-- Toggle "incluir e-mails", "incluir histórico", "incluir itinerários internos (RAG)".
+**`supabase/functions/propose-tour-program/index.ts`**
+- Carregar `lead.travel_start_date`/`travel_end_date` (ou `quote.valid_until`/datas dos itens existentes) e injetar no prompt como **âncora obrigatória**.
+- Atualizar o JSON Schema da tool `update_program`:
+  - `days[].date` → obrigatório (ISO `YYYY-MM-DD`).
+  - `days[].schedule[]` (novo): `[{ time: "HH:MM", title, description, kind: "transfer|tour|meal|free|hotel" }]`.
+  - `hotels[].check_in` / `check_out` → obrigatórios + `check_in_time` (default 15:00) e `check_out_time` (default 11:00).
+  - `flights[].date` + `departure_time` / `arrival_time`.
+  - `services[].date` + `start_time` / `end_time`.
+- Regra no system prompt: "Distribua as datas em sequência a partir de `travel_start_date`; check-out de um hotel = check-in do próximo; respeite duração total".
 
-**Direita — Chat com a IA**
-- Mensagem inicial automática: a IA gera um **Programa Turístico** com:
-  - Cronograma dia a dia (manhã/tarde/noite) com cidade.
-  - Lista de **hotéis** sugeridos (categoria, noites, observações).
-  - Lista de **voos** (trechos, classe sugerida).
-  - **Serviços/tours/transfers** por dia.
-  - **Resumo executivo** + observações.
-- Caixa de input para o usuário pedir alterações ("trocar hotel para 5★", "adicionar dia em Florença", "remover passeio X", "reduzir orçamento 15%", "traduzir em russo"…).
-- Cada turno da IA devolve o programa atualizado (JSON estruturado) + texto explicativo.
-- Botões no rodapé:
-  - **Aplicar à proposta** → converte itens estruturados (hotéis/voos/serviços) em `quote_items` usando os dialogs já existentes (`HotelDialog`/`FlightDialog`/`ServiceDialog` reaproveitam preços via supplier_rates / pricing-engine).
-  - **Gerar documento .docx** → mantém compatibilidade chamando `generate-proposal-doc` com o briefing consolidado.
-  - **Salvar conversa** → grava em `ai_conversations` (`title = "Programa — <lead>"`).
+**`src/lib/applyProgramToQuote.ts`**
+- Gravar `item_date` = check-in / data do voo / data do serviço; `check_out` = check-out do hotel.
+- Concatenar horários no `notes` ("Check-in 15:00 · Check-out 11:00", "Saída 09:00 — Retorno 17:00").
 
-## 2. Edge function: `propose-tour-program`
+**`src/components/proposal/AiProgramAssistantDialog.tsx`**
+- Mostrar datas e horários no preview (já renderiza `d.date` — adicionar `schedule[]`, hotel `check_in/out + horários`, flight horários).
 
-Nova função em `supabase/functions/propose-tour-program/index.ts`. Streaming SSE.
+## 2. Renomear botão e novo dialog "Proposta Executiva"
 
-Entrada:
-```ts
-{ lead_id, quote_id, messages: [{role,content}], options: { include_emails, include_interactions, include_rag, language, tone } }
+**`src/components/proposal/ProposalEditor.tsx`**
+- Trocar label do botão atual `genOpen` (`GenerateDocDialog`) por **"Gerar Proposta Executiva"** + ícone `FileCheck`.
+
+**Substituir `GenerateDocDialog.tsx` por `ExecutiveProposalDialog.tsx`** (mantém props: `quoteId`, `open`, `onOpenChange`, `onGenerated`):
+
+Campos no dialog:
+- **Modo de preço** (radio): `Valor por item` (default) | `Valor total`.
+- **Formato** (radio): `DOCX` (default) | `PDF`.
+- **Idioma**, **Tom**, **Briefing curto** (mantidos, mais compactos).
+- Toggle "Incluir cronograma detalhado" (default on).
+
+Botão "Gerar Proposta Executiva" → invoca `generate-proposal-doc` com `price_mode: "detailed" | "final"` e novo parâmetro `format: "docx" | "pdf"`.
+
+## 3. Backend — DOCX e PDF + Descritivo + Cronograma
+
+**`supabase/functions/generate-proposal-doc/index.ts`**
+
+Adições:
+- Novo parâmetro `format: "docx" | "pdf"` no body (default `docx`).
+- Nova seção no DOCX **antes da tabela de preços**: **"Descritivo Executivo"** — parágrafo curto (gerado pela IA, novo campo `executive_summary` na tool `build_proposal_content`) listando hotéis (cidade + categoria + noites), voos, principais tours.
+- **Cronograma consolidado**: tabela única `Data | Hora | Atividade | Local` montada a partir de `quote_items` (data, descrição, horários do `notes`) + `quote_flights`. Renderizada sempre, mesmo no modo `final`.
+- **`price_mode: "final"`** já existe — mantém só uma linha "Total". O modo `detailed` mostra item a item + total (já implementado).
+- **Geração de PDF** (quando `format === "pdf"`):
+  - Estratégia: gerar o `.docx` primeiro (mesmo conteúdo), depois converter para PDF usando **`docx-pdf` via REST?** Não há LibreOffice em Edge Functions.
+  - Decisão: usar **`pdf-lib` + `@pdfme/generator`?** Mais simples: re-renderizar o conteúdo direto em PDF com **`pdfkit`** (esm.sh) — duplica o builder.
+  - **Abordagem escolhida**: criar helper `buildContent(content, items, ...)` retornando uma estrutura intermediária (lista de blocos: heading, paragraph, table, bullet, pageBreak); dois renderers — `renderDocx(blocks)` (já existe) e novo `renderPdf(blocks)` usando **`pdf-lib`** (fontes Helvetica nativas, sem dependências binárias). Salva em storage com extensão correta e MIME `application/pdf`.
+
+**`quote_documents`** — campo `format` já é texto; aceita `"pdf"`. Sem migração.
+
+## 4. Detalhes técnicos
+
+```text
+ExecutiveProposalDialog
+  ├── price_mode: "detailed" | "final"
+  ├── format:     "docx" | "pdf"
+  └── invoke('generate-proposal-doc', { quote_id, price_mode, format, language, tone, briefing, include_itinerary:true, include_schedule:true })
+
+generate-proposal-doc
+  ├── AI tool agora retorna: executive_summary (string curta) + days[].schedule[] (já existe)
+  ├── buildBlocks(content, items, flights, totals) → Block[]
+  ├── if format=docx → renderDocx(blocks) → upload .docx
+  └── if format=pdf  → renderPdf(blocks)  → upload .pdf
 ```
 
-Pipeline:
-1. Carrega lead + cotação atual + interações + e-mails (server-side via service role).
-2. RAG opcional: chama `itinerary-search` com destino+perfil para trazer trechos de itinerários históricos.
-3. Monta system prompt com role "Arquiteto de Roteiros". Exige resposta em **tool call** `update_program` com schema:
-   ```
-   { summary, days: [{day,date,city,morning,afternoon,evening}],
-     hotels: [{city,name,category,nights,check_in,check_out,notes}],
-     flights: [{from,to,date,class,notes}],
-     services: [{day,kind,description,supplier_hint,duration}],
-     notes, language }
-   ```
-4. Modelo: `google/gemini-3-flash-preview` (default). Tool calling para garantir JSON estável; texto livre vai como `assistant_message`.
-5. Stream do texto + envio do JSON final em evento `program`. Trata 429/402.
+## Arquivos
 
-## 3. Persistência
+**Criar**
+- `src/components/proposal/ExecutiveProposalDialog.tsx`
+- `supabase/functions/generate-proposal-doc/render-pdf.ts` (helper `pdf-lib`)
+- `supabase/functions/generate-proposal-doc/blocks.ts` (estrutura intermediária + builder)
 
-- Reaproveitar `ai_conversations` + `ai_messages` (já existem). Adicionar coluna opcional `program_json jsonb` em `ai_messages` para guardar a versão do programa de cada turno (migration pequena).
-- Sem novas tabelas além disso.
+**Editar**
+- `supabase/functions/propose-tour-program/index.ts` — schema com datas/horários + prompt
+- `src/lib/applyProgramToQuote.ts` — persistir horários
+- `src/components/proposal/AiProgramAssistantDialog.tsx` — exibir horários
+- `src/components/proposal/ProposalEditor.tsx` — trocar `GenerateDocDialog` por `ExecutiveProposalDialog` + relabel
+- `supabase/functions/generate-proposal-doc/index.ts` — refactor para usar blocks + suportar `format: pdf` + descritivo executivo + cronograma consolidado
+- `src/lib/i18n.tsx` — chave `generateExecutiveProposal`
 
-## 4. Aplicação à proposta
+**Remover (após migração)**: `GenerateDocDialog.tsx`
 
-Função `applyProgramToQuote(program, quoteId)`:
-- Para cada `hotel` → cria `quote_items` tipo hotel (qtd = noites × quartos), tentando casar com `supplier_rates` via slug de cidade/categoria; se não achar, cria com custo 0 + flag "preencher".
-- Idem para `flights` (kind=flight) e `services`.
-- Aplica markup default via `pricing-engine` (`priceItem`).
-- Mostra resumo: "X hotéis, Y voos, Z serviços adicionados — N itens precisam de custo".
+## Pontos a confirmar
 
-## 5. ProposalEditor
-
-- Remover botão "Gerar Documento" como ação principal; vira item secundário dentro do assistente.
-- Novo botão primário: **🪄 Assistente IA** (ícone `Sparkles`) abre `AiProgramAssistantDialog`.
-- Mantém demais botões (Propor Envio, Propor Fatura).
-
-## 6. Arquivos
-
-Criar:
-- `src/components/proposal/AiProgramAssistantDialog.tsx`
-- `src/lib/applyProgramToQuote.ts`
-- `supabase/functions/propose-tour-program/index.ts`
-
-Editar:
-- `src/components/proposal/ProposalEditor.tsx` (trocar botão + dialog).
-- `src/lib/i18n.tsx` (chaves novas: `aiAssistant`, `aiAssistantTitle`, `applyToProposal`, etc.).
-
-Migration:
-- `ALTER TABLE ai_messages ADD COLUMN program_json jsonb;`
-
-Manter `GenerateDocDialog.tsx` como secundário (acessível dentro do assistente) para não quebrar o fluxo .docx.
-
-## Perguntas abertas
-1. O assistente deve **substituir** os itens existentes da cotação ao aplicar, ou **adicionar** ao final? (proposta: adicionar; usuário confirma "limpar antes" via checkbox)
-2. Idioma da resposta inicial: detectar do lead ou sempre PT-BR? (proposta: usar `lead.language` se existir, senão PT-BR)
+1. **Datas do lead**: posso usar `lead.travel_start_date` e `travel_end_date` como âncora? Se o lead não tiver, perguntar à IA estimar a partir do número de noites/dias?
+2. **Horários default**: check-in 15:00 / check-out 11:00 / tours 09:00 — OK?
+3. **PDF**: tudo bem usar layout simples (Helvetica, sem cores de marca) para o PDF na primeira versão? Posso depois evoluir para visual mais elaborado.

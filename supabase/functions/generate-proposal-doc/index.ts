@@ -390,12 +390,15 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     const quoteId: string = body.quote_id;
+    const docType: "executive" | "tour_program" | "combined" = ["executive","tour_program","combined"].includes(body.doc_type) ? body.doc_type : "executive";
     const priceMode: PriceMode = body.price_mode ?? "detailed";
     const format: "docx" | "pdf" = body.format === "pdf" ? "pdf" : "docx";
     const lang: Lang = (body.language ?? "en") as Lang;
     const tone: string = body.tone ?? "inspirational";
     const includeItinerary: boolean = body.include_itinerary !== false;
     const includeSchedule: boolean = body.include_schedule !== false;
+    const includeCityHighlights: boolean = body.include_city_highlights !== false;
+    const includeItemDescriptions: boolean = body.include_item_descriptions !== false;
     const briefing: string = String(body.briefing ?? "").slice(0, 2000).trim();
     const L = LABELS[lang] ?? LABELS.en;
 

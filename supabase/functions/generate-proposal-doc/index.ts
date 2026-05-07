@@ -566,30 +566,90 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
         .select("flight_date, departure_time, arrival_time, from_code, to_code, flight_number")
         .eq("quote_id", quoteId)
         .order("flight_date", { ascending: true });
-      type SchedRow = { date: string; time: string; activity: string; place: string };
+
+      type SchedRow = {
+        date: string;
+        time: string;     // HH:MM, "" sorts first within day
+        sortKey: number;  // tie-breaker: check-in/flight-arrival come before tours, check-out last
+        activity: string;
+        place: string;
+      };
       const sched: SchedRow[] = [];
+
+      // Helpers: extract stored times from the structured notes
+      // applyProgramToQuote writes:
+      //   hotel:   "Check-in HH:MM · Check-out HH:MM[ · ...]"
+      //   flight:  "Saída HH:MM → Chegada HH:MM[ · ...]"
+      //   service: "HH:MM[–HH:MM][ · Duração: ...]"
+      const HHMM = /([01]?\d|2[0-3]):([0-5]\d)/;
+      const norm = (m: RegExpMatchArray | null) =>
+        m ? `${m[1].padStart(2, "0")}:${m[2]}` : "";
+      const extractHotelTimes = (notes: string | null) => {
+        const s = String(notes ?? "");
+        const ci = s.match(/Check-?in\s+([01]?\d|2[0-3]):([0-5]\d)/i);
+        const co = s.match(/Check-?out\s+([01]?\d|2[0-3]):([0-5]\d)/i);
+        return { checkIn: norm(ci) || "15:00", checkOut: norm(co) || "11:00" };
+      };
+      const extractServiceStart = (notes: string | null) => {
+        const s = String(notes ?? "");
+        // First HH:MM token (start time)
+        const m = s.match(HHMM);
+        return norm(m);
+      };
+
       for (const it of items) {
-        if (!it.item_date) continue;
-        const timeMatch = String(it.notes ?? "").match(/(\d{1,2}:\d{2})/);
-        sched.push({
-          date: String(it.item_date),
-          time: it.kind === "hotel" ? "15:00" : timeMatch?.[1] ?? "—",
-          activity: it.kind === "hotel" ? `Check-in ${it.description}` : it.description,
-          place: it.city ?? "—",
-        });
-        if (it.kind === "hotel" && it.check_out) {
-          sched.push({ date: String(it.check_out), time: "11:00", activity: `Check-out ${it.description}`, place: it.city ?? "—" });
+        if (it.kind === "hotel") {
+          const { checkIn, checkOut } = extractHotelTimes(it.notes);
+          if (it.item_date) {
+            sched.push({
+              date: String(it.item_date),
+              time: checkIn,
+              sortKey: 0, // check-in first when arriving
+              activity: `Check-in ${it.description}`,
+              place: it.city ?? "—",
+            });
+          }
+          if (it.check_out) {
+            sched.push({
+              date: String(it.check_out),
+              time: checkOut,
+              sortKey: 9, // check-out last on its day
+              activity: `Check-out ${it.description}`,
+              place: it.city ?? "—",
+            });
+          }
+        } else {
+          if (!it.item_date) continue;
+          const t = extractServiceStart(it.notes);
+          sched.push({
+            date: String(it.item_date),
+            time: t || "—",
+            sortKey: 5,
+            activity: it.description,
+            place: it.city ?? "—",
+          });
         }
       }
       for (const f of flightsRaw ?? []) {
+        const dep = String(f.departure_time ?? "").slice(0, 5);
         sched.push({
           date: String(f.flight_date),
-          time: String(f.departure_time ?? "—").slice(0, 5),
-          activity: `Voo ${f.flight_number ?? ""} ${f.from_code} → ${f.to_code}`.trim(),
+          time: dep || "—",
+          sortKey: 1, // flights before ground services
+          activity: `Voo ${f.flight_number ?? ""} ${f.from_code} → ${f.to_code}${
+            f.arrival_time ? ` (chegada ${String(f.arrival_time).slice(0, 5)})` : ""
+          }`.trim(),
           place: f.from_code,
         });
       }
-      sched.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      sched.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        // Unknown times ("—") go to the end of the day
+        const at = a.time === "—" ? "99:99" : a.time;
+        const bt = b.time === "—" ? "99:99" : b.time;
+        if (at !== bt) return at.localeCompare(bt);
+        return a.sortKey - b.sortKey;
+      });
       if (sched.length > 0) {
         children.push(P(""));
         children.push(P(L.schedule, { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));

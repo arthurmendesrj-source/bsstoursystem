@@ -25,6 +25,7 @@ import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
 import { ServiceDialog, type ServiceInitial } from "./ServiceDialog";
 import { HotelDialog, type HotelInitial } from "./HotelDialog";
+import { priceItem, summarizePricing, type PricingCategory } from "@/lib/pricing-engine";
 
 type Mode = "proposal" | "invoice";
 

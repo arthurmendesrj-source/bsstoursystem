@@ -1,237 +1,89 @@
-# Plano: Automação IA do Fluxo Comercial (CRM+ERP Turismo)
+# Assistente de IA na aba Proposta
 
-Baseado no estado atual do projeto (Lovable Cloud, Lovable AI Gateway já configurado, tabelas `leads`, `quotes`, `quote_items`, `bookings`, `suppliers`, `supplier_rates`, `interactions`, `tasks`, `ai_pending_actions` já existentes) e nas suas respostas: cotação mista (tabela + e-mail), proposta/invoice no sistema sem template padronizado, e nenhuma integração externa ainda.
+Substituir o botão **Gerar Documento** (atual `GenerateDocDialog`) por um **Assistente de IA de Programa Turístico** integrado ao editor de propostas. Ele lê todo o contexto do lead, propõe um programa completo e permite refinar via chat antes de aplicar à proposta.
 
----
+## 1. Novo componente: `AiProgramAssistantDialog.tsx`
 
-## A) MAPA DO FUNIL COMERCIAL
+Substitui o atual dialog. Layout em 2 colunas (desktop) / abas (mobile):
 
-```text
-[1 Novo] → [2 Em Atendimento] → [3 Qualificado] → [4 Proposta]
-   ↓             ↓                    ↓                ↓
-[Operador]   [Operador+IA]      [Operador+IA]    [IA rascunho + Operador aprova]
-                                                       ↓
-[7 Faturado] ← [6 Aceito/Booking] ← [5 Negociação]
-   ↑                ↑                    ↑
-[IA invoice +   [IA cria booking    [IA follow-up
- aprovação]      + cotação final]    + simulações]
+**Esquerda — Contexto coletado (read-only, editável)**
+- Lead: nome, destino(s), datas, pax (adultos/crianças), orçamento, idioma, perfil (lua de mel/família/luxo/corporativo).
+- Últimas interações + e-mails (`interactions`, `gmail_messages` se existir) — últimos 20 itens resumidos pela IA.
+- Itens já adicionados na cotação atual.
+- Toggle "incluir e-mails", "incluir histórico", "incluir itinerários internos (RAG)".
+
+**Direita — Chat com a IA**
+- Mensagem inicial automática: a IA gera um **Programa Turístico** com:
+  - Cronograma dia a dia (manhã/tarde/noite) com cidade.
+  - Lista de **hotéis** sugeridos (categoria, noites, observações).
+  - Lista de **voos** (trechos, classe sugerida).
+  - **Serviços/tours/transfers** por dia.
+  - **Resumo executivo** + observações.
+- Caixa de input para o usuário pedir alterações ("trocar hotel para 5★", "adicionar dia em Florença", "remover passeio X", "reduzir orçamento 15%", "traduzir em russo"…).
+- Cada turno da IA devolve o programa atualizado (JSON estruturado) + texto explicativo.
+- Botões no rodapé:
+  - **Aplicar à proposta** → converte itens estruturados (hotéis/voos/serviços) em `quote_items` usando os dialogs já existentes (`HotelDialog`/`FlightDialog`/`ServiceDialog` reaproveitam preços via supplier_rates / pricing-engine).
+  - **Gerar documento .docx** → mantém compatibilidade chamando `generate-proposal-doc` com o briefing consolidado.
+  - **Salvar conversa** → grava em `ai_conversations` (`title = "Programa — <lead>"`).
+
+## 2. Edge function: `propose-tour-program`
+
+Nova função em `supabase/functions/propose-tour-program/index.ts`. Streaming SSE.
+
+Entrada:
+```ts
+{ lead_id, quote_id, messages: [{role,content}], options: { include_emails, include_interactions, include_rag, language, tone } }
 ```
 
-| Estágio | Critério passagem | Dono | Automação IA |
-|---|---|---|---|
-| 1. Novo | Lead criado (form/import/manual) | Operador | Enriquecimento, dedupe, score, distribuição |
-| 2. Em Atendimento | 1ª interação registrada | Operador | Sugestão de mensagem, qualificação SPIN |
-| 3. Qualificado | Destino+datas+pax+budget OK | Operador | Checklist de dados, sugestão de pacote |
-| 4. Proposta | Quote gerado e enviado | IA→Operador | Rascunho proposta, cotação fornecedores, precificação |
-| 5. Negociação | Cliente respondeu/contraproposta | IA→Operador | Simulação alternativa, follow-up, recálculo |
-| 6. Aceito | `quote.status=accepted` | Operador | Cria booking, invoice rascunho |
-| 7. Faturado | Invoice emitida | Operador | Cobrança, lembretes, handoff operações |
+Pipeline:
+1. Carrega lead + cotação atual + interações + e-mails (server-side via service role).
+2. RAG opcional: chama `itinerary-search` com destino+perfil para trazer trechos de itinerários históricos.
+3. Monta system prompt com role "Arquiteto de Roteiros". Exige resposta em **tool call** `update_program` com schema:
+   ```
+   { summary, days: [{day,date,city,morning,afternoon,evening}],
+     hotels: [{city,name,category,nights,check_in,check_out,notes}],
+     flights: [{from,to,date,class,notes}],
+     services: [{day,kind,description,supplier_hint,duration}],
+     notes, language }
+   ```
+4. Modelo: `google/gemini-3-flash-preview` (default). Tool calling para garantir JSON estável; texto livre vai como `assistant_message`.
+5. Stream do texto + envio do JSON final em evento `program`. Trata 429/402.
 
----
+## 3. Persistência
 
-## B) TOP 15 FRICÇÕES & OPORTUNIDADES
+- Reaproveitar `ai_conversations` + `ai_messages` (já existem). Adicionar coluna opcional `program_json jsonb` em `ai_messages` para guardar a versão do programa de cada turno (migration pequena).
+- Sem novas tabelas além disso.
 
-| # | Onde | Sintoma | Causa | Solução IA |
-|---|---|---|---|---|
-| 1 | Lead novo | Demora 1h+ pra responder | Sem alerta/distribuição | Auto-assign por carga + push em 5min |
-| 2 | Qualificação | Falta destino/datas/pax | Coleta manual ad-hoc | Checklist obrigatório + IA pede via WhatsApp |
-| 3 | Cotação fornecedor | E-mails dispersos sem rastreio | Fora do sistema | E-mail estruturado + parser de resposta IA |
-| 4 | Cotação | Tabela interna desatualizada | Sem validade | Validade por rate + alerta vencimento |
-| 5 | Precificação | Margem negativa não detectada | Cálculo manual | Validador de margem mínima por categoria |
-| 6 | Câmbio | Cotação travada em USD desatualizada | `exchange_rates` manual | Job diário de atualização |
-| 7 | Proposta | Cada operador faz no seu jeito | Sem template | Template versionado + IA preenche |
-| 8 | Proposta | Demora 2-4h para montar | Tudo manual | IA gera rascunho em <30s |
-| 9 | Envio | Sem tracking de abertura | E-mail simples | Pixel + log em `interactions` |
-| 10 | Follow-up | Esquecido após 3 dias | Sem SLA | `sla_settings` já existe → ativar IA pra criar tasks |
-| 11 | Negociação | Recálculo manual a cada ajuste | Sem simulador | Simulador de cenários (-10%, +1 pax, etc.) |
-| 12 | Aceite | Booking criado manualmente | Sem trigger | Auto-criar booking + tasks operacionais |
-| 13 | Invoice | Sem padrão (PDF caseiro) | Sem gerador | Gerador de invoice (PDF) + parcelas |
-| 14 | Cobrança | Sem lembrete vencimento | Manual | Job diário + WhatsApp/e-mail automático |
-| 15 | Auditoria | "Quem mudou o quê?" | `activity_log` subutilizado | Painel de trilha + IA explica mudanças |
+## 4. Aplicação à proposta
 
----
+Função `applyProgramToQuote(program, quoteId)`:
+- Para cada `hotel` → cria `quote_items` tipo hotel (qtd = noites × quartos), tentando casar com `supplier_rates` via slug de cidade/categoria; se não achar, cria com custo 0 + flag "preencher".
+- Idem para `flights` (kind=flight) e `services`.
+- Aplica markup default via `pricing-engine` (`priceItem`).
+- Mostra resumo: "X hotéis, Y voos, Z serviços adicionados — N itens precisam de custo".
 
-## C) CATÁLOGO DE AUTOMAÇÕES (eventos)
+## 5. ProposalEditor
 
-Cada automação grava em `ai_pending_actions` quando exige aprovação. Caso contrário, ação direta com log em `activity_log`.
+- Remover botão "Gerar Documento" como ação principal; vira item secundário dentro do assistente.
+- Novo botão primário: **🪄 Assistente IA** (ícone `Sparkles`) abre `AiProgramAssistantDialog`.
+- Mantém demais botões (Propor Envio, Propor Fatura).
 
-### C1. `lead.created` → Triagem
-- **Condições:** lead sem `assigned_to`
-- **Ações:** dedupe (telefone/email vs `customers`+`leads`), score (0-100 baseado em destino/budget/canal), distribuir por carga ao operador menos ocupado, criar task "Primeiro contato em 30min"
-- **Auto-executa:** sim (reversível)
+## 6. Arquivos
 
-### C2. `lead.qualified` (status muda) → Sugestão de Pacote
-- **Condições:** `destination`, `pax`, `travel_dates`, `estimated_value` preenchidos
-- **Ações IA:** busca semântica em `itineraries` (já há embeddings + `match_itineraries`), retorna top 3 pacotes; cria proposta de quote rascunho
-- **Aprovação:** operador escolhe qual pacote
+Criar:
+- `src/components/proposal/AiProgramAssistantDialog.tsx`
+- `src/lib/applyProgramToQuote.ts`
+- `supabase/functions/propose-tour-program/index.ts`
 
-### C3. `quote.draft_requested` → Cotação Fornecedores
-- **Trigger:** botão "Cotar fornecedores" ou IA proativa
-- **Ações:** para cada item do quote, busca em `supplier_rates` (válido na data); se não houver, gera e-mail estruturado pros fornecedores cadastrados em `supplier_contacts`; salva pendências em `ai_pending_actions`
-- **Aprovação:** envio de e-mail (1-clique aprovar lote)
+Editar:
+- `src/components/proposal/ProposalEditor.tsx` (trocar botão + dialog).
+- `src/lib/i18n.tsx` (chaves novas: `aiAssistant`, `aiAssistantTitle`, `applyToProposal`, etc.).
 
-### C4. `supplier.email_replied` → Parser
-- **Trigger:** webhook Gmail / forward para inbox
-- **Ações IA:** Lovable AI extrai preço/disponibilidade/condições do e-mail, popula `supplier_rates` rascunho
-- **Aprovação:** operador valida valores
+Migration:
+- `ALTER TABLE ai_messages ADD COLUMN program_json jsonb;`
 
-### C5. `quote.priced` → Validador de Margem
-- **Condições:** margem < piso por categoria
-- **Ações:** alerta + sugestão de ajuste; bloqueia envio se margem negativa
-- **Aprovação:** se desconto > política, exige aprovação gerente (`has_role`)
+Manter `GenerateDocDialog.tsx` como secundário (acessível dentro do assistente) para não quebrar o fluxo .docx.
 
-### C6. `quote.ready_to_send` → Gerador de Proposta
-- **Ações IA:** monta DOCX/PDF via template versionado + Lovable AI para textos personalizados (perfil cliente: lua-de-mel/família/luxo/corporate); salva em `quote_documents` (bucket `proposal-docs`)
-- **Aprovação:** preview + 1-clique enviar
-
-### C7. `proposal.sent` → Follow-up Inteligente
-- **Cron:** D+2, D+5, D+10 sem resposta
-- **Ações IA:** redige mensagem personalizada (WhatsApp/e-mail) com contexto da conversa; cria task
-- **Aprovação:** operador revisa antes do envio
-
-### C8. `quote.accepted` → Booking + Invoice Rascunho
-- **Ações:** cria `bookings` + `booking_suppliers` + tasks operacionais (voucher, transfer, hotel); gera `invoice` rascunho
-- **Aprovação:** operador confirma booking; emissão de invoice exige aprovação separada
-
-### C9. `invoice.due_in_3d` → Cobrança
-- **Cron diário**
-- **Ações IA:** mensagem cordial de lembrete via canal preferido; escalona após vencimento
-- **Aprovação:** lote único pelo financeiro
-
-### C10. `cancellation.requested` → Análise de Política
-- **Ações IA:** calcula penalidade (regras de fornecedor + política), gera resumo; **NUNCA executa cancelamento**
-- **Aprovação:** sempre humana
-
----
-
-## D) MOTOR DE COTAÇÃO
-
-```text
-Quote Item → Resolver(item) → 
-  1. Cache: supplier_rates WHERE válido na data + categoria + cidade
-  2. Match: rank por (preço, rating fornecedor, SLA, margem resultante)
-  3. Se vazio: gerar pedido de cotação (e-mail estruturado a top N fornecedores)
-  4. Inbox parser (IA): captura resposta → supplier_rates rascunho
-  5. Operador aprova → vira cotação oficial
-  6. Validade: rate.valid_until; alerta D-3
-```
-
-**Tratamento de incerteza:** quote item carrega flag `quote_status` (cached/pending/confirmed). Proposta pode ser gerada com `pending` mas marcada "sujeito a confirmação".
-
----
-
-## E) MOTOR DE PRECIFICAÇÃO
-
-```text
-preço_venda = (custo × câmbio) × (1 + markup%) + taxas + fee_cartão
-margem = (preço_venda − custo_total) / preço_venda
-```
-
-- **Markup default:** por `ref_service_categories.kind` (hotel 25%, transfer 30%, tour 35%, pacote 20%)
-- **Validações:** margem mínima por categoria; desconto > 10% exige `gerente`; > 20% exige `diretor`
-- **Câmbio:** tabela `exchange_rates` + job diário (Lovable Cloud cron)
-- **Saída auditável:** JSON com breakdown anexado ao `quote.metadata` ("Explicação do cálculo")
-
----
-
-## F) GERADOR DE PROPOSTA
-
-**Estrutura padrão (template versionado):**
-1. Capa (cliente, destino, datas, código quote)
-2. Resumo executivo (texto IA personalizado por perfil)
-3. Roteiro dia-a-dia (de `quote_items` ordenados)
-4. Inclusos / Não inclusos
-5. Condições comerciais (validade, pagamento, câmbio, cancelamento)
-6. FAQ por tipo de viagem
-7. Anexos (vouchers exemplo, mapa)
-
-**Variantes de tom:** formal, inspiracional (já existem em `GenerateDocDialog`).
-**Componentes dinâmicos:** lua-de-mel (jantares românticos), família (atividades kids), luxo (transferes privativos), corporate (faturas detalhadas).
-**Validações pré-envio:** datas coerentes, sem placeholders `{{...}}`, moeda única, validade futura, nome cliente OK.
-**Tecnologia:** já há `generate-proposal-doc` edge function — estender para usar template + IA + checklist.
-
----
-
-## G) GERADOR DE INVOICE
-
-**Nova tabela:** `invoices` (number, booking_id, customer_id, status, items, parcels, total, currency, issued_at, due_at).
-
-**Estados:** `draft → pending_approval → issued → paid → overdue → cancelled` (cada transição loga em `activity_log`).
-
-**Quando criar rascunho:** trigger `quote.accepted` ou após sinal recebido.
-
-**Itens/parcelas:** entrada % + saldo (configurável), vencimento, instruções de pagamento.
-
-**Pagamento (futuro):** começar com instruções manuais (PIX/dados bancários); depois plugar Stripe/Asaas.
-
-**Reversão:** apenas cancelamento de invoice issued exige aprovação `diretor`.
-
----
-
-## H) FILA DE AÇÕES DA IA (UX)
-
-Nova rota `/inbox-ia` (e card no dashboard) lendo `ai_pending_actions`:
-
-```text
-┌──────────────────────────────────────────────┐
-│ 🟡 Alta · Lead AB030526 · há 3min            │
-│ Sugestão: Enviar proposta (Buenos Aires 4n)  │
-│ [Preview] · usou: itinerário X, fornecedor Y │
-│ Risco: margem 18% (mín 15%) ✓                │
-│ [Aprovar] [Editar] [Rejeitar] [Mais dados]   │
-└──────────────────────────────────────────────┘
-```
-
-- **Score:** urgência (SLA) + impacto (valor estimado) + reversibilidade
-- **Modo lote:** marcar várias propostas/follow-ups e aprovar com 1 clique (apenas ações low-risk)
-- **Trilha:** quem aprovou, mudanças, snapshot do payload
-
----
-
-## I) BACKLOG PRIORIZADO
-
-### P0 — Fundação (2 sprints)
-| Item | Esforço | KPI | Dep. |
-|---|---|---|---|
-| Tabela `invoices` + estados + RLS | M | — | — |
-| Engine de precificação (lib + validador) | M | % propostas margem ≥ mín | — |
-| Template proposta versionado + checklist | M | tempo médio envio < 15min | — |
-| Fila `/inbox-ia` (UI + score) | L | % ações aprovadas em <2min | `ai_pending_actions` |
-| Auto-distribuição lead + score | S | tempo 1ª resposta < 10min | — |
-
-### P1 — Cotação & IA (2 sprints)
-| Item | Esforço | KPI |
-|---|---|---|
-| E-mail estruturado a fornecedor + parser IA | L | % cotações automatizadas |
-| Sugestão de pacote (semântica) no quote | M | conversão qualificado→proposta |
-| Follow-up automático D+2/5/10 | M | taxa resposta após follow-up |
-| Job câmbio diário | S | % quotes com câmbio < 24h |
-| Validador desconto + escalonamento por role | S | % desconto fora política |
-
-### P2 — Pagamento & Crescimento
-| Item | Esforço | KPI |
-|---|---|---|
-| Integração Stripe/Asaas (PIX/cartão) | L | % invoices pagas no app |
-| WhatsApp Business API | L | tempo médio resposta cliente |
-| Gmail OAuth + parser inbox fornecedor | L | cotações capturadas via e-mail |
-| Painel KPIs comerciais (conversão por estágio, margem média, SLA) | M | — |
-| Assinatura digital (Clicksign) na proposta | M | tempo aceite |
-
-**Rollout:** piloto com 1 operador (2 semanas) → 50% time → geral, com kill-switch por automação em `settings`.
-
-**Riscos & mitigação:**
-- IA aluciar preço → validador determinístico + bloqueio
-- Spam de follow-up → throttle por lead + opt-out
-- LGPD em e-mails de cotação → mascarar dados pessoais do cliente
-- Custo Lovable AI → cache de respostas + modelos lite (`gemini-2.5-flash-lite`) para tarefas simples
-
----
-
-## Próximo passo sugerido
-
-Confirme se quer que eu inicie pelo **P0** (Fundação). Posso começar criando:
-1. Migração da tabela `invoices` + RLS
-2. Lib de precificação `src/lib/pricing-engine.ts`  
-3. Rota `/inbox-ia` consumindo `ai_pending_actions`
-
-Ou prefere outra ordem (ex.: começar pelo gerador de proposta com template, já que `generate-proposal-doc` existe)?
+## Perguntas abertas
+1. O assistente deve **substituir** os itens existentes da cotação ao aplicar, ou **adicionar** ao final? (proposta: adicionar; usuário confirma "limpar antes" via checkbox)
+2. Idioma da resposta inicial: detectar do lead ou sempre PT-BR? (proposta: usar `lead.language` se existir, senão PT-BR)

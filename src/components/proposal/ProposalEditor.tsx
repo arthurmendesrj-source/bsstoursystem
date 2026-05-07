@@ -268,13 +268,13 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       if (cErr || !created) { toast.error(cErr?.message ?? "Erro ao criar conversa"); return; }
       convId = created.id;
     }
-    const { error } = await supabase.from("ai_pending_actions").insert({
+    const { error } = await supabase.from("ai_pending_actions").insert([{
       user_id: uid,
       conversation_id: convId,
       action_type,
       payload,
       status: "pending",
-    });
+    }]);
     if (error) { toast.error(error.message); return; }
     toast.success("Ação enfileirada no Inbox IA");
   };

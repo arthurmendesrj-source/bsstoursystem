@@ -747,6 +747,81 @@ export type Database = {
           },
         ]
       }
+      invoices: {
+        Row: {
+          booking_id: string | null
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          currency: Database["public"]["Enums"]["currency_code"]
+          customer_id: string | null
+          due_at: string | null
+          fees: number
+          id: string
+          issued_at: string | null
+          items: Json
+          notes: string | null
+          number: string | null
+          paid_at: string | null
+          parcels: Json
+          payment_instructions: string | null
+          quote_id: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          subtotal: number
+          taxes: number
+          total: number
+          updated_at: string
+        }
+        Insert: {
+          booking_id?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"]
+          customer_id?: string | null
+          due_at?: string | null
+          fees?: number
+          id?: string
+          issued_at?: string | null
+          items?: Json
+          notes?: string | null
+          number?: string | null
+          paid_at?: string | null
+          parcels?: Json
+          payment_instructions?: string | null
+          quote_id?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          taxes?: number
+          total?: number
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string | null
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: Database["public"]["Enums"]["currency_code"]
+          customer_id?: string | null
+          due_at?: string | null
+          fees?: number
+          id?: string
+          issued_at?: string | null
+          items?: Json
+          notes?: string | null
+          number?: string | null
+          paid_at?: string | null
+          parcels?: Json
+          payment_instructions?: string | null
+          quote_id?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal?: number
+          taxes?: number
+          total?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       itineraries: {
         Row: {
           code: string | null
@@ -2592,6 +2667,13 @@ export type Database = {
       customer_status: "ativo" | "inativo" | "bloqueado"
       customer_type: "pf" | "pj"
       interaction_type: "ligacao" | "email" | "reuniao" | "nota" | "whatsapp"
+      invoice_status:
+        | "draft"
+        | "pending_approval"
+        | "issued"
+        | "paid"
+        | "overdue"
+        | "cancelled"
       lead_status:
         | "novo"
         | "qualificado"
@@ -2769,6 +2851,14 @@ export const Constants = {
       customer_status: ["ativo", "inativo", "bloqueado"],
       customer_type: ["pf", "pj"],
       interaction_type: ["ligacao", "email", "reuniao", "nota", "whatsapp"],
+      invoice_status: [
+        "draft",
+        "pending_approval",
+        "issued",
+        "paid",
+        "overdue",
+        "cancelled",
+      ],
       lead_status: [
         "novo",
         "qualificado",

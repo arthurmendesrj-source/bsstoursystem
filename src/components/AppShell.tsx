@@ -24,6 +24,7 @@ import {
   ChevronDown,
   BarChart3,
   LayoutGrid,
+  Sparkles,
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { useAuth } from "@/lib/auth";
@@ -82,6 +83,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const items = [
+    { to: "/inbox-ia", label: "Inbox IA", icon: Sparkles },
     { to: "/email", label: t("email"), icon: Mail },
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },

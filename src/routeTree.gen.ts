@@ -20,6 +20,7 @@ import { Route as PackagesRouteImport } from './routes/packages'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ItinerariesRouteImport } from './routes/itineraries'
+import { Route as InboxIaRouteImport } from './routes/inbox-ia'
 import { Route as GerencialRouteImport } from './routes/gerencial'
 import { Route as FunnelRouteImport } from './routes/funnel'
 import { Route as EmailRouteImport } from './routes/email'
@@ -105,6 +106,11 @@ const LeadsRoute = LeadsRouteImport.update({
 const ItinerariesRoute = ItinerariesRouteImport.update({
   id: '/itineraries',
   path: '/itineraries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InboxIaRoute = InboxIaRouteImport.update({
+  id: '/inbox-ia',
+  path: '/inbox-ia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GerencialRoute = GerencialRouteImport.update({
@@ -279,6 +285,7 @@ export interface FileRoutesByFullPath {
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
+  '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
@@ -323,6 +330,7 @@ export interface FileRoutesByTo {
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
+  '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
@@ -368,6 +376,7 @@ export interface FileRoutesById {
   '/email': typeof EmailRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
+  '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
@@ -414,6 +423,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/funnel'
     | '/gerencial'
+    | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/login'
@@ -458,6 +468,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/funnel'
     | '/gerencial'
+    | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/login'
@@ -502,6 +513,7 @@ export interface FileRouteTypes {
     | '/email'
     | '/funnel'
     | '/gerencial'
+    | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/login'
@@ -547,6 +559,7 @@ export interface RootRouteChildren {
   EmailRoute: typeof EmailRoute
   FunnelRoute: typeof FunnelRoute
   GerencialRoute: typeof GerencialRouteWithChildren
+  InboxIaRoute: typeof InboxIaRoute
   ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -643,6 +656,13 @@ declare module '@tanstack/react-router' {
       path: '/itineraries'
       fullPath: '/itineraries'
       preLoaderRoute: typeof ItinerariesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inbox-ia': {
+      id: '/inbox-ia'
+      path: '/inbox-ia'
+      fullPath: '/inbox-ia'
+      preLoaderRoute: typeof InboxIaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gerencial': {
@@ -961,6 +981,7 @@ const rootRouteChildren: RootRouteChildren = {
   EmailRoute: EmailRoute,
   FunnelRoute: FunnelRoute,
   GerencialRoute: GerencialRouteWithChildren,
+  InboxIaRoute: InboxIaRoute,
   ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,

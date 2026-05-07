@@ -272,7 +272,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       user_id: uid,
       conversation_id: convId,
       action_type,
-      payload,
+      payload: payload as never,
       status: "pending",
     }]);
     if (error) { toast.error(error.message); return; }

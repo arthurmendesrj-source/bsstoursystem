@@ -21,7 +21,7 @@ import {
   type ProposalItemKind,
 } from "@/lib/proposal-totals";
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
-import { GenerateDocDialog } from "./GenerateDocDialog";
+import { ExecutiveProposalDialog } from "./ExecutiveProposalDialog";
 import { AiProgramAssistantDialog } from "./AiProgramAssistantDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";

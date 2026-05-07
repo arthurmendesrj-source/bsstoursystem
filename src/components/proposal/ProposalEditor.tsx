@@ -560,7 +560,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             <Sparkles className="h-4 w-4 mr-1" /> Assistente IA
           </Button>
           <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-            <FileCheck className="h-4 w-4 mr-1" /> Gerar Proposta Executiva
+            <FileText className="h-4 w-4 mr-1" /> Gerar Documento
           </Button>
           <Can module="quotes" action="edit">
             <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>

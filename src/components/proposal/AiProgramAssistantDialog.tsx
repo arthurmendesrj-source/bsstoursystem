@@ -182,7 +182,7 @@ export function AiProgramAssistantDialog({
                         </h3>
                         <div className="space-y-2">
                           {program.days.map((d, i) => (
-                            <div key={i} className="rounded-md border p-2 text-xs">
+                            <div key={i} className="rounded-md border p-2 text-xs space-y-1">
                               <div className="flex items-center justify-between">
                                 <span className="font-medium">
                                   Dia {d.day} — {d.city}
@@ -196,6 +196,16 @@ export function AiProgramAssistantDialog({
                               {d.morning && <p><span className="text-muted-foreground">Manhã:</span> {d.morning}</p>}
                               {d.afternoon && <p><span className="text-muted-foreground">Tarde:</span> {d.afternoon}</p>}
                               {d.evening && <p><span className="text-muted-foreground">Noite:</span> {d.evening}</p>}
+                              {(d as any).schedule?.length > 0 && (
+                                <div className="mt-1 border-t pt-1 space-y-0.5">
+                                  {(d as any).schedule.map((s: any, j: number) => (
+                                    <div key={j} className="flex gap-2">
+                                      <span className="font-mono text-[10px] text-muted-foreground w-10">{s.time}</span>
+                                      <span className="flex-1">{s.title}{s.description ? ` — ${s.description}` : ""}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>

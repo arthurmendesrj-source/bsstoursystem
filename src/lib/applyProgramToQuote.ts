@@ -138,7 +138,10 @@ export async function applyProgramToQuote(
       category: s.kind,
       item_date: s.date || null,
       pax: s.pax || null,
-      notes: s.duration ? `Duração: ${s.duration}` : null,
+      notes: [
+        s.start_time ? `${s.start_time}${s.end_time ? `–${s.end_time}` : ""}` : null,
+        s.duration ? `Duração: ${s.duration}` : null,
+      ].filter(Boolean).join(" · ") || null,
     });
     needCost++;
   }

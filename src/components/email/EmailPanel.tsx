@@ -53,8 +53,19 @@ export type EmailPanelProps = {
 export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelProps) {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { viewAs } = useViewAs();
   const { subordinates } = useSubordinates();
 
+  // Email "efetivo" da caixa: respeita impersona\u00e7\u00e3o (viewAs)
+  const effectiveEmail = (() => {
+    if (viewAs?.full_name) {
+      const slug = viewAs.full_name
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().trim().replace(/\s+/g, ".");
+      return `${slug}@sim.local`;
+    }
+    return user?.email ?? null;
+  })();
   const syncFn = useServerFn(gmailSync);
   const getFn = useServerFn(gmailGet);
   const modifyFn = useServerFn(gmailModify);

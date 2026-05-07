@@ -10,6 +10,7 @@ export type TourProgram = {
     morning?: string;
     afternoon?: string;
     evening?: string;
+    schedule?: Array<{ time: string; title: string; description?: string; kind?: string }>;
   }>;
   hotels: Array<{
     city: string;
@@ -19,12 +20,16 @@ export type TourProgram = {
     rooms?: number;
     check_in?: string;
     check_out?: string;
+    check_in_time?: string;
+    check_out_time?: string;
     notes?: string;
   }>;
   flights: Array<{
     from: string;
     to: string;
     date?: string;
+    departure_time?: string;
+    arrival_time?: string;
     class?: string;
     pax?: number;
     notes?: string;
@@ -32,6 +37,8 @@ export type TourProgram = {
   services: Array<{
     day?: number;
     date?: string;
+    start_time?: string;
+    end_time?: string;
     city?: string;
     kind: "tour" | "transfer" | "service";
     description: string;
@@ -83,7 +90,12 @@ export async function applyProgramToQuote(
       rooms: h.rooms || 1,
       item_date: h.check_in || null,
       check_out: h.check_out || null,
-      notes: h.notes || null,
+      notes: [
+        h.check_in_time || h.check_out_time
+          ? `Check-in ${h.check_in_time || "15:00"} · Check-out ${h.check_out_time || "11:00"}`
+          : null,
+        h.notes || null,
+      ].filter(Boolean).join(" · ") || null,
     });
     needCost++;
   }
@@ -102,7 +114,12 @@ export async function applyProgramToQuote(
       category: "voo",
       item_date: f.date || null,
       pax: f.pax || null,
-      notes: f.notes || null,
+      notes: [
+        f.departure_time || f.arrival_time
+          ? `Saída ${f.departure_time || "—"} → Chegada ${f.arrival_time || "—"}`
+          : null,
+        f.notes || null,
+      ].filter(Boolean).join(" · ") || null,
     });
     needCost++;
   }
@@ -121,7 +138,10 @@ export async function applyProgramToQuote(
       category: s.kind,
       item_date: s.date || null,
       pax: s.pax || null,
-      notes: s.duration ? `Duração: ${s.duration}` : null,
+      notes: [
+        s.start_time ? `${s.start_time}${s.end_time ? `–${s.end_time}` : ""}` : null,
+        s.duration ? `Duração: ${s.duration}` : null,
+      ].filter(Boolean).join(" · ") || null,
     });
     needCost++;
   }

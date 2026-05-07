@@ -769,6 +769,28 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       />
 
 
+      {!readOnly && viewMarkupTotals && (pricingSummary.blocks.length > 0 || pricingSummary.warnings.length > 0) && (
+        <div className={cn(
+          "rounded-md border p-3 space-y-1.5 text-sm",
+          pricingSummary.blocks.length > 0 ? "border-destructive/50 bg-destructive/5" : "border-amber-500/50 bg-amber-500/5"
+        )}>
+          <div className="flex items-center gap-2 font-medium">
+            {pricingSummary.blocks.length > 0 ? (
+              <><AlertTriangle className="h-4 w-4 text-destructive" /> Bloqueios de pricing</>
+            ) : (
+              <><ShieldCheck className="h-4 w-4 text-amber-600" /> Avisos de margem</>
+            )}
+            <Badge variant="outline" className="ml-auto">
+              Margem {(pricingSummary.margin * 100).toFixed(1)}%
+            </Badge>
+          </div>
+          <ul className="text-xs space-y-0.5 list-disc list-inside text-muted-foreground">
+            {pricingSummary.blocks.map((b, i) => <li key={`b${i}`} className="text-destructive">{b}</li>)}
+            {pricingSummary.warnings.map((w, i) => <li key={`w${i}`}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+
       <div className="rounded-md border p-4 space-y-1.5 bg-muted/20">
         {!readOnly && viewCostFields && (
           <>

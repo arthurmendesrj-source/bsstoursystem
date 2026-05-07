@@ -223,7 +223,8 @@ export function AiProgramAssistantDialog({
                               <div className="font-medium">{h.name || `Hotel em ${h.city}`}</div>
                               <div className="text-muted-foreground">
                                 {h.city} · {h.category ?? "—"} · {h.nights} noites
-                                {h.check_in && ` · ${h.check_in}→${h.check_out ?? ""}`}
+                                {h.check_in && ` · Check-in ${h.check_in} ${(h as any).check_in_time || "15:00"}`}
+                                {h.check_out && ` → Check-out ${h.check_out} ${(h as any).check_out_time || "11:00"}`}
                               </div>
                               {h.notes && <p className="text-muted-foreground mt-0.5">{h.notes}</p>}
                             </div>

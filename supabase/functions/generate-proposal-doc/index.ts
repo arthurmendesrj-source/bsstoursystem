@@ -584,15 +584,59 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
     children.push(P(""));
     if (content.intro) children.push(P(content.intro, { size: 22 }));
 
-    // Executive summary (descritivo dos produtos vendidos)
-    if (content.executive_summary) {
+    const isExecutive = docType === "executive" || docType === "combined";
+    const isProgram = docType === "tour_program" || docType === "combined";
+
+    // ===== TOUR PROGRAM SECTION (promotional, no prices) =====
+    if (isProgram && content.tour_program && typeof content.tour_program === "object") {
+      const tp = content.tour_program;
+      children.push(P(""));
+      children.push(P("Programa Turístico", { bold: true, size: 32, heading: HeadingLevel.HEADING_1 }));
+      if (tp.intro) children.push(P(String(tp.intro), { size: 22 }));
+
+      if (Array.isArray(tp.cities) && tp.cities.length > 0) {
+        children.push(P(""));
+        children.push(P("Destinos", { bold: true, size: 26, heading: HeadingLevel.HEADING_2 }));
+        for (const c of tp.cities) {
+          const head = `${c.name ?? ""}${c.country ? ` — ${c.country}` : ""}`;
+          children.push(P(head, { bold: true, size: 24, heading: HeadingLevel.HEADING_3 }));
+          if (c.short_description) children.push(P(String(c.short_description), { size: 22 }));
+          if (includeCityHighlights && Array.isArray(c.highlights) && c.highlights.length > 0) {
+            for (const h of c.highlights) {
+              children.push(new Paragraph({
+                bullet: { level: 0 },
+                children: [new TextRun({ text: String(h), font: "Arial", size: 22 })],
+              }));
+            }
+          }
+          children.push(P(""));
+        }
+      }
+
+      if (includeItemDescriptions && tp.inclusions_narrative) {
+        children.push(P("O que está incluído na sua viagem", { bold: true, size: 26, heading: HeadingLevel.HEADING_2 }));
+        children.push(P(String(tp.inclusions_narrative), { size: 22 }));
+      }
+
+      if (tp.closing) {
+        children.push(P(""));
+        children.push(P(String(tp.closing), { size: 22 }));
+      }
+
+      if (docType === "combined") {
+        children.push(new Paragraph({ children: [new PageBreak()] }));
+      }
+    }
+
+    // Executive summary (descritivo dos produtos vendidos) - only for executive/combined
+    if (isExecutive && content.executive_summary) {
       children.push(P(""));
       children.push(P("Descritivo Executivo", { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
       children.push(P(String(content.executive_summary), { size: 22 }));
     }
 
     // Cronograma consolidado (datas + horários)
-    if (includeSchedule) {
+    if (isExecutive && includeSchedule) {
       // Build flat schedule from items + flights
       const { data: flightsRaw } = await admin
         .from("quote_flights")

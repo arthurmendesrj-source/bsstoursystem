@@ -551,6 +551,67 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
     children.push(P(""));
     if (content.intro) children.push(P(content.intro, { size: 22 }));
 
+    // Executive summary (descritivo dos produtos vendidos)
+    if (content.executive_summary) {
+      children.push(P(""));
+      children.push(P("Descritivo Executivo", { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
+      children.push(P(String(content.executive_summary), { size: 22 }));
+    }
+
+    // Cronograma consolidado (datas + horários)
+    if (includeSchedule) {
+      // Build flat schedule from items + flights
+      const { data: flightsRaw } = await admin
+        .from("quote_flights")
+        .select("flight_date, departure_time, arrival_time, from_code, to_code, flight_number")
+        .eq("quote_id", quoteId)
+        .order("flight_date", { ascending: true });
+      type SchedRow = { date: string; time: string; activity: string; place: string };
+      const sched: SchedRow[] = [];
+      for (const it of items) {
+        if (!it.item_date) continue;
+        const timeMatch = String(it.notes ?? "").match(/(\d{1,2}:\d{2})/);
+        sched.push({
+          date: String(it.item_date),
+          time: it.kind === "hotel" ? "15:00" : timeMatch?.[1] ?? "—",
+          activity: it.kind === "hotel" ? `Check-in ${it.description}` : it.description,
+          place: it.city ?? "—",
+        });
+        if (it.kind === "hotel" && it.check_out) {
+          sched.push({ date: String(it.check_out), time: "11:00", activity: `Check-out ${it.description}`, place: it.city ?? "—" });
+        }
+      }
+      for (const f of flightsRaw ?? []) {
+        sched.push({
+          date: String(f.flight_date),
+          time: String(f.departure_time ?? "—").slice(0, 5),
+          activity: `Voo ${f.flight_number ?? ""} ${f.from_code} → ${f.to_code}`.trim(),
+          place: f.from_code,
+        });
+      }
+      sched.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
+      if (sched.length > 0) {
+        children.push(P(""));
+        children.push(P(L.schedule, { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
+        const sw = [1500, 1100, 5260, 1500];
+        const rows: TableRow[] = [
+          new TableRow({ tableHeader: true, children: [
+            cell(L.date, { bold: true, bg: "D5E8F0", width: sw[0] }),
+            cell(L.time, { bold: true, bg: "D5E8F0", width: sw[1] }),
+            cell(L.activity, { bold: true, bg: "D5E8F0", width: sw[2] }),
+            cell(L.city, { bold: true, bg: "D5E8F0", width: sw[3] }),
+          ]}),
+          ...sched.map((s) => new TableRow({ children: [
+            cell(s.date, { width: sw[0] }),
+            cell(s.time, { width: sw[1] }),
+            cell(s.activity, { width: sw[2] }),
+            cell(s.place, { width: sw[3] }),
+          ]})),
+        ];
+        children.push(new Table({ width: { size: 9360, type: WidthType.DXA }, columnWidths: sw, rows }));
+      }
+    }
+
     // Pricing
     children.push(P(""));
     children.push(P(L.pricing, { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));

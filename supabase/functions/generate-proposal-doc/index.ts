@@ -749,12 +749,12 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       }
     }
 
+    const totalWidth = 9360;
     // Pricing (only on executive/combined)
     if (isExecutive) {
     children.push(P(""));
     children.push(P(L.pricing, { bold: true, size: 28, heading: HeadingLevel.HEADING_1 }));
 
-    const totalWidth = 9360;
     if (priceMode === "final") {
       const t = new Table({
         width: { size: totalWidth, type: WidthType.DXA },

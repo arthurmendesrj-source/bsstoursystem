@@ -114,7 +114,12 @@ export async function applyProgramToQuote(
       category: "voo",
       item_date: f.date || null,
       pax: f.pax || null,
-      notes: f.notes || null,
+      notes: [
+        f.departure_time || f.arrival_time
+          ? `Saída ${f.departure_time || "—"} → Chegada ${f.arrival_time || "—"}`
+          : null,
+        f.notes || null,
+      ].filter(Boolean).join(" · ") || null,
     });
     needCost++;
   }

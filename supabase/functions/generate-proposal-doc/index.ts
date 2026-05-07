@@ -501,6 +501,14 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
               includeItinerary
                 ? "Include a detailed day-by-day narrative."
                 : "Skip the day-by-day; only return title, subtitle, intro, inclusions, exclusions, notes."
+            }\n\nDocument type requested: ${docType}.\n${
+              docType === "tour_program" || docType === "combined"
+                ? `Also fill the 'tour_program' object with: a promotional 'intro' (3-5 sentences), 'cities' array (one per distinct destination city with short_description${includeCityHighlights ? " and 3-5 highlights" : ""}), 'inclusions_narrative' (a flowing promotional paragraph${includeItemDescriptions ? " describing each hotel, flight and signature service" : ""} — DO NOT include any prices or monetary values), and a 'closing' inspirational call-to-action.`
+                : ""
+            }${
+              docType === "executive" || docType === "combined"
+                ? "\nAlso provide 'executive_summary' (2-4 sentences listing hotels, flights, main experiences sold)."
+                : ""
             }`,
           },
         ],

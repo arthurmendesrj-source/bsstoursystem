@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useViewAs } from "@/lib/viewAs";
 import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -52,8 +53,19 @@ export type EmailPanelProps = {
 export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelProps) {
   const { t, lang } = useI18n();
   const { user } = useAuth();
+  const { viewAs } = useViewAs();
   const { subordinates } = useSubordinates();
 
+  // Email "efetivo" da caixa: respeita impersona\u00e7\u00e3o (viewAs)
+  const effectiveEmail = (() => {
+    if (viewAs?.full_name) {
+      const slug = viewAs.full_name
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().trim().replace(/\s+/g, ".");
+      return `${slug}@sim.local`;
+    }
+    return user?.email ?? null;
+  })();
   const syncFn = useServerFn(gmailSync);
   const getFn = useServerFn(gmailGet);
   const modifyFn = useServerFn(gmailModify);
@@ -124,7 +136,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
     if (mode === "lead" && leadId) {
       query = query.eq("lead_id", leadId);
     } else {
-      if (user?.email) query = query.contains("to_emails", [user.email]);
+      if (effectiveEmail) query = query.contains("to_emails", [effectiveEmail]);
       if (f === "unread") query = query.eq("is_unread", true);
       if (f === "sent") query = query.contains("labels", ["SENT"]);
       if (f === "trash") query = query.contains("labels", ["TRASH"]);
@@ -139,7 +151,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   useEffect(() => {
     void loadList(folder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder, leadId, mode, user?.email]);
+  }, [folder, leadId, mode, effectiveEmail]);
 
   useEffect(() => {
     // Skip auto-sync to avoid 403 when no Gmail account is connected

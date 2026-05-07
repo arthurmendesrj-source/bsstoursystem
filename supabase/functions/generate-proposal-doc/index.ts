@@ -837,6 +837,7 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
         }),
       );
     }
+    } // end isExecutive pricing
 
     // Helpers for sub-blocks
     const bullet = (text: string) =>

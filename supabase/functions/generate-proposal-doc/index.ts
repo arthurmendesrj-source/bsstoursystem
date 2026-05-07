@@ -291,6 +291,28 @@ const CONTENT_TOOL = {
         inclusions: { type: "array", items: { type: "string" } },
         exclusions: { type: "array", items: { type: "string" } },
         notes: { type: "array", items: { type: "string" } },
+        tour_program: {
+          type: "object",
+          description: "Conteúdo promocional do programa turístico (sem preços). Preencher quando solicitado.",
+          properties: {
+            intro: { type: "string", description: "Parágrafo de abertura promocional do pacote (3-5 frases)." },
+            cities: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  country: { type: "string" },
+                  short_description: { type: "string" },
+                  highlights: { type: "array", items: { type: "string" } },
+                },
+                required: ["name", "short_description"],
+              },
+            },
+            inclusions_narrative: { type: "string", description: "Texto descritivo apresentando hotéis, voos e serviços de forma promocional, sem valores." },
+            closing: { type: "string", description: "Chamada final inspiracional convidando o cliente a embarcar." },
+          },
+        },
       },
       required: ["title", "intro", "inclusions", "exclusions"],
     },

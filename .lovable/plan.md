@@ -1,192 +1,132 @@
-## Problema confirmado
+Vamos gravar a tela continuamente enquanto o navegador automatizado executa o roteiro real, usuário por usuário, em sequência encadeada. O foco aqui é detalhar o roteiro: cada cena, cada clique, cada uso de IA e o que precisa aparecer na tela.
 
-O vídeo atual não está instrutivo porque o script só navega para rotas e tira screenshot. Quando o roteiro tem várias etapas na mesma tela, por exemplo `/email` ou `/itineraries`, a imagem fica igual. Isso cria frames repetidos e não mostra o passo a passo real.
+## Estratégia de gravação
 
-## Objetivo
+- Um único arquivo de vídeo por usuário (4 arquivos), depois concatenados em um vídeo único.
+- A gravação acompanha o cursor, modais, toasts e respostas da IA acontecendo em tempo real.
+- Antes de iniciar, o script lê na base os emails reais de cada usuário e escolhe os emails certos para o roteiro. Se faltar email obrigatório, ele para e avisa.
+- Cada usuário "passa o bastão" para o próximo: o lead/atribuição criado por um vira o ponto de partida do outro.
 
-Refazer a captura desde o início para que cada frame represente uma ação visual diferente e verificável:
+## Roteiro encadeado por usuário
 
-- abrir email real da caixa de entrada;
-- acionar triagem por IA;
-- criar atividade ou lead a partir do email;
-- avançar lead entre Diretor, Gerente, Operador e Coordenador;
-- usar IA para orçamento, proposta, programa turístico, invoice, voucher/Bíblia e mensagens operacionais;
-- tirar screenshot somente depois de a tela mudar ou a ação aparecer concluída.
+### Cena 1 — Diretora (Agrafena)
 
-## Plano de correção
+Objetivo: receber demandas por email, usar IA para triar e gerar trabalho para si mesma e para a Gerente.
 
-### 1. Trocar captura por rota por captura por ação
+1. Abre tela de login, digita email e senha da Diretora, entra.
+2. Cai no Dashboard. Pausa de leitura mostrando indicadores e leads recentes.
+3. Vai ao menu lateral e abre "Caixa de entrada" (/email).
+4. Lista de emails carrega. Cursor passa sobre 2–3 assuntos.
+5. Abre o primeiro email: comunicado interno administrativo.
+6. Aciona "Triagem IA" no painel do email.
+7. IA processa (estado de carregamento) e retorna: classifica como "tarefa interna" e sugere criar Atividade para a Diretora.
+8. Diretora confirma criar Atividade. Modal abre já preenchido pela IA (título, descrição, prazo).
+9. Salva. Toast de confirmação aparece.
+10. Volta para a caixa de entrada.
+11. Abre o segundo email: solicitação de cotação de viagem (cliente externo).
+12. Aciona "Triagem IA". IA extrai: nome do cliente, destino, datas, número de passageiros, valor estimado.
+13. IA recomenda criar Lead. Diretora confirma.
+14. Modal de Lead abre preenchido pela IA. Diretora revisa rapidamente.
+15. No campo "Atribuir a", seleciona a Gerente (Alexandra).
+16. Salva. Toast confirma "Lead criado e atribuído a Alexandra". O ID do lead é guardado pelo script.
+17. Diretora desloga (ou o navegador fecha o contexto).
 
-Substituir o modelo atual:
+### Cena 2 — Gerente (Alexandra)
+
+Objetivo: receber lead da Diretora, montar proposta com IA, aprovar e ainda triar um email menor para encaminhar ao Operador.
+
+1. Tela de login, entra como Alexandra.
+2. Dashboard mostra notificação/contador de "novo lead atribuído".
+3. Abre "Leads" e o lead recém-criado pela Diretora aparece no topo.
+4. Abre o lead. Tela de detalhe carrega: briefing, cliente, datas.
+5. Aciona "IA · Gerar orçamento". IA processa e preenche serviços, fornecedores sugeridos e valores.
+6. Aciona "IA · Programa turístico". IA monta itinerário dia a dia.
+7. Revisa proposta, ajusta um item simples (ex: data de check-in).
+8. Clica em "Enviar proposta". Toast confirma envio.
+9. Marca proposta como "Aprovada pelo cliente". Status do lead muda visivelmente.
+10. Volta ao menu e abre "Caixa de entrada".
+11. Abre um email de cotação de menor valor.
+12. Aciona "Triagem IA". IA classifica como lead simples e extrai dados.
+13. Confirma criar Lead. Modal preenchido pela IA.
+14. No "Atribuir a", seleciona o Operador (Sergei).
+15. Salva. Toast confirma. ID guardado pelo script.
+16. Desloga.
+
+### Cena 3 — Operador (Sergei)
+
+Objetivo: pegar o lead simples encaminhado pela Gerente, montar proposta com IA e aprovar.
+
+1. Login como Sergei.
+2. Dashboard mostra novo lead atribuído.
+3. Abre "Leads", abre o lead vindo da Gerente.
+4. Aciona "IA · Gerar orçamento". IA preenche itens e fornecedores.
+5. Aciona "IA · Programa turístico". IA monta roteiro curto.
+6. Revisa, clica "Enviar proposta". Toast.
+7. Marca como "Aprovada". Status muda na tela.
+8. Desloga.
+
+### Cena 4 — Coordenador (Mikhail)
+
+Objetivo: executar a parte operacional dos dois leads aprovados (o da Gerente e o do Operador), usando IA em cada etapa.
+
+1. Login como Mikhail.
+2. Abre "Operações" (ou "Reservas/Bookings aprovados").
+3. Lista mostra os dois leads aprovados nas cenas anteriores.
+4. Abre a primeira operação (lead aprovado pela Gerente).
+5. Aciona "IA · Gerar invoice". IA preenche invoice com itens e valores. Salva.
+6. Confirma reservas com fornecedores (botão de geração de reserva). Status muda.
+7. Aciona "Gerar voucher". Voucher aparece na tela.
+8. Aciona "IA · Bíblia da viagem". IA monta documento consolidado de viagem.
+9. Aciona "IA · Mensagem aos fornecedores". IA gera texto pronto para envio. Coordenador clica "Enviar".
+10. Marca operação como concluída. Toast.
+11. Volta à lista, abre a segunda operação (lead aprovado pelo Operador).
+12. Repete: IA invoice → reserva → voucher → IA Bíblia → IA mensagem fornecedores → conclusão.
+13. Tela final mostra ambas operações com status "Concluída".
+
+## Pontos onde a IA precisa estar visivelmente em uso
+
+- Triagem de email (Diretora e Gerente).
+- Geração de orçamento (Gerente e Operador).
+- Geração de programa turístico (Gerente e Operador).
+- Geração de invoice (Coordenador).
+- Geração de Bíblia da viagem (Coordenador).
+- Geração de mensagem aos fornecedores (Coordenador).
+
+Em cada um, a gravação precisa mostrar: clique no botão de IA, estado de processamento, e resultado preenchido na tela.
+
+## Encadeamento dos dados
 
 ```text
-goto('/email') -> screenshot
-goto('/email') -> screenshot
-goto('/email') -> screenshot
+Diretora cria Lead A (cena 1)
+     -> Gerente abre Lead A (cena 2)
+     -> Gerente aprova Lead A
+        -> Coordenador opera Lead A (cena 4, primeira parte)
+
+Gerente cria Lead B (cena 2)
+     -> Operador abre Lead B (cena 3)
+     -> Operador aprova Lead B
+        -> Coordenador opera Lead B (cena 4, segunda parte)
 ```
 
-por um modelo de ações reais:
+O script guarda os IDs criados em cada cena e os usa para abrir os mesmos itens nas cenas seguintes — nada de abrir "qualquer lead".
 
-```text
-abrir /email
-clicar no email correto
-aguardar painel/detalhe abrir
-screenshot
-clicar em Triagem IA
-aguardar resultado IA aparecer
-screenshot
-clicar em Criar Lead ou Criar Atividade
-aguardar formulário/modal preenchido
-screenshot
-salvar/atribuir
-aguardar confirmação
-screenshot
-```
+## Entregas
 
-### 2. Criar um executor de etapas com validação visual
+### Fase A — gravação bruta (para sua conferência)
+- 4 vídeos (um por usuário) e/ou um vídeo único concatenado.
+- Sem edição, sem áudio, sem legenda.
+- Você assiste, confirma se o roteiro foi cumprido e se a IA aparece de fato.
 
-Cada etapa do roteiro terá:
+### Fase B — vídeo instrutivo (depois da sua aprovação)
+- Legendas curtas por etapa.
+- Realces/zoom nos botões de IA.
+- Cortes em esperas longas.
+- Áudio/narração se você pedir.
+- Exportação final em MP4.
 
-- usuário/role;
-- ação real a executar;
-- seletor ou texto esperado após a ação;
-- legenda do frame;
-- marcação se usou IA;
-- validação contra duplicata visual.
-
-Se uma etapa não mudar a tela, o script não deve aceitar a captura como válida. Ele deve tentar uma ação alternativa, como abrir detalhe, modal, aba, dropdown, scroll controlado ou destacar o elemento correto.
-
-### 3. Ler emails reais antes da gravação
-
-Antes de capturar, o script deve consultar os emails existentes por usuário e escolher os emails que vão dirigir o roteiro:
-
-- Diretor: email administrativo interno para criar atividade própria;
-- Diretor: email de solicitação de cotação para criar lead da Gerente;
-- Gerente: lead criado pelo Diretor;
-- Gerente: email de cotação menor para criar lead do Operador;
-- Operador: lead criado pela Gerente;
-- Coordenador: leads aprovados para executar parte operacional.
-
-Se algum email obrigatório não existir, o script deve parar e informar o que falta, ou criar um email demo claramente marcado como `DEMO`, se isso for aprovado no fluxo de implementação.
-
-### 4. Garantir isolamento e login por usuário
-
-Manter a parte que funcionou:
-
-- contexto de navegador separado para cada usuário;
-- sessão isolada por Diretor, Gerente, Operador e Coordenador;
-- validação de login antes da primeira captura;
-- abortar o usuário se cair na tela de login.
-
-### 5. Registrar o encadeamento real dos dados
-
-O roteiro deve guardar IDs criados durante a execução:
-
-```text
-Diretor cria Lead A -> Gerente abre Lead A
-Gerente aprova Lead A -> Coordenador opera Lead A
-Gerente cria Lead B -> Operador abre Lead B
-Operador aprova Lead B -> Coordenador opera Lead B
-```
-
-Isso evita um usuário abrir dados antigos ou errados.
-
-### 6. Usar IA de forma visível
-
-Para cada ponto de IA, a captura precisa mostrar algo concreto:
-
-- botão/ação de IA acionado;
-- estado de processamento;
-- resultado preenchido;
-- toast ou painel com resposta da IA.
-
-Se a UI atual não tiver estado visual suficiente, adicionar pequenos elementos de demonstração na própria tela, como painel “Resultado da IA”, preenchimento progressivo ou confirmação visível. Sem isso, o screenshot continuará parecendo igual.
-
-### 7. Controle de qualidade antes do vídeo
-
-Antes de renderizar o MP4:
-
-- gerar todas as capturas;
-- calcular hash/percepção visual das imagens;
-- listar frames duplicados;
-- reprovar automaticamente se houver duplicatas consecutivas relevantes;
-- gerar uma folha de conferência com miniaturas para você revisar;
-- só depois renderizar o vídeo final com 3 segundos por frame.
-
-## Roteiro instrutivo revisado
-
-### Diretor
-
-1. Entra no dashboard.
-2. Abre caixa de entrada.
-3. Abre email administrativo interno.
-4. Usa IA para triagem do email.
-5. IA cria/preenche atividade para o próprio Diretor.
-6. Diretor salva/conclui a atividade.
-7. Volta à caixa de entrada.
-8. Abre email de solicitação de cotação.
-9. Usa IA para triagem da cotação.
-10. IA extrai dados e recomenda criação de lead.
-11. Lead é criado/preenchido.
-12. Lead é atribuído à Gerente.
-13. Confirma encaminhamento.
-
-### Gerente
-
-14. Abre lead recebido do Diretor.
-15. Analisa briefing.
-16. Usa IA para gerar orçamento.
-17. IA sugere serviços, fornecedores e valores.
-18. IA monta programa turístico.
-19. Gerente revisa proposta.
-20. Proposta é enviada.
-21. Proposta é marcada como aprovada.
-22. Gerente abre inbox.
-23. Abre email de cotação de menor valor.
-24. Usa IA para triagem.
-25. IA cria lead simplificado.
-26. Gerente atribui lead ao Operador.
-27. Confirma encaminhamento.
-
-### Operador
-
-28. Abre lead recebido da Gerente.
-29. Analisa pedido.
-30. Usa IA para orçamento automático.
-31. IA completa itens e fornecedores.
-32. IA monta programa turístico.
-33. Operador revisa proposta.
-34. Envia proposta.
-35. Marca proposta como aprovada.
-
-### Coordenador
-
-36. Abre lista de operações/reservas aprovadas.
-37. Abre operação do lead aprovado da Gerente.
-38. Usa IA para gerar invoice.
-39. Gera/organiza reserva.
-40. Gera voucher.
-41. Usa IA para Bíblia da viagem.
-42. Usa IA para mensagem aos fornecedores.
-43. Finaliza primeira operação.
-44. Repete operação no lead aprovado pelo Operador.
-45. Confirma operação concluída.
-
-## Entregáveis da implementação
-
-- Script de captura refeito por ações reais.
-- Arquivo `frames.json` com as etapas e validações.
-- Capturas novas sem repetição relevante.
-- Folha de conferência com miniaturas para revisão antes do vídeo.
-- Depois da sua aprovação visual, renderização do vídeo final com 3 segundos por frame.
-
-## Critério de aceite
-
-O vídeo só será considerado pronto se:
-
-- cada usuário estiver logado corretamente;
-- cada etapa mostrar uma mudança visual clara;
-- as ações forem baseadas nos emails/leads reais;
-- as etapas com IA mostrarem resultado visível da IA;
-- não houver blocos de frames repetidos como no teste atual;
-- você puder revisar as capturas antes do MP4 final.
+## Critério de aceite da Fase A
+- Cada usuário loga sem ficar preso na tela de login.
+- O lead criado por um aparece para o próximo, na ordem certa.
+- Cada uso de IA aparece sendo executado e devolvendo resultado visível.
+- Os emails abertos são os reais da base, escolhidos para o roteiro.
+- Nenhuma cena depende de imagem estática ou repetição de frame.

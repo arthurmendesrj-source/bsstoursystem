@@ -1,62 +1,55 @@
-# Mostrar subordinados para Diretor e Gerente no painel de E-mail
+## Objetivo
 
-## Diagnóstico
+Tornar **privado ao Admin criador** tudo que ele cria. Nenhum outro usuário (nem outros admins) verá esses registros.
 
-No `/email`, ao impersonar um Diretor (Agrafena) ou Gerente (Alexandra), os campos
-**"Atribuir a"** (em Criar Lead) e **"Responsável"** (em Criar Atividade), além do uso na **Triagem IA**, não aparecem.
+## Tabelas afetadas
 
-Causa: o hook `useSubordinates` (`src/lib/hierarchy.ts`) lista subordinados via:
+`leads`, `quotes`, `quote_items`, `quote_flights`, `bookings`, `booking_pax`, `booking_suppliers`, `booking_item_confirmations`, `customers`, `interactions`, `operations_activities`, `itineraries`, `emails`.
 
-```ts
-supabase.from("user_roles").select("user_id,role")
-```
+## Abordagem técnica
 
-Mas a RLS de `user_roles` só permite leitura completa para admin:
+1. Criar função `is_admin_owned(_created_by uuid) returns boolean` (SECURITY DEFINER, STABLE) que retorna `true` quando `_created_by` possui role `admin`.
 
-```
-Admins view all roles  → is_admin(auth.uid())
-Users view own roles   → auth.uid() = user_id
-```
+2. Adicionar a TODAS as policies de SELECT / UPDATE / DELETE das tabelas acima a cláusula:
 
-Resultado: para Diretor/Gerente, a query devolve só a própria linha, `myRank` ainda é
-calculado, mas o map `byUser` só contém o próprio usuário e a lista final fica vazia →
-o gate `subordinates.length > 0` esconde os campos. Para o Admin funciona porque ele lê tudo.
+   ```
+   AND (NOT public.is_admin_owned(<col_dono>) OR auth.uid() = <col_dono>)
+   ```
 
-(Os botões "Criar Lead", "Criar Atividade" e "Triagem IA" em si já aparecem — o gate é só `mode === "full"`. O que some é a seção de atribuição a subordinado.)
+   - Coluna usada: `created_by` na maioria. Em `quote_items`, `quote_flights`, `booking_pax`, `booking_suppliers`, `booking_item_confirmations` o "dono" é resolvido via subselect no `quotes.created_by` / `bookings.created_by`.
+   - Em `leads` o filtro também considera `assigned_to` (admin pode criar lead atribuído a outro: nesse caso permanece visível ao designado, pois `created_by` é o admin mas o admin pode reatribuir — abaixo).
 
-## Correção
+3. **Emails**: como não possuem `created_by`, vamos restringir via heurística sugerida abaixo (precisa decisão do usuário se for relevante — emails normalmente são compartilhados). Por padrão **manter como está**, pois email é caixa coletiva. (Confirmar.)
 
-Trocar a leitura direta de `user_roles` pela função `public.get_subordinates(_user_id)` que já existe no banco como SECURITY DEFINER e respeita a hierarquia (admin/diretor → todos abaixo; gerente → supervisor + operador; etc).
+4. **Triggers / hooks de notificação** continuam disparando normalmente.
 
-### Mudanças
+## Comportamento resultante
 
-**1. `src/lib/hierarchy.ts`** — refatorar `useSubordinates`:
+- Admin cria um lead/cotação/booking/cliente/atividade → apenas ele vê e edita.
+- Outros admins, diretores, gerentes, operadores: registros do admin ficam invisíveis.
+- Registros criados por usuários não-admin permanecem com as regras atuais (hierarquia/permissões).
+- Se um admin precisar compartilhar, basta mudar `created_by` (ou usar um usuário não-admin para criar).
 
-- Chamar `supabase.rpc("get_subordinates", { _user_id: user.id })` para obter os IDs dos subordinados.
-- Em paralelo, buscar `profiles(user_id, full_name)` e `user_roles(user_id, role)` filtrando `IN (subordinate_ids)`.
-- Manter o shape de retorno (`{ user_id, full_name, role }[]`) para não quebrar consumidores.
-- Manter o cálculo do "maior papel por usuário" no client (caso um sub tenha múltiplos roles).
-
-**2. RLS em `user_roles`** — adicionar policy SELECT para deixar qualquer usuário autenticado ler os papéis dos próprios subordinados, via `is_subordinate_of(user_id, auth.uid())`. Isso garante que o `IN (...)` da etapa 1 retorne os roles esperados sem expor a tabela inteira.
+## Migração (resumo SQL)
 
 ```sql
-CREATE POLICY "Users view subordinate roles"
-  ON public.user_roles FOR SELECT
-  USING (public.is_subordinate_of(user_id, auth.uid()));
+CREATE OR REPLACE FUNCTION public.is_admin_owned(_created_by uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path=public AS $$
+  SELECT _created_by IS NOT NULL AND public.is_admin(_created_by);
+$$;
+
+-- Para cada tabela, DROP POLICY existente e recriar adicionando:
+--   AND (NOT public.is_admin_owned(created_by) OR auth.uid() = created_by)
+-- nas policies SELECT/UPDATE/DELETE.
+-- Para tabelas-filhas (quote_items etc), usar EXISTS no parent.
 ```
-
-(Também adiciona uma policy análoga em `profiles` se necessário — verificar antes; a tabela já é mais aberta.)
-
-### Não muda
-
-- Botões "Criar Lead / Criar Atividade / Triagem IA" continuam gated apenas por `mode === "full"`.
-- Nenhuma alteração visual ou de fluxo.
-- Admin continua vendo tudo via `is_admin`.
 
 ## Verificação
 
-1. Logar como Admin → dropdown de subordinados continua mostrando todos abaixo.
-2. Impersonar Agrafena (diretor) → ver Alexandra, Mikhail, Sergei.
-3. Impersonar Alexandra (gerente) → ver Mikhail, Sergei.
-4. Impersonar Mikhail (supervisor) → ver Sergei.
-5. Operador (Sergei) → dropdown segue oculto (sem subordinados).
+- Logar como Admin → criar lead/cotação/atividade → confirmar visível só para ele.
+- Logar como Diretor/Gerente/Operador → confirmar que registros do Admin não aparecem em listas, dashboard, triagem, e-mail panel, bíblia.
+- Registros pré-existentes criados pelo Admin tornam-se invisíveis para os demais (efeito retroativo desejado).
+
+## Pendência de confirmação
+
+- **Emails**: manter compartilhados (recomendado) ou também restringir por algum critério?

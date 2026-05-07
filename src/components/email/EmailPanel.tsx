@@ -151,7 +151,7 @@ export function EmailPanel({ mode, leadId, customerId, className }: EmailPanelPr
   useEffect(() => {
     void loadList(folder);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder, leadId, mode, user?.email]);
+  }, [folder, leadId, mode, effectiveEmail]);
 
   useEffect(() => {
     // Skip auto-sync to avoid 403 when no Gmail account is connected

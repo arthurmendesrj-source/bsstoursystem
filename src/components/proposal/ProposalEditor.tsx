@@ -607,7 +607,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         />
       )}
 
-      <GenerateDocDialog
+      <ExecutiveProposalDialog
         quoteId={quoteId}
         open={genOpen}
         onOpenChange={setGenOpen}

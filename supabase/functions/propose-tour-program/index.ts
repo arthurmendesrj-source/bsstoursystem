@@ -228,18 +228,21 @@ ${currentItems
   .join("\n") || "— vazio —"}
 `.trim();
 
+    const startDate = lead.expected_travel_date || null;
     const systemPrompt = `Você é um Arquiteto de Roteiros sênior em turismo de luxo, atuando como assistente do operador.
-Sua tarefa: a partir do contexto do lead (perfil, e-mails, interações), montar um Programa Turístico COMPLETO e refiná-lo conforme o operador pedir alterações.
+Sua tarefa: a partir do contexto do lead (perfil, e-mails, interações), montar um Programa Turístico COMPLETO com DATAS e HORÁRIOS concretos, e refiná-lo conforme o operador pedir alterações.
 
-Regras:
+Regras OBRIGATÓRIAS:
 - Idioma da resposta: ${language}. Tom: ${tone}.
 - Sempre responda chamando a tool "update_program" com a versão ATUAL e COMPLETA do programa (não envie deltas).
-- O cronograma "days" deve cobrir todos os dias da viagem (manhã/tarde/noite).
-- Hotéis: liste UMA entrada por cidade/trecho com noites e categoria estimada.
-- Voos: inclua trechos plausíveis (ida, internos, volta) baseados no destino.
-- Serviços: tours, passeios, traslados, ingressos — vinculados ao dia.
+- DATA INICIAL da viagem: ${startDate ?? "estime a partir do contexto e marque em notes"}.
+- Distribua as datas em sequência cronológica a partir da data inicial.
+- Cada "days[]" DEVE ter campo "date" (YYYY-MM-DD) e "schedule[]" com horários HH:MM por atividade (manhã, almoço, tarde, jantar).
+- Hotéis: check_in e check_out OBRIGATÓRIOS (YYYY-MM-DD). Defaults: check_in_time 15:00, check_out_time 11:00. Check-out de um hotel = check-in do próximo na sequência.
+- Voos: incluir date + departure_time + arrival_time (HH:MM). Trechos plausíveis (ida, internos, volta).
+- Serviços/tours/traslados: SEMPRE com date + start_time (e end_time quando aplicável).
 - Em "assistant_message" explique brevemente as escolhas e pergunte se o operador deseja ajustar algo.
-- Se faltar informação crítica (datas, pax), use suposições razoáveis e marque em "notes".
+- Se faltar informação crítica, use suposições razoáveis e marque em "notes".
 
 CONTEXTO ATUAL:
 ${contextBlock}`;

@@ -1,28 +1,23 @@
-## Diagnóstico
+## Causa
 
-A query em `EmailPanel.loadList` (linha 123) traz `*` da tabela `emails` sem filtrar pelo destinatário, então qualquer usuário vê todos os 50 emails. Além disso, a distribuição atual no banco não segue a regra desejada.
+A sessão atual é da Alexandra **impersonada** por um gerente. O `useAuth().user.email` retorna o email do gerente (usuário realmente logado no Supabase Auth), não da Alexandra. Como o filtro `to_emails contains user.email` usa o email do gerente, nenhum email seed bate e a caixa fica vazia.
 
 ## Plano
 
-### 1. Redistribuir os 50 emails seed (UPDATE no banco via tool insert)
+Trocar a fonte do "email efetivo" para respeitar o modo impersonação (`viewAs`):
 
-Reatribuir `to_emails` dos seeds 01–50 conforme a regra:
+1. **`EmailPanel.tsx`**:
+   - Importar `useViewAs` de `@/lib/viewAs`.
+   - Calcular `effectiveEmail`: se `viewAs` está ativo, usar o email do usuário impersonado; senão, `user?.email`.
+   - Usar `effectiveEmail` no `query.contains("to_emails", [effectiveEmail])` e na dependência do `useEffect`.
 
-- **Alexandra Ermolaeva** (`alexandra.ermolaeva@sim.local`) → seeds 01,03,05,07,09,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39 (20 emails)
-- **Agrafena Svetlova** (`agrafena.svetlova@sim.local`) → seeds 02,04,06,08,10,12,14,16,18,20,41,42,43,44,45,46,47,48,49,50 (20 emails)
-- **Mikhail Kutuzov** (`mikhail.kutuzov@sim.local`) → seeds 22,24,26,28,30,32,34,36,38,40 (10 emails)
+2. **Como obter o email do usuário impersonado** (o `viewAs` só guarda `user_id`, `full_name`, `role`):
+   - Adicionar um pequeno `useEffect` no `EmailPanel` que, quando `viewAs?.user_id` muda, busca o email via edge function `admin-users` (já usada em `routes/users.tsx`) ou via uma chamada simples — vou usar `supabase.functions.invoke("admin-users", { body: { action: "get", id: viewAs.user_id } })` se disponível, senão fazer fallback derivando do `full_name` no padrão `nome.sobrenome@sim.local` (que é o padrão dos seeds: `alexandra.ermolaeva@sim.local`, etc.).
+   - Fallback simples e suficiente para os seeds: `slugify(full_name) + "@sim.local"` — deriva corretamente os 3 emails (Alexandra, Agrafena, Mikhail).
 
-### 2. Filtrar a inbox pelo email do usuário logado
-
-Em `src/components/email/EmailPanel.tsx`:
-- Buscar o email do usuário atual via `supabase.auth.getUser()` (uma vez, em `useEffect`, guardar em estado).
-- Em `loadList`, quando `mode !== "lead"`, adicionar `query.contains("to_emails", [currentUserEmail])`.
-
-Resultado: cada usuário vê apenas os emails da sua própria caixa (Alexandra 20, Agrafena 20, Mikhail 10).
+Vou usar o **fallback por slug do nome** porque é determinístico, não depende de RLS/edge function e atende exatamente os usuários seed. Quando o usuário não está impersonando, continua usando `user.email` real.
 
 ### Não vou mexer
-- Layout/visual da inbox.
-- RLS, migrações, tabelas.
-- Lógica de triagem com IA, sync Gmail, ações em emails seed (já corrigidas anteriormente).
+- Layout, RLS, migrações, lógica de Gmail/IA.
 
-Confirma que posso aplicar?
+Confirma?

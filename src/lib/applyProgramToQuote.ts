@@ -10,6 +10,7 @@ export type TourProgram = {
     morning?: string;
     afternoon?: string;
     evening?: string;
+    schedule?: Array<{ time: string; title: string; description?: string; kind?: string }>;
   }>;
   hotels: Array<{
     city: string;
@@ -19,12 +20,16 @@ export type TourProgram = {
     rooms?: number;
     check_in?: string;
     check_out?: string;
+    check_in_time?: string;
+    check_out_time?: string;
     notes?: string;
   }>;
   flights: Array<{
     from: string;
     to: string;
     date?: string;
+    departure_time?: string;
+    arrival_time?: string;
     class?: string;
     pax?: number;
     notes?: string;
@@ -32,6 +37,8 @@ export type TourProgram = {
   services: Array<{
     day?: number;
     date?: string;
+    start_time?: string;
+    end_time?: string;
     city?: string;
     kind: "tour" | "transfer" | "service";
     description: string;

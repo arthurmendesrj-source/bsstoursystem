@@ -1,96 +1,95 @@
-
 ## Objetivo
 
-1. Quando a IA gera o programa, já trazer **datas concretas** (check-in/check-out de hotéis, datas de voos e horários por serviço) — derivadas do período do lead/quote.
-2. Renomear o botão **"Gerar .docx"** para **"Gerar Proposta Executiva"** e abrir um dialog com novas opções:
-   - Modo de preço: **Valor por item** (item a item + total) ou **Valor total** (somente total).
-   - Formato: **DOCX** ou **PDF**.
-   - Inclui descritivo curto dos produtos vendidos + cronograma com horários.
+Renomear o botão **"Gerar Proposta Executiva"** para **"Gerar Documento"** e expandir o dialog para oferecer **3 tipos de saída**:
 
-## 1. Datas e horários no Programa IA
+1. **Proposta Executiva** — documento comercial atual (descritivo executivo + tabela de preços + cronograma).
+2. **Programa Turístico** — documento promocional/informativo das cidades e itens em cotação, no formato de apresentação de pacote turístico (sem foco em preço).
+3. **Proposta Executiva + Programa Turístico** — combinação dos dois em um único arquivo (Programa primeiro como apresentação, depois a Proposta Executiva).
 
-**`supabase/functions/propose-tour-program/index.ts`**
-- Carregar `lead.travel_start_date`/`travel_end_date` (ou `quote.valid_until`/datas dos itens existentes) e injetar no prompt como **âncora obrigatória**.
-- Atualizar o JSON Schema da tool `update_program`:
-  - `days[].date` → obrigatório (ISO `YYYY-MM-DD`).
-  - `days[].schedule[]` (novo): `[{ time: "HH:MM", title, description, kind: "transfer|tour|meal|free|hotel" }]`.
-  - `hotels[].check_in` / `check_out` → obrigatórios + `check_in_time` (default 15:00) e `check_out_time` (default 11:00).
-  - `flights[].date` + `departure_time` / `arrival_time`.
-  - `services[].date` + `start_time` / `end_time`.
-- Regra no system prompt: "Distribua as datas em sequência a partir de `travel_start_date`; check-out de um hotel = check-in do próximo; respeite duração total".
+## 1. UI — `ExecutiveProposalDialog.tsx` → `GenerateDocumentDialog.tsx`
 
-**`src/lib/applyProgramToQuote.ts`**
-- Gravar `item_date` = check-in / data do voo / data do serviço; `check_out` = check-out do hotel.
-- Concatenar horários no `notes` ("Check-in 15:00 · Check-out 11:00", "Saída 09:00 — Retorno 17:00").
+Renomear arquivo e componente. Manter assinatura (`quoteId`, `open`, `onOpenChange`, `onGenerated`).
 
-**`src/components/proposal/AiProgramAssistantDialog.tsx`**
-- Mostrar datas e horários no preview (já renderiza `d.date` — adicionar `schedule[]`, hotel `check_in/out + horários`, flight horários).
+Novo campo no topo do dialog (radio cards, default `executive`):
 
-## 2. Renomear botão e novo dialog "Proposta Executiva"
-
-**`src/components/proposal/ProposalEditor.tsx`**
-- Trocar label do botão atual `genOpen` (`GenerateDocDialog`) por **"Gerar Proposta Executiva"** + ícone `FileCheck`.
-
-**Substituir `GenerateDocDialog.tsx` por `ExecutiveProposalDialog.tsx`** (mantém props: `quoteId`, `open`, `onOpenChange`, `onGenerated`):
-
-Campos no dialog:
-- **Modo de preço** (radio): `Valor por item` (default) | `Valor total`.
-- **Formato** (radio): `DOCX` (default) | `PDF`.
-- **Idioma**, **Tom**, **Briefing curto** (mantidos, mais compactos).
-- Toggle "Incluir cronograma detalhado" (default on).
-
-Botão "Gerar Proposta Executiva" → invoca `generate-proposal-doc` com `price_mode: "detailed" | "final"` e novo parâmetro `format: "docx" | "pdf"`.
-
-## 3. Backend — DOCX e PDF + Descritivo + Cronograma
-
-**`supabase/functions/generate-proposal-doc/index.ts`**
-
-Adições:
-- Novo parâmetro `format: "docx" | "pdf"` no body (default `docx`).
-- Nova seção no DOCX **antes da tabela de preços**: **"Descritivo Executivo"** — parágrafo curto (gerado pela IA, novo campo `executive_summary` na tool `build_proposal_content`) listando hotéis (cidade + categoria + noites), voos, principais tours.
-- **Cronograma consolidado**: tabela única `Data | Hora | Atividade | Local` montada a partir de `quote_items` (data, descrição, horários do `notes`) + `quote_flights`. Renderizada sempre, mesmo no modo `final`.
-- **`price_mode: "final"`** já existe — mantém só uma linha "Total". O modo `detailed` mostra item a item + total (já implementado).
-- **Geração de PDF** (quando `format === "pdf"`):
-  - Estratégia: gerar o `.docx` primeiro (mesmo conteúdo), depois converter para PDF usando **`docx-pdf` via REST?** Não há LibreOffice em Edge Functions.
-  - Decisão: usar **`pdf-lib` + `@pdfme/generator`?** Mais simples: re-renderizar o conteúdo direto em PDF com **`pdfkit`** (esm.sh) — duplica o builder.
-  - **Abordagem escolhida**: criar helper `buildContent(content, items, ...)` retornando uma estrutura intermediária (lista de blocos: heading, paragraph, table, bullet, pageBreak); dois renderers — `renderDocx(blocks)` (já existe) e novo `renderPdf(blocks)` usando **`pdf-lib`** (fontes Helvetica nativas, sem dependências binárias). Salva em storage com extensão correta e MIME `application/pdf`.
-
-**`quote_documents`** — campo `format` já é texto; aceita `"pdf"`. Sem migração.
-
-## 4. Detalhes técnicos
-
-```text
-ExecutiveProposalDialog
-  ├── price_mode: "detailed" | "final"
-  ├── format:     "docx" | "pdf"
-  └── invoke('generate-proposal-doc', { quote_id, price_mode, format, language, tone, briefing, include_itinerary:true, include_schedule:true })
-
-generate-proposal-doc
-  ├── AI tool agora retorna: executive_summary (string curta) + days[].schedule[] (já existe)
-  ├── buildBlocks(content, items, flights, totals) → Block[]
-  ├── if format=docx → renderDocx(blocks) → upload .docx
-  └── if format=pdf  → renderPdf(blocks)  → upload .pdf
+```
+○ Proposta Executiva       — documento comercial com preços e cronograma
+○ Programa Turístico       — apresentação promocional das cidades e itens
+○ Proposta + Programa      — um arquivo único combinando ambos
 ```
 
-## Arquivos
+Comportamento dos demais campos conforme a escolha:
 
-**Criar**
-- `src/components/proposal/ExecutiveProposalDialog.tsx`
-- `supabase/functions/generate-proposal-doc/render-pdf.ts` (helper `pdf-lib`)
-- `supabase/functions/generate-proposal-doc/blocks.ts` (estrutura intermediária + builder)
+- **Proposta Executiva**: mostra todos os campos atuais (modo de preço, formato, idioma, tom, toggles de roteiro/cronograma, briefing).
+- **Programa Turístico**: oculta `price_mode` e o toggle "cronograma consolidado". Mantém formato, idioma, tom, briefing e o toggle "incluir roteiro dia a dia". Adiciona toggle **"Incluir destaques das cidades"** (default on) e **"Incluir descrição dos hotéis e serviços"** (default on).
+- **Proposta + Programa**: mostra a união dos campos (price_mode aplicado apenas à parte da proposta).
 
-**Editar**
-- `supabase/functions/propose-tour-program/index.ts` — schema com datas/horários + prompt
-- `src/lib/applyProgramToQuote.ts` — persistir horários
-- `src/components/proposal/AiProgramAssistantDialog.tsx` — exibir horários
-- `src/components/proposal/ProposalEditor.tsx` — trocar `GenerateDocDialog` por `ExecutiveProposalDialog` + relabel
-- `supabase/functions/generate-proposal-doc/index.ts` — refactor para usar blocks + suportar `format: pdf` + descritivo executivo + cronograma consolidado
-- `src/lib/i18n.tsx` — chave `generateExecutiveProposal`
+Botão de ação muda o label conforme o tipo selecionado: "Gerar Proposta Executiva" / "Gerar Programa Turístico" / "Gerar Documento Completo".
 
-**Remover (após migração)**: `GenerateDocDialog.tsx`
+## 2. `ProposalEditor.tsx`
+
+Trocar:
+- Label `Gerar Proposta Executiva` → `Gerar Documento`
+- Ícone `FileCheck` → `FileText` (ou manter `FileCheck`)
+- Import: `ExecutiveProposalDialog` → `GenerateDocumentDialog`
+
+## 3. Backend — `supabase/functions/generate-proposal-doc/index.ts`
+
+Aceitar novo parâmetro `doc_type: "executive" | "tour_program" | "combined"` (default `executive`). Mantém `format`, `price_mode`, `language`, `tone`, `briefing`, toggles existentes + novos:
+- `include_city_highlights` (boolean)
+- `include_item_descriptions` (boolean)
+
+### Mudanças no prompt da IA (tool `build_proposal_content`)
+
+Adicionar novos campos no schema:
+- `tour_program`: objeto com:
+  - `intro`: parágrafo de abertura promocional do pacote (3-5 frases).
+  - `cities[]`: `{ name, country?, highlights: string[], short_description }` para cada cidade do roteiro.
+  - `inclusions_narrative`: texto descritivo (não-tabular) apresentando hotéis ("hospedagem em hotel 5★ no centro histórico…"), voos e serviços de forma promocional.
+  - `closing`: chamada final inspiracional.
+
+A IA deve gerar `tour_program` quando `doc_type` for `tour_program` ou `combined`, e `executive_summary` quando for `executive` ou `combined`.
+
+### Builder de blocos
+
+Novo módulo lógico `buildTourProgramBlocks(content, items, flights, lead)`:
+- Capa/título: "Programa Turístico — {destino}"
+- Intro promocional
+- Para cada cidade: nome como heading, descrição curta, lista de destaques
+- Roteiro dia a dia (reaproveita a lógica existente de `days[]` com `schedule[]` e datas)
+- Narrativa de inclusões (hotéis com check-in/out, voos, principais serviços) — **sem coluna de preço**
+- Fechamento
+
+Função `buildExecutiveBlocks(...)` (refactor do que já existe): descritivo executivo + tabela de preços (respeitando `price_mode`) + cronograma consolidado.
+
+Roteamento por `doc_type`:
+- `executive` → `buildExecutiveBlocks(...)`
+- `tour_program` → `buildTourProgramBlocks(...)`
+- `combined` → `[...buildTourProgramBlocks(...), pageBreak, ...buildExecutiveBlocks(...)]`
+
+Renderização (`renderDocx` / `renderPdf`) e upload para storage permanecem iguais. Nome do arquivo derivado do `doc_type`:
+- `proposta-executiva-{quote}.{ext}`
+- `programa-turistico-{quote}.{ext}`
+- `proposta-completa-{quote}.{ext}`
+
+## 4. i18n
+
+Em `src/lib/i18n.tsx`:
+- `generateExecutiveProposal` → mantém, agora reusado internamente
+- novas: `generateDocument`, `docTypeExecutive`, `docTypeTourProgram`, `docTypeCombined`, `generateTourProgram`, `generateCompleteDocument`, `includeCityHighlights`, `includeItemDescriptions`
+
+## 5. Arquivos
+
+**Renomear/editar**
+- `src/components/proposal/ExecutiveProposalDialog.tsx` → `GenerateDocumentDialog.tsx` (novo seletor de tipo + lógica condicional dos campos)
+- `src/components/proposal/ProposalEditor.tsx` (label, ícone e import)
+- `supabase/functions/generate-proposal-doc/index.ts` (param `doc_type`, novos campos da tool, builder de blocos do programa, roteamento)
+- `src/lib/i18n.tsx`
+
+**Sem mudanças no banco** — `quote_documents.format` já aceita pdf/docx; podemos opcionalmente persistir `doc_type` no campo `metadata`/`title` do documento gerado.
 
 ## Pontos a confirmar
 
-1. **Datas do lead**: posso usar `lead.travel_start_date` e `travel_end_date` como âncora? Se o lead não tiver, perguntar à IA estimar a partir do número de noites/dias?
-2. **Horários default**: check-in 15:00 / check-out 11:00 / tours 09:00 — OK?
-3. **PDF**: tudo bem usar layout simples (Helvetica, sem cores de marca) para o PDF na primeira versão? Posso depois evoluir para visual mais elaborado.
+1. **Programa Turístico — preços**: confirma que NÃO deve aparecer **nenhuma** referência a valores no Programa Turístico (nem total)? (Seguirei como sem preços por padrão.)
+2. **Combinado — ordem**: Programa primeiro e Proposta Executiva depois? Ou inverter?
+3. **Imagens das cidades no Programa**: por enquanto **somente texto** (sem buscar/gerar imagens) — OK manter assim nesta primeira versão e evoluir depois?

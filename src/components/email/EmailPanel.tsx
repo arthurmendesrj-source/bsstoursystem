@@ -85,15 +85,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   });
   useEffect(() => { try { localStorage.setItem(LS_COLLAPSED, collapsed ? "1" : "0"); } catch {} }, [collapsed]);
 
-  // panel sizes
-  const initialSizes = useMemo<number[]>(() => {
-    if (typeof window === "undefined") return [22, 30, 48];
-    try {
-      const raw = localStorage.getItem(LS_SIZES);
-      if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length === 3) return arr; }
-    } catch {}
-    return [22, 30, 48];
-  }, []);
 
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
 

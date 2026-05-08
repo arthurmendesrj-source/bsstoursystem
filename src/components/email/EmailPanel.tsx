@@ -441,8 +441,56 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     </aside>
   );
 
+  const labelNamesPt: Record<SyncLabel, string> = {
+    INBOX: "Caixa de entrada", SENT: "Enviados", DRAFT: "Rascunhos",
+    SPAM: "Spam", TRASH: "Lixeira", IMPORTANT: "Importantes", STARRED: "Com estrela",
+  };
+  const doneCount = SYNC_LABELS.filter((l) => syncProgress.perLabel[l].status === "done").length;
+  const showSyncPanel = syncProgress.active && !syncProgress.hidden;
+
+  const SyncProgressPanel = showSyncPanel ? (
+    <div className="border-b bg-card/50 p-3 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">Sincronizando últimos 6 meses</div>
+          <div className="text-xs text-muted-foreground">
+            {syncProgress.totalSynced.toLocaleString("pt-BR")} mensagens · {doneCount} de {SYNC_LABELS.length} pastas
+          </div>
+        </div>
+        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setSyncProgress((p) => ({ ...p, hidden: true }))}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <Progress value={(doneCount / SYNC_LABELS.length) * 100} className="h-1.5" />
+      <ul className="space-y-1.5">
+        {SYNC_LABELS.map((l) => {
+          const s = syncProgress.perLabel[l];
+          const Icon = s.status === "done" ? Check : s.status === "active" ? Loader2 : Circle;
+          return (
+            <li key={l} className="space-y-1">
+              <div className="flex items-center gap-2 text-xs">
+                <Icon className={cn("h-3.5 w-3.5 shrink-0",
+                  s.status === "done" && "text-primary",
+                  s.status === "active" && "text-primary animate-spin",
+                  s.status === "pending" && "text-muted-foreground/50")} />
+                <span className={cn("flex-1 truncate", s.status === "pending" ? "text-muted-foreground" : "text-foreground")}>{labelNamesPt[l]}</span>
+                <span className="tabular-nums text-muted-foreground">{s.count.toLocaleString("pt-BR")}</span>
+              </div>
+              {s.status === "active" && (
+                <div className="h-1 ml-5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ) : null;
+
   const ThreadList = (
     <section className="flex flex-col h-full bg-background min-w-0">
+      {SyncProgressPanel}
       <div className="p-3 border-b space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />

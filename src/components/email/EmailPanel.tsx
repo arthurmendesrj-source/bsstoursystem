@@ -572,14 +572,50 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   if (authorizedEmails === null) {
     return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
   }
+  const AddAccountDialog = (
+    <Dialog open={addAccountOpen} onOpenChange={(o) => { setAddAccountOpen(o); if (!o) setNewAccountEmail(""); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Vincular conta de email</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="new-email-account">Endereço Gmail</Label>
+          <Input
+            id="new-email-account"
+            type="email"
+            autoFocus
+            placeholder="voce@gmail.com"
+            value={newAccountEmail}
+            onChange={(e) => setNewAccountEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void addEmailAccount(); }}
+          />
+          <p className="text-xs text-muted-foreground">
+            A conta será vinculada ao seu usuário. A sincronização usa a integração Gmail já configurada.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setAddAccountOpen(false)} disabled={addingAccount}>Cancelar</Button>
+          <Button onClick={() => void addEmailAccount()} disabled={addingAccount}>
+            {addingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Vincular
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!hasMailbox) {
     return (
       <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center bg-background", className)}>
         <div className="max-w-md text-center px-6 py-10 rounded-lg border bg-card">
           <Mail className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
           <h2 className="text-lg font-semibold mb-2">Nenhuma conta de email vinculada</h2>
-          <p className="text-sm text-muted-foreground">Solicite ao administrador que vincule sua conta.</p>
+          <p className="text-sm text-muted-foreground mb-4">Vincule uma conta Gmail para começar a sincronizar.</p>
+          <Button onClick={() => setAddAccountOpen(true)}>
+            <Mail className="h-4 w-4 mr-2" /> Adicionar conta de email
+          </Button>
         </div>
+        {AddAccountDialog}
       </div>
     );
   }

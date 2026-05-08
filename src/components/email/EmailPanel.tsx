@@ -897,6 +897,15 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           {resettingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
           Reiniciar do zero
         </Button>
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={wipingMirror}
+          onClick={() => { setWipeConfirmText(""); setWipeOpen(true); }}
+        >
+          {wipingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
+          Esvaziar tudo e ressincronizar
+        </Button>
       </div>
     </div>
   ) : null;

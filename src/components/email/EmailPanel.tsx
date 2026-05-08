@@ -104,9 +104,9 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
   const [syncWindowDays, setSyncWindowDays] = useState<number>(() => {
-    if (typeof window === "undefined") return 180;
+    if (typeof window === "undefined") return 360;
     const v = Number(localStorage.getItem(LS_SYNC_DAYS));
-    return Number.isFinite(v) && v >= 1 && v <= 3650 ? v : 180;
+    return Number.isFinite(v) && v >= 1 && v <= 3650 ? v : 360;
   });
   useEffect(() => { try { localStorage.setItem(LS_SYNC_DAYS, String(syncWindowDays)); } catch {} }, [syncWindowDays]);
   const [customDaysOpen, setCustomDaysOpen] = useState(false);

@@ -175,19 +175,51 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
 
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [newAccountEmail, setNewAccountEmail] = useState("");
+  const [addingAccount, setAddingAccount] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const loadAccounts = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) { setAuthorizedEmails([]); return; }
+    const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
+    setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
+  }, []);
+
+  useEffect(() => { void loadAccounts(); }, [loadAccounts]);
+
+  const addEmailAccount = useCallback(async () => {
+    const email = newAccountEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Informe um endereço de email válido.");
+      return;
+    }
+    setAddingAccount(true);
+    try {
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user?.id;
-      if (!uid) { if (!cancelled) setAuthorizedEmails([]); return; }
-      const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
-      if (cancelled) return;
-      setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
-    })();
-    return () => { cancelled = true; };
-  }, []);
+      if (!uid) { toast.error("Sessão expirada."); return; }
+      const isFirst = (authorizedEmails?.length ?? 0) === 0;
+      const { error } = await supabase
+        .from("user_email_accounts")
+        .insert({ user_id: uid, email_address: email, is_primary: isFirst });
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          toast.error("Esta conta já está vinculada.");
+        } else {
+          toast.error(error.message || "Falha ao vincular conta.");
+        }
+        return;
+      }
+      toast.success(`Conta ${email} vinculada.`);
+      setNewAccountEmail("");
+      setAddAccountOpen(false);
+      await loadAccounts();
+    } finally {
+      setAddingAccount(false);
+    }
+  }, [newAccountEmail, authorizedEmails, loadAccounts]);
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
 
@@ -540,14 +572,50 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   if (authorizedEmails === null) {
     return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
   }
+  const AddAccountDialog = (
+    <Dialog open={addAccountOpen} onOpenChange={(o) => { setAddAccountOpen(o); if (!o) setNewAccountEmail(""); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Vincular conta de email</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label htmlFor="new-email-account">Endereço Gmail</Label>
+          <Input
+            id="new-email-account"
+            type="email"
+            autoFocus
+            placeholder="voce@gmail.com"
+            value={newAccountEmail}
+            onChange={(e) => setNewAccountEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void addEmailAccount(); }}
+          />
+          <p className="text-xs text-muted-foreground">
+            A conta será vinculada ao seu usuário. A sincronização usa a integração Gmail já configurada.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setAddAccountOpen(false)} disabled={addingAccount}>Cancelar</Button>
+          <Button onClick={() => void addEmailAccount()} disabled={addingAccount}>
+            {addingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Vincular
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!hasMailbox) {
     return (
       <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center bg-background", className)}>
         <div className="max-w-md text-center px-6 py-10 rounded-lg border bg-card">
           <Mail className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
           <h2 className="text-lg font-semibold mb-2">Nenhuma conta de email vinculada</h2>
-          <p className="text-sm text-muted-foreground">Solicite ao administrador que vincule sua conta.</p>
+          <p className="text-sm text-muted-foreground mb-4">Vincule uma conta Gmail para começar a sincronizar.</p>
+          <Button onClick={() => setAddAccountOpen(true)}>
+            <Mail className="h-4 w-4 mr-2" /> Adicionar conta de email
+          </Button>
         </div>
+        {AddAccountDialog}
       </div>
     );
   }
@@ -619,6 +687,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
                   {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
                   <span className="flex-1">Importar tudo (cópia fiel)</span>
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
+                  <Mail className="h-3.5 w-3.5 mr-2" />
+                  <span className="flex-1">Adicionar conta de email…</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -650,6 +723,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
               <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
                 {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
                 <span className="flex-1">Importar tudo (cópia fiel)</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
+                <Mail className="h-3.5 w-3.5 mr-2" />
+                <span className="flex-1">Adicionar conta de email…</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -875,6 +953,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         {Sidebar}
         <div className="w-96 shrink-0 border-r">{ThreadList}</div>
         <div className="flex-1 min-w-0">{Reader}</div>
+
+        {AddAccountDialog}
 
         {/* POPUP independente */}
         <Dialog open={!!popupThreadId} onOpenChange={(o) => { if (!o) { setPopupThreadId(null); setPopupMessages(null); } }}>

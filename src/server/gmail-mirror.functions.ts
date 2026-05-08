@@ -123,7 +123,7 @@ export const gmailListLabels = createServerFn({ method: "POST" })
     const { supabase } = context;
     // who am i (owner email)
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
-    const owner = profile.emailAddress;
+    const owner = profile.emailAddress.toLowerCase();
 
     const list = (await gw(`/users/me/labels`)) as { labels: Array<{ id: string; name: string; type: string; messageListVisibility?: string; labelListVisibility?: string }> };
 
@@ -262,7 +262,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     const max = data.maxPerLabel ?? 100;
 
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
-    const owner = profile.emailAddress;
+    const owner = profile.emailAddress.toLowerCase();
 
     // Walk all messages (most recent N) — Gmail returns across all labels except SPAM/TRASH by default;
     // we use q empty + includeSpamTrash to cover everything.
@@ -314,7 +314,7 @@ export const gmailIncrementalSync = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
-    const owner = profile.emailAddress;
+    const owner = profile.emailAddress.toLowerCase();
 
     const { data: state } = await supabase
       .from("email_sync_state")

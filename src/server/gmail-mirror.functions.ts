@@ -24,6 +24,49 @@ export const gmailStartFullMirror = createServerFn({ method: "POST" })
     return { owner: r.owner, queueLength: r.queue.length };
   });
 
+// ---------------- CANCEL FULL MIRROR ----------------
+// Stops the background sync: clears in-progress flag, label queue, page token,
+// current label/month and empty-streak counter. Preserves total counters and
+// last_full_sync_at for audit purposes.
+export const gmailCancelFullMirror = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
+    const owner = profile.emailAddress.toLowerCase();
+    await supabase.from("email_sync_state").update({
+      full_sync_in_progress: false,
+      full_sync_label_queue: [],
+      full_sync_page_token: null,
+      full_sync_current_label: null,
+      full_sync_current_month_offset: 0,
+      full_sync_empty_streak: 0,
+    }).eq("owner_email", owner);
+    return { owner, cancelled: true };
+  });
+
+// ---------------- RESET FULL MIRROR ----------------
+// Cancels the in-flight sync, zeroes the totals, then re-initializes the
+// queue from scratch via startFullMirror — equivalent to a fresh start.
+export const gmailResetFullMirror = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
+    const owner = profile.emailAddress.toLowerCase();
+    await supabase.from("email_sync_state").update({
+      full_sync_in_progress: false,
+      full_sync_label_queue: [],
+      full_sync_page_token: null,
+      full_sync_current_label: null,
+      full_sync_current_month_offset: 0,
+      full_sync_empty_streak: 0,
+      full_sync_total_synced: 0,
+    }).eq("owner_email", owner);
+    const r = await startFullMirror(supabase);
+    return { owner: r.owner, queueLength: r.queue.length, reset: true };
+  });
+
 // ---------------- FULL SYNC (one tick) ----------------
 // Kept for manual UI invocation; the cron drives this same logic in the
 // background via /api/public/gmail-cron-tick.

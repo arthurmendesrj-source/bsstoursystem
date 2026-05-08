@@ -239,7 +239,9 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [mode, hasMailbox]);
 
-  const doFullSync = async () => {
+  const doFullSync = async (daysOverride?: number) => {
+    const days = Math.max(1, Math.min(3650, daysOverride ?? syncWindowDays));
+    if (daysOverride) setSyncWindowDays(days);
     setSyncing(true);
     setSyncProgress({
       active: true, hidden: false, currentLabel: "INBOX", totalSynced: 0,
@@ -249,7 +251,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     try {
       await listLabelsFn({ data: undefined as never });
       for (let i = 0; i < 2000; i++) {
-        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: 180 } });
+        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
         total = r.totalSynced || total + r.syncedThisRun;
         const lbl = r.label as SyncLabel;
         const next = (r.nextLabel ?? null) as SyncLabel | null;

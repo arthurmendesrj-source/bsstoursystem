@@ -204,6 +204,32 @@ export function AiTriageDialog({
                 )}
               </div>
             </div>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Languages className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Traduzir email</Label>
+                <div className="flex-1" />
+                <Select value={targetLang} onValueChange={setTargetLang}>
+                  <SelectTrigger className="w-[160px] h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Português">Português</SelectItem>
+                    <SelectItem value="Inglês">Inglês</SelectItem>
+                    <SelectItem value="Espanhol">Espanhol</SelectItem>
+                    <SelectItem value="Francês">Francês</SelectItem>
+                    <SelectItem value="Italiano">Italiano</SelectItem>
+                    <SelectItem value="Alemão">Alemão</SelectItem>
+                    <SelectItem value="Japonês">Japonês</SelectItem>
+                    <SelectItem value="Chinês">Chinês</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => void doTranslate()} disabled={translating}>
+                  {translating ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Traduzindo…</> : "Traduzir"}
+                </Button>
+              </div>
+              {translation && (
+                <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/40 rounded p-2 max-h-72 overflow-y-auto">{translation}</pre>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground">
               Recomendação da IA: <strong>{sug.suggested_action === "create_lead" ? "Criar Lead" : sug.suggested_action === "create_task" ? "Criar Atividade" : "Ignorar"}</strong>
             </div>

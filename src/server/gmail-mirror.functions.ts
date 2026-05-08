@@ -522,10 +522,28 @@ export const gmailGetThread = createServerFn({ method: "POST" })
   });
 
 // ---------------- GET ATTACHMENT ----------------
+// Tries Storage first; falls back to Gmail if missing.
 export const gmailGetAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { messageId: string; attachmentId: string }) => d)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: row } = await supabase
+      .from("email_attachments")
+      .select("storage_path, mime_type, filename, size")
+      .eq("attachment_id", data.attachmentId)
+      .maybeSingle();
+    const storagePath = (row as any)?.storage_path as string | null | undefined;
+    if (storagePath) {
+      const { data: blob, error } = await supabase.storage.from(ATTACHMENT_BUCKET).download(storagePath);
+      if (!error && blob) {
+        const buf = new Uint8Array(await blob.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+        const b64 = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        return { dataB64Url: b64, size: buf.length };
+      }
+    }
     const att = (await gw(`/users/me/messages/${encodeURIComponent(data.messageId)}/attachments/${encodeURIComponent(data.attachmentId)}`)) as { data: string; size: number };
     return { dataB64Url: att.data, size: att.size };
   });

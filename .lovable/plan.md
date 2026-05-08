@@ -1,70 +1,65 @@
+## Problema
+
+A sincronização do Gmail (botão "Sincronizar") usa `/users/me/messages?maxResults=500&includeSpamTrash=true` **sem filtro de tempo nem de label**, paginando do mais novo para o mais antigo. Resultado:
+
+- Em caixas grandes, a sincronização raramente "termina" (200 lotes × 500 = limite do loop), e a aba **Enviados** fica incompleta porque os emails de `SENT` mais antigos chegam no fim da paginação geral e nunca são alcançados.
+- A sincronização incremental (`history`) só pega o que mudou depois do `last_history_id` — não corrige o backlog que faltou.
+- Não existe nenhum recorte por janela de tempo (ex.: últimos 6 meses) nem garantia de cobertura por pasta.
+
 ## Objetivo
 
-Tornar o buscador da aba E-mail abrangente: ao digitar uma palavra, encontrar threads cujo **assunto, snippet, participantes, remetente, destinatários OU corpo da mensagem** contenham o termo.
+Sincronizar **todas as mensagens dos últimos 6 meses** em **cada pasta do sistema** (INBOX, SENT, DRAFT, SPAM, TRASH, IMPORTANT, STARRED), de forma confiável e idempotente.
 
-## Estado atual
+## Solução
 
-`src/components/email/EmailPanel.tsx` (l. 117) filtra apenas `subject` e `snippet` da tabela `email_threads`:
+### 1. `src/server/gmail-mirror.functions.ts` — `gmailFullSync`
 
-```ts
-q = q.or(`subject.ilike.%${search}%,snippet.ilike.%${search}%`);
+Trocar a estratégia de "paginação global" por **sincronização por label, com janela de tempo**:
+
+- Adicionar `inputValidator` aceitando:
+  - `restart?: boolean`
+  - `windowDays?: number` (default `180` ≈ 6 meses)
+  - `label?: string` (label atual sendo sincronizado; default `"INBOX"`)
+- Manter a ordem fixa de labels: `["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"]`.
+- Para cada chamada, montar a query do Gmail:
+  ```
+  /users/me/messages?maxResults=500
+    &labelIds={label}
+    &q=newer_than:{windowDays}d
+    &includeSpamTrash=true        (apenas para SPAM/TRASH)
+    &pageToken={token}
+  ```
+- Persistir progresso em `email_sync_state` em duas colunas novas (ou reutilizar via JSON):
+  - `full_sync_current_label` (text)
+  - `full_sync_page_token` (já existe — passa a ser por label)
+- Quando `nextPageToken` acabar para o label atual, avançar para o próximo label da lista. Quando todos os labels terminarem, marcar `done: true` e gravar `last_full_sync_at`.
+- Retorno: `{ done, label, syncedThisRun, totalSynced, threads, hasMore, nextLabel? }`.
+
+### 2. Migration: `email_sync_state`
+
+Adicionar coluna:
+```sql
+ALTER TABLE public.email_sync_state
+  ADD COLUMN IF NOT EXISTS full_sync_current_label text;
 ```
+Sem mudanças em RLS.
 
-Campos úteis ficam de fora: `participants` (array em `email_threads`), `from_email`, `from_name`, `to_emails`, `body_text` e `body_html` (em `emails`).
+### 3. `src/components/email/EmailPanel.tsx` — `doFullSync`
 
-## O que muda
+- Mostrar no toast o **label atual** + total ("Sincronizando Enviados — 1.240 msgs…").
+- Manter o loop de até 200 iterações chamando `fullSyncFn({ data: { restart: i === 0, windowDays: 180 } })` até `r.done === true`.
+- Ao fim, recarregar pastas e threads.
 
-### Em `src/components/email/EmailPanel.tsx` — `loadThreads()`
+### 4. Endpoint público `src/routes/api/public/gmail-poll.ts`
 
-Quando `search.trim()` tiver ao menos 2 caracteres:
+- Quando `state.last_history_id` está ausente **ou** `full_sync_in_progress = true`, executar uma rodada de `fullSync` por owner em vez de só retornar `needsFullSync`. Isso garante que o cron continua o backfill sem depender de o usuário clicar no botão.
 
-1. **Buscar thread_ids candidatos por conteúdo** na tabela `emails` (filtrando por `owner_email`):
-   ```ts
-   const like = `%${term}%`;
-   const { data: hits } = await supabase
-     .from("emails")
-     .select("thread_id")
-     .in("owner_email", authorizedEmails!)
-     .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
-     .limit(500);
-   const threadIds = Array.from(new Set((hits ?? []).map(h => h.thread_id).filter(Boolean)));
-   ```
+### Fora de escopo
 
-2. **Buscar nas próprias threads** (assunto, snippet, participantes — esta inclui destinatários):
-   ```ts
-   let q = supabase.from("email_threads").select("*")
-     .in("owner_email", authorizedEmails!)
-     .contains("labels", [activeLabel])
-     .order("last_message_at", { ascending: false }).limit(200);
+- Não muda RLS, não mexe em `emails`/`email_threads`, não toca em anexos nem no compose.
+- Não altera o `EmailPanel` além do toast e do parâmetro `windowDays`.
+- Não muda janela depois de pronta — fica fixa em 180 dias (configurável só via parâmetro do server fn).
 
-   const orParts = [
-     `subject.ilike.${like}`,
-     `snippet.ilike.${like}`,
-     // array overlap como string Postgres: {term}
-     `participants.cs.{${term.replace(/[",{}\\]/g, "")}}`,
-   ];
-   if (threadIds.length) orParts.push(`id.in.(${threadIds.map(id => `"${id}"`).join(",")})`);
-   q = q.or(orParts.join(","));
-   ```
+## Detalhe técnico
 
-   - `participants.cs.{term}` (`contains`) cobre buscas exatas de e-mail; para parcial dentro do array, o caminho é via `emails.from_email`/`to_emails` (item 1).
-   - Para incluir `to_emails` (array em `emails`), adicionamos no `or` da consulta de `emails`: `to_emails.cs.{term}` (apenas para correspondência completa de endereço). Para parcial, `from_email`/`subject` já capturam a maior parte.
-
-3. **Manter o limite de 200 threads** e ordenação por `last_message_at`.
-
-4. **Sanitização**: escapar `%`, `,`, `(`, `)`, `"` no termo antes de montar o `or`, evitando quebrar a sintaxe PostgREST.
-
-5. **Debounce de 250 ms** no `search` para não disparar duas consultas a cada tecla.
-
-6. **Indicador de carregamento**: usar o `syncing`/novo `searching` para mostrar spinner pequeno no campo enquanto busca.
-
-### Sem mudanças em backend / RLS
-
-- As policies de `emails` e `email_threads` já restringem por `owner_email` do usuário; o pré-filtro `.in("owner_email", authorizedEmails!)` mantém o escopo.
-- Nenhuma migração ou nova função é necessária.
-
-## Fora do escopo
-
-- Não alteramos o buscador global (lupa do header), que já cobre busca em e-mails em todo o sistema.
-- Não criamos índice full-text (FTS); se o volume crescer, fica como evolução futura.
-- Anexos (nome do arquivo) não entram nessa rodada — exige join em `email_attachments`.
+A query `q=newer_than:180d` usa a sintaxe nativa de busca do Gmail e é avaliada do lado do servidor, então a paginação volta apenas IDs dentro da janela — sem desperdiçar lotes em emails antigos. Combinada com `labelIds`, garante cobertura por pasta sem depender da ordem global de `internalDate`.

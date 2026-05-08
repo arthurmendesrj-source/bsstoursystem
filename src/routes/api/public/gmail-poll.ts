@@ -167,6 +167,72 @@ async function rebuildThread(owner: string, threadId: string) {
   }, { onConflict: "id" });
 }
 
+const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
+type SyncLabel = typeof SYNC_LABELS[number];
+
+async function runFullSyncRound(owner: string, windowDays = 180) {
+  const profile = await gw(`/users/me/profile`) as { emailAddress: string; historyId?: string };
+  if (profile.emailAddress.toLowerCase() !== owner) {
+    return { skipped: true, reason: `connector account mismatch` };
+  }
+
+  const { data: state } = await supabaseAdmin
+    .from("email_sync_state")
+    .select("full_sync_page_token, full_sync_total_synced, full_sync_started_at, full_sync_current_label")
+    .eq("owner_email", owner)
+    .maybeSingle();
+  const s = state as any;
+
+  let currentLabel: SyncLabel = (s?.full_sync_current_label as SyncLabel) ?? "INBOX";
+  if (!SYNC_LABELS.includes(currentLabel)) currentLabel = "INBOX";
+  const pageToken: string | undefined = s?.full_sync_page_token ?? undefined;
+  let totalSynced: number = s?.full_sync_total_synced ?? 0;
+  const startedAt = s?.full_sync_started_at ?? new Date().toISOString();
+
+  const params = new URLSearchParams();
+  params.set("maxResults", "500");
+  params.set("labelIds", currentLabel);
+  params.set("q", `newer_than:${windowDays}d`);
+  if (currentLabel === "SPAM" || currentLabel === "TRASH") params.set("includeSpamTrash", "true");
+  if (pageToken) params.set("pageToken", pageToken);
+
+  const list = await gw(`/users/me/messages?${params.toString()}`) as { messages?: { id: string }[]; nextPageToken?: string };
+  const ids = (list.messages ?? []).map((m) => m.id);
+  const nextPageToken = list.nextPageToken;
+
+  const threadIds = new Set<string>();
+  for (let i = 0; i < ids.length; i += 5) {
+    const batch = ids.slice(i, i + 5);
+    const results = await Promise.all(batch.map(async (id) => {
+      try { return await fetchAndStore(owner, id); } catch (e) { console.error("fullsync msg", id, e); return null; }
+    }));
+    results.forEach((r) => { if (r?.threadId) threadIds.add(r.threadId); });
+  }
+  for (const tid of threadIds) await rebuildThread(owner, tid);
+
+  totalSynced += ids.length;
+  const idx = SYNC_LABELS.indexOf(currentLabel);
+  const nextLabel: SyncLabel | null = nextPageToken
+    ? currentLabel
+    : (idx < SYNC_LABELS.length - 1 ? SYNC_LABELS[idx + 1] : null);
+  const done = !nextPageToken && nextLabel === null;
+
+  await supabaseAdmin.from("email_sync_state").upsert({
+    owner_email: owner,
+    last_history_id: profile.historyId ? Number(profile.historyId) : null,
+    last_full_sync_at: done ? new Date().toISOString() : null,
+    last_incremental_sync_at: new Date().toISOString(),
+    full_sync_page_token: nextPageToken ?? null,
+    full_sync_current_label: done ? null : nextLabel,
+    full_sync_in_progress: !done,
+    full_sync_started_at: done ? null : startedAt,
+    full_sync_total_synced: done ? 0 : totalSynced,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "owner_email" });
+
+  return { fullSync: true, label: currentLabel, syncedThisRun: ids.length, totalSynced, threads: threadIds.size, done };
+}
+
 async function syncOwner(owner: string) {
   const profile = await gw(`/users/me/profile`) as { emailAddress: string; historyId?: string };
   const remoteOwner = profile.emailAddress.toLowerCase();
@@ -174,9 +240,10 @@ async function syncOwner(owner: string) {
     return { skipped: true, reason: `connector account is ${remoteOwner}, mailbox is ${owner}` };
   }
 
-  const { data: state } = await supabaseAdmin.from("email_sync_state").select("last_history_id").eq("owner_email", owner).maybeSingle();
-  if (!(state as any)?.last_history_id) {
-    return { needsFullSync: true };
+  const { data: state } = await supabaseAdmin.from("email_sync_state").select("last_history_id, full_sync_in_progress").eq("owner_email", owner).maybeSingle();
+  const s = state as any;
+  if (!s?.last_history_id || s?.full_sync_in_progress) {
+    return await runFullSyncRound(owner);
   }
 
   const params = new URLSearchParams();

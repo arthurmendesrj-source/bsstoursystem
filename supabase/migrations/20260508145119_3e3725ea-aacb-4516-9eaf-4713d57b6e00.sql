@@ -1,0 +1,1 @@
+ALTER TABLE public.email_sync_state ADD COLUMN IF NOT EXISTS full_sync_current_label text;

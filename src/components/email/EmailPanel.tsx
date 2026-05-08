@@ -35,6 +35,20 @@ const SYSTEM_NAMES_PT: Record<string, string> = {
   SENT: "Enviados", DRAFT: "Rascunhos", SPAM: "Spam", TRASH: "Lixeira",
 };
 const LS_COLLAPSED = "email.sidebar.collapsed";
+const LS_SYNC_DAYS = "email.sync.windowDays";
+const SYNC_PRESETS: { label: string; days: number }[] = [
+  { label: "Últimos 3 meses", days: 90 },
+  { label: "Últimos 6 meses", days: 180 },
+  { label: "Últimos 12 meses", days: 365 },
+  { label: "Últimos 24 meses", days: 730 },
+];
+const formatWindowLabel = (days: number) => {
+  if (days % 30 === 0) {
+    const m = days / 30;
+    return m === 1 ? "1 mês" : `${m} meses`;
+  }
+  return `${days} dias`;
+};
 
 const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
 type SyncLabel = typeof SYNC_LABELS[number];

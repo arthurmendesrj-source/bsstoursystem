@@ -288,16 +288,35 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const doFullSync = async (daysOverride?: number) => {
     const days = Math.max(1, Math.min(3650, daysOverride ?? syncWindowDays));
     if (daysOverride) setSyncWindowDays(days);
+    const totalMonths = Math.max(1, Math.ceil(days / 30));
     setSyncing(true);
     setSyncProgress({
-      active: true, hidden: false, currentLabel: "INBOX", totalSynced: 0,
+      active: true, hidden: false, currentLabel: "INBOX",
+      currentMonthLabel: null, currentMonthIndex: 1, totalMonths,
+      totalSynced: 0,
       perLabel: { ...initialPerLabel(), INBOX: { count: 0, threads: 0, status: "active" } },
     });
     let total = 0;
     try {
       await listLabelsFn({ data: undefined as never });
-      for (let i = 0; i < 2000; i++) {
-        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
+      const maxIters = 7 /*labels*/ * totalMonths * 30 /*pages safety*/;
+      for (let i = 0; i < maxIters; i++) {
+        // Retry transient failures (gateway timeout) up to 3 times — server state is preserved
+        let r: Awaited<ReturnType<typeof fullSyncFn>> | null = null;
+        let attempt = 0;
+        while (true) {
+          try {
+            r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
+            break;
+          } catch (err) {
+            attempt++;
+            const msg = err instanceof Error ? err.message : String(err);
+            const transient = /timeout|504|503|502|429|upstream/i.test(msg);
+            if (!transient || attempt >= 3) throw err;
+            await new Promise((res) => setTimeout(res, 1000 * attempt + 1000));
+          }
+        }
+        if (!r) break;
         total = r.totalSynced || total + r.syncedThisRun;
         const lbl = r.label as SyncLabel;
         const next = (r.nextLabel ?? null) as SyncLabel | null;
@@ -315,13 +334,21 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           if (r.done) {
             for (const l of SYNC_LABELS) if (perLabel[l].status !== "done") perLabel[l].status = "done";
           }
-          return { ...prev, currentLabel: r.done ? null : (next ?? lbl), totalSynced: total, perLabel };
+          return {
+            ...prev,
+            currentLabel: r.done ? null : (next ?? lbl),
+            currentMonthLabel: r.monthLabel ?? prev.currentMonthLabel,
+            currentMonthIndex: r.done ? prev.totalMonths : ((r.nextMonthOffset ?? 0) + 1),
+            totalMonths: r.totalMonths ?? prev.totalMonths,
+            totalSynced: total,
+            perLabel,
+          };
         });
         await loadFolders(); await loadThreads();
         if (r.done) break;
         await new Promise((res) => setTimeout(res, 150));
       }
-      toast.success(`Sincronização concluída — últimos 6 meses`);
+      toast.success(`Sincronização concluída — ${formatWindowLabel(days)}`);
       setTimeout(() => setSyncProgress((p) => ({ ...p, active: false })), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao sincronizar";

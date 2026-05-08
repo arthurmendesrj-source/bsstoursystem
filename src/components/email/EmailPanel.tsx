@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen, Check, Loader2, Circle, X } from "lucide-react";
+import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen, Check, Loader2, Circle, X, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

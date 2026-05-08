@@ -45,10 +45,19 @@ export function AiTriageDialog({
   subject?: string;
 }) {
   const analyzeFn = useServerFn(emailAnalyze);
+  const translateFn = useServerFn(emailTranslate);
+  const { user } = useAuth();
+  const { subordinates } = useSubordinates();
   const [loading, setLoading] = useState(false);
   const [sug, setSug] = useState<Suggestion | null>(null);
   const [mode, setMode] = useState<"summary" | "lead" | "task">("summary");
   const [saving, setSaving] = useState(false);
+  const [assignedTo, setAssignedTo] = useState<string>("");
+
+  // translation
+  const [targetLang, setTargetLang] = useState<string>("Português");
+  const [translating, setTranslating] = useState(false);
+  const [translation, setTranslation] = useState<string>("");
 
   // lead form
   const [lName, setLName] = useState("");

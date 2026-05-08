@@ -954,6 +954,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         <div className="w-96 shrink-0 border-r">{ThreadList}</div>
         <div className="flex-1 min-w-0">{Reader}</div>
 
+        {AddAccountDialog}
+
         {/* POPUP independente */}
         <Dialog open={!!popupThreadId} onOpenChange={(o) => { if (!o) { setPopupThreadId(null); setPopupMessages(null); } }}>
           <DialogContent className="sm:max-w-5xl h-[85vh] p-0 flex flex-col gap-0">

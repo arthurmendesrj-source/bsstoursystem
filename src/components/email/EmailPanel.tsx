@@ -724,6 +724,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
                 {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
                 <span className="flex-1">Importar tudo (cópia fiel)</span>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
+                <Mail className="h-3.5 w-3.5 mr-2" />
+                <span className="flex-1">Adicionar conta de email…</span>
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}

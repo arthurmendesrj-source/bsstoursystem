@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen, Check, Loader2, Circle, X } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,6 +35,22 @@ const SYSTEM_NAMES_PT: Record<string, string> = {
 };
 const LS_COLLAPSED = "email.sidebar.collapsed";
 
+const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
+type SyncLabel = typeof SYNC_LABELS[number];
+type LabelStatus = "pending" | "active" | "done";
+type SyncProgressState = {
+  active: boolean;
+  hidden: boolean;
+  currentLabel: SyncLabel | null;
+  totalSynced: number;
+  perLabel: Record<SyncLabel, { count: number; threads: number; status: LabelStatus }>;
+};
+const initialPerLabel = (): SyncProgressState["perLabel"] =>
+  SYNC_LABELS.reduce((acc, l) => { acc[l] = { count: 0, threads: 0, status: "pending" }; return acc; }, {} as SyncProgressState["perLabel"]);
+const initialSyncProgress = (): SyncProgressState => ({
+  active: false, hidden: false, currentLabel: null, totalSynced: 0, perLabel: initialPerLabel(),
+});
+
 function formatRelative(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -67,6 +84,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[] | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
   const [composeOpen, setComposeOpen] = useState<null | { mode: "reply" | "forward" | "new"; msg?: ThreadMessage }>(null);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
@@ -200,27 +218,45 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const doFullSync = async () => {
     setSyncing(true);
+    setSyncProgress({
+      active: true, hidden: false, currentLabel: "INBOX", totalSynced: 0,
+      perLabel: { ...initialPerLabel(), INBOX: { count: 0, threads: 0, status: "active" } },
+    });
     let total = 0;
-    const labelNames: Record<string, string> = {
-      INBOX: "Caixa de entrada", SENT: "Enviados", DRAFT: "Rascunhos",
-      SPAM: "Spam", TRASH: "Lixeira", IMPORTANT: "Importantes", STARRED: "Com estrela",
-    };
     try {
       await listLabelsFn({ data: undefined as never });
       for (let i = 0; i < 2000; i++) {
         const r = await fullSyncFn({ data: { restart: i === 0, windowDays: 180 } });
         total = r.totalSynced || total + r.syncedThisRun;
-        const labelLabel = labelNames[r.label] ?? r.label;
-        toast.message(`Sincronizando ${labelLabel}…`, { description: `${total} mensagens, ${r.threads} conversas neste lote` });
+        const lbl = r.label as SyncLabel;
+        const next = (r.nextLabel ?? null) as SyncLabel | null;
+        setSyncProgress((prev) => {
+          if (!SYNC_LABELS.includes(lbl)) return prev;
+          const perLabel = { ...prev.perLabel };
+          perLabel[lbl] = {
+            count: perLabel[lbl].count + r.syncedThisRun,
+            threads: perLabel[lbl].threads + r.threads,
+            status: r.done || (next && next !== lbl) ? "done" : "active",
+          };
+          if (next && next !== lbl && SYNC_LABELS.includes(next) && perLabel[next].status === "pending") {
+            perLabel[next] = { ...perLabel[next], status: "active" };
+          }
+          if (r.done) {
+            for (const l of SYNC_LABELS) if (perLabel[l].status !== "done") perLabel[l].status = "done";
+          }
+          return { ...prev, currentLabel: r.done ? null : (next ?? lbl), totalSynced: total, perLabel };
+        });
         await loadFolders(); await loadThreads();
         if (r.done) break;
         await new Promise((res) => setTimeout(res, 150));
       }
       toast.success(`Sincronização concluída — últimos 6 meses`);
+      setTimeout(() => setSyncProgress((p) => ({ ...p, active: false })), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
       if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
       else toast.error(msg);
+      setSyncProgress((p) => ({ ...p, active: false }));
     } finally { setSyncing(false); }
   };
 
@@ -405,8 +441,56 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     </aside>
   );
 
+  const labelNamesPt: Record<SyncLabel, string> = {
+    INBOX: "Caixa de entrada", SENT: "Enviados", DRAFT: "Rascunhos",
+    SPAM: "Spam", TRASH: "Lixeira", IMPORTANT: "Importantes", STARRED: "Com estrela",
+  };
+  const doneCount = SYNC_LABELS.filter((l) => syncProgress.perLabel[l].status === "done").length;
+  const showSyncPanel = syncProgress.active && !syncProgress.hidden;
+
+  const SyncProgressPanel = showSyncPanel ? (
+    <div className="border-b bg-card/50 p-3 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold truncate">Sincronizando últimos 6 meses</div>
+          <div className="text-xs text-muted-foreground">
+            {syncProgress.totalSynced.toLocaleString("pt-BR")} mensagens · {doneCount} de {SYNC_LABELS.length} pastas
+          </div>
+        </div>
+        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setSyncProgress((p) => ({ ...p, hidden: true }))}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <Progress value={(doneCount / SYNC_LABELS.length) * 100} className="h-1.5" />
+      <ul className="space-y-1.5">
+        {SYNC_LABELS.map((l) => {
+          const s = syncProgress.perLabel[l];
+          const Icon = s.status === "done" ? Check : s.status === "active" ? Loader2 : Circle;
+          return (
+            <li key={l} className="space-y-1">
+              <div className="flex items-center gap-2 text-xs">
+                <Icon className={cn("h-3.5 w-3.5 shrink-0",
+                  s.status === "done" && "text-primary",
+                  s.status === "active" && "text-primary animate-spin",
+                  s.status === "pending" && "text-muted-foreground/50")} />
+                <span className={cn("flex-1 truncate", s.status === "pending" ? "text-muted-foreground" : "text-foreground")}>{labelNamesPt[l]}</span>
+                <span className="tabular-nums text-muted-foreground">{s.count.toLocaleString("pt-BR")}</span>
+              </div>
+              {s.status === "active" && (
+                <div className="h-1 ml-5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  ) : null;
+
   const ThreadList = (
     <section className="flex flex-col h-full bg-background min-w-0">
+      {SyncProgressPanel}
       <div className="p-3 border-b space-y-2">
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />

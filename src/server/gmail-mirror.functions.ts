@@ -262,7 +262,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     const max = data.maxPerLabel ?? 100;
 
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
-    const owner = profile.emailAddress;
+    const owner = profile.emailAddress.toLowerCase();
 
     // Walk all messages (most recent N) — Gmail returns across all labels except SPAM/TRASH by default;
     // we use q empty + includeSpamTrash to cover everything.

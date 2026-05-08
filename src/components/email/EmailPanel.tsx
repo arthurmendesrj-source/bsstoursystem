@@ -587,9 +587,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     <div className="border-b bg-card/50 p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">Sincronizando últimos 6 meses</div>
+          <div className="text-sm font-semibold truncate">Sincronizando {formatWindowLabel(syncWindowDays)}</div>
           <div className="text-xs text-muted-foreground">
             {syncProgress.totalSynced.toLocaleString("pt-BR")} mensagens · {doneCount} de {SYNC_LABELS.length} pastas
+            {syncProgress.currentMonthLabel && syncProgress.currentLabel ? (
+              <> · {labelNamesPt[syncProgress.currentLabel]} — {syncProgress.currentMonthLabel} ({syncProgress.currentMonthIndex}/{syncProgress.totalMonths})</>
+            ) : null}
           </div>
         </div>
         <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setSyncProgress((p) => ({ ...p, hidden: true }))}>

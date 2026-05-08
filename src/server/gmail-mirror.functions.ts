@@ -123,7 +123,7 @@ export const gmailListLabels = createServerFn({ method: "POST" })
     const { supabase } = context;
     // who am i (owner email)
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
-    const owner = profile.emailAddress;
+    const owner = profile.emailAddress.toLowerCase();
 
     const list = (await gw(`/users/me/labels`)) as { labels: Array<{ id: string; name: string; type: string; messageListVisibility?: string; labelListVisibility?: string }> };
 

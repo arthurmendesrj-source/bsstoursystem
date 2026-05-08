@@ -153,28 +153,71 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const loadThreads = useCallback(async () => {
     if (!hasMailbox) { setThreads([]); return; }
     const term = search.trim();
-    let threadIdHits: string[] | null = null;
-    if (term.length >= 2) {
-      const safe = term.replace(/[%,()"\\]/g, " ").trim();
+    const safe = term.replace(/[%,()"\\]/g, " ").trim();
+    const like = safe ? `%${safe}%` : "";
+
+    // Para pastas de "saída", o agregado de email_threads contém também
+    // mensagens da contraparte (uma resposta sua faz a thread inteira aparecer
+    // em SENT). Para refletir o que o Gmail mostra em "Enviados/Rascunhos/etc.",
+    // listamos direto da tabela emails e tomamos a mensagem mais recente
+    // por thread que tem o label ativo.
+    const OUTBOUND = new Set(["SENT", "DRAFT", "TRASH", "SPAM"]);
+    if (OUTBOUND.has(activeLabel)) {
+      let q = supabase
+        .from("emails")
+        .select("id, thread_id, subject, snippet, from_email, from_name, to_emails, internal_date, is_starred, is_unread, is_important, has_attachments, labels, body_text")
+        .in("owner_email", authorizedEmails!)
+        .contains("labels", [activeLabel])
+        .order("internal_date", { ascending: false })
+        .limit(500);
       if (safe) {
-        const like = `%${safe}%`;
-        const { data: hits } = await supabase
-          .from("emails")
-          .select("thread_id")
-          .in("owner_email", authorizedEmails!)
-          .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
-          .limit(500);
-        threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
+        q = q.or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`);
       }
+      const { data, error } = await q;
+      if (error) { toast.error(error.message); return; }
+      const seen = new Set<string>();
+      const rows: ThreadRow[] = [];
+      for (const m of (data ?? []) as Array<{ id: string; thread_id: string | null; subject: string | null; snippet: string | null; from_email: string | null; from_name: string | null; to_emails: string[] | null; internal_date: string | null; is_starred: boolean; is_unread: boolean; is_important: boolean; has_attachments: boolean; labels: string[] | null }>) {
+        const tid = m.thread_id ?? m.id;
+        if (seen.has(tid)) continue;
+        seen.add(tid);
+        const participants = activeLabel === "SENT"
+          ? (m.to_emails ?? [])
+          : [m.from_name || m.from_email || "(sem remetente)"];
+        rows.push({
+          id: tid,
+          subject: m.subject,
+          snippet: m.snippet,
+          participants,
+          last_message_at: m.internal_date,
+          message_count: 1,
+          is_unread: m.is_unread,
+          is_starred: m.is_starred,
+          is_important: m.is_important,
+          has_attachments: m.has_attachments,
+          labels: m.labels ?? [],
+        });
+        if (rows.length >= 200) break;
+      }
+      setThreads(rows);
+      return;
+    }
+
+    let threadIdHits: string[] | null = null;
+    if (safe) {
+      const { data: hits } = await supabase
+        .from("emails")
+        .select("thread_id")
+        .in("owner_email", authorizedEmails!)
+        .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
+        .limit(500);
+      threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
     }
     let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
       .order("last_message_at", { ascending: false }).limit(200);
     q = q.contains("labels", [activeLabel]);
-    if (term.length >= 2) {
-      const safe = term.replace(/[%,()"\\]/g, " ").trim();
-      const like = `%${safe}%`;
+    if (safe) {
       const orParts = [`subject.ilike.${like}`, `snippet.ilike.${like}`];
-      // partial match within participants array (server-side via PostgREST)
       orParts.push(`participants.cs.{${safe}}`);
       if (threadIdHits && threadIdHits.length) {
         orParts.push(`id.in.(${threadIdHits.map((id) => `"${id}"`).join(",")})`);

@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror } from "@/server/gmail-mirror.functions";
+import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror, gmailWipeAndRestart } from "@/server/gmail-mirror.functions";
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -131,6 +131,24 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Erro ao reiniciar");
     } finally { setResettingMirror(false); }
+  };
+
+  // Wipe + restart with destructive typed confirmation
+  const wipeAndRestartFn = useServerFn(gmailWipeAndRestart);
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipeConfirmText, setWipeConfirmText] = useState("");
+  const [wipingMirror, setWipingMirror] = useState(false);
+  const wipeAndRestart = async () => {
+    if (wipeConfirmText !== "ESVAZIAR") return;
+    setWipingMirror(true);
+    try {
+      const r = await wipeAndRestartFn({ data: { confirm: "ESVAZIAR" } });
+      toast.success(`Limpeza concluída. ${r.deletedEmails.toLocaleString("pt-BR")} mensagens removidas. Nova sincronização iniciada (${r.queueLength} pastas na fila).`);
+      setWipeOpen(false);
+      setWipeConfirmText("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao esvaziar");
+    } finally { setWipingMirror(false); }
   };
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);

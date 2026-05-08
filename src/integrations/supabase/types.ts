@@ -725,7 +725,9 @@ export type Database = {
         Row: {
           full_sync_current_label: string | null
           full_sync_current_month_offset: number
+          full_sync_empty_streak: number
           full_sync_in_progress: boolean
+          full_sync_label_queue: string[]
           full_sync_page_token: string | null
           full_sync_started_at: string | null
           full_sync_total_synced: number
@@ -740,7 +742,9 @@ export type Database = {
         Insert: {
           full_sync_current_label?: string | null
           full_sync_current_month_offset?: number
+          full_sync_empty_streak?: number
           full_sync_in_progress?: boolean
+          full_sync_label_queue?: string[]
           full_sync_page_token?: string | null
           full_sync_started_at?: string | null
           full_sync_total_synced?: number
@@ -755,7 +759,9 @@ export type Database = {
         Update: {
           full_sync_current_label?: string | null
           full_sync_current_month_offset?: number
+          full_sync_empty_streak?: number
           full_sync_in_progress?: boolean
+          full_sync_label_queue?: string[]
           full_sync_page_token?: string | null
           full_sync_started_at?: string | null
           full_sync_total_synced?: number

@@ -105,6 +105,33 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       setStartingMirror(false);
     }
   };
+  const cancelFullMirrorFn = useServerFn(gmailCancelFullMirror);
+  const resetFullMirrorFn = useServerFn(gmailResetFullMirror);
+  const [cancellingMirror, setCancellingMirror] = useState(false);
+  const [resettingMirror, setResettingMirror] = useState(false);
+
+  const cancelFullMirror = async () => {
+    if (typeof window !== "undefined" && !window.confirm("Cancelar a sincronização em andamento? O progresso atual será mantido, mas a fila restante será limpa.")) return;
+    setCancellingMirror(true);
+    try {
+      await cancelFullMirrorFn({ data: undefined as never });
+      toast.success("Sincronização cancelada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao cancelar");
+    } finally { setCancellingMirror(false); }
+  };
+
+  const resetFullMirror = async () => {
+    if (typeof window !== "undefined" && !window.confirm("Reiniciar a sincronização do zero? O contador de mensagens será zerado e a fila será recriada com todas as pastas.")) return;
+    setResettingMirror(true);
+    try {
+      const r = await resetFullMirrorFn({ data: undefined as never });
+      toast.success(`Sincronização reiniciada — ${r.queueLength} pastas na fila`);
+      await loadFolders();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reiniciar");
+    } finally { setResettingMirror(false); }
+  };
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);

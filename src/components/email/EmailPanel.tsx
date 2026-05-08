@@ -3,12 +3,10 @@ import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Sear
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -34,15 +32,7 @@ const SYSTEM_NAMES_PT: Record<string, string> = {
   INBOX: "Caixa de entrada", STARRED: "Com estrela", IMPORTANT: "Importante",
   SENT: "Enviados", DRAFT: "Rascunhos", SPAM: "Spam", TRASH: "Lixeira",
 };
-const CATEGORIES = [
-  { id: "CATEGORY_PERSONAL", name: "Principal" },
-  { id: "CATEGORY_SOCIAL", name: "Social" },
-  { id: "CATEGORY_PROMOTIONS", name: "Promoções" },
-  { id: "CATEGORY_UPDATES", name: "Atualizações" },
-];
-
 const LS_COLLAPSED = "email.sidebar.collapsed";
-const LS_SIZES = "email.panels.sizes";
 
 function formatRelative(iso: string | null) {
   if (!iso) return "";
@@ -70,7 +60,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");
-  const [activeCategory, setActiveCategory] = useState<string>("CATEGORY_PERSONAL");
+  
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [search, setSearch] = useState("");
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
@@ -95,15 +85,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   });
   useEffect(() => { try { localStorage.setItem(LS_COLLAPSED, collapsed ? "1" : "0"); } catch {} }, [collapsed]);
 
-  // panel sizes
-  const initialSizes = useMemo<number[]>(() => {
-    if (typeof window === "undefined") return [22, 30, 48];
-    try {
-      const raw = localStorage.getItem(LS_SIZES);
-      if (raw) { const arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length === 3) return arr; }
-    } catch {}
-    return [22, 30, 48];
-  }, []);
 
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
 
@@ -132,13 +113,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     if (!hasMailbox) { setThreads([]); return; }
     let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
       .order("last_message_at", { ascending: false }).limit(200);
-    if (activeLabel === "INBOX") q = q.contains("labels", ["INBOX", activeCategory]);
-    else q = q.contains("labels", [activeLabel]);
+    q = q.contains("labels", [activeLabel]);
     if (search.trim()) q = q.or(`subject.ilike.%${search}%,snippet.ilike.%${search}%`);
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, activeCategory, search, hasMailbox, authorizedEmails]);
+  }, [activeLabel, search, hasMailbox, authorizedEmails]);
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);
@@ -324,7 +304,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   };
 
   const Sidebar = (
-    <aside className={cn("shrink-0 border-r flex flex-col bg-background h-full", collapsed ? "w-14" : "w-full")}>
+    <aside className={cn("shrink-0 border-r flex flex-col bg-background h-full", collapsed ? "w-14" : "w-60")}>
       <div className={cn("p-2 border-b flex items-center gap-2", collapsed && "flex-col")}>
         {!collapsed && (
           <Button onClick={doFullSync} disabled={syncing} className="flex-1 justify-start gap-2" variant="default" size="sm">
@@ -373,13 +353,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar e-mails" className="pl-9" />
         </div>
-        {activeLabel === "INBOX" && (
-          <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-            <TabsList className="w-full grid grid-cols-4 h-8">
-              {CATEGORIES.map((c) => <TabsTrigger key={c.id} value={c.id} className="text-xs">{c.name}</TabsTrigger>)}
-            </TabsList>
-          </Tabs>
-        )}
       </div>
       <ScrollArea className="flex-1">
         {threads.length === 0 ? (
@@ -435,31 +408,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     />
   );
 
-  const onLayout = (sizes: number[]) => {
-    try { localStorage.setItem(LS_SIZES, JSON.stringify(sizes)); } catch {}
-  };
-
   return (
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
-        {collapsed ? (
-          <>
-            {Sidebar}
-            <ResizablePanelGroup direction="horizontal" className="flex-1" onLayout={(s) => onLayout([0, ...s])}>
-              <ResizablePanel defaultSize={initialSizes[1] + initialSizes[0] / 2} minSize={20}>{ThreadList}</ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={initialSizes[2] + initialSizes[0] / 2} minSize={30}>{Reader}</ResizablePanel>
-            </ResizablePanelGroup>
-          </>
-        ) : (
-          <ResizablePanelGroup direction="horizontal" className="flex-1" onLayout={onLayout}>
-            <ResizablePanel defaultSize={initialSizes[0]} minSize={12} maxSize={35}>{Sidebar}</ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={initialSizes[1]} minSize={18}>{ThreadList}</ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={initialSizes[2]} minSize={30}>{Reader}</ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+        {Sidebar}
+        <div className="w-96 shrink-0 border-r">{ThreadList}</div>
+        <div className="flex-1 min-w-0">{Reader}</div>
 
         {/* POPUP independente */}
         <Dialog open={!!popupThreadId} onOpenChange={(o) => { if (!o) { setPopupThreadId(null); setPopupMessages(null); } }}>

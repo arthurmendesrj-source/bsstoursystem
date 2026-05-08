@@ -71,8 +71,10 @@ export function ThreadReader({
         if (e.customer_id) update.customer_id = e.customer_id;
       }
       // remove nulls so we don't wipe other fields
-      const cleaned: Record<string, string> = {};
-      for (const [k, v] of Object.entries(update)) if (v) cleaned[k] = v;
+      const cleaned: { lead_id?: string; customer_id?: string; supplier_id?: string } = {};
+      if (update.lead_id) cleaned.lead_id = update.lead_id;
+      if (update.customer_id) cleaned.customer_id = update.customer_id;
+      if (update.supplier_id) cleaned.supplier_id = update.supplier_id;
       if (Object.keys(cleaned).length === 0) { toast.error("Sem dados para associar"); return; }
       const { error } = await supabase.from("emails").update(cleaned).eq("thread_id", thread.id);
       if (error) throw new Error(error.message);

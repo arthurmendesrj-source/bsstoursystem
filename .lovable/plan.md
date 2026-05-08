@@ -1,77 +1,71 @@
-# Plano: Google Workspace Add-on para Gmail integrado ao CRM
+# Importação completa do Gmail — cópia fiel automática
 
 ## Objetivo
-Construir um add-on do Gmail (Apps Script + CardService) que mostra um painel lateral ao abrir um e-mail, consulta o CRM por endpoints HTTPS e permite criar/associar contato, lead, negócio, atividade e nota — **sem espelhar a caixa de e-mail no banco**. Em paralelo, expor no backend (TanStack Start) os endpoints `/api/gmail/*` que o add-on vai consumir.
+Espelhar 100% da conta Gmail conectada (`booking@adatours.com`) no banco do app: **todas as pastas/labels** (INBOX, SENT, DRAFT, SPAM, TRASH, IMPORTANT, STARRED + labels customizadas), **histórico completo** (sem limite de meses) e **todos os anexos** baixados para o storage. Sem necessidade de instalar nada no Gmail/Apps Script.
 
-## Arquitetura
+## Diagnóstico atual
+- A infraestrutura de mirror já existe (`gmailFullSync`, `gmailIncrementalSync`, tabelas `emails`/`email_threads`/`email_labels`/`email_attachments`/`email_sync_state`, bucket `email-attachments`).
+- A sincronização parou em `INBOX`, mês 0, com 125 emails — porque depende da UI re-invocar página por página manualmente.
+- A lista de labels percorridos é fixa em 7 labels do sistema; labels customizadas ficam de fora.
+- A janela máxima é 360 dias por padrão (10 anos no limite hard-coded).
 
-```text
-Gmail (usuário) ──onGmailMessageOpen──> Apps Script Add-on (CardService)
-                                              │
-                                              │ UrlFetchApp + Bearer token
-                                              ▼
-                                   {CRM_BASE_URL}/api/gmail/*
-                                   (rotas públicas TanStack Start)
-                                              │
-                                              ▼
-                                   Lovable Cloud (DB: leads, customers,
-                                   email_message_links, activities)
+## O que muda
+
+### 1. Cobertura completa de labels
+Em `src/server/gmail-mirror.functions.ts`:
+- Substituir a constante `SYNC_LABELS` por uma função que, no início do full sync, busca todos os labels da conta via `email_labels` (preenchido por `gmailListLabels`) e percorre **todos**: sistema + customizados.
+- O cursor `full_sync_current_label` passa a guardar o `id` real do label (ex.: `Label_1234`) em vez do nome enum.
+- Em `gmailListLabels`, salvar a ordem de processamento (sistema primeiro: INBOX→SENT→DRAFT→SPAM→TRASH→IMPORTANT→STARRED, depois customizados em ordem alfabética).
+
+### 2. Histórico completo (sem limite de janela)
+- `windowDays` default passa a ser configurável; quando o usuário escolhe "histórico completo", usar a data do email mais antigo do Gmail como limite.
+- Estratégia: começar `monthOffset = 0` e avançar até a página retornar `messages: []` por **3 meses consecutivos vazios** → encerra esse label e pula para o próximo. Evita cravar um número arbitrário de meses.
+
+### 3. Loop automático via cron (sem depender da UI)
+Criar nova rota pública `src/routes/api/public/gmail-full-sync-tick.ts`:
+- Autenticação por `apikey` header (anon key).
+- Lê `email_sync_state` de cada owner com `full_sync_in_progress = true`.
+- Invoca a lógica do `gmailFullSync` uma vez (uma página) por owner.
+- Retorna progresso resumido.
+
+Agendar via `pg_cron` para rodar **a cada 1 minuto**:
 ```
+SELECT cron.schedule('gmail-full-sync-tick', '* * * * *',
+  $$SELECT net.http_post(url:='…/api/public/gmail-full-sync-tick',
+    headers:='{"apikey":"<ANON>"}'::jsonb) as id;$$);
+```
+Quando `done = true`, o tick para sozinho (porque `full_sync_in_progress` vira `false`).
 
-O token do CRM fica em `PropertiesService.getUserProperties()` (configurado pelo usuário no primeiro uso, via card de settings) — nunca hardcoded.
+Adicionalmente, agendar `gmailIncrementalSync` (via outra rota pública `gmail-incremental-tick`) **a cada 5 minutos** para manter o espelho em dia depois que o full sync acabar.
 
-## Entregáveis
+### 4. Anexos (já implementado, manter)
+`fetchAndStoreMessage` já baixa anexos até 25 MB para o bucket `email-attachments`. Sem mudanças.
 
-### 1. Apps Script — `Code.gs`
-Funções:
-- `onHomepage(e)` — card inicial com status da conexão e botão "Configurar token"
-- `onGmailMessageOpen(e)` — trigger contextual; lê `messageMetadata.messageId/threadId/accessToken`, chama `GmailApp.getMessageById`, monta payload (from/to/cc/subject/date/snippet) e chama `crmLookup`
-- `buildMessageCard(meta, lookup)` — renderiza:
-  - seção com remetente, destinatários, assunto, data, snippet
-  - se `lookup.contact` existe → badge "Encontrado", botões "Abrir no CRM", "Associar ao Negócio", "Registrar atividade", "Adicionar nota"
-  - se não existe → botão primário "Criar contato no CRM" + "Criar lead" + "Criar negócio"
-- `crmFetch(path, method, payload)` — wrapper sobre `UrlFetchApp.fetch` com `muteHttpExceptions`, timeout, header `Authorization: Bearer <token>`, tratamento de 401/5xx
-- Handlers (action callbacks): `handleCreateContact`, `handleCreateLead`, `handleCreateDeal`, `handleLogActivity`, `handleAddNote`, `handleSaveToken`, `handleAssociateDeal`
-- `buildErrorCard(msg)` / `buildLoadingNotification()` / `notify(text)` para UX
-- `getStoredToken()` / `getStoredBaseUrl()` via `PropertiesService.getUserProperties()`
+### 5. UI — painel de progresso em `/email`
+Substituir o botão atual por:
+- Botão **"Importar tudo (cópia fiel)"** que chama uma nova server fn `gmailStartFullMirror` — ela faz: `gmailListLabels` + reset do `email_sync_state` (`full_sync_in_progress = true`, label = primeiro da lista, offset 0, sem `windowDays`).
+- Card de progresso ao vivo (Realtime em `email_sync_state`) mostrando: label atual, mês corrente, total sincronizado, ETA aproximado.
+- Mensagem clara: "A importação roda automaticamente em segundo plano. Você pode fechar a página."
 
-Privacidade: enviado ao CRM apenas metadados + snippet (configurável via toggle no settings card). Corpo completo nunca sai do Gmail.
+### 6. Limpeza
+- Remover/ocultar a pasta `gmail-addon/` em `/mnt/documents/` (não usada mais) e remover as rotas de webhook do Apps Script (`src/routes/api/public/gmail/*`) — ou manter inativas se o usuário quiser usar depois. **A confirmar**: por padrão, deixaremos os arquivos no repo mas removeremos as instruções do README.
 
-### 2. Apps Script — `appsscript.json` (manifest)
-- `runtimeVersion: V8`, `timeZone: "America/Sao_Paulo"`
-- `oauthScopes` mínimos:
-  - `https://www.googleapis.com/auth/gmail.addons.execute`
-  - `https://www.googleapis.com/auth/gmail.addons.current.message.metadata`
-  - `https://www.googleapis.com/auth/gmail.addons.current.message.readonly` (para snippet)
-  - `https://www.googleapis.com/auth/script.external_request` (UrlFetchApp)
-  - `https://www.googleapis.com/auth/script.storage` (PropertiesService)
-- `addOns.common` (name, logoUrl, openLinkUrlPrefixes, homepageTrigger)
-- `addOns.gmail.contextualTriggers[{ unconditional: {}, onTriggerFunction: "onGmailMessageOpen" }]`
-- `urlFetchWhitelist` com `{{CRM_BASE_URL}}`
+## Detalhes técnicos
 
-### 3. Backend (TanStack Start) — novas rotas em `src/routes/api/gmail/`
-Todas com auth via Bearer token (validação contra um secret `CRM_GMAIL_ADDON_TOKEN` armazenado em Lovable Cloud secrets):
+**Arquivos editados:**
+- `src/server/gmail-mirror.functions.ts` — labels dinâmicos, encerramento por janela vazia, nova fn `gmailStartFullMirror`.
+- `src/components/email/EmailPanel.tsx` — botão "Importar tudo" + card de progresso Realtime.
 
-- `lookup.ts` — `GET ?email=...` → `{ contact, lead, deals[] }` consultando `customers` e `leads`
-- `contact.ts` — `POST { email, name, gmail_message_id, gmail_thread_id }` → cria em `customers`
-- `lead.ts` — `POST { email, name, subject, snippet, gmail_message_id, gmail_thread_id }` → cria em `leads`
-- `deal.ts` — `POST { contact_id, title, value? }` → cria/associa negócio
-- `activity.ts` — `POST { contact_id?, lead_id?, deal_id?, gmail_message_id, gmail_thread_id, subject, snippet, occurred_at }` → grava em `activities` (ou tabela equivalente) + opcionalmente em `email_message_links` para o vínculo e-mail↔registro CRM (sem armazenar o corpo)
+**Arquivos criados:**
+- `src/routes/api/public/gmail-full-sync-tick.ts` — endpoint chamado pelo cron.
+- `src/routes/api/public/gmail-incremental-tick.ts` — endpoint chamado pelo cron.
 
-Migração: tabela `email_message_links (id, gmail_message_id, gmail_thread_id, lead_id?, customer_id?, deal_id?, snippet, subject, from_email, created_at)` com RLS apropriado.
+**Migração SQL:**
+- `ALTER PUBLICATION supabase_realtime ADD TABLE public.email_sync_state` (para Realtime na UI).
+- Agendar 2 jobs `pg_cron` (full-sync-tick a cada 1 min, incremental a cada 5 min).
+- Adicionar coluna `email_labels.sort_order int` para ordenar a fila de labels.
 
-### 4. Documentação (entregue no chat após approve)
-- Passo a passo: criar projeto Apps Script, colar `Code.gs` e `appsscript.json`, deploy de teste (Deploy → Test deployments → Install), instalar no Gmail
-- Como gerar o `CRM_API_TOKEN` no app e colar no card de settings do add-on
-- Exemplos de request/response JSON para cada endpoint
-- Como publicar no Workspace Marketplace (opcional, futuro)
+**Sem novos secrets** — usa o conector Gmail já configurado (`GOOGLE_MAIL_API_KEY_1`) e a anon key para o cron.
 
-## Fora de escopo
-- Espelhamento da caixa de entrada (explicitamente rejeitado pelo usuário)
-- Sincronização de labels Gmail
-- OAuth próprio do CRM (usaremos Bearer token simples — suficiente e mais leve; podemos migrar para OAuth depois se necessário)
-
-## Perguntas (se quiser ajustar antes de implementar)
-1. Confirma Bearer token estático (1 token por instalação, configurado pelo usuário) em vez de OAuth do CRM? **Recomendado para v1.**
-2. Snippet enviado ao CRM: limite de 500 caracteres OK?
-3. Quer também um card "lista de mensagens" (selectionTrigger) ou só ao abrir mensagem?
+## O que o usuário precisa fazer
+**Nada.** Clicar em "Importar tudo" uma vez. O cron continua até terminar (pode levar várias horas dependendo do volume).

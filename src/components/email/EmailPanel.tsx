@@ -427,20 +427,57 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     <aside className={cn("shrink-0 border-r flex flex-col bg-background h-full", collapsed ? "w-14" : "w-60")}>
       <div className={cn("p-2 border-b flex items-center gap-2", collapsed && "flex-col")}>
         {!collapsed && (
-          <Button onClick={doFullSync} disabled={syncing} className="flex-1 justify-start gap-2" variant="default" size="sm">
-            <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-            {syncing ? "Sincronizando…" : "Sincronizar"}
-          </Button>
+          <div className="flex-1 flex">
+            <Button onClick={() => void doFullSync()} disabled={syncing} className="flex-1 justify-start gap-2 rounded-r-none" variant="default" size="sm">
+              <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
+              <span className="truncate">{syncing ? "Sincronizando…" : `Sincronizar (${formatWindowLabel(syncWindowDays)})`}</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={syncing} variant="default" size="sm" className="px-2 rounded-l-none border-l border-primary-foreground/20">
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {SYNC_PRESETS.map((p) => (
+                  <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
+                    <span className="flex-1">{p.label}</span>
+                    {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
+                  Personalizado…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
         {collapsed && (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <Button onClick={doFullSync} disabled={syncing} size="icon" variant="default" className="h-9 w-9">
-                <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Sincronizar Gmail</TooltipContent>
-          </Tooltip>
+          <DropdownMenu>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button disabled={syncing} size="icon" variant="default" className="h-9 w-9">
+                    <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">Sincronizar Gmail ({formatWindowLabel(syncWindowDays)})</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-56">
+              {SYNC_PRESETS.map((p) => (
+                <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
+                  <span className="flex-1">{p.label}</span>
+                  {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
+                Personalizado…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>

@@ -304,7 +304,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   };
 
   const Sidebar = (
-    <aside className={cn("shrink-0 border-r flex flex-col bg-background h-full", collapsed ? "w-14" : "w-full")}>
+    <aside className={cn("shrink-0 border-r flex flex-col bg-background h-full", collapsed ? "w-14" : "w-60")}>
       <div className={cn("p-2 border-b flex items-center gap-2", collapsed && "flex-col")}>
         {!collapsed && (
           <Button onClick={doFullSync} disabled={syncing} className="flex-1 justify-start gap-2" variant="default" size="sm">

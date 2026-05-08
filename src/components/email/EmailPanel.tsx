@@ -207,13 +207,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     };
     try {
       await listLabelsFn({ data: undefined as never });
-      for (let i = 0; i < 400; i++) {
+      for (let i = 0; i < 2000; i++) {
         const r = await fullSyncFn({ data: { restart: i === 0, windowDays: 180 } });
         total = r.totalSynced || total + r.syncedThisRun;
         const labelLabel = labelNames[r.label] ?? r.label;
         toast.message(`Sincronizando ${labelLabel}…`, { description: `${total} mensagens, ${r.threads} conversas neste lote` });
         await loadFolders(); await loadThreads();
         if (r.done) break;
+        await new Promise((res) => setTimeout(res, 150));
       }
       toast.success(`Sincronização concluída — últimos 6 meses`);
     } catch (e) {

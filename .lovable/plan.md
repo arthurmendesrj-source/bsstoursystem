@@ -1,46 +1,19 @@
-## Objetivo
+## Problema
 
-Restaurar atribuição a subordinados na Triagem IA (Diretor/Gerente atribuem Lead/Atividade criados a usuários abaixo na hierarquia) e adicionar botão de tradução do email com seleção de idioma.
+Na triagem de IA do email, ao gerar Lead (ou Atividade), o seletor **"Atribuir a"** só aparece quando `subordinates.length > 0`. Como gerente, se o hook ainda está carregando, falhou silenciosamente, ou nenhum subordinado foi resolvido (ex.: ranks/roles não cadastrados), o campo desaparece — sem opção de atribuir mesmo a si mesmo.
 
-## Mudanças
+## Solução
 
-### 1. Atribuição a subordinados em `AiTriageDialog.tsx`
+Em `src/components/email/AiTriageDialog.tsx`:
 
-- Importar `useSubordinates` de `@/lib/hierarchy` e `useAuth` de `@/lib/auth`.
-- Adicionar estado `assignedTo` (default = `user.id` do usuário atual).
-- Renderizar um `Select "Atribuir a"` em ambos os modos (`lead` e `task`):
-  - Opção padrão: "Eu (próprio usuário)".
-  - Opções adicionais: lista de `subordinates` (nome + role).
-  - Só aparece se `subordinates.length > 0` (ou seja, somente Diretor/Gerente/Supervisor verão).
-- `createLead`: usar `assigned_to: assignedTo`, mantendo `created_by: uid`.
-- `createTask`: usar `assigned_to: assignedTo`, mantendo `created_by: uid`.
+1. Importar `useAuth` para obter `roles` (já temos `user`).
+2. Calcular `canAssign = roles.some(r => ["admin","diretor","gerente","supervisor"].includes(r))`.
+3. Trocar a condição `subordinates.length > 0` por `canAssign` nos dois formulários (Lead e Atividade). Assim o seletor aparece sempre para gestores, mesmo que a lista de subordinados venha vazia.
+4. Dentro do `Select`, manter `Eu` como primeira opção. Se `subordinates.length === 0 && !loading`, mostrar item desabilitado "Nenhum subordinado disponível". Se `loading`, mostrar item desabilitado "Carregando…".
+5. Expor `loading` do `useSubordinates()` (já é retornado) e usá-lo na UI.
 
-### 2. Tradução do email na Triagem IA
-
-**Backend** — adicionar `emailTranslate` em `src/server/gmail.functions.ts`:
-- `createServerFn({ method: "POST" })` com middleware de auth (igual ao `emailAnalyze`).
-- Input: `{ gmail_id: string, target_language: string }`.
-- Carrega o email pelo `gmail_id` (mesmo padrão do `emailAnalyze`), extrai corpo texto.
-- Chama Lovable AI Gateway (`google/gemini-2.5-flash`) com prompt: "Traduza o email a seguir para {target_language}, preservando formatação e quebras de linha. Retorne APENAS o texto traduzido."
-- Retorna `{ translated: string }`.
-
-**Frontend** — em `AiTriageDialog.tsx`, no bloco `mode === "summary"`:
-- Adicionar `Select` de idioma com opções: Português, Inglês, Espanhol, Francês, Italiano, Alemão (default: Português).
-- Botão "Traduzir email" ao lado do select.
-- Ao clicar, chama `emailTranslate` via `useServerFn`, mostra loader, e renderiza o texto traduzido em uma caixa abaixo do resumo (com `whitespace-pre-wrap`).
-- Estado: `translating`, `translation`, `targetLang`.
-
-### 3. Manter intacto
-
-- `EmailPanel.tsx`, `ThreadReader.tsx`, `AssociateDialog.tsx`: sem alteração.
-- Lógica de criar Lead / Atividade / Ignorar mantida — apenas adiciona campo `assigned_to`.
+Nenhuma mudança de banco/RLS — a política `leads_insert` já aceita `assigned_to = auth.uid()` ou subordinado.
 
 ## Arquivos afetados
 
-- `src/components/email/AiTriageDialog.tsx` — adicionar select de subordinados + bloco de tradução.
-- `src/server/gmail.functions.ts` — nova `emailTranslate`.
-
-## Fora do escopo
-
-- Não alterar layout do `EmailPanel`, `ThreadReader`, sidebar ou backend de sync.
-- Não traduzir anexos (apenas corpo do email).
+- `src/components/email/AiTriageDialog.tsx`

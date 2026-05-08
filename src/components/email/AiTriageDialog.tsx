@@ -46,8 +46,9 @@ export function AiTriageDialog({
 }) {
   const analyzeFn = useServerFn(emailAnalyze);
   const translateFn = useServerFn(emailTranslate);
-  const { user } = useAuth();
-  const { subordinates } = useSubordinates();
+  const { user, roles } = useAuth();
+  const { subordinates, loading: loadingSubs } = useSubordinates();
+  const canAssign = roles.some((r) => ["admin", "diretor", "gerente", "supervisor"].includes(r));
   const [loading, setLoading] = useState(false);
   const [sug, setSug] = useState<Suggestion | null>(null);
   const [mode, setMode] = useState<"summary" | "lead" | "task">("summary");
@@ -251,13 +252,17 @@ export function AiTriageDialog({
               <div><Label>Valor estimado</Label><Input type="number" value={lValue} onChange={(e) => setLValue(e.target.value)} /></div>
               <div><Label>Data viagem</Label><Input type="date" value={lDate} onChange={(e) => setLDate(e.target.value)} /></div>
             </div>
-            {subordinates.length > 0 && (
+            {canAssign && (
               <div>
                 <Label>Atribuir a</Label>
                 <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {loadingSubs && <SelectItem value="__loading" disabled>Carregando…</SelectItem>}
+                    {!loadingSubs && subordinates.length === 0 && (
+                      <SelectItem value="__empty" disabled>Nenhum subordinado disponível</SelectItem>
+                    )}
                     {subordinates.map((s) => (
                       <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
                     ))}
@@ -300,13 +305,17 @@ export function AiTriageDialog({
               </div>
               <div><Label>Vencimento</Label><Input type="datetime-local" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
             </div>
-            {subordinates.length > 0 && (
+            {canAssign && (
               <div>
                 <Label>Atribuir a</Label>
                 <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {loadingSubs && <SelectItem value="__loading" disabled>Carregando…</SelectItem>}
+                    {!loadingSubs && subordinates.length === 0 && (
+                      <SelectItem value="__empty" disabled>Nenhum subordinado disponível</SelectItem>
+                    )}
                     {subordinates.map((s) => (
                       <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
                     ))}

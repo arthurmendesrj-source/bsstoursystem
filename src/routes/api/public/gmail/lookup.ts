@@ -26,15 +26,15 @@ export const Route = createFileRoute("/api/public/gmail/lookup")({
             .maybeSingle(),
         ]);
 
-        let bookings: Array<{ id: string; code: string | null; status: string | null }> = [];
+        let bookings: Array<{ id: string; status: string | null }> = [];
         if (customer?.id) {
           const { data } = await supabaseAdmin
             .from("bookings")
-            .select("id, code, status")
+            .select("id, status")
             .eq("customer_id", customer.id)
             .order("created_at", { ascending: false })
             .limit(5);
-          bookings = data ?? [];
+          bookings = (data ?? []) as Array<{ id: string; status: string | null }>;
         }
         return jsonResponse({ contact: customer ?? null, lead: lead ?? null, deals: bookings });
       },

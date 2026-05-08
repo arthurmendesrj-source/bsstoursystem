@@ -7,7 +7,7 @@ const Body = z.object({
   customer_id: z.string().uuid().optional().nullable(),
   lead_id: z.string().uuid().optional().nullable(),
   booking_id: z.string().uuid().optional().nullable(),
-  type: z.enum(["email", "ligacao", "reuniao", "whatsapp", "outro"]).default("email"),
+  type: z.enum(["email", "ligacao", "reuniao", "whatsapp", "nota"]).default("email"),
   subject: z.string().optional().nullable(),
   content: z.string().optional().nullable(), // can be a note or snippet
   occurred_at: z.string().optional().nullable(),
@@ -37,9 +37,10 @@ export const Route = createFileRoute("/api/public/gmail/activity")({
             subject: d.subject ?? null,
             content: d.content ?? null,
             occurred_at: d.occurred_at ?? new Date().toISOString(),
-          })
+          } as never)
           .select("id").single();
-        if (error) return jsonResponse({ error: error.message }, 500);
+        if (error || !data) return jsonResponse({ error: error?.message ?? "insert failed" }, 500);
+        const row = data as { id: string };
 
         if (d.gmail_message_id) {
           await supabaseAdmin.from("email_message_links").insert({
@@ -53,7 +54,7 @@ export const Route = createFileRoute("/api/public/gmail/activity")({
             booking_id: d.booking_id ?? null,
           });
         }
-        return jsonResponse({ id: data.id });
+        return jsonResponse({ id: row.id });
       },
     },
   },

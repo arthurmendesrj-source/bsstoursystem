@@ -27,8 +27,7 @@ export const Route = createFileRoute("/api/public/gmail/deal")({
 
         const insertPayload: Record<string, unknown> = {
           customer_id: d.customer_id,
-          title: d.title,
-          status: "rascunho",
+          notes: d.title,
         };
         if (d.lead_id) insertPayload.lead_id = d.lead_id;
         if (d.value != null) insertPayload.total_amount = d.value;
@@ -36,8 +35,9 @@ export const Route = createFileRoute("/api/public/gmail/deal")({
 
         const { data: booking, error } = await supabaseAdmin
           .from("bookings").insert(insertPayload as never)
-          .select("id, code").single();
-        if (error) return jsonResponse({ error: error.message }, 500);
+          .select("id").single();
+        if (error || !booking) return jsonResponse({ error: error?.message ?? "insert failed" }, 500);
+        const bookingRow = booking as { id: string };
 
         if (d.gmail_message_id) {
           await supabaseAdmin.from("email_message_links").insert({
@@ -47,10 +47,10 @@ export const Route = createFileRoute("/api/public/gmail/deal")({
             snippet: d.snippet ?? null,
             customer_id: d.customer_id,
             lead_id: d.lead_id ?? null,
-            booking_id: booking.id,
+            booking_id: bookingRow.id,
           });
         }
-        return jsonResponse({ id: booking.id, code: booking.code });
+        return jsonResponse({ id: bookingRow.id });
       },
     },
   },

@@ -91,7 +91,8 @@ export function GlobalSearchTrigger() {
   const go = (to: string) => {
     setOpen(false);
     setQ("");
-    navigate({ to, replace: false });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    navigate({ to } as any);
   };
 
   return (

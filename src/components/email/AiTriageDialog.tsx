@@ -300,6 +300,20 @@ export function AiTriageDialog({
               </div>
               <div><Label>Vencimento</Label><Input type="datetime-local" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
             </div>
+            {subordinates.length > 0 && (
+              <div>
+                <Label>Atribuir a</Label>
+                <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Descrição</Label><Textarea rows={5} value={tDescription} onChange={(e) => setTDescription(e.target.value)} /></div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setMode("summary")}>Voltar</Button>

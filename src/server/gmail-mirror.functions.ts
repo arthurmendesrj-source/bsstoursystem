@@ -357,7 +357,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
       : stateAny.full_sync_started_at;
 
     const params = new URLSearchParams();
-    params.set("maxResults", "500");
+    params.set("maxResults", "75");
     params.set("labelIds", currentLabel);
     params.set("q", `newer_than:${windowDays}d`);
     if (currentLabel === "SPAM" || currentLabel === "TRASH") {
@@ -372,7 +372,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     const nextPageToken: string | undefined = list.nextPageToken;
 
     const threadIds = new Set<string>();
-    const CONCURRENCY = 5;
+    const CONCURRENCY = 8;
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const batch = ids.slice(i, i + CONCURRENCY);
       const results = await Promise.all(batch.map(async (id) => {

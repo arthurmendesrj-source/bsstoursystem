@@ -790,6 +790,18 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
         </div>
       )}
+      <div className="flex items-center gap-2 pt-1">
+        {mirror!.in_progress && (
+          <Button size="sm" variant="outline" disabled={cancellingMirror} onClick={() => void cancelFullMirror()}>
+            {cancellingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1.5" />}
+            Cancelar
+          </Button>
+        )}
+        <Button size="sm" variant="outline" disabled={resettingMirror} onClick={() => void resetFullMirror()}>
+          {resettingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+          Reiniciar do zero
+        </Button>
+      </div>
     </div>
   ) : null;
 

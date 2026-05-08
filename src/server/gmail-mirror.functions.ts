@@ -67,6 +67,81 @@ export const gmailResetFullMirror = createServerFn({ method: "POST" })
     return { owner: r.owner, queueLength: r.queue.length, reset: true };
   });
 
+// ---------------- WIPE AND RESTART ----------------
+// Destructive: deletes ALL mirrored email data for the connected owner
+// (attachments storage + DB rows for emails/threads/labels/attachments),
+// resets the sync state, and re-initializes the full mirror queue.
+const ATTACHMENT_BUCKET_WIPE = "email-attachments";
+async function wipeOwnerStorage(supabase: any, owner: string) {
+  // List all email folders under owner/, then list files inside each, then remove in chunks.
+  const { data: folders } = await supabase.storage.from(ATTACHMENT_BUCKET_WIPE).list(owner, { limit: 1000 });
+  if (!folders || folders.length === 0) return;
+  for (const f of folders) {
+    const sub = `${owner}/${f.name}`;
+    const { data: files } = await supabase.storage.from(ATTACHMENT_BUCKET_WIPE).list(sub, { limit: 1000 });
+    if (!files || files.length === 0) continue;
+    const paths = files.map((x: any) => `${sub}/${x.name}`);
+    for (let i = 0; i < paths.length; i += 100) {
+      await supabase.storage.from(ATTACHMENT_BUCKET_WIPE).remove(paths.slice(i, i + 100));
+    }
+  }
+}
+
+export const gmailWipeAndRestart = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { confirm: string }) => {
+    if (!d || d.confirm !== "ESVAZIAR") {
+      throw new Error('Confirmação inválida. Digite "ESVAZIAR" para prosseguir.');
+    }
+    return d;
+  })
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
+    const owner = profile.emailAddress.toLowerCase();
+
+    // 1) Stop any in-flight sync.
+    await supabase.from("email_sync_state").update({
+      full_sync_in_progress: false,
+      full_sync_label_queue: [],
+      full_sync_page_token: null,
+      full_sync_current_label: null,
+      full_sync_current_month_offset: 0,
+      full_sync_empty_streak: 0,
+    }).eq("owner_email", owner);
+
+    // 2) Wipe attachment storage for this owner.
+    try { await wipeOwnerStorage(supabase, owner); }
+    catch (e) { console.error("storage wipe error", e); }
+
+    // 3) Delete attachments rows for this owner's emails (no FK; do via subselect).
+    const { data: emailIds } = await supabase
+      .from("emails").select("id").eq("owner_email", owner);
+    const ids = ((emailIds ?? []) as Array<{ id: string }>).map((r) => r.id);
+    for (let i = 0; i < ids.length; i += 500) {
+      const chunk = ids.slice(i, i + 500);
+      if (chunk.length) await supabase.from("email_attachments").delete().in("email_id", chunk);
+    }
+
+    // 4) Delete owner data from emails / threads / labels.
+    await supabase.from("emails").delete().eq("owner_email", owner);
+    await supabase.from("email_threads").delete().eq("owner_email", owner);
+    await supabase.from("email_labels").delete().eq("owner_email", owner);
+
+    // 5) Fully reset sync_state counters/cursors.
+    await supabase.from("email_sync_state").update({
+      full_sync_total_synced: 0,
+      last_history_id: null,
+      last_full_sync_at: null,
+      last_incremental_sync_at: null,
+      full_sync_started_at: null,
+    }).eq("owner_email", owner);
+
+    // 6) Re-bootstrap the full mirror queue from scratch.
+    const r = await startFullMirror(supabase);
+    return { owner: r.owner, queueLength: r.queue.length, deletedEmails: ids.length };
+  });
+
 // ---------------- FULL SYNC (one tick) ----------------
 // Kept for manual UI invocation; the cron drives this same logic in the
 // background via /api/public/gmail-cron-tick.

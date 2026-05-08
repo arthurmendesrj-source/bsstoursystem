@@ -175,7 +175,7 @@ export function GlobalSearchTrigger() {
               <CommandSeparator />
               <CommandGroup heading="Reservas">
                 {results.bookings.map((b) => (
-                  <CommandItem key={`b-${b.id}`} value={`book-${b.id}`} onSelect={() => go(`/bookings_/${b.id}`)}>
+                  <CommandItem key={`b-${b.id}`} value={`book-${b.id}`} onSelect={() => go(`/bookings/${b.id}`)}>
                     <CalendarRange className="mr-2 h-4 w-4 text-muted-foreground" />
                     <div className="flex flex-col">
                       <span>Reserva · {b.status}</span>

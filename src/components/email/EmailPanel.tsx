@@ -113,13 +113,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     if (!hasMailbox) { setThreads([]); return; }
     let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
       .order("last_message_at", { ascending: false }).limit(200);
-    if (activeLabel === "INBOX") q = q.contains("labels", ["INBOX", activeCategory]);
-    else q = q.contains("labels", [activeLabel]);
+    q = q.contains("labels", [activeLabel]);
     if (search.trim()) q = q.or(`subject.ilike.%${search}%,snippet.ilike.%${search}%`);
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, activeCategory, search, hasMailbox, authorizedEmails]);
+  }, [activeLabel, search, hasMailbox, authorizedEmails]);
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);

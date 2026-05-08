@@ -164,6 +164,54 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
 
+  // Live mirror state (driven by background cron / realtime)
+  type MirrorState = {
+    in_progress: boolean;
+    current_label: string | null;
+    month_offset: number;
+    total_synced: number;
+    label_queue: string[];
+    started_at: string | null;
+    last_full_sync_at: string | null;
+    empty_streak: number;
+  };
+  const [mirror, setMirror] = useState<MirrorState | null>(null);
+  const [mirrorHidden, setMirrorHidden] = useState(false);
+
+  useEffect(() => {
+    if (!hasMailbox) { setMirror(null); return; }
+    const owners = authorizedEmails!;
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("email_sync_state")
+        .select("full_sync_in_progress, full_sync_current_label, full_sync_current_month_offset, full_sync_total_synced, full_sync_label_queue, full_sync_started_at, last_full_sync_at, full_sync_empty_streak")
+        .in("owner_email", owners)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setMirror({
+        in_progress: !!data.full_sync_in_progress,
+        current_label: data.full_sync_current_label,
+        month_offset: data.full_sync_current_month_offset ?? 0,
+        total_synced: data.full_sync_total_synced ?? 0,
+        label_queue: (data.full_sync_label_queue ?? []) as string[],
+        started_at: data.full_sync_started_at,
+        last_full_sync_at: data.last_full_sync_at,
+        empty_streak: data.full_sync_empty_streak ?? 0,
+      });
+      if (data.full_sync_in_progress) setMirrorHidden(false);
+    };
+    void load();
+    const channel = supabase
+      .channel("email_sync_state_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "email_sync_state" }, () => { void load(); })
+      .subscribe();
+    const poll = setInterval(load, 20_000);
+    return () => { cancelled = true; supabase.removeChannel(channel); clearInterval(poll); };
+  }, [hasMailbox, authorizedEmails]);
+
   const loadFolders = useCallback(async () => {
     if (!hasMailbox) { setFolders([]); return; }
     const { data } = await supabase.from("email_labels").select("*").in("owner_email", authorizedEmails!).order("name");
@@ -653,8 +701,74 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     </div>
   ) : null;
 
+  // Helpers for live mirror panel
+  const resolveLabelName = (id: string | null): string => {
+    if (!id) return "—";
+    if (SYSTEM_NAMES_PT[id]) return SYSTEM_NAMES_PT[id];
+    const f = folders.find((x) => x.id === id);
+    return f?.name ?? id;
+  };
+  const monthLabelFromOffset = (offset: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset * 30);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+  const showMirrorPanel = !!mirror && !mirrorHidden && (mirror.in_progress || (mirror.total_synced > 0 && !!mirror.last_full_sync_at));
+
+  const MirrorPanel = showMirrorPanel ? (
+    <div className="border-b bg-card/50 p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {mirror!.in_progress ? (
+              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+            ) : (
+              <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+            )}
+            <span className="text-sm font-semibold truncate">
+              {mirror!.in_progress ? "Importação em andamento" : "Importação concluída"}
+            </span>
+            <span className="text-[11px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+              {mirror!.in_progress ? "Em andamento" : "Concluído"}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+            <div>
+              <span className="font-medium text-foreground">Pasta atual:</span> {resolveLabelName(mirror!.current_label)}
+              {mirror!.in_progress && mirror!.label_queue.length > 0 && (
+                <> · {mirror!.label_queue.length} restantes na fila</>
+              )}
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Mês atual:</span> {monthLabelFromOffset(mirror!.month_offset)}
+              <span className="text-muted-foreground/70"> (offset {mirror!.month_offset})</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Total sincronizado:</span>{" "}
+              <span className="tabular-nums">{mirror!.total_synced.toLocaleString("pt-BR")}</span> mensagens
+            </div>
+            {mirror!.last_full_sync_at && !mirror!.in_progress && (
+              <div className="text-muted-foreground/80">
+                Última atualização: {new Date(mirror!.last_full_sync_at).toLocaleString("pt-BR")}
+              </div>
+            )}
+          </div>
+        </div>
+        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setMirrorHidden(true)}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {mirror!.in_progress && (
+        <div className="h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
+        </div>
+      )}
+    </div>
+  ) : null;
+
   const ThreadList = (
     <section className="flex flex-col h-full bg-background min-w-0">
+      {MirrorPanel}
       {SyncProgressPanel}
       <div className="p-3 border-b space-y-2">
         <div className="relative">

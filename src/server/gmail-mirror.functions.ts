@@ -318,30 +318,53 @@ async function rebuildThread(supabase: any, owner: string, threadId: string) {
 // Each invocation lists ONE page of message IDs (up to 500) and fetches them.
 // Progress is persisted in email_sync_state.full_sync_page_token. The UI
 // re-invokes until { done: true }.
+const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
+type SyncLabel = typeof SYNC_LABELS[number];
+
 export const gmailFullSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d?: { restart?: boolean }) => d ?? {})
+  .inputValidator((d?: { restart?: boolean; windowDays?: number; label?: string }) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase } = context;
+    const windowDays = Math.max(1, Math.min(3650, data.windowDays ?? 180));
 
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
     const owner = profile.emailAddress.toLowerCase();
 
     const { data: state } = await supabase
       .from("email_sync_state")
-      .select("full_sync_page_token, full_sync_in_progress, full_sync_total_synced, full_sync_started_at")
+      .select("full_sync_page_token, full_sync_in_progress, full_sync_total_synced, full_sync_started_at, full_sync_current_label")
       .eq("owner_email", owner)
       .maybeSingle();
 
     const restart = !!data.restart;
-    const pageToken: string | undefined = restart ? undefined : ((state as any)?.full_sync_page_token ?? undefined);
-    let totalSynced: number = restart ? 0 : ((state as any)?.full_sync_total_synced ?? 0);
-    const startedAt = restart || !(state as any)?.full_sync_started_at ? new Date().toISOString() : (state as any).full_sync_started_at;
+    const stateAny = state as any;
+
+    // Determine current label: explicit param > saved > first
+    let currentLabel: SyncLabel = (
+      (data.label as SyncLabel | undefined) ??
+      (!restart ? (stateAny?.full_sync_current_label as SyncLabel | undefined) : undefined) ??
+      "INBOX"
+    );
+    if (!SYNC_LABELS.includes(currentLabel)) currentLabel = "INBOX";
+
+    const pageToken: string | undefined = restart || (data.label && data.label !== stateAny?.full_sync_current_label)
+      ? undefined
+      : (stateAny?.full_sync_page_token ?? undefined);
+    let totalSynced: number = restart ? 0 : (stateAny?.full_sync_total_synced ?? 0);
+    const startedAt = restart || !stateAny?.full_sync_started_at
+      ? new Date().toISOString()
+      : stateAny.full_sync_started_at;
 
     const params = new URLSearchParams();
     params.set("maxResults", "500");
-    params.set("includeSpamTrash", "true");
+    params.set("labelIds", currentLabel);
+    params.set("q", `newer_than:${windowDays}d`);
+    if (currentLabel === "SPAM" || currentLabel === "TRASH") {
+      params.set("includeSpamTrash", "true");
+    }
     if (pageToken) params.set("pageToken", pageToken);
+
     const list = (await gw(`/users/me/messages?${params.toString()}`)) as {
       messages?: { id: string }[]; nextPageToken?: string;
     };
@@ -362,14 +385,21 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     for (const tid of threadIds) await rebuildThread(supabase, owner, tid);
 
     totalSynced += ids.length;
-    const done = !nextPageToken;
+
+    // Decide what's next: more pages of current label, next label, or fully done
+    const labelIdx = SYNC_LABELS.indexOf(currentLabel);
+    const nextLabel: SyncLabel | null = nextPageToken
+      ? currentLabel
+      : (labelIdx < SYNC_LABELS.length - 1 ? SYNC_LABELS[labelIdx + 1] : null);
+    const done = !nextPageToken && nextLabel === null;
 
     await supabase.from("email_sync_state").upsert({
       owner_email: owner,
       last_history_id: profile.historyId ? Number(profile.historyId) : null,
       last_full_sync_at: done ? new Date().toISOString() : null,
       last_incremental_sync_at: new Date().toISOString(),
-      full_sync_page_token: done ? null : nextPageToken,
+      full_sync_page_token: nextPageToken ?? null,
+      full_sync_current_label: done ? null : nextLabel,
       full_sync_in_progress: !done,
       full_sync_started_at: done ? null : startedAt,
       full_sync_total_synced: done ? 0 : totalSynced,
@@ -378,6 +408,8 @@ export const gmailFullSync = createServerFn({ method: "POST" })
 
     return {
       done,
+      label: currentLabel,
+      nextLabel,
       syncedThisRun: ids.length,
       totalSynced,
       threads: threadIds.size,

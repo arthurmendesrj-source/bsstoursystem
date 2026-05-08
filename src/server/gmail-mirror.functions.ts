@@ -314,7 +314,7 @@ export const gmailIncrementalSync = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
-    const owner = profile.emailAddress;
+    const owner = profile.emailAddress.toLowerCase();
 
     const { data: state } = await supabase
       .from("email_sync_state")

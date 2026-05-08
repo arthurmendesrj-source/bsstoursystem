@@ -190,7 +190,7 @@ async function runFullSyncRound(owner: string, windowDays = 180) {
   const startedAt = s?.full_sync_started_at ?? new Date().toISOString();
 
   const params = new URLSearchParams();
-  params.set("maxResults", "500");
+  params.set("maxResults", "75");
   params.set("labelIds", currentLabel);
   params.set("q", `newer_than:${windowDays}d`);
   if (currentLabel === "SPAM" || currentLabel === "TRASH") params.set("includeSpamTrash", "true");

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useAuth } from "@/lib/auth";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment } from "@/server/gmail-mirror.functions";
@@ -71,7 +71,7 @@ export type EmailPanelProps = {
 };
 
 export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
-  const { user } = useAuth();
+  
   const listLabelsFn = useServerFn(gmailListLabels);
   const fullSyncFn = useServerFn(gmailFullSync);
   const incSyncFn = useServerFn(gmailIncrementalSync);

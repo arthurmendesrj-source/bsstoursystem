@@ -251,6 +251,20 @@ export function AiTriageDialog({
               <div><Label>Valor estimado</Label><Input type="number" value={lValue} onChange={(e) => setLValue(e.target.value)} /></div>
               <div><Label>Data viagem</Label><Input type="date" value={lDate} onChange={(e) => setLDate(e.target.value)} /></div>
             </div>
+            {subordinates.length > 0 && (
+              <div>
+                <Label>Atribuir a</Label>
+                <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Notas</Label><Textarea rows={4} value={lNotes} onChange={(e) => setLNotes(e.target.value)} /></div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setMode("summary")}>Voltar</Button>

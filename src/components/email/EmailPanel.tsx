@@ -111,10 +111,35 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const loadThreads = useCallback(async () => {
     if (!hasMailbox) { setThreads([]); return; }
+    const term = search.trim();
+    let threadIdHits: string[] | null = null;
+    if (term.length >= 2) {
+      const safe = term.replace(/[%,()"\\]/g, " ").trim();
+      if (safe) {
+        const like = `%${safe}%`;
+        const { data: hits } = await supabase
+          .from("emails")
+          .select("thread_id")
+          .in("owner_email", authorizedEmails!)
+          .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
+          .limit(500);
+        threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
+      }
+    }
     let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
       .order("last_message_at", { ascending: false }).limit(200);
     q = q.contains("labels", [activeLabel]);
-    if (search.trim()) q = q.or(`subject.ilike.%${search}%,snippet.ilike.%${search}%`);
+    if (term.length >= 2) {
+      const safe = term.replace(/[%,()"\\]/g, " ").trim();
+      const like = `%${safe}%`;
+      const orParts = [`subject.ilike.${like}`, `snippet.ilike.${like}`];
+      // partial match within participants array (server-side via PostgREST)
+      orParts.push(`participants.cs.{${safe}}`);
+      if (threadIdHits && threadIdHits.length) {
+        orParts.push(`id.in.(${threadIdHits.map((id) => `"${id}"`).join(",")})`);
+      }
+      q = q.or(orParts.join(","));
+    }
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     setThreads((data ?? []) as ThreadRow[]);

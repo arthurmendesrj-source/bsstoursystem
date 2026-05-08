@@ -1,56 +1,66 @@
-## Diagnóstico
+## Problema
 
-- O estado atual mostra `wipe_status = wiping` em `booking@adatours.com`, mas a fila do cron não está drenando — por isso nada foi apagado (688 emails, 23 threads, 92 anexos, 15 labels ainda no banco).
-- Você quer remover o botão **Esvaziar tudo e ressincronizar** do painel `/email` e fazer a limpeza completa agora, manualmente, pelo chat.
-- Depois que o banco e o storage estiverem 100% vazios, você mesmo vai disparar a sincronização nova pelo fluxo correto (pasta por pasta, mês a mês).
+O cron `/api/public/gmail-poll` decide o que fazer por owner com esta lógica:
 
-## Plano
+1. Se `wipe_status = 'wiping'` → roda batch de wipe
+2. Se `full_sync_in_progress = true` → roda tick do full sync
+3. Se ocioso há mais de 5 min → **roda incremental sync**
+4. Caso contrário → skip
 
-### 1. Remover o botão e o diálogo de "Esvaziar"
+Como acabamos de zerar tudo, o owner cai no caso 3. O incremental chama o Gmail History API com o `last_history_id` antigo (`33256984`), que pode dar 404 ("history not found"), ou no melhor caso simplesmente avança o cursor sem trazer nada — e nunca dispara o mirror completo. Toda vez que limpo `last_history_id` no banco, o cron roda em segundos e reescreve.
 
-Em `src/components/email/EmailPanel.tsx`:
+## Solução
 
-- remover o botão **Esvaziar tudo e ressincronizar** do `MirrorPanel`
-- remover o `Dialog` de confirmação (com input "ESVAZIAR")
-- remover os estados `wipeOpen`, `wipeConfirmText`, `wipingMirror`
-- remover a função `wipeAndRestart` e o `useServerFn(gmailWipeAndRestart)`
-- remover o import de `Trash2` se não for mais usado
+Adicionar uma trava no `gmail-poll.ts`: só chamar `runIncrementalSync` se já houve pelo menos um full sync bem-sucedido (`last_full_sync_at IS NOT NULL`). Enquanto não houver, o cron fica skipando o incremental e espera você clicar em "Iniciar mirror completo".
 
-Em `src/server/gmail-mirror.functions.ts`:
+## Mudanças
 
-- remover o export `gmailWipeAndRestart` e a função auxiliar `wipeOwnerStorage`
-- remover o import de `enqueueWipe`
+### 1. `src/routes/api/public/gmail-poll.ts`
 
-Em `src/server/gmail-mirror.server.ts`:
+No bloco que decide o que fazer por owner, adicionar a guarda antes do branch incremental:
 
-- remover `enqueueWipe` e `runWipeBatch` (não serão mais usados)
+```ts
+// Antes:
+if (idleMinutes > 5) {
+  await runIncrementalSync(owner_email);
+  ...
+}
 
-Em `src/routes/api/public/gmail-poll.ts`:
+// Depois:
+if (!last_full_sync_at) {
+  // Mirror completo nunca rodou — não tente incremental,
+  // o usuário precisa iniciar o full sync manualmente.
+  return { owner_email, action: 'skip_waiting_full_sync' };
+}
+if (idleMinutes > 5) {
+  await runIncrementalSync(owner_email);
+  ...
+}
+```
 
-- remover o ramo `wipe_status === "wiping"` e o import de `runWipeBatch`
-- manter apenas full-sync tick e incremental
+### 2. Limpar o estado restante (uma vez, depois do deploy)
 
-### 2. Limpar tudo agora via chat (sem botão)
+Após o código estar no ar, rodar:
 
-Vou executar na ordem:
+```sql
+UPDATE email_sync_state
+SET last_history_id = NULL,
+    last_incremental_sync_at = NULL,
+    last_full_sync_at = NULL
+WHERE owner_email = 'booking@adatours.com';
+```
 
-1. **Storage**: listar e remover recursivamente `email-attachments/booking@adatours.com/**`
-2. **Banco** (migração): apagar `email_attachments` → `emails` → `email_threads` → `email_labels` do owner
-3. **Estado**: zerar completamente `email_sync_state` para o owner: `wipe_status = idle`, `wipe_step = null`, `wipe_deleted_count = 0`, `full_sync_in_progress = false`, `full_sync_label_queue = []`, `full_sync_page_token = null`, `full_sync_current_label = null`, `full_sync_current_month_offset = 0`, `full_sync_empty_streak = 0`, `full_sync_total_synced = 0`, `last_history_id = null`, `last_incremental_sync_at = null`
+Agora o cron não vai mais reescrever esses campos. O painel `/email` fica esperando você clicar em **"Iniciar mirror completo"**, que é o caminho correto.
 
-Resultado: caixa 100% zerada, sem nenhum botão destrutivo, pronta para você iniciar a nova sincronização manualmente quando quiser.
+### 3. Comportamento depois do mirror completo
 
-### 3. Confirmação no painel
+Quando o full sync terminar com sucesso, `runFullSyncTick` (na função final) deve setar `last_full_sync_at = now()` e gravar o `last_history_id` atual do Gmail. A partir daí o cron volta a rodar incremental normalmente, sempre com um cursor válido.
 
-Após a limpeza, o painel `/email` deve mostrar:
-
-- 0 emails, 0 threads, 0 anexos
-- nenhum sync em andamento
-- somente os botões existentes de "Listar labels", "Iniciar mirror completo", "Sincronizar incremental" (e cancelar/reset se já existem)
+Verificar no `gmail-mirror.server.ts` que essa gravação já acontece ao finalizar o full sync. Se não acontecer, ajustar para gravar.
 
 ## Resultado esperado
 
-- Botão "Esvaziar" e todo o caminho destrutivo removidos do código.
-- Banco e storage do `booking@adatours.com` completamente vazios.
-- Estado de sincronização totalmente resetado.
-- Você inicia a nova sincronização pelo fluxo correto, sem nenhuma rota de wipe automática no caminho.
+- Estado fica limpo e estável (sem cron sobrescrevendo).
+- Botão "Iniciar mirror completo" funciona como único ponto de partida.
+- Incremental só liga depois que o mirror completo terminar pelo menos uma vez.
+- Sem mais erros 404 de history antigo.

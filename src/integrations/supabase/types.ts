@@ -738,6 +738,12 @@ export type Database = {
           owner_email: string
           updated_at: string
           watch_expiration: string | null
+          wipe_deleted_count: number
+          wipe_error: string | null
+          wipe_finished_at: string | null
+          wipe_started_at: string | null
+          wipe_status: string
+          wipe_step: string | null
         }
         Insert: {
           full_sync_current_label?: string | null
@@ -755,6 +761,12 @@ export type Database = {
           owner_email: string
           updated_at?: string
           watch_expiration?: string | null
+          wipe_deleted_count?: number
+          wipe_error?: string | null
+          wipe_finished_at?: string | null
+          wipe_started_at?: string | null
+          wipe_status?: string
+          wipe_step?: string | null
         }
         Update: {
           full_sync_current_label?: string | null
@@ -772,6 +784,12 @@ export type Database = {
           owner_email?: string
           updated_at?: string
           watch_expiration?: string | null
+          wipe_deleted_count?: number
+          wipe_error?: string | null
+          wipe_finished_at?: string | null
+          wipe_started_at?: string | null
+          wipe_status?: string
+          wipe_step?: string | null
         }
         Relationships: []
       }

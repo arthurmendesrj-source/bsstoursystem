@@ -3,7 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   gw, findHeader, parseFrom, extractBody, extractAttachments, type GmailPart,
-  listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync,
+  listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe,
 } from "@/server/gmail-mirror.server";
 
 // ---------------- LABELS ----------------
@@ -87,6 +87,8 @@ async function wipeOwnerStorage(supabase: any, owner: string) {
   }
 }
 
+// Just ENQUEUES the wipe — the cron drains it in small batches.
+// Returns immediately so the UI never times out.
 export const gmailWipeAndRestart = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { confirm: string }) => {
@@ -99,47 +101,8 @@ export const gmailWipeAndRestart = createServerFn({ method: "POST" })
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
     const owner = profile.emailAddress.toLowerCase();
-
-    // 1) Stop any in-flight sync.
-    await supabase.from("email_sync_state").update({
-      full_sync_in_progress: false,
-      full_sync_label_queue: [],
-      full_sync_page_token: null,
-      full_sync_current_label: null,
-      full_sync_current_month_offset: 0,
-      full_sync_empty_streak: 0,
-    }).eq("owner_email", owner);
-
-    // 2) Wipe attachment storage for this owner.
-    try { await wipeOwnerStorage(supabase, owner); }
-    catch (e) { console.error("storage wipe error", e); }
-
-    // 3) Delete attachments rows for this owner's emails (no FK; do via subselect).
-    const { data: emailIds } = await supabase
-      .from("emails").select("id").eq("owner_email", owner);
-    const ids = ((emailIds ?? []) as Array<{ id: string }>).map((r) => r.id);
-    for (let i = 0; i < ids.length; i += 500) {
-      const chunk = ids.slice(i, i + 500);
-      if (chunk.length) await supabase.from("email_attachments").delete().in("email_id", chunk);
-    }
-
-    // 4) Delete owner data from emails / threads / labels.
-    await supabase.from("emails").delete().eq("owner_email", owner);
-    await supabase.from("email_threads").delete().eq("owner_email", owner);
-    await supabase.from("email_labels").delete().eq("owner_email", owner);
-
-    // 5) Fully reset sync_state counters/cursors.
-    await supabase.from("email_sync_state").update({
-      full_sync_total_synced: 0,
-      last_history_id: null,
-      last_full_sync_at: null,
-      last_incremental_sync_at: null,
-      full_sync_started_at: null,
-    }).eq("owner_email", owner);
-
-    // 6) Re-bootstrap the full mirror queue from scratch.
-    const r = await startFullMirror(supabase);
-    return { owner: r.owner, queueLength: r.queue.length, deletedEmails: ids.length };
+    await enqueueWipe(supabase, owner);
+    return { owner, queueLength: 0, deletedEmails: 0, queued: true };
   });
 
 // ---------------- FULL SYNC (one tick) ----------------

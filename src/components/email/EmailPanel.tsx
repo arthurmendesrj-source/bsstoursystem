@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen, Check, Loader2, Circle, X } from "lucide-react";
+import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen, Check, Loader2, Circle, X, ChevronDown } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +35,20 @@ const SYSTEM_NAMES_PT: Record<string, string> = {
   SENT: "Enviados", DRAFT: "Rascunhos", SPAM: "Spam", TRASH: "Lixeira",
 };
 const LS_COLLAPSED = "email.sidebar.collapsed";
+const LS_SYNC_DAYS = "email.sync.windowDays";
+const SYNC_PRESETS: { label: string; days: number }[] = [
+  { label: "Últimos 3 meses", days: 90 },
+  { label: "Últimos 6 meses", days: 180 },
+  { label: "Últimos 12 meses", days: 365 },
+  { label: "Últimos 24 meses", days: 730 },
+];
+const formatWindowLabel = (days: number) => {
+  if (days % 30 === 0) {
+    const m = days / 30;
+    return m === 1 ? "1 mês" : `${m} meses`;
+  }
+  return `${days} dias`;
+};
 
 const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
 type SyncLabel = typeof SYNC_LABELS[number];
@@ -85,6 +100,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [loadingThread, setLoadingThread] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
+  const [syncWindowDays, setSyncWindowDays] = useState<number>(() => {
+    if (typeof window === "undefined") return 180;
+    const v = Number(localStorage.getItem(LS_SYNC_DAYS));
+    return Number.isFinite(v) && v >= 1 && v <= 3650 ? v : 180;
+  });
+  useEffect(() => { try { localStorage.setItem(LS_SYNC_DAYS, String(syncWindowDays)); } catch {} }, [syncWindowDays]);
+  const [customDaysOpen, setCustomDaysOpen] = useState(false);
+  const [customDaysInput, setCustomDaysInput] = useState<string>(String(syncWindowDays));
   const [composeOpen, setComposeOpen] = useState<null | { mode: "reply" | "forward" | "new"; msg?: ThreadMessage }>(null);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
@@ -216,7 +239,9 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [mode, hasMailbox]);
 
-  const doFullSync = async () => {
+  const doFullSync = async (daysOverride?: number) => {
+    const days = Math.max(1, Math.min(3650, daysOverride ?? syncWindowDays));
+    if (daysOverride) setSyncWindowDays(days);
     setSyncing(true);
     setSyncProgress({
       active: true, hidden: false, currentLabel: "INBOX", totalSynced: 0,
@@ -226,7 +251,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     try {
       await listLabelsFn({ data: undefined as never });
       for (let i = 0; i < 2000; i++) {
-        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: 180 } });
+        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
         total = r.totalSynced || total + r.syncedThisRun;
         const lbl = r.label as SyncLabel;
         const next = (r.nextLabel ?? null) as SyncLabel | null;
@@ -402,20 +427,57 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     <aside className={cn("shrink-0 border-r flex flex-col bg-background h-full", collapsed ? "w-14" : "w-60")}>
       <div className={cn("p-2 border-b flex items-center gap-2", collapsed && "flex-col")}>
         {!collapsed && (
-          <Button onClick={doFullSync} disabled={syncing} className="flex-1 justify-start gap-2" variant="default" size="sm">
-            <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-            {syncing ? "Sincronizando…" : "Sincronizar"}
-          </Button>
+          <div className="flex-1 flex">
+            <Button onClick={() => void doFullSync()} disabled={syncing} className="flex-1 justify-start gap-2 rounded-r-none" variant="default" size="sm">
+              <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
+              <span className="truncate">{syncing ? "Sincronizando…" : `Sincronizar (${formatWindowLabel(syncWindowDays)})`}</span>
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={syncing} variant="default" size="sm" className="px-2 rounded-l-none border-l border-primary-foreground/20">
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {SYNC_PRESETS.map((p) => (
+                  <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
+                    <span className="flex-1">{p.label}</span>
+                    {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
+                  Personalizado…
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         )}
         {collapsed && (
-          <Tooltip delayDuration={200}>
-            <TooltipTrigger asChild>
-              <Button onClick={doFullSync} disabled={syncing} size="icon" variant="default" className="h-9 w-9">
-                <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Sincronizar Gmail</TooltipContent>
-          </Tooltip>
+          <DropdownMenu>
+            <Tooltip delayDuration={200}>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button disabled={syncing} size="icon" variant="default" className="h-9 w-9">
+                    <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="right">Sincronizar Gmail ({formatWindowLabel(syncWindowDays)})</TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="start" className="w-56">
+              {SYNC_PRESETS.map((p) => (
+                <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
+                  <span className="flex-1">{p.label}</span>
+                  {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
+                Personalizado…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         )}
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
@@ -575,6 +637,34 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           </DialogContent>
         </Dialog>
 
+        {/* CUSTOM SYNC PERIOD */}
+        <Dialog open={customDaysOpen} onOpenChange={setCustomDaysOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader><DialogTitle>Período personalizado</DialogTitle></DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="custom-days">Dias para trás (1 a 3650)</Label>
+              <Input
+                id="custom-days"
+                type="number"
+                min={1}
+                max={3650}
+                value={customDaysInput}
+                onChange={(e) => setCustomDaysInput(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">Atual: {formatWindowLabel(syncWindowDays)}</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCustomDaysOpen(false)}>Cancelar</Button>
+              <Button onClick={() => {
+                const n = Math.max(1, Math.min(3650, Math.floor(Number(customDaysInput) || 0)));
+                if (!n) return;
+                setCustomDaysOpen(false);
+                void doFullSync(n);
+              }}>Sincronizar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* COMPOSE */}
         <Dialog open={!!composeOpen} onOpenChange={(o) => !o && setComposeOpen(null)}>
           <DialogContent className="sm:max-w-2xl">

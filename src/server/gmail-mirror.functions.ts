@@ -178,6 +178,7 @@ async function fetchAndStoreMessage(supabase: any, owner: string, messageId: str
   const labels = m.labelIds ?? [];
 
   const row = {
+    owner_email: owner,
     gmail_id: m.id,
     thread_id: m.threadId,
     from_email: from.email,

@@ -162,6 +162,55 @@ export const gmailListLabels = createServerFn({ method: "POST" })
     return { count: rows.length, owner };
   });
 
+// ---------------- internal: download attachment binary into Storage ----------------
+const ATTACHMENT_BUCKET = "email-attachments";
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB
+
+function b64UrlToBytes(s: string): Uint8Array {
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+  const bin = atob(b64 + pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function attStoragePath(owner: string, emailId: string, attachmentId: string, filename: string): string {
+  const safeName = (filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  // first segment = owner_email so storage RLS can match it
+  return `${owner}/${emailId}/${attachmentId}_${safeName}`;
+}
+
+async function downloadAttachmentToStorage(
+  supabase: any,
+  owner: string,
+  messageId: string,
+  emailId: string,
+  att: { attachment_id: string; filename: string; mime_type: string; size: number },
+): Promise<string | null> {
+  if (att.size && att.size > MAX_ATTACHMENT_BYTES) {
+    console.warn(`skip large attachment ${att.filename} (${att.size} bytes)`);
+    return null;
+  }
+  const path = attStoragePath(owner, emailId, att.attachment_id, att.filename);
+  // skip if already uploaded
+  const { data: existing } = await supabase.storage.from(ATTACHMENT_BUCKET).list(`${owner}/${emailId}`, { search: `${att.attachment_id}_` });
+  if (existing && existing.length > 0) return path;
+  try {
+    const r = (await gw(`/users/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.attachment_id)}`)) as { data: string; size: number };
+    const bytes = b64UrlToBytes(r.data);
+    const { error: upErr } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(path, bytes, {
+      contentType: att.mime_type || "application/octet-stream",
+      upsert: true,
+    });
+    if (upErr) { console.error("attachment upload failed", path, upErr.message); return null; }
+    return path;
+  } catch (e) {
+    console.error("attachment fetch failed", att.filename, e);
+    return null;
+  }
+}
+
 // ---------------- internal: fetch + persist a single message ----------------
 async function fetchAndStoreMessage(supabase: any, owner: string, messageId: string) {
   const m = (await gw(`/users/me/messages/${encodeURIComponent(messageId)}?format=full`)) as {
@@ -207,12 +256,24 @@ async function fetchAndStoreMessage(supabase: any, owner: string, messageId: str
     .single();
   if (error) throw new Error(`emails upsert: ${error.message}`);
 
-  // attachments
+  // attachments — register metadata then download binaries to Storage
   if (hasAttachments && upserted?.id) {
-    const atts = extractAttachments(m.payload).map((a) => ({ ...a, email_id: upserted.id }));
+    const atts = extractAttachments(m.payload);
     if (atts.length) {
+      // Re-register metadata rows (idempotent: clear and reinsert per email)
       await supabase.from("email_attachments").delete().eq("email_id", upserted.id);
-      await supabase.from("email_attachments").insert(atts);
+      const inserted = atts.map((a) => ({ ...a, email_id: upserted.id, storage_path: null as string | null }));
+      await supabase.from("email_attachments").insert(inserted);
+      // Download binaries
+      for (const a of atts) {
+        const path = await downloadAttachmentToStorage(supabase, owner, m.id, upserted.id, a);
+        if (path) {
+          await supabase.from("email_attachments")
+            .update({ storage_path: path })
+            .eq("email_id", upserted.id)
+            .eq("attachment_id", a.attachment_id);
+        }
+      }
     }
   }
 

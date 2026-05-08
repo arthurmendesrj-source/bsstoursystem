@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror, gmailWipeAndRestart } from "@/server/gmail-mirror.functions";
+import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror } from "@/server/gmail-mirror.functions";
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -133,23 +133,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     } finally { setResettingMirror(false); }
   };
 
-  // Wipe + restart with destructive typed confirmation
-  const wipeAndRestartFn = useServerFn(gmailWipeAndRestart);
-  const [wipeOpen, setWipeOpen] = useState(false);
-  const [wipeConfirmText, setWipeConfirmText] = useState("");
-  const [wipingMirror, setWipingMirror] = useState(false);
-  const wipeAndRestart = async () => {
-    if (wipeConfirmText !== "ESVAZIAR") return;
-    setWipingMirror(true);
-    try {
-      const r = await wipeAndRestartFn({ data: { confirm: "ESVAZIAR" } });
-      toast.success(`Limpeza concluída. ${r.deletedEmails.toLocaleString("pt-BR")} mensagens removidas. Nova sincronização iniciada (${r.queueLength} pastas na fila).`);
-      setWipeOpen(false);
-      setWipeConfirmText("");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao esvaziar");
-    } finally { setWipingMirror(false); }
-  };
+  // (botão "Esvaziar" removido — limpeza é feita via chat/admin)
+
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);
@@ -897,15 +882,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           {resettingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
           Reiniciar do zero
         </Button>
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={wipingMirror}
-          onClick={() => { setWipeConfirmText(""); setWipeOpen(true); }}
-        >
-          {wipingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 mr-1.5" />}
-          Esvaziar tudo e ressincronizar
-        </Button>
       </div>
     </div>
   ) : null;
@@ -1040,48 +1016,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
             <DialogFooter>
               <Button variant="outline" onClick={() => setComposeOpen(null)}>Cancelar</Button>
               <Button onClick={sendCompose} disabled={sending}>{sending ? "Enviando…" : "Enviar"}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        {/* WIPE + RESTART */}
-        <Dialog open={wipeOpen} onOpenChange={(o) => { if (!wipingMirror) { setWipeOpen(o); if (!o) setWipeConfirmText(""); } }}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-destructive">Esvaziar tudo e ressincronizar</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3 text-sm">
-              <p className="text-muted-foreground">
-                Esta ação <strong className="text-foreground">apaga todas as mensagens, threads, anexos e etiquetas</strong> espelhados desta conta e inicia uma <strong className="text-foreground">nova sincronização do zero</strong>, pasta por pasta, mês a mês.
-              </p>
-              <p className="text-muted-foreground">
-                Os dados originais no Gmail <strong className="text-foreground">não são afetados</strong> — apenas a cópia local é removida e refeita.
-              </p>
-              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
-                <Label htmlFor="wipe-confirm" className="text-destructive">
-                  Para confirmar, digite <span className="font-mono font-bold">ESVAZIAR</span>
-                </Label>
-                <Input
-                  id="wipe-confirm"
-                  autoFocus
-                  autoComplete="off"
-                  value={wipeConfirmText}
-                  onChange={(e) => setWipeConfirmText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && wipeConfirmText === "ESVAZIAR") void wipeAndRestart(); }}
-                  placeholder="ESVAZIAR"
-                  disabled={wipingMirror}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setWipeOpen(false)} disabled={wipingMirror}>Cancelar</Button>
-              <Button
-                variant="destructive"
-                onClick={() => void wipeAndRestart()}
-                disabled={wipingMirror || wipeConfirmText !== "ESVAZIAR"}
-              >
-                {wipingMirror && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Esvaziar e ressincronizar
-              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

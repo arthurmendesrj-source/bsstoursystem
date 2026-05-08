@@ -218,27 +218,45 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const doFullSync = async () => {
     setSyncing(true);
+    setSyncProgress({
+      active: true, hidden: false, currentLabel: "INBOX", totalSynced: 0,
+      perLabel: { ...initialPerLabel(), INBOX: { count: 0, threads: 0, status: "active" } },
+    });
     let total = 0;
-    const labelNames: Record<string, string> = {
-      INBOX: "Caixa de entrada", SENT: "Enviados", DRAFT: "Rascunhos",
-      SPAM: "Spam", TRASH: "Lixeira", IMPORTANT: "Importantes", STARRED: "Com estrela",
-    };
     try {
       await listLabelsFn({ data: undefined as never });
       for (let i = 0; i < 2000; i++) {
         const r = await fullSyncFn({ data: { restart: i === 0, windowDays: 180 } });
         total = r.totalSynced || total + r.syncedThisRun;
-        const labelLabel = labelNames[r.label] ?? r.label;
-        toast.message(`Sincronizando ${labelLabel}…`, { description: `${total} mensagens, ${r.threads} conversas neste lote` });
+        const lbl = r.label as SyncLabel;
+        const next = (r.nextLabel ?? null) as SyncLabel | null;
+        setSyncProgress((prev) => {
+          if (!SYNC_LABELS.includes(lbl)) return prev;
+          const perLabel = { ...prev.perLabel };
+          perLabel[lbl] = {
+            count: perLabel[lbl].count + r.syncedThisRun,
+            threads: perLabel[lbl].threads + r.threads,
+            status: r.done || (next && next !== lbl) ? "done" : "active",
+          };
+          if (next && next !== lbl && SYNC_LABELS.includes(next) && perLabel[next].status === "pending") {
+            perLabel[next] = { ...perLabel[next], status: "active" };
+          }
+          if (r.done) {
+            for (const l of SYNC_LABELS) if (perLabel[l].status !== "done") perLabel[l].status = "done";
+          }
+          return { ...prev, currentLabel: r.done ? null : (next ?? lbl), totalSynced: total, perLabel };
+        });
         await loadFolders(); await loadThreads();
         if (r.done) break;
         await new Promise((res) => setTimeout(res, 150));
       }
       toast.success(`Sincronização concluída — últimos 6 meses`);
+      setTimeout(() => setSyncProgress((p) => ({ ...p, active: false })), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
       if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
       else toast.error(msg);
+      setSyncProgress((p) => ({ ...p, active: false }));
     } finally { setSyncing(false); }
   };
 

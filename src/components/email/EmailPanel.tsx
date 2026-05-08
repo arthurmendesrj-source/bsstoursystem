@@ -164,6 +164,54 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
 
+  // Live mirror state (driven by background cron / realtime)
+  type MirrorState = {
+    in_progress: boolean;
+    current_label: string | null;
+    month_offset: number;
+    total_synced: number;
+    label_queue: string[];
+    started_at: string | null;
+    last_full_sync_at: string | null;
+    empty_streak: number;
+  };
+  const [mirror, setMirror] = useState<MirrorState | null>(null);
+  const [mirrorHidden, setMirrorHidden] = useState(false);
+
+  useEffect(() => {
+    if (!hasMailbox) { setMirror(null); return; }
+    const owners = authorizedEmails!;
+    let cancelled = false;
+    const load = async () => {
+      const { data } = await supabase
+        .from("email_sync_state")
+        .select("full_sync_in_progress, full_sync_current_label, full_sync_current_month_offset, full_sync_total_synced, full_sync_label_queue, full_sync_started_at, last_full_sync_at, full_sync_empty_streak")
+        .in("owner_email", owners)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (cancelled || !data) return;
+      setMirror({
+        in_progress: !!data.full_sync_in_progress,
+        current_label: data.full_sync_current_label,
+        month_offset: data.full_sync_current_month_offset ?? 0,
+        total_synced: data.full_sync_total_synced ?? 0,
+        label_queue: (data.full_sync_label_queue ?? []) as string[],
+        started_at: data.full_sync_started_at,
+        last_full_sync_at: data.last_full_sync_at,
+        empty_streak: data.full_sync_empty_streak ?? 0,
+      });
+      if (data.full_sync_in_progress) setMirrorHidden(false);
+    };
+    void load();
+    const channel = supabase
+      .channel("email_sync_state_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "email_sync_state" }, () => { void load(); })
+      .subscribe();
+    const poll = setInterval(load, 20_000);
+    return () => { cancelled = true; supabase.removeChannel(channel); clearInterval(poll); };
+  }, [hasMailbox, authorizedEmails]);
+
   const loadFolders = useCallback(async () => {
     if (!hasMailbox) { setFolders([]); return; }
     const { data } = await supabase.from("email_labels").select("*").in("owner_email", authorizedEmails!).order("name");

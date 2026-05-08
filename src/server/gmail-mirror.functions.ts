@@ -372,7 +372,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     const nextPageToken: string | undefined = list.nextPageToken;
 
     const threadIds = new Set<string>();
-    const CONCURRENCY = 5;
+    const CONCURRENCY = 8;
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const batch = ids.slice(i, i + CONCURRENCY);
       const results = await Promise.all(batch.map(async (id) => {

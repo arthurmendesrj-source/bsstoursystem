@@ -657,6 +657,70 @@ export type Database = {
         }
         Relationships: []
       }
+      email_message_links: {
+        Row: {
+          booking_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          from_email: string | null
+          gmail_message_id: string
+          gmail_thread_id: string | null
+          id: string
+          lead_id: string | null
+          snippet: string | null
+          subject: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          from_email?: string | null
+          gmail_message_id: string
+          gmail_thread_id?: string | null
+          id?: string
+          lead_id?: string | null
+          snippet?: string | null
+          subject?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          from_email?: string | null
+          gmail_message_id?: string
+          gmail_thread_id?: string | null
+          id?: string
+          lead_id?: string | null
+          snippet?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_message_links_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_message_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_message_links_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_sync_state: {
         Row: {
           full_sync_current_label: string | null

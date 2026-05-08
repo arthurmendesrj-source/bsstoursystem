@@ -16,10 +16,11 @@ export const Route = createFileRoute("/api/public/gmail-poll")({
         try {
           const { data: states } = await supabaseAdmin
             .from("email_sync_state")
-            .select("owner_email, wipe_status, full_sync_in_progress, last_incremental_sync_at");
+            .select("owner_email, wipe_status, full_sync_in_progress, last_incremental_sync_at, last_full_sync_at");
           const rows = (states ?? []) as Array<{
             owner_email: string; wipe_status: string | null;
             full_sync_in_progress: boolean | null; last_incremental_sync_at: string | null;
+            last_full_sync_at: string | null;
           }>;
           for (const r of rows) {
             const owner = r.owner_email;

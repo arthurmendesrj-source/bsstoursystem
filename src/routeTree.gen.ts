@@ -53,6 +53,11 @@ import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/cha
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
+import { Route as ApiPublicGmailLookupRouteImport } from './routes/api/public/gmail/lookup'
+import { Route as ApiPublicGmailLeadRouteImport } from './routes/api/public/gmail/lead'
+import { Route as ApiPublicGmailDealRouteImport } from './routes/api/public/gmail/deal'
+import { Route as ApiPublicGmailContactRouteImport } from './routes/api/public/gmail/contact'
+import { Route as ApiPublicGmailActivityRouteImport } from './routes/api/public/gmail/activity'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -278,6 +283,31 @@ const ApiPublicHooksLeadEventsRoute =
     path: '/api/public/hooks/lead-events',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicGmailLookupRoute = ApiPublicGmailLookupRouteImport.update({
+  id: '/api/public/gmail/lookup',
+  path: '/api/public/gmail/lookup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGmailLeadRoute = ApiPublicGmailLeadRouteImport.update({
+  id: '/api/public/gmail/lead',
+  path: '/api/public/gmail/lead',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGmailDealRoute = ApiPublicGmailDealRouteImport.update({
+  id: '/api/public/gmail/deal',
+  path: '/api/public/gmail/deal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGmailContactRoute = ApiPublicGmailContactRouteImport.update({
+  id: '/api/public/gmail/contact',
+  path: '/api/public/gmail/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicGmailActivityRoute = ApiPublicGmailActivityRouteImport.update({
+  id: '/api/public/gmail/activity',
+  path: '/api/public/gmail/activity',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -321,6 +351,11 @@ export interface FileRoutesByFullPath {
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
+  '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
+  '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
+  '/api/public/gmail/lead': typeof ApiPublicGmailLeadRoute
+  '/api/public/gmail/lookup': typeof ApiPublicGmailLookupRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -367,6 +402,11 @@ export interface FileRoutesByTo {
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
+  '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
+  '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
+  '/api/public/gmail/lead': typeof ApiPublicGmailLeadRoute
+  '/api/public/gmail/lookup': typeof ApiPublicGmailLookupRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -414,6 +454,11 @@ export interface FileRoutesById {
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
+  '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
+  '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
+  '/api/public/gmail/lead': typeof ApiPublicGmailLeadRoute
+  '/api/public/gmail/lookup': typeof ApiPublicGmailLookupRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -462,6 +507,11 @@ export interface FileRouteTypes {
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
+    | '/api/public/gmail/activity'
+    | '/api/public/gmail/contact'
+    | '/api/public/gmail/deal'
+    | '/api/public/gmail/lead'
+    | '/api/public/gmail/lookup'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -508,6 +558,11 @@ export interface FileRouteTypes {
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
+    | '/api/public/gmail/activity'
+    | '/api/public/gmail/contact'
+    | '/api/public/gmail/deal'
+    | '/api/public/gmail/lead'
+    | '/api/public/gmail/lookup'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -554,6 +609,11 @@ export interface FileRouteTypes {
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users_/$userId/permissions'
+    | '/api/public/gmail/activity'
+    | '/api/public/gmail/contact'
+    | '/api/public/gmail/deal'
+    | '/api/public/gmail/lead'
+    | '/api/public/gmail/lookup'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -587,6 +647,11 @@ export interface RootRouteChildren {
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
+  ApiPublicGmailActivityRoute: typeof ApiPublicGmailActivityRoute
+  ApiPublicGmailContactRoute: typeof ApiPublicGmailContactRoute
+  ApiPublicGmailDealRoute: typeof ApiPublicGmailDealRoute
+  ApiPublicGmailLeadRoute: typeof ApiPublicGmailLeadRoute
+  ApiPublicGmailLookupRoute: typeof ApiPublicGmailLookupRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
@@ -902,6 +967,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksLeadEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/gmail/lookup': {
+      id: '/api/public/gmail/lookup'
+      path: '/api/public/gmail/lookup'
+      fullPath: '/api/public/gmail/lookup'
+      preLoaderRoute: typeof ApiPublicGmailLookupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gmail/lead': {
+      id: '/api/public/gmail/lead'
+      path: '/api/public/gmail/lead'
+      fullPath: '/api/public/gmail/lead'
+      preLoaderRoute: typeof ApiPublicGmailLeadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gmail/deal': {
+      id: '/api/public/gmail/deal'
+      path: '/api/public/gmail/deal'
+      fullPath: '/api/public/gmail/deal'
+      preLoaderRoute: typeof ApiPublicGmailDealRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gmail/contact': {
+      id: '/api/public/gmail/contact'
+      path: '/api/public/gmail/contact'
+      fullPath: '/api/public/gmail/contact'
+      preLoaderRoute: typeof ApiPublicGmailContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/gmail/activity': {
+      id: '/api/public/gmail/activity'
+      path: '/api/public/gmail/activity'
+      fullPath: '/api/public/gmail/activity'
+      preLoaderRoute: typeof ApiPublicGmailActivityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1017,6 +1117,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
+  ApiPublicGmailActivityRoute: ApiPublicGmailActivityRoute,
+  ApiPublicGmailContactRoute: ApiPublicGmailContactRoute,
+  ApiPublicGmailDealRoute: ApiPublicGmailDealRoute,
+  ApiPublicGmailLeadRoute: ApiPublicGmailLeadRoute,
+  ApiPublicGmailLookupRoute: ApiPublicGmailLookupRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,

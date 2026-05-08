@@ -1,54 +1,77 @@
+# Plano: Google Workspace Add-on para Gmail integrado ao CRM
+
 ## Objetivo
+Construir um add-on do Gmail (Apps Script + CardService) que mostra um painel lateral ao abrir um e-mail, consulta o CRM por endpoints HTTPS e permite criar/associar contato, lead, negócio, atividade e nota — **sem espelhar a caixa de e-mail no banco**. Em paralelo, expor no backend (TanStack Start) os endpoints `/api/gmail/*` que o add-on vai consumir.
 
-Refazer a sincronização completa percorrendo **pasta por pasta × mês a mês** dos últimos 12 meses, com janelas pequenas para evitar `upstream request timeout` no gateway do Gmail.
+## Arquitetura
 
-## Estratégia
+```text
+Gmail (usuário) ──onGmailMessageOpen──> Apps Script Add-on (CardService)
+                                              │
+                                              │ UrlFetchApp + Bearer token
+                                              ▼
+                                   {CRM_BASE_URL}/api/gmail/*
+                                   (rotas públicas TanStack Start)
+                                              │
+                                              ▼
+                                   Lovable Cloud (DB: leads, customers,
+                                   email_message_links, activities)
+```
 
-Hoje, cada chamada de `gmailFullSync` lista uma página de até 75 mensagens dentro de uma janela única (ex.: `newer_than:180d`). Para janelas grandes, o `messages.list` + leitura dos detalhes em lote estoura o tempo do gateway.
+O token do CRM fica em `PropertiesService.getUserProperties()` (configurado pelo usuário no primeiro uso, via card de settings) — nunca hardcoded.
 
-Mudaremos para um **cursor de duas dimensões**: `(label, monthOffset, pageToken)`. A cada chamada o servidor:
+## Entregáveis
 
-1. Lê `current_label` + `current_month_offset` + `page_token` do `email_sync_state`.
-2. Monta a query Gmail `after:YYYY/MM/DD before:YYYY/MM/DD` para a fatia de 30 dias correspondente (ex.: `monthOffset=0` → últimos 30d; `=1` → 30–60d atrás; … até `=11`).
-3. Lista 1 página (mantém `maxResults=50` — reduzir um pouco para folga) e processa.
-4. Decide o próximo passo:
-   - se há `nextPageToken` → mesma `(label, month)`;
-   - se acabaram as páginas e `month < 11` → próximo mês na mesma pasta;
-   - se acabou os 12 meses → próxima pasta, `month=0`;
-   - se acabou tudo → `done=true`.
+### 1. Apps Script — `Code.gs`
+Funções:
+- `onHomepage(e)` — card inicial com status da conexão e botão "Configurar token"
+- `onGmailMessageOpen(e)` — trigger contextual; lê `messageMetadata.messageId/threadId/accessToken`, chama `GmailApp.getMessageById`, monta payload (from/to/cc/subject/date/snippet) e chama `crmLookup`
+- `buildMessageCard(meta, lookup)` — renderiza:
+  - seção com remetente, destinatários, assunto, data, snippet
+  - se `lookup.contact` existe → badge "Encontrado", botões "Abrir no CRM", "Associar ao Negócio", "Registrar atividade", "Adicionar nota"
+  - se não existe → botão primário "Criar contato no CRM" + "Criar lead" + "Criar negócio"
+- `crmFetch(path, method, payload)` — wrapper sobre `UrlFetchApp.fetch` com `muteHttpExceptions`, timeout, header `Authorization: Bearer <token>`, tratamento de 401/5xx
+- Handlers (action callbacks): `handleCreateContact`, `handleCreateLead`, `handleCreateDeal`, `handleLogActivity`, `handleAddNote`, `handleSaveToken`, `handleAssociateDeal`
+- `buildErrorCard(msg)` / `buildLoadingNotification()` / `notify(text)` para UX
+- `getStoredToken()` / `getStoredBaseUrl()` via `PropertiesService.getUserProperties()`
 
-Assim cada invocação processa no máximo ~50 mensagens de **uma única fatia mensal**, eliminando o timeout, e percorre exatamente: INBOX × 12 meses, depois SENT × 12 meses, e assim por diante (`SENT`, `DRAFT`, `SPAM`, `TRASH`, `IMPORTANT`, `STARRED`).
+Privacidade: enviado ao CRM apenas metadados + snippet (configurável via toggle no settings card). Corpo completo nunca sai do Gmail.
 
-## Mudanças
+### 2. Apps Script — `appsscript.json` (manifest)
+- `runtimeVersion: V8`, `timeZone: "America/Sao_Paulo"`
+- `oauthScopes` mínimos:
+  - `https://www.googleapis.com/auth/gmail.addons.execute`
+  - `https://www.googleapis.com/auth/gmail.addons.current.message.metadata`
+  - `https://www.googleapis.com/auth/gmail.addons.current.message.readonly` (para snippet)
+  - `https://www.googleapis.com/auth/script.external_request` (UrlFetchApp)
+  - `https://www.googleapis.com/auth/script.storage` (PropertiesService)
+- `addOns.common` (name, logoUrl, openLinkUrlPrefixes, homepageTrigger)
+- `addOns.gmail.contextualTriggers[{ unconditional: {}, onTriggerFunction: "onGmailMessageOpen" }]`
+- `urlFetchWhitelist` com `{{CRM_BASE_URL}}`
 
-### 1. Banco — `email_sync_state`
+### 3. Backend (TanStack Start) — novas rotas em `src/routes/api/gmail/`
+Todas com auth via Bearer token (validação contra um secret `CRM_GMAIL_ADDON_TOKEN` armazenado em Lovable Cloud secrets):
 
-Adicionar colunas via migration:
-- `full_sync_current_month_offset int not null default 0`
-- `full_sync_window_days int` (passa a guardar janela total — para este caso, 360)
+- `lookup.ts` — `GET ?email=...` → `{ contact, lead, deals[] }` consultando `customers` e `leads`
+- `contact.ts` — `POST { email, name, gmail_message_id, gmail_thread_id }` → cria em `customers`
+- `lead.ts` — `POST { email, name, subject, snippet, gmail_message_id, gmail_thread_id }` → cria em `leads`
+- `deal.ts` — `POST { contact_id, title, value? }` → cria/associa negócio
+- `activity.ts` — `POST { contact_id?, lead_id?, deal_id?, gmail_message_id, gmail_thread_id, subject, snippet, occurred_at }` → grava em `activities` (ou tabela equivalente) + opcionalmente em `email_message_links` para o vínculo e-mail↔registro CRM (sem armazenar o corpo)
 
-### 2. Servidor — `src/server/gmail-mirror.functions.ts`
+Migração: tabela `email_message_links (id, gmail_message_id, gmail_thread_id, lead_id?, customer_id?, deal_id?, snippet, subject, from_email, created_at)` com RLS apropriado.
 
-Em `gmailFullSync`:
-- Aceitar `windowDays` (default 360) e usar para calcular `totalMonths = ceil(windowDays/30)`.
-- Substituir `q=newer_than:Xd` por `q=after:YYYY/MM/DD before:YYYY/MM/DD` calculado a partir de `monthOffset`.
-- Reduzir `maxResults` de 75 → 50 e `CONCURRENCY` de 8 → 5 (mais folga no gateway).
-- Persistir `full_sync_current_month_offset` no `upsert`.
-- Retornar `monthOffset`, `monthLabel` (ex.: "out/2025"), `totalMonths` para a UI.
-
-### 3. UI — `src/components/email/EmailPanel.tsx`
-
-- Fixar a sincronização do botão "Sincronizar tudo (12 meses)" em `windowDays=360`. Manter o seletor existente para o usuário poder escolher outro período.
-- Mostrar no painel de progresso o mês atual da pasta ativa (ex.: `INBOX — out/2025 (3 de 12)`).
-- Mensagem final: "Sincronização concluída — 12 meses de INBOX, SENT, DRAFT, SPAM, TRASH, IMPORTANT, STARRED."
-- Em caso de erro de timeout pontual, fazer **retry automático** da mesma chamada até 3 vezes com backoff (1s/3s/6s) antes de abortar.
-
-### 4. Tratamento de timeout
-
-No helper `gw()` server-side: se o gateway responder 504/timeout, lançar erro tipado; o loop da UI captura, espera 2s e reenvia o **mesmo** estado (graças à persistência de `month_offset` + `page_token`, a sincronização retoma exatamente do ponto que falhou).
+### 4. Documentação (entregue no chat após approve)
+- Passo a passo: criar projeto Apps Script, colar `Code.gs` e `appsscript.json`, deploy de teste (Deploy → Test deployments → Install), instalar no Gmail
+- Como gerar o `CRM_API_TOKEN` no app e colar no card de settings do add-on
+- Exemplos de request/response JSON para cada endpoint
+- Como publicar no Workspace Marketplace (opcional, futuro)
 
 ## Fora de escopo
+- Espelhamento da caixa de entrada (explicitamente rejeitado pelo usuário)
+- Sincronização de labels Gmail
+- OAuth próprio do CRM (usaremos Bearer token simples — suficiente e mais leve; podemos migrar para OAuth depois se necessário)
 
-- Alterar `email_threads` ou a leitura de Enviados (já corrigido).
-- Sincronização incremental (`gmailIncrementalSync`) — continua igual.
-- Janelas além de 12 meses.
+## Perguntas (se quiser ajustar antes de implementar)
+1. Confirma Bearer token estático (1 token por instalação, configurado pelo usuário) em vez de OAuth do CRM? **Recomendado para v1.**
+2. Snippet enviado ao CRM: limite de 500 caracteres OK?
+3. Quer também um card "lista de mensagens" (selectionTrigger) ou só ao abrir mensagem?

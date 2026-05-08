@@ -1043,6 +1043,48 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {/* WIPE + RESTART */}
+        <Dialog open={wipeOpen} onOpenChange={(o) => { if (!wipingMirror) { setWipeOpen(o); if (!o) setWipeConfirmText(""); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-destructive">Esvaziar tudo e ressincronizar</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                Esta ação <strong className="text-foreground">apaga todas as mensagens, threads, anexos e etiquetas</strong> espelhados desta conta e inicia uma <strong className="text-foreground">nova sincronização do zero</strong>, pasta por pasta, mês a mês.
+              </p>
+              <p className="text-muted-foreground">
+                Os dados originais no Gmail <strong className="text-foreground">não são afetados</strong> — apenas a cópia local é removida e refeita.
+              </p>
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 space-y-2">
+                <Label htmlFor="wipe-confirm" className="text-destructive">
+                  Para confirmar, digite <span className="font-mono font-bold">ESVAZIAR</span>
+                </Label>
+                <Input
+                  id="wipe-confirm"
+                  autoFocus
+                  autoComplete="off"
+                  value={wipeConfirmText}
+                  onChange={(e) => setWipeConfirmText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && wipeConfirmText === "ESVAZIAR") void wipeAndRestart(); }}
+                  placeholder="ESVAZIAR"
+                  disabled={wipingMirror}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setWipeOpen(false)} disabled={wipingMirror}>Cancelar</Button>
+              <Button
+                variant="destructive"
+                onClick={() => void wipeAndRestart()}
+                disabled={wipingMirror || wipeConfirmText !== "ESVAZIAR"}
+              >
+                {wipingMirror && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Esvaziar e ressincronizar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </TooltipProvider>
   );

@@ -408,31 +408,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     />
   );
 
-  const onLayout = (sizes: number[]) => {
-    try { localStorage.setItem(LS_SIZES, JSON.stringify(sizes)); } catch {}
-  };
-
   return (
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
-        {collapsed ? (
-          <>
-            {Sidebar}
-            <ResizablePanelGroup direction="horizontal" className="flex-1" onLayout={(s) => onLayout([0, ...s])}>
-              <ResizablePanel defaultSize={initialSizes[1] + initialSizes[0] / 2} minSize={20}>{ThreadList}</ResizablePanel>
-              <ResizableHandle withHandle />
-              <ResizablePanel defaultSize={initialSizes[2] + initialSizes[0] / 2} minSize={30}>{Reader}</ResizablePanel>
-            </ResizablePanelGroup>
-          </>
-        ) : (
-          <ResizablePanelGroup direction="horizontal" className="flex-1" onLayout={onLayout}>
-            <ResizablePanel defaultSize={initialSizes[0]} minSize={12} maxSize={35}>{Sidebar}</ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={initialSizes[1]} minSize={18}>{ThreadList}</ResizablePanel>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={initialSizes[2]} minSize={30}>{Reader}</ResizablePanel>
-          </ResizablePanelGroup>
-        )}
+        {Sidebar}
+        <div className="w-96 shrink-0 border-r">{ThreadList}</div>
+        <div className="flex-1 min-w-0">{Reader}</div>
 
         {/* POPUP independente */}
         <Dialog open={!!popupThreadId} onOpenChange={(o) => { if (!o) { setPopupThreadId(null); setPopupMessages(null); } }}>

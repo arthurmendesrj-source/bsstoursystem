@@ -175,19 +175,51 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
 
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [newAccountEmail, setNewAccountEmail] = useState("");
+  const [addingAccount, setAddingAccount] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
+  const loadAccounts = useCallback(async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) { setAuthorizedEmails([]); return; }
+    const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
+    setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
+  }, []);
+
+  useEffect(() => { void loadAccounts(); }, [loadAccounts]);
+
+  const addEmailAccount = useCallback(async () => {
+    const email = newAccountEmail.trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error("Informe um endereço de email válido.");
+      return;
+    }
+    setAddingAccount(true);
+    try {
       const { data: userData } = await supabase.auth.getUser();
       const uid = userData.user?.id;
-      if (!uid) { if (!cancelled) setAuthorizedEmails([]); return; }
-      const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
-      if (cancelled) return;
-      setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
-    })();
-    return () => { cancelled = true; };
-  }, []);
+      if (!uid) { toast.error("Sessão expirada."); return; }
+      const isFirst = (authorizedEmails?.length ?? 0) === 0;
+      const { error } = await supabase
+        .from("user_email_accounts")
+        .insert({ user_id: uid, email_address: email, is_primary: isFirst });
+      if (error) {
+        if ((error as { code?: string }).code === "23505") {
+          toast.error("Esta conta já está vinculada.");
+        } else {
+          toast.error(error.message || "Falha ao vincular conta.");
+        }
+        return;
+      }
+      toast.success(`Conta ${email} vinculada.`);
+      setNewAccountEmail("");
+      setAddAccountOpen(false);
+      await loadAccounts();
+    } finally {
+      setAddingAccount(false);
+    }
+  }, [newAccountEmail, authorizedEmails, loadAccounts]);
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
 

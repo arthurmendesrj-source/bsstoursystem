@@ -1,37 +1,54 @@
-## Diagnóstico
+## Objetivo
 
-Fiz duas verificações no banco e encontrei dois problemas distintos:
+Refazer a sincronização completa percorrendo **pasta por pasta × mês a mês** dos últimos 12 meses, com janelas pequenas para evitar `upstream request timeout` no gateway do Gmail.
 
-**1. Filtro da pasta "Enviados" mistura conteúdo (causa principal do "errado")**
+## Estratégia
 
-A aba `Enviados` filtra `email_threads.labels contains "SENT"`. Mas em conversas com respostas, a thread agrega rótulos de *todas* as mensagens — então uma conversa cujo último email é recebido (INBOX) aparece em "Enviados" só porque ela contém uma resposta sua em algum momento. Hoje no banco: 95 threads com SENT, 81 dessas também têm INBOX → o usuário vê 81 conversas que parecem "recebidas" listadas em Enviados.
+Hoje, cada chamada de `gmailFullSync` lista uma página de até 75 mensagens dentro de uma janela única (ex.: `newer_than:180d`). Para janelas grandes, o `messages.list` + leitura dos detalhes em lote estoura o tempo do gateway.
 
-**2. Full sync ainda não chegou na pasta SENT**
+Mudaremos para um **cursor de duas dimensões**: `(label, monthOffset, pageToken)`. A cada chamada o servidor:
 
-`email_sync_state` mostra `full_sync_in_progress = true`, label atual ainda `INBOX`, total = 75. As 191 mensagens com label SENT no banco vieram do polling incremental (datas só dos últimos 8 dias). O sync sequencial não chegou na fase SENT ainda — vai chegar quando o "Sincronizar" rodar até o fim.
+1. Lê `current_label` + `current_month_offset` + `page_token` do `email_sync_state`.
+2. Monta a query Gmail `after:YYYY/MM/DD before:YYYY/MM/DD` para a fatia de 30 dias correspondente (ex.: `monthOffset=0` → últimos 30d; `=1` → 30–60d atrás; … até `=11`).
+3. Lista 1 página (mantém `maxResults=50` — reduzir um pouco para folga) e processa.
+4. Decide o próximo passo:
+   - se há `nextPageToken` → mesma `(label, month)`;
+   - se acabaram as páginas e `month < 11` → próximo mês na mesma pasta;
+   - se acabou os 12 meses → próxima pasta, `month=0`;
+   - se acabou tudo → `done=true`.
 
-## Plano
+Assim cada invocação processa no máximo ~50 mensagens de **uma única fatia mensal**, eliminando o timeout, e percorre exatamente: INBOX × 12 meses, depois SENT × 12 meses, e assim por diante (`SENT`, `DRAFT`, `SPAM`, `TRASH`, `IMPORTANT`, `STARRED`).
 
-### Mudança 1 — Listagem por mensagem nas pastas "saída" (frontend)
+## Mudanças
 
-Em `src/components/email/EmailPanel.tsx`, alterar `loadThreads` para usar uma query dedicada quando `activeLabel ∈ {SENT, DRAFT, TRASH, SPAM}`:
+### 1. Banco — `email_sync_state`
 
-- Em vez de `email_threads.contains(labels, [activeLabel])`, consultar `emails` filtrando `labels.cs.{ACTIVE_LABEL}`, ordenando por `internal_date desc`, limitando a 500.
-- Agrupar no cliente por `thread_id`, mantendo apenas a mensagem mais recente por thread que possui aquele label.
-- Montar `ThreadRow[]` sintéticos a partir desses emails, exibindo `from_name/from_email`, `to_emails`, `subject`, `snippet`, `internal_date`, `is_starred`, `has_attachments`.
-- Para INBOX, IMPORTANT, STARRED e labels de usuário: manter o caminho atual (filtro em `email_threads`), pois nesses casos o agrupamento por thread faz sentido.
-- Buscar a query de pesquisa (`search`) continua funcionando: aplicar o mesmo `or(...)` sobre a tabela `emails` no caminho novo.
+Adicionar colunas via migration:
+- `full_sync_current_month_offset int not null default 0`
+- `full_sync_window_days int` (passa a guardar janela total — para este caso, 360)
 
-Resultado: a pasta "Enviados" passa a mostrar apenas mensagens que VOCÊ enviou (uma linha por conversa, com o conteúdo do email enviado, não do recebido). DRAFT/TRASH/SPAM ganham comportamento equivalente.
+### 2. Servidor — `src/server/gmail-mirror.functions.ts`
 
-### Mudança 2 — Garantir que o sync cubra SENT (sem mudança de código, apenas operação)
+Em `gmailFullSync`:
+- Aceitar `windowDays` (default 360) e usar para calcular `totalMonths = ceil(windowDays/30)`.
+- Substituir `q=newer_than:Xd` por `q=after:YYYY/MM/DD before:YYYY/MM/DD` calculado a partir de `monthOffset`.
+- Reduzir `maxResults` de 75 → 50 e `CONCURRENCY` de 8 → 5 (mais folga no gateway).
+- Persistir `full_sync_current_month_offset` no `upsert`.
+- Retornar `monthOffset`, `monthLabel` (ex.: "out/2025"), `totalMonths` para a UI.
 
-Após a mudança 1, basta clicar **Sincronizar** (já com seletor de 6 meses). O sync sequencial roda INBOX → SENT → DRAFT → SPAM → TRASH → IMPORTANT → STARRED, retomando do estado atual. Como o painel de progresso já mostra contagem por pasta, dá para acompanhar a fase SENT chegar ao 0 restante.
+### 3. UI — `src/components/email/EmailPanel.tsx`
 
-Sem mudança no servidor, no banco ou no algoritmo de sync. A janela continua sendo a escolhida pelo usuário (3/6/12/24 meses ou personalizado).
+- Fixar a sincronização do botão "Sincronizar tudo (12 meses)" em `windowDays=360`. Manter o seletor existente para o usuário poder escolher outro período.
+- Mostrar no painel de progresso o mês atual da pasta ativa (ex.: `INBOX — out/2025 (3 de 12)`).
+- Mensagem final: "Sincronização concluída — 12 meses de INBOX, SENT, DRAFT, SPAM, TRASH, IMPORTANT, STARRED."
+- Em caso de erro de timeout pontual, fazer **retry automático** da mesma chamada até 3 vezes com backoff (1s/3s/6s) antes de abortar.
 
-### Fora de escopo
+### 4. Tratamento de timeout
 
-- Mudar a estrutura de `email_threads` (separar SENT em outro agregado): impactaria muito mais o app por uma melhoria localizada.
-- Filtrar SENT no servidor com `email_threads.is_sent`: exigiria nova coluna + migração + backfill — desnecessário se o frontend faz a leitura correta direto da tabela `emails`.
-- Resetar o sync: o estado atual é válido e retomável; não precisa restart.
+No helper `gw()` server-side: se o gateway responder 504/timeout, lançar erro tipado; o loop da UI captura, espera 2s e reenvia o **mesmo** estado (graças à persistência de `month_offset` + `page_token`, a sincronização retoma exatamente do ponto que falhou).
+
+## Fora de escopo
+
+- Alterar `email_threads` ou a leitura de Enviados (já corrigido).
+- Sincronização incremental (`gmailIncrementalSync`) — continua igual.
+- Janelas além de 12 meses.

@@ -660,10 +660,12 @@ export type Database = {
       email_sync_state: {
         Row: {
           full_sync_current_label: string | null
+          full_sync_current_month_offset: number
           full_sync_in_progress: boolean
           full_sync_page_token: string | null
           full_sync_started_at: string | null
           full_sync_total_synced: number
+          full_sync_window_days: number | null
           last_full_sync_at: string | null
           last_history_id: number | null
           last_incremental_sync_at: string | null
@@ -673,10 +675,12 @@ export type Database = {
         }
         Insert: {
           full_sync_current_label?: string | null
+          full_sync_current_month_offset?: number
           full_sync_in_progress?: boolean
           full_sync_page_token?: string | null
           full_sync_started_at?: string | null
           full_sync_total_synced?: number
+          full_sync_window_days?: number | null
           last_full_sync_at?: string | null
           last_history_id?: number | null
           last_incremental_sync_at?: string | null
@@ -686,10 +690,12 @@ export type Database = {
         }
         Update: {
           full_sync_current_label?: string | null
+          full_sync_current_month_offset?: number
           full_sync_in_progress?: boolean
           full_sync_page_token?: string | null
           full_sync_started_at?: string | null
           full_sync_total_synced?: number
+          full_sync_window_days?: number | null
           last_full_sync_at?: string | null
           last_history_id?: number | null
           last_incremental_sync_at?: string | null

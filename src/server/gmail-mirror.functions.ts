@@ -321,26 +321,51 @@ async function rebuildThread(supabase: any, owner: string, threadId: string) {
 const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
 type SyncLabel = typeof SYNC_LABELS[number];
 
+// Format a Date as YYYY/MM/DD (Gmail query format)
+function fmtGmailDate(d: Date): string {
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${y}/${m}/${day}`;
+}
+
+// Returns { afterStr, beforeStr, monthLabel } for the given monthOffset (0 = most recent 30d)
+function monthWindow(monthOffset: number): { after: string; before: string; label: string } {
+  const now = new Date();
+  const before = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  before.setUTCDate(before.getUTCDate() - monthOffset * 30 + 1); // +1 because Gmail 'before' is exclusive
+  const after = new Date(before);
+  after.setUTCDate(after.getUTCDate() - 31); // 30-day window with overlap day
+  const labelDate = new Date(before);
+  labelDate.setUTCDate(labelDate.getUTCDate() - 15);
+  const months = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  return {
+    after: fmtGmailDate(after),
+    before: fmtGmailDate(before),
+    label: `${months[labelDate.getUTCMonth()]}/${labelDate.getUTCFullYear()}`,
+  };
+}
+
 export const gmailFullSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d?: { restart?: boolean; windowDays?: number; label?: string }) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const windowDays = Math.max(1, Math.min(3650, data.windowDays ?? 180));
+    const windowDays = Math.max(1, Math.min(3650, data.windowDays ?? 360));
+    const totalMonths = Math.max(1, Math.ceil(windowDays / 30));
 
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
     const owner = profile.emailAddress.toLowerCase();
 
     const { data: state } = await supabase
       .from("email_sync_state")
-      .select("full_sync_page_token, full_sync_in_progress, full_sync_total_synced, full_sync_started_at, full_sync_current_label")
+      .select("full_sync_page_token, full_sync_in_progress, full_sync_total_synced, full_sync_started_at, full_sync_current_label, full_sync_current_month_offset")
       .eq("owner_email", owner)
       .maybeSingle();
 
     const restart = !!data.restart;
     const stateAny = state as any;
 
-    // Determine current label: explicit param > saved > first
     let currentLabel: SyncLabel = (
       (data.label as SyncLabel | undefined) ??
       (!restart ? (stateAny?.full_sync_current_label as SyncLabel | undefined) : undefined) ??
@@ -348,7 +373,11 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     );
     if (!SYNC_LABELS.includes(currentLabel)) currentLabel = "INBOX";
 
-    const pageToken: string | undefined = restart || (data.label && data.label !== stateAny?.full_sync_current_label)
+    const labelChanged = !!(data.label && data.label !== stateAny?.full_sync_current_label);
+    let monthOffset: number = restart || labelChanged
+      ? 0
+      : Math.max(0, Math.min(totalMonths - 1, stateAny?.full_sync_current_month_offset ?? 0));
+    const pageToken: string | undefined = restart || labelChanged
       ? undefined
       : (stateAny?.full_sync_page_token ?? undefined);
     let totalSynced: number = restart ? 0 : (stateAny?.full_sync_total_synced ?? 0);
@@ -356,10 +385,11 @@ export const gmailFullSync = createServerFn({ method: "POST" })
       ? new Date().toISOString()
       : stateAny.full_sync_started_at;
 
+    const win = monthWindow(monthOffset);
     const params = new URLSearchParams();
-    params.set("maxResults", "75");
+    params.set("maxResults", "50");
     params.set("labelIds", currentLabel);
-    params.set("q", `newer_than:${windowDays}d`);
+    params.set("q", `after:${win.after} before:${win.before}`);
     if (currentLabel === "SPAM" || currentLabel === "TRASH") {
       params.set("includeSpamTrash", "true");
     }
@@ -372,7 +402,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
     const nextPageToken: string | undefined = list.nextPageToken;
 
     const threadIds = new Set<string>();
-    const CONCURRENCY = 8;
+    const CONCURRENCY = 5;
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const batch = ids.slice(i, i + CONCURRENCY);
       const results = await Promise.all(batch.map(async (id) => {
@@ -386,20 +416,38 @@ export const gmailFullSync = createServerFn({ method: "POST" })
 
     totalSynced += ids.length;
 
-    // Decide what's next: more pages of current label, next label, or fully done
+    // Advance cursor: more pages -> same (label,month); else next month; else next label
     const labelIdx = SYNC_LABELS.indexOf(currentLabel);
-    const nextLabel: SyncLabel | null = nextPageToken
-      ? currentLabel
-      : (labelIdx < SYNC_LABELS.length - 1 ? SYNC_LABELS[labelIdx + 1] : null);
-    const done = !nextPageToken && nextLabel === null;
+    let nextLabel: SyncLabel | null = currentLabel;
+    let nextMonthOffset = monthOffset;
+    let nextToken: string | undefined = nextPageToken;
+    let done = false;
+
+    if (nextPageToken) {
+      // same label/month, next page
+    } else if (monthOffset + 1 < totalMonths) {
+      nextMonthOffset = monthOffset + 1;
+      nextToken = undefined;
+    } else if (labelIdx < SYNC_LABELS.length - 1) {
+      nextLabel = SYNC_LABELS[labelIdx + 1];
+      nextMonthOffset = 0;
+      nextToken = undefined;
+    } else {
+      nextLabel = null;
+      nextMonthOffset = 0;
+      nextToken = undefined;
+      done = true;
+    }
 
     await supabase.from("email_sync_state").upsert({
       owner_email: owner,
       last_history_id: profile.historyId ? Number(profile.historyId) : null,
       last_full_sync_at: done ? new Date().toISOString() : null,
       last_incremental_sync_at: new Date().toISOString(),
-      full_sync_page_token: nextPageToken ?? null,
+      full_sync_page_token: nextToken ?? null,
       full_sync_current_label: done ? null : nextLabel,
+      full_sync_current_month_offset: done ? 0 : nextMonthOffset,
+      full_sync_window_days: done ? null : windowDays,
       full_sync_in_progress: !done,
       full_sync_started_at: done ? null : startedAt,
       full_sync_total_synced: done ? 0 : totalSynced,
@@ -410,6 +458,10 @@ export const gmailFullSync = createServerFn({ method: "POST" })
       done,
       label: currentLabel,
       nextLabel,
+      monthOffset,
+      monthLabel: win.label,
+      nextMonthOffset,
+      totalMonths,
       syncedThisRun: ids.length,
       totalSynced,
       threads: threadIds.size,

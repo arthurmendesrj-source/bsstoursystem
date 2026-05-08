@@ -57,13 +57,16 @@ type SyncProgressState = {
   active: boolean;
   hidden: boolean;
   currentLabel: SyncLabel | null;
+  currentMonthLabel: string | null;
+  currentMonthIndex: number; // 1-based for display
+  totalMonths: number;
   totalSynced: number;
   perLabel: Record<SyncLabel, { count: number; threads: number; status: LabelStatus }>;
 };
 const initialPerLabel = (): SyncProgressState["perLabel"] =>
   SYNC_LABELS.reduce((acc, l) => { acc[l] = { count: 0, threads: 0, status: "pending" }; return acc; }, {} as SyncProgressState["perLabel"]);
 const initialSyncProgress = (): SyncProgressState => ({
-  active: false, hidden: false, currentLabel: null, totalSynced: 0, perLabel: initialPerLabel(),
+  active: false, hidden: false, currentLabel: null, currentMonthLabel: null, currentMonthIndex: 0, totalMonths: 12, totalSynced: 0, perLabel: initialPerLabel(),
 });
 
 function formatRelative(iso: string | null) {
@@ -101,9 +104,9 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
   const [syncWindowDays, setSyncWindowDays] = useState<number>(() => {
-    if (typeof window === "undefined") return 180;
+    if (typeof window === "undefined") return 360;
     const v = Number(localStorage.getItem(LS_SYNC_DAYS));
-    return Number.isFinite(v) && v >= 1 && v <= 3650 ? v : 180;
+    return Number.isFinite(v) && v >= 1 && v <= 3650 ? v : 360;
   });
   useEffect(() => { try { localStorage.setItem(LS_SYNC_DAYS, String(syncWindowDays)); } catch {} }, [syncWindowDays]);
   const [customDaysOpen, setCustomDaysOpen] = useState(false);
@@ -285,16 +288,35 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const doFullSync = async (daysOverride?: number) => {
     const days = Math.max(1, Math.min(3650, daysOverride ?? syncWindowDays));
     if (daysOverride) setSyncWindowDays(days);
+    const totalMonths = Math.max(1, Math.ceil(days / 30));
     setSyncing(true);
     setSyncProgress({
-      active: true, hidden: false, currentLabel: "INBOX", totalSynced: 0,
+      active: true, hidden: false, currentLabel: "INBOX",
+      currentMonthLabel: null, currentMonthIndex: 1, totalMonths,
+      totalSynced: 0,
       perLabel: { ...initialPerLabel(), INBOX: { count: 0, threads: 0, status: "active" } },
     });
     let total = 0;
     try {
       await listLabelsFn({ data: undefined as never });
-      for (let i = 0; i < 2000; i++) {
-        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
+      const maxIters = 7 /*labels*/ * totalMonths * 30 /*pages safety*/;
+      for (let i = 0; i < maxIters; i++) {
+        // Retry transient failures (gateway timeout) up to 3 times — server state is preserved
+        let r: Awaited<ReturnType<typeof fullSyncFn>> | null = null;
+        let attempt = 0;
+        while (true) {
+          try {
+            r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
+            break;
+          } catch (err) {
+            attempt++;
+            const msg = err instanceof Error ? err.message : String(err);
+            const transient = /timeout|504|503|502|429|upstream/i.test(msg);
+            if (!transient || attempt >= 3) throw err;
+            await new Promise((res) => setTimeout(res, 1000 * attempt + 1000));
+          }
+        }
+        if (!r) break;
         total = r.totalSynced || total + r.syncedThisRun;
         const lbl = r.label as SyncLabel;
         const next = (r.nextLabel ?? null) as SyncLabel | null;
@@ -312,13 +334,21 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           if (r.done) {
             for (const l of SYNC_LABELS) if (perLabel[l].status !== "done") perLabel[l].status = "done";
           }
-          return { ...prev, currentLabel: r.done ? null : (next ?? lbl), totalSynced: total, perLabel };
+          return {
+            ...prev,
+            currentLabel: r.done ? null : (next ?? lbl),
+            currentMonthLabel: r.monthLabel ?? prev.currentMonthLabel,
+            currentMonthIndex: r.done ? prev.totalMonths : ((r.nextMonthOffset ?? 0) + 1),
+            totalMonths: r.totalMonths ?? prev.totalMonths,
+            totalSynced: total,
+            perLabel,
+          };
         });
         await loadFolders(); await loadThreads();
         if (r.done) break;
         await new Promise((res) => setTimeout(res, 150));
       }
-      toast.success(`Sincronização concluída — últimos 6 meses`);
+      toast.success(`Sincronização concluída — ${formatWindowLabel(days)}`);
       setTimeout(() => setSyncProgress((p) => ({ ...p, active: false })), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
@@ -557,9 +587,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     <div className="border-b bg-card/50 p-3 space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-sm font-semibold truncate">Sincronizando últimos 6 meses</div>
+          <div className="text-sm font-semibold truncate">Sincronizando {formatWindowLabel(syncWindowDays)}</div>
           <div className="text-xs text-muted-foreground">
             {syncProgress.totalSynced.toLocaleString("pt-BR")} mensagens · {doneCount} de {SYNC_LABELS.length} pastas
+            {syncProgress.currentMonthLabel && syncProgress.currentLabel ? (
+              <> · {labelNamesPt[syncProgress.currentLabel]} — {syncProgress.currentMonthLabel} ({syncProgress.currentMonthIndex}/{syncProgress.totalMonths})</>
+            ) : null}
           </div>
         </div>
         <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setSyncProgress((p) => ({ ...p, hidden: true }))}>

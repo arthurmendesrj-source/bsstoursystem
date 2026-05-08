@@ -1,40 +1,37 @@
-## Objetivo
-Permitir escolher o período da sincronização completa (3, 6, 12 meses ou personalizado) antes de iniciar.
+## Diagnóstico
 
-## Escopo
-Apenas frontend, em `src/components/email/EmailPanel.tsx`. Backend já aceita `windowDays` arbitrário (1–3650) — nenhuma mudança em `gmail-mirror.functions.ts`, `gmail-poll.ts`, banco ou RLS.
+Fiz duas verificações no banco e encontrei dois problemas distintos:
 
-## Mudanças
+**1. Filtro da pasta "Enviados" mistura conteúdo (causa principal do "errado")**
 
-1. **Estado novo**:
-   - `syncWindowDays: number` (default `180`), persistido em `localStorage` (`email.sync.windowDays`) para lembrar a preferência do usuário entre sessões.
-   - `syncMenuOpen: boolean` para controlar o popover.
+A aba `Enviados` filtra `email_threads.labels contains "SENT"`. Mas em conversas com respostas, a thread agrega rótulos de *todas* as mensagens — então uma conversa cujo último email é recebido (INBOX) aparece em "Enviados" só porque ela contém uma resposta sua em algum momento. Hoje no banco: 95 threads com SENT, 81 dessas também têm INBOX → o usuário vê 81 conversas que parecem "recebidas" listadas em Enviados.
 
-2. **UI do botão "Sincronizar"** (sidebar expandida e colapsada):
-   - Substituir o `<Button onClick={doFullSync}>` por um `DropdownMenu` (shadcn, já presente no projeto):
-     - **Item principal** (clique direto no botão): inicia sync com o período atual (mostra label tipo "Sincronizar (6 meses)").
-     - **Botão chevron** ao lado abre o menu com opções:
-       - "Últimos 3 meses" → 90 dias
-       - "Últimos 6 meses" → 180 dias (default)
-       - "Últimos 12 meses" → 365 dias
-       - "Últimos 24 meses" → 730 dias
-       - Separador
-       - "Personalizado…" → abre um pequeno `Dialog` com `Input type=number` (1–3650 dias) e botão "Sincronizar".
-   - Ao escolher uma opção do menu: salva em `localStorage`, fecha o menu e dispara o sync imediatamente com aquele período.
-   - Versão colapsada (sidebar w-14): mantém apenas o ícone `RefreshCw` que abre o mesmo menu (sem split-button por falta de espaço).
+**2. Full sync ainda não chegou na pasta SENT**
 
-3. **`doFullSync(days?: number)`**:
-   - Aceita um parâmetro opcional `days`; usa `days ?? syncWindowDays` e passa para `fullSyncFn({ data: { restart: i === 0, windowDays } })`.
-   - O painel de progresso já existente passa a mostrar no cabeçalho "Sincronizando últimos N meses" derivado do período escolhido (3 / 6 / 12 / 24 / "N dias").
+`email_sync_state` mostra `full_sync_in_progress = true`, label atual ainda `INBOX`, total = 75. As 191 mensagens com label SENT no banco vieram do polling incremental (datas só dos últimos 8 dias). O sync sequencial não chegou na fase SENT ainda — vai chegar quando o "Sincronizar" rodar até o fim.
 
-4. **Sem mudanças** em: estado de progresso por pasta, lógica de retomada (`restart` no primeiro lote), polling incremental, ou no endpoint `/api/public/gmail-poll` (que continua usando 180 dias por padrão para cron).
+## Plano
 
-## Detalhes técnicos
-- `DropdownMenu`, `DropdownMenuTrigger`, `DropdownMenuContent`, `DropdownMenuItem`, `DropdownMenuSeparator` de `@/components/ui/dropdown-menu`.
-- `Dialog` para o personalizado (componente já importado no arquivo).
-- Tokens semânticos do design system (sem cores hardcoded).
-- Preferência persistida com try/catch em `localStorage` (mesmo padrão do `LS_COLLAPSED`).
+### Mudança 1 — Listagem por mensagem nas pastas "saída" (frontend)
 
-## Fora de escopo
-- Janelas por pasta diferentes (ex.: 12 meses só para SENT). O período se aplica a todas as pastas, como hoje.
-- Sincronização parcial (ex.: só uma pasta). Continua sincronizando todas as 7 labels do `SYNC_LABELS`.
+Em `src/components/email/EmailPanel.tsx`, alterar `loadThreads` para usar uma query dedicada quando `activeLabel ∈ {SENT, DRAFT, TRASH, SPAM}`:
+
+- Em vez de `email_threads.contains(labels, [activeLabel])`, consultar `emails` filtrando `labels.cs.{ACTIVE_LABEL}`, ordenando por `internal_date desc`, limitando a 500.
+- Agrupar no cliente por `thread_id`, mantendo apenas a mensagem mais recente por thread que possui aquele label.
+- Montar `ThreadRow[]` sintéticos a partir desses emails, exibindo `from_name/from_email`, `to_emails`, `subject`, `snippet`, `internal_date`, `is_starred`, `has_attachments`.
+- Para INBOX, IMPORTANT, STARRED e labels de usuário: manter o caminho atual (filtro em `email_threads`), pois nesses casos o agrupamento por thread faz sentido.
+- Buscar a query de pesquisa (`search`) continua funcionando: aplicar o mesmo `or(...)` sobre a tabela `emails` no caminho novo.
+
+Resultado: a pasta "Enviados" passa a mostrar apenas mensagens que VOCÊ enviou (uma linha por conversa, com o conteúdo do email enviado, não do recebido). DRAFT/TRASH/SPAM ganham comportamento equivalente.
+
+### Mudança 2 — Garantir que o sync cubra SENT (sem mudança de código, apenas operação)
+
+Após a mudança 1, basta clicar **Sincronizar** (já com seletor de 6 meses). O sync sequencial roda INBOX → SENT → DRAFT → SPAM → TRASH → IMPORTANT → STARRED, retomando do estado atual. Como o painel de progresso já mostra contagem por pasta, dá para acompanhar a fase SENT chegar ao 0 restante.
+
+Sem mudança no servidor, no banco ou no algoritmo de sync. A janela continua sendo a escolhida pelo usuário (3/6/12/24 meses ou personalizado).
+
+### Fora de escopo
+
+- Mudar a estrutura de `email_threads` (separar SENT em outro agregado): impactaria muito mais o app por uma melhoria localizada.
+- Filtrar SENT no servidor com `email_threads.is_sent`: exigiria nova coluna + migração + backfill — desnecessário se o frontend faz a leitura correta direto da tabela `emails`.
+- Resetar o sync: o estado atual é válido e retomável; não precisa restart.

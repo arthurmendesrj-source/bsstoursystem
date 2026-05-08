@@ -162,6 +162,55 @@ export const gmailListLabels = createServerFn({ method: "POST" })
     return { count: rows.length, owner };
   });
 
+// ---------------- internal: download attachment binary into Storage ----------------
+const ATTACHMENT_BUCKET = "email-attachments";
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024; // 25 MB
+
+function b64UrlToBytes(s: string): Uint8Array {
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
+  const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+  const bin = atob(b64 + pad);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function attStoragePath(owner: string, emailId: string, attachmentId: string, filename: string): string {
+  const safeName = (filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  // first segment = owner_email so storage RLS can match it
+  return `${owner}/${emailId}/${attachmentId}_${safeName}`;
+}
+
+async function downloadAttachmentToStorage(
+  supabase: any,
+  owner: string,
+  messageId: string,
+  emailId: string,
+  att: { attachment_id: string; filename: string; mime_type: string; size: number },
+): Promise<string | null> {
+  if (att.size && att.size > MAX_ATTACHMENT_BYTES) {
+    console.warn(`skip large attachment ${att.filename} (${att.size} bytes)`);
+    return null;
+  }
+  const path = attStoragePath(owner, emailId, att.attachment_id, att.filename);
+  // skip if already uploaded
+  const { data: existing } = await supabase.storage.from(ATTACHMENT_BUCKET).list(`${owner}/${emailId}`, { search: `${att.attachment_id}_` });
+  if (existing && existing.length > 0) return path;
+  try {
+    const r = (await gw(`/users/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.attachment_id)}`)) as { data: string; size: number };
+    const bytes = b64UrlToBytes(r.data);
+    const { error: upErr } = await supabase.storage.from(ATTACHMENT_BUCKET).upload(path, bytes, {
+      contentType: att.mime_type || "application/octet-stream",
+      upsert: true,
+    });
+    if (upErr) { console.error("attachment upload failed", path, upErr.message); return null; }
+    return path;
+  } catch (e) {
+    console.error("attachment fetch failed", att.filename, e);
+    return null;
+  }
+}
+
 // ---------------- internal: fetch + persist a single message ----------------
 async function fetchAndStoreMessage(supabase: any, owner: string, messageId: string) {
   const m = (await gw(`/users/me/messages/${encodeURIComponent(messageId)}?format=full`)) as {
@@ -207,12 +256,24 @@ async function fetchAndStoreMessage(supabase: any, owner: string, messageId: str
     .single();
   if (error) throw new Error(`emails upsert: ${error.message}`);
 
-  // attachments
+  // attachments — register metadata then download binaries to Storage
   if (hasAttachments && upserted?.id) {
-    const atts = extractAttachments(m.payload).map((a) => ({ ...a, email_id: upserted.id }));
+    const atts = extractAttachments(m.payload);
     if (atts.length) {
+      // Re-register metadata rows (idempotent: clear and reinsert per email)
       await supabase.from("email_attachments").delete().eq("email_id", upserted.id);
-      await supabase.from("email_attachments").insert(atts);
+      const inserted = atts.map((a) => ({ ...a, email_id: upserted.id, storage_path: null as string | null }));
+      await supabase.from("email_attachments").insert(inserted);
+      // Download binaries
+      for (const a of atts) {
+        const path = await downloadAttachmentToStorage(supabase, owner, m.id, upserted.id, a);
+        if (path) {
+          await supabase.from("email_attachments")
+            .update({ storage_path: path })
+            .eq("email_id", upserted.id)
+            .eq("attachment_id", a.attachment_id);
+        }
+      }
     }
   }
 
@@ -253,38 +314,42 @@ async function rebuildThread(supabase: any, owner: string, threadId: string) {
   }, { onConflict: "id" });
 }
 
-// ---------------- FULL SYNC ----------------
+// ---------------- FULL SYNC (resumable, one page per call) ----------------
+// Each invocation lists ONE page of message IDs (up to 500) and fetches them.
+// Progress is persisted in email_sync_state.full_sync_page_token. The UI
+// re-invokes until { done: true }.
 export const gmailFullSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { maxPerLabel?: number }) => d)
+  .inputValidator((d?: { restart?: boolean }) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const max = data.maxPerLabel ?? 100;
 
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
     const owner = profile.emailAddress.toLowerCase();
 
-    // Walk all messages (most recent N) — Gmail returns across all labels except SPAM/TRASH by default;
-    // we use q empty + includeSpamTrash to cover everything.
-    const collected = new Set<string>();
-    let pageToken: string | undefined = undefined;
-    let fetched = 0;
-    do {
-      const params = new URLSearchParams();
-      params.set("maxResults", "100");
-      params.set("includeSpamTrash", "true");
-      if (pageToken) params.set("pageToken", pageToken);
-      const res = (await gw(`/users/me/messages?${params.toString()}`)) as { messages?: { id: string }[]; nextPageToken?: string };
-      (res.messages ?? []).forEach((m) => collected.add(m.id));
-      pageToken = res.nextPageToken;
-      fetched = collected.size;
-    } while (pageToken && fetched < max);
+    const { data: state } = await supabase
+      .from("email_sync_state")
+      .select("full_sync_page_token, full_sync_in_progress, full_sync_total_synced, full_sync_started_at")
+      .eq("owner_email", owner)
+      .maybeSingle();
 
-    const ids = Array.from(collected).slice(0, max);
+    const restart = !!data.restart;
+    const pageToken: string | undefined = restart ? undefined : ((state as any)?.full_sync_page_token ?? undefined);
+    let totalSynced: number = restart ? 0 : ((state as any)?.full_sync_total_synced ?? 0);
+    const startedAt = restart || !(state as any)?.full_sync_started_at ? new Date().toISOString() : (state as any).full_sync_started_at;
 
-    // Fetch and persist with limited concurrency
+    const params = new URLSearchParams();
+    params.set("maxResults", "500");
+    params.set("includeSpamTrash", "true");
+    if (pageToken) params.set("pageToken", pageToken);
+    const list = (await gw(`/users/me/messages?${params.toString()}`)) as {
+      messages?: { id: string }[]; nextPageToken?: string;
+    };
+    const ids = (list.messages ?? []).map((m) => m.id);
+    const nextPageToken: string | undefined = list.nextPageToken;
+
     const threadIds = new Set<string>();
-    const CONCURRENCY = 6;
+    const CONCURRENCY = 5;
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const batch = ids.slice(i, i + CONCURRENCY);
       const results = await Promise.all(batch.map(async (id) => {
@@ -296,16 +361,29 @@ export const gmailFullSync = createServerFn({ method: "POST" })
 
     for (const tid of threadIds) await rebuildThread(supabase, owner, tid);
 
-    // Save sync state
+    totalSynced += ids.length;
+    const done = !nextPageToken;
+
     await supabase.from("email_sync_state").upsert({
       owner_email: owner,
       last_history_id: profile.historyId ? Number(profile.historyId) : null,
-      last_full_sync_at: new Date().toISOString(),
+      last_full_sync_at: done ? new Date().toISOString() : null,
       last_incremental_sync_at: new Date().toISOString(),
+      full_sync_page_token: done ? null : nextPageToken,
+      full_sync_in_progress: !done,
+      full_sync_started_at: done ? null : startedAt,
+      full_sync_total_synced: done ? 0 : totalSynced,
       updated_at: new Date().toISOString(),
     }, { onConflict: "owner_email" });
 
-    return { synced: ids.length, threads: threadIds.size, owner };
+    return {
+      done,
+      syncedThisRun: ids.length,
+      totalSynced,
+      threads: threadIds.size,
+      owner,
+      hasMore: !done,
+    };
   });
 
 // ---------------- INCREMENTAL SYNC ----------------
@@ -444,10 +522,28 @@ export const gmailGetThread = createServerFn({ method: "POST" })
   });
 
 // ---------------- GET ATTACHMENT ----------------
+// Tries Storage first; falls back to Gmail if missing.
 export const gmailGetAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { messageId: string; attachmentId: string }) => d)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: row } = await supabase
+      .from("email_attachments")
+      .select("storage_path, mime_type, filename, size")
+      .eq("attachment_id", data.attachmentId)
+      .maybeSingle();
+    const storagePath = (row as any)?.storage_path as string | null | undefined;
+    if (storagePath) {
+      const { data: blob, error } = await supabase.storage.from(ATTACHMENT_BUCKET).download(storagePath);
+      if (!error && blob) {
+        const buf = new Uint8Array(await blob.arrayBuffer());
+        let bin = "";
+        for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+        const b64 = btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+        return { dataB64Url: b64, size: buf.length };
+      }
+    }
     const att = (await gw(`/users/me/messages/${encodeURIComponent(data.messageId)}/attachments/${encodeURIComponent(data.attachmentId)}`)) as { data: string; size: number };
     return { dataB64Url: att.data, size: att.size };
   });

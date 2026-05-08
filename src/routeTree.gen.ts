@@ -48,6 +48,7 @@ import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferenc
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
+import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
@@ -250,6 +251,11 @@ const UsersUserIdPermissionsRoute = UsersUserIdPermissionsRouteImport.update({
   path: '/users/$userId/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGmailPollRoute = ApiPublicGmailPollRouteImport.update({
+  id: '/api/public/gmail-poll',
+  path: '/api/public/gmail-poll',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   id: '/api/assistant/chat',
   path: '/api/assistant/chat',
@@ -313,6 +319,7 @@ export interface FileRoutesByFullPath {
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
@@ -358,6 +365,7 @@ export interface FileRoutesByTo {
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
@@ -404,6 +412,7 @@ export interface FileRoutesById {
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
+  '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-validation'
     | '/suppliers/references'
     | '/api/assistant/chat'
+    | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
@@ -496,6 +506,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-validation'
     | '/suppliers/references'
     | '/api/assistant/chat'
+    | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
@@ -541,6 +552,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-validation'
     | '/suppliers/references'
     | '/api/assistant/chat'
+    | '/api/public/gmail-poll'
     | '/users_/$userId/permissions'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
@@ -573,6 +585,7 @@ export interface RootRouteChildren {
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
+  ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
@@ -854,6 +867,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsersUserIdPermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/gmail-poll': {
+      id: '/api/public/gmail-poll'
+      path: '/api/public/gmail-poll'
+      fullPath: '/api/public/gmail-poll'
+      preLoaderRoute: typeof ApiPublicGmailPollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/assistant/chat': {
       id: '/api/assistant/chat'
       path: '/api/assistant/chat'
@@ -995,6 +1015,7 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
+  ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,

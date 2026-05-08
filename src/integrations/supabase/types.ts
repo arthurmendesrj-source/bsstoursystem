@@ -579,6 +579,7 @@ export type Database = {
           mime_type: string | null
           part_id: string | null
           size: number | null
+          storage_path: string | null
         }
         Insert: {
           attachment_id: string
@@ -590,6 +591,7 @@ export type Database = {
           mime_type?: string | null
           part_id?: string | null
           size?: number | null
+          storage_path?: string | null
         }
         Update: {
           attachment_id?: string
@@ -601,6 +603,7 @@ export type Database = {
           mime_type?: string | null
           part_id?: string | null
           size?: number | null
+          storage_path?: string | null
         }
         Relationships: [
           {
@@ -656,6 +659,10 @@ export type Database = {
       }
       email_sync_state: {
         Row: {
+          full_sync_in_progress: boolean
+          full_sync_page_token: string | null
+          full_sync_started_at: string | null
+          full_sync_total_synced: number
           last_full_sync_at: string | null
           last_history_id: number | null
           last_incremental_sync_at: string | null
@@ -664,6 +671,10 @@ export type Database = {
           watch_expiration: string | null
         }
         Insert: {
+          full_sync_in_progress?: boolean
+          full_sync_page_token?: string | null
+          full_sync_started_at?: string | null
+          full_sync_total_synced?: number
           last_full_sync_at?: string | null
           last_history_id?: number | null
           last_incremental_sync_at?: string | null
@@ -672,6 +683,10 @@ export type Database = {
           watch_expiration?: string | null
         }
         Update: {
+          full_sync_in_progress?: boolean
+          full_sync_page_token?: string | null
+          full_sync_started_at?: string | null
+          full_sync_total_synced?: number
           last_full_sync_at?: string | null
           last_history_id?: number | null
           last_incremental_sync_at?: string | null

@@ -176,7 +176,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         if ((r as any)?.needsFullSync) return; // ignore silently
       } catch (e) { /* silent */ }
     };
-    timer = setInterval(tick, 30_000);
+    timer = setInterval(tick, 15_000);
     void tick();
     const onVisibility = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVisibility);
@@ -186,12 +186,20 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   // ---------- ACTIONS ----------
   const doFullSync = async () => {
     setSyncing(true);
+    let total = 0;
     try {
       await listLabelsFn({ data: undefined as any });
-      const r = await fullSyncFn({ data: { maxPerLabel: 300 } });
-      toast.success(`${r.synced} mensagens, ${r.threads} conversas`);
-      await loadFolders();
-      await loadThreads();
+      // Loop until done — each call processes one Gmail page (up to 500 messages).
+      // Caps at 200 pages as a safety net (~100k messages).
+      for (let i = 0; i < 200; i++) {
+        const r = await fullSyncFn({ data: { restart: i === 0 } });
+        total = r.totalSynced || total + r.syncedThisRun;
+        toast.message(`Sincronizando…`, { description: `${total} mensagens, ${r.threads} conversas neste lote` });
+        await loadFolders();
+        await loadThreads();
+        if (r.done) break;
+      }
+      toast.success(`Sincronização concluída — ${total} mensagens`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
       if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) {

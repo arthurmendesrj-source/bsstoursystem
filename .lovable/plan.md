@@ -1,53 +1,77 @@
 ## Objetivo
 
-A caixa em `/email` deve refletir 1:1 o Gmail da `booking@adatours.com`:
-todas as mensagens (sem teto), anexos baixados e armazenados, e atualização contínua sem depender da aba estar aberta.
-
-## Estado atual
-
-- `gmailFullSync` está limitado a `maxPerLabel: 300` (botão da UI) e tem hard-cap nos primeiros 100–300 IDs. Inbox real tem milhares.
-- Anexos: só metadado é gravado. O binário só é puxado quando o usuário clica para baixar (`gmailGetAttachment`).
-- "Tempo real": polling a cada 30s **só enquanto a aba está visível** + Supabase Realtime na UI. Se ninguém abrir o painel, nada sincroniza.
+Reformular o `EmailPanel` para ficar como um cliente de email completo, com painéis ajustáveis, sidebar colapsável e funções de IA + Associar reintroduzidas.
 
 ## Mudanças
 
-### 1. Sync completo, paginado e retomável (sem teto)
+### 1. Sidebar de pastas colapsável (estilo "toolbar")
+- Adicionar estado `foldersCollapsed` (persistido em `localStorage`).
+- Botão de toggle no topo da sidebar (ícone `PanelLeftClose` / `PanelLeftOpen`).
+- Quando colapsada: largura fixa `w-14`, mostra apenas ícones das pastas (com `Tooltip` no hover exibindo o nome e contador de não lidas).
+- Quando expandida: comportamento atual com nomes e contadores.
+- O botão "Sincronizar Gmail" vira ícone `RefreshCw` no estado colapsado.
 
-- Adicionar colunas em `email_sync_state`: `full_sync_page_token text`, `full_sync_in_progress bool`, `full_sync_started_at timestamptz`, `full_sync_total_synced int`.
-- Reescrever `gmailFullSync` para processar **um lote por invocação** (~150 mensagens, ~25–30s) e retornar `{ done, nextPageToken, syncedSoFar }`. Ele:
-  - Lê `full_sync_page_token` da última execução
-  - Lista 1 página de IDs (`maxResults=500`) usando `q=` (sem filtro) + `includeSpamTrash=true`
-  - Persiste cada mensagem com `fetchAndStoreMessage` (concorrência 6)
-  - Salva o `nextPageToken` ou marca `done=true` quando acabar
-- UI: o botão "Sincronizar Gmail" dispara um loop client-side que chama `gmailFullSync` até `done`, mostrando progresso ("X mensagens sincronizadas…"). Sai do loop se a aba fechar; o estado fica salvo no banco e retoma na próxima execução.
+### 2. Painéis redimensionáveis (largura editável)
+- Substituir os três `<aside>/<section>` fixos por `ResizablePanelGroup` (`react-resizable-panels` já presente em `src/components/ui/resizable.tsx`).
+- Estrutura: `Sidebar | ResizableHandle | Lista de Threads | ResizableHandle | Leitor`.
+- Persistir os tamanhos em `localStorage` (`email.panels.sizes`) via `onLayout` do grupo.
+- Tamanhos mínimos sensatos (`minSize` em %): sidebar 8, lista 18, leitor 30.
+- Quando a sidebar estiver colapsada, ela sai do grupo redimensionável e vira um `div` fixo `w-14` ao lado do grupo (para não permitir resize do strip de ícones).
 
-### 2. Download e armazenamento de anexos
+### 3. Duplo clique abre popup independente da thread
+- Adicionar `onDoubleClick` em cada item de thread na lista.
+- Estado `popupThreadId: string | null` que abre um `Dialog` grande (`sm:max-w-5xl`, `h-[85vh]`) renderizando o mesmo Reader (extraído para um subcomponente `ThreadReader` reutilizado pelo painel principal e pelo popup).
+- O popup é independente do `selectedThreadId` — pode-se ter uma thread aberta no painel e várias outras em popups (cada chamada de duplo clique substitui o popup atual; manter simples com 1 popup por vez).
+- Dentro do popup: mesmas ações (Reply, Forward, Star, Archive, Trash, Anexos) e também os botões de IA/Associar abaixo.
 
-- Criar bucket privado `email-attachments` no Storage com policies que liberam leitura para usuários cujo `auth.uid()` está em `user_email_accounts` para o `owner_email` do email pai. Path convencionado: `{owner_email}/{email_id}/{attachment_id}_{filename}`.
-- Em `fetchAndStoreMessage`, após inserir os registros em `email_attachments`, baixar cada anexo via `users/me/messages/{id}/attachments/{attId}`, decodificar base64url e fazer upload no bucket. Gravar `storage_path` em `email_attachments` (renomear `cached_url`→`storage_path` ou adicionar coluna).
-- Em `gmailGetAttachment` (download via UI) priorizar leitura do Storage; só cair no Gmail se faltar.
-- Adicionar limite de tamanho (ex.: pular > 25 MB e logar).
+### 4. Reintroduzir IA + Associar
+Recolocar os fluxos que existiam antes:
 
-### 3. Atualização contínua no servidor (não depende da aba aberta)
+**Botão "Triagem com IA"** na barra de ações do leitor (e no popup):
+- Chama `emailAnalyze` (já existe em `src/server/gmail.functions.ts`) com o `gmail_id` da última mensagem.
+- Abre `Dialog` de triagem mostrando: `summary`, `suggested_action`, `intent`, dados extraídos (cliente, destino, pax, valor estimado).
+- Três botões finais:
+  - **Criar Lead** — pré-preenche e navega para `/leads` com `state` (ou abre dialog) usando os dados extraídos; persiste `email_id` no lead.
+  - **Criar Atividade** — abre dialog simples (título, categoria negocio/suporte, prioridade, descrição com summary, due date) e insere em `tasks` com `source='email'` e `email_id`.
+  - **Ignorar** — fecha e marca thread como lida.
 
-- Criar rota pública `src/routes/api/public/gmail-poll.ts` que executa `gmailIncrementalSync` para cada `owner_email` em `user_email_accounts`. Protegida por header `X-Cron-Secret` (segredo `GMAIL_CRON_SECRET`).
-- Agendar pg_cron a cada 1 minuto chamando essa rota na URL estável `project--{id}.lovable.app`.
-- Manter Supabase Realtime (`postgres_changes` em `email_threads`/`email_labels`) — ele já está ligado e fará a UI atualizar instantaneamente quando o cron gravar novas linhas.
-- Reduzir o polling client-side para 15s como fallback quando a aba está visível.
-- Lidar com `needsFullSync` (historyId expirou): o cron dispara automaticamente um lote do full sync resumível.
+**Botão "Associar"** na mesma barra:
+- Abre `AssociateDialog` (`src/components/AssociateDialog.tsx`) com tabs `lead | customer | supplier | quote | booking`.
+- Ao escolher: faz `update` em `email_threads`/`emails` setando `lead_id` / `customer_id` / `supplier_id` / `quote_id` / `booking_id` na thread atual (e em todas as mensagens da thread).
+- Toast de confirmação. Mostrar chip "Associado a: …" no header do leitor quando houver vínculo.
 
-### 4. Detalhes técnicos
+### 5. Detalhes técnicos
 
-- O sync incremental atual já cobre `messagesAdded`, `messagesDeleted`, `labelsAdded`, `labelsRemoved` — manter, mas garantir que ao re-puxar uma mensagem com label alterada, os anexos não sejam re-baixados se já existem no Storage.
-- Adicionar índice em `emails(thread_id)` e `emails(owner_email, internal_date desc)` para acelerar queries da caixa.
-- Migration garante que `cached_url` em `email_attachments` vira `storage_path text` (ou adicionamos a nova coluna ao lado).
+```text
+EmailPanel
+├── Sidebar (colapsável, w-60 ↔ w-14)
+└── ResizablePanelGroup (horizontal)
+    ├── Panel: ThreadList            (defaultSize 28, min 18)
+    ├── ResizableHandle
+    └── Panel: ThreadReader          (defaultSize 60, min 30)
 
-## Pontos de atenção
+ThreadReader  (componente extraído)
+├── Header com ações: Archive, Trash, Star, "Triagem IA", "Associar"
+├── ScrollArea com mensagens
+└── Footer Reply/Forward por mensagem
 
-- Inbox grande: a primeira sincronização completa pode levar horas. O esquema retomável evita perda de progresso e timeouts da função serverless.
-- Cota Gmail: 250 unidades/usuário/segundo. A concorrência 6 + lote 150 fica bem dentro do limite, mas adicionamos retry exponencial (já existe no `gw`).
-- Custo de Storage: anexos podem somar GBs. O usuário deve estar ciente.
+Popup independente
+└── Dialog → ThreadReader (mesma instância de componente)
+```
 
-## Pergunta
+- Persistência: `localStorage` para `foldersCollapsed` e tamanhos dos painéis.
+- Schema: verificar se `email_threads` tem colunas `lead_id`, `customer_id`, `supplier_id`, `quote_id`, `booking_id`. Se faltarem, criar migration adicionando-as como `uuid null` (sem FK rígida para evitar quebrar deletes em cascata indesejados) e índices.
+- IA: reaproveita `emailAnalyze` existente (sem alterar backend).
+- Tooltips: usar `@/components/ui/tooltip` no estado colapsado.
 
-Confirma o uso do Storage do Lovable Cloud para guardar os anexos (privado, com RLS por `user_email_accounts`)? Sem isso, "espelho fiel com anexos" não é possível — só ficaríamos com o metadado e o binário viria do Google sob demanda.
+## Arquivos afetados
+
+- `src/components/email/EmailPanel.tsx` — refator principal (sidebar colapsável + ResizablePanelGroup + duplo clique + extração de `ThreadReader`).
+- `src/components/email/ThreadReader.tsx` — novo (subcomponente reutilizado por painel e popup).
+- `src/components/email/AiTriageDialog.tsx` — novo (UI da triagem com IA + criar lead/atividade/ignorar).
+- Migration `add_email_thread_associations` — apenas se as colunas de associação não existirem.
+
+## Fora do escopo
+
+- Não alterar backend de sync/realtime do Gmail.
+- Não mexer no modo `lead` (`LeadEmailMini`) — segue como está.

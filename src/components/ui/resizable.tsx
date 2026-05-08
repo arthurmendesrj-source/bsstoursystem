@@ -1,10 +1,17 @@
 import { GripVertical } from "lucide-react";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { Group, Panel, Separator, type GroupProps, type Layout } from "react-resizable-panels";
 
 import { cn } from "@/lib/utils";
 
-const ResizablePanelGroup = ({ className, ...props }: React.ComponentProps<typeof Group>) => (
+type ShadcnGroupProps = Omit<GroupProps, "orientation" | "onLayoutChange"> & {
+  direction?: "horizontal" | "vertical";
+  onLayout?: (sizes: number[]) => void;
+};
+
+const ResizablePanelGroup = ({ className, direction = "horizontal", onLayout, ...props }: ShadcnGroupProps) => (
   <Group
+    orientation={direction}
+    onLayoutChange={onLayout ? (layout: Layout) => onLayout(Object.values(layout)) : undefined}
     className={cn("flex h-full w-full data-[panel-group-direction=vertical]:flex-col", className)}
     {...props}
   />

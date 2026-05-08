@@ -123,6 +123,34 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);
 
+  // Deep-link from global search: ?q=...&thread=...
+  const pendingThreadRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== "full" || typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const qParam = sp.get("q");
+    const threadParam = sp.get("thread");
+    if (qParam) setSearch(qParam);
+    if (threadParam) pendingThreadRef.current = threadParam;
+    if (qParam || threadParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("q");
+      url.searchParams.delete("thread");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    const tid = pendingThreadRef.current;
+    if (!tid || threads.length === 0) return;
+    const match = threads.find((t) => t.id === tid);
+    if (match) {
+      pendingThreadRef.current = null;
+      void openThread(match);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threads]);
+
   useEffect(() => {
     const ch = supabase.channel("email-mirror")
       .on("postgres_changes", { event: "*", schema: "public", table: "email_threads" }, () => loadThreads())

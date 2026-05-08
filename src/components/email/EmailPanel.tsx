@@ -88,6 +88,23 @@ export type EmailPanelProps = {
 export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
   const listLabelsFn = useServerFn(gmailListLabels);
   const fullSyncFn = useServerFn(gmailFullSync);
+  const startFullMirrorFn = useServerFn(gmailStartFullMirror);
+  const [startingMirror, setStartingMirror] = useState(false);
+
+  const startFullMirror = async () => {
+    setStartingMirror(true);
+    try {
+      const r = await startFullMirrorFn({ data: undefined as never });
+      toast.success(`Importação completa iniciada — ${r.queueLength} pastas na fila. O processo continuará em segundo plano.`);
+      await loadFolders();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao iniciar importação";
+      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
+      else toast.error(msg);
+    } finally {
+      setStartingMirror(false);
+    }
+  };
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);

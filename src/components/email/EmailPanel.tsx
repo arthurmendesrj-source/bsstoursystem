@@ -167,7 +167,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const incRef = useRef(incSyncFn);
   incRef.current = incSyncFn;
   useEffect(() => {
-    if (mode !== "full") return;
+    if (mode !== "full" || !hasMailbox) return;
     let timer: ReturnType<typeof setInterval> | null = null;
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
@@ -181,7 +181,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const onVisibility = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVisibility);
     return () => { if (timer) clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
-  }, [mode]);
+  }, [mode, hasMailbox]);
 
   // ---------- ACTIONS ----------
   const doFullSync = async () => {

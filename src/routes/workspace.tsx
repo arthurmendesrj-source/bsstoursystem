@@ -257,7 +257,7 @@ function WorkspacePage() {
       </div>
 
       <ResizablePanelGroup
-        orientation="horizontal"
+        direction="horizontal"
         className="min-h-[600px]"
       >
         <ResizablePanel defaultSize="28%" minSize="18%" maxSize="45%">

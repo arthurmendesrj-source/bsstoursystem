@@ -1,77 +1,35 @@
 ## Objetivo
 
-Reformular o `EmailPanel` para ficar como um cliente de email completo, com painéis ajustáveis, sidebar colapsável e funções de IA + Associar reintroduzidas.
+Simplificar o `EmailPanel` mantendo apenas a sidebar colapsável (com ícones) e removendo os painéis redimensionáveis e as abas de categorias do Gmail (Principal / Social / Promoções / Atualizações).
 
 ## Mudanças
 
-### 1. Sidebar de pastas colapsável (estilo "toolbar")
-- Adicionar estado `foldersCollapsed` (persistido em `localStorage`).
-- Botão de toggle no topo da sidebar (ícone `PanelLeftClose` / `PanelLeftOpen`).
-- Quando colapsada: largura fixa `w-14`, mostra apenas ícones das pastas (com `Tooltip` no hover exibindo o nome e contador de não lidas).
-- Quando expandida: comportamento atual com nomes e contadores.
-- O botão "Sincronizar Gmail" vira ícone `RefreshCw` no estado colapsado.
+### 1. Remover painéis redimensionáveis
+- Remover o uso de `ResizablePanelGroup` / `ResizablePanel` / `ResizableHandle` em `src/components/email/EmailPanel.tsx`.
+- Remover o import de `@/components/ui/resizable`.
+- Remover o estado `panelSizes`, a constante `LS_SIZES`, o `useMemo` de `initialSizes` e o `onLayout` que persistia em `localStorage`.
+- Voltar para um layout fixo com flex:
+  - Sidebar (`w-60` quando expandida, `w-14` quando colapsada).
+  - Lista de threads com largura fixa (`w-80` / `w-96`).
+  - Leitor ocupando o restante (`flex-1`).
 
-### 2. Painéis redimensionáveis (largura editável)
-- Substituir os três `<aside>/<section>` fixos por `ResizablePanelGroup` (`react-resizable-panels` já presente em `src/components/ui/resizable.tsx`).
-- Estrutura: `Sidebar | ResizableHandle | Lista de Threads | ResizableHandle | Leitor`.
-- Persistir os tamanhos em `localStorage` (`email.panels.sizes`) via `onLayout` do grupo.
-- Tamanhos mínimos sensatos (`minSize` em %): sidebar 8, lista 18, leitor 30.
-- Quando a sidebar estiver colapsada, ela sai do grupo redimensionável e vira um `div` fixo `w-14` ao lado do grupo (para não permitir resize do strip de ícones).
+### 2. Remover categorias do Gmail
+- Remover a constante `CATEGORIES` (Principal / Social / Promoções / Atualizações).
+- Remover o estado `activeCategory` e `setActiveCategory`.
+- Remover o `<Tabs>` de categorias renderizado acima da lista de threads.
+- Remover qualquer uso de `activeCategory` na query de threads (filtro por label de categoria), passando a listar threads apenas pelo `activeLabel` (INBOX, STARRED, etc.).
+- Remover o import de `Tabs, TabsList, TabsTrigger` se não houver mais uso no arquivo.
 
-### 3. Duplo clique abre popup independente da thread
-- Adicionar `onDoubleClick` em cada item de thread na lista.
-- Estado `popupThreadId: string | null` que abre um `Dialog` grande (`sm:max-w-5xl`, `h-[85vh]`) renderizando o mesmo Reader (extraído para um subcomponente `ThreadReader` reutilizado pelo painel principal e pelo popup).
-- O popup é independente do `selectedThreadId` — pode-se ter uma thread aberta no painel e várias outras em popups (cada chamada de duplo clique substitui o popup atual; manter simples com 1 popup por vez).
-- Dentro do popup: mesmas ações (Reply, Forward, Star, Archive, Trash, Anexos) e também os botões de IA/Associar abaixo.
-
-### 4. Reintroduzir IA + Associar
-Recolocar os fluxos que existiam antes:
-
-**Botão "Triagem com IA"** na barra de ações do leitor (e no popup):
-- Chama `emailAnalyze` (já existe em `src/server/gmail.functions.ts`) com o `gmail_id` da última mensagem.
-- Abre `Dialog` de triagem mostrando: `summary`, `suggested_action`, `intent`, dados extraídos (cliente, destino, pax, valor estimado).
-- Três botões finais:
-  - **Criar Lead** — pré-preenche e navega para `/leads` com `state` (ou abre dialog) usando os dados extraídos; persiste `email_id` no lead.
-  - **Criar Atividade** — abre dialog simples (título, categoria negocio/suporte, prioridade, descrição com summary, due date) e insere em `tasks` com `source='email'` e `email_id`.
-  - **Ignorar** — fecha e marca thread como lida.
-
-**Botão "Associar"** na mesma barra:
-- Abre `AssociateDialog` (`src/components/AssociateDialog.tsx`) com tabs `lead | customer | supplier | quote | booking`.
-- Ao escolher: faz `update` em `email_threads`/`emails` setando `lead_id` / `customer_id` / `supplier_id` / `quote_id` / `booking_id` na thread atual (e em todas as mensagens da thread).
-- Toast de confirmação. Mostrar chip "Associado a: …" no header do leitor quando houver vínculo.
-
-### 5. Detalhes técnicos
-
-```text
-EmailPanel
-├── Sidebar (colapsável, w-60 ↔ w-14)
-└── ResizablePanelGroup (horizontal)
-    ├── Panel: ThreadList            (defaultSize 28, min 18)
-    ├── ResizableHandle
-    └── Panel: ThreadReader          (defaultSize 60, min 30)
-
-ThreadReader  (componente extraído)
-├── Header com ações: Archive, Trash, Star, "Triagem IA", "Associar"
-├── ScrollArea com mensagens
-└── Footer Reply/Forward por mensagem
-
-Popup independente
-└── Dialog → ThreadReader (mesma instância de componente)
-```
-
-- Persistência: `localStorage` para `foldersCollapsed` e tamanhos dos painéis.
-- Schema: verificar se `email_threads` tem colunas `lead_id`, `customer_id`, `supplier_id`, `quote_id`, `booking_id`. Se faltarem, criar migration adicionando-as como `uuid null` (sem FK rígida para evitar quebrar deletes em cascata indesejados) e índices.
-- IA: reaproveita `emailAnalyze` existente (sem alterar backend).
-- Tooltips: usar `@/components/ui/tooltip` no estado colapsado.
+### 3. Manter o que já funciona
+- Sidebar colapsável continua igual: toggle persiste em `localStorage` (`email.sidebar.collapsed`); colapsada mostra apenas ícones com `Tooltip`; expandida mostra nomes + contadores.
+- Duplo clique abre popup independente (`Dialog` com `ThreadReader`) — sem alteração.
+- `ThreadReader` (com botões Triagem IA e Associar) — sem alteração.
+- Backend de sync e realtime — sem alteração.
 
 ## Arquivos afetados
 
-- `src/components/email/EmailPanel.tsx` — refator principal (sidebar colapsável + ResizablePanelGroup + duplo clique + extração de `ThreadReader`).
-- `src/components/email/ThreadReader.tsx` — novo (subcomponente reutilizado por painel e popup).
-- `src/components/email/AiTriageDialog.tsx` — novo (UI da triagem com IA + criar lead/atividade/ignorar).
-- Migration `add_email_thread_associations` — apenas se as colunas de associação não existirem.
+- `src/components/email/EmailPanel.tsx` — remover ResizablePanelGroup, categorias e estados associados; voltar a layout flex fixo.
 
 ## Fora do escopo
 
-- Não alterar backend de sync/realtime do Gmail.
-- Não mexer no modo `lead` (`LeadEmailMini`) — segue como está.
+- Não alterar `ThreadReader.tsx`, `AiTriageDialog.tsx`, `AssociateDialog.tsx`, `resizable.tsx` nem o backend.

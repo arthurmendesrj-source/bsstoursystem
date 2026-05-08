@@ -701,8 +701,74 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     </div>
   ) : null;
 
+  // Helpers for live mirror panel
+  const resolveLabelName = (id: string | null): string => {
+    if (!id) return "—";
+    if (SYSTEM_NAMES_PT[id]) return SYSTEM_NAMES_PT[id];
+    const f = folders.find((x) => x.id === id);
+    return f?.name ?? id;
+  };
+  const monthLabelFromOffset = (offset: number): string => {
+    const d = new Date();
+    d.setDate(d.getDate() - offset * 30);
+    return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  };
+  const showMirrorPanel = !!mirror && !mirrorHidden && (mirror.in_progress || (mirror.total_synced > 0 && !!mirror.last_full_sync_at));
+
+  const MirrorPanel = showMirrorPanel ? (
+    <div className="border-b bg-card/50 p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            {mirror!.in_progress ? (
+              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
+            ) : (
+              <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+            )}
+            <span className="text-sm font-semibold truncate">
+              {mirror!.in_progress ? "Importação em andamento" : "Importação concluída"}
+            </span>
+            <span className="text-[11px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
+              {mirror!.in_progress ? "Em andamento" : "Concluído"}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+            <div>
+              <span className="font-medium text-foreground">Pasta atual:</span> {resolveLabelName(mirror!.current_label)}
+              {mirror!.in_progress && mirror!.label_queue.length > 0 && (
+                <> · {mirror!.label_queue.length} restantes na fila</>
+              )}
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Mês atual:</span> {monthLabelFromOffset(mirror!.month_offset)}
+              <span className="text-muted-foreground/70"> (offset {mirror!.month_offset})</span>
+            </div>
+            <div>
+              <span className="font-medium text-foreground">Total sincronizado:</span>{" "}
+              <span className="tabular-nums">{mirror!.total_synced.toLocaleString("pt-BR")}</span> mensagens
+            </div>
+            {mirror!.last_full_sync_at && !mirror!.in_progress && (
+              <div className="text-muted-foreground/80">
+                Última atualização: {new Date(mirror!.last_full_sync_at).toLocaleString("pt-BR")}
+              </div>
+            )}
+          </div>
+        </div>
+        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setMirrorHidden(true)}>
+          <X className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      {mirror!.in_progress && (
+        <div className="h-1 rounded-full bg-muted overflow-hidden">
+          <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
+        </div>
+      )}
+    </div>
+  ) : null;
+
   const ThreadList = (
     <section className="flex flex-col h-full bg-background min-w-0">
+      {MirrorPanel}
       {SyncProgressPanel}
       <div className="p-3 border-b space-y-2">
         <div className="relative">

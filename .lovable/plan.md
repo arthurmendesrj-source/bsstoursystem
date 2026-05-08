@@ -1,55 +1,70 @@
 ## Objetivo
 
-Adicionar um buscador global no cabeçalho do app, com ícone de lupa posicionado ao lado do ícone de IA (Sparkles do `AssistantFab`). O buscador deve pesquisar em todo o sistema, incluindo o conteúdo dos e-mails (assunto, remetente e texto).
+Tornar o buscador da aba E-mail abrangente: ao digitar uma palavra, encontrar threads cujo **assunto, snippet, participantes, remetente, destinatários OU corpo da mensagem** contenham o termo.
+
+## Estado atual
+
+`src/components/email/EmailPanel.tsx` (l. 117) filtra apenas `subject` e `snippet` da tabela `email_threads`:
+
+```ts
+q = q.or(`subject.ilike.%${search}%,snippet.ilike.%${search}%`);
+```
+
+Campos úteis ficam de fora: `participants` (array em `email_threads`), `from_email`, `from_name`, `to_emails`, `body_text` e `body_html` (em `emails`).
 
 ## O que muda
 
-### 1. Botão de lupa no cabeçalho (`src/components/AppShell.tsx`)
-- Adicionar um botão com ícone `Search` imediatamente à esquerda do `<AssistantFab />` na `<header>`.
-- Atalho de teclado: `Ctrl/Cmd + K` abre o mesmo diálogo.
-- Visível em todas as telas (já que o header é global).
+### Em `src/components/email/EmailPanel.tsx` — `loadThreads()`
 
-### 2. Novo componente `GlobalSearchDialog` (`src/components/GlobalSearch.tsx`)
-- Diálogo de busca estilo "command palette" usando o `Command` (cmdk) já presente em `src/components/ui/command.tsx`.
-- Campo único de texto com debounce de ~250 ms.
-- Resultados agrupados por categoria, cada item navega para a página correspondente:
-  - **Leads** → `/leads/$leadId` (busca em `leads.name`, `leads.email`, `leads.phone`, `leads.code`, `leads.destination`, `leads.notes`)
-  - **Clientes** → `/customers` (busca em `customers.name`, `customers.email`, `customers.phone`, `customers.code`)
-  - **Fornecedores** → `/suppliers` (busca em `suppliers.name`, `suppliers.email`, `suppliers.code`)
-  - **Reservas** → `/bookings_/$bookingId` (busca em `bookings.code`, `bookings.title`/destino quando existir)
-  - **E-mails** → `/email` com o assunto pré-selecionado (busca em `emails.subject`, `emails.from_name`, `emails.from_email`, `emails.snippet`, `emails.body_text`)
-- Cada grupo limita a 5 resultados, com indicador "ver mais" quando há mais.
-- Estado vazio: mensagem "Digite para buscar em leads, clientes, fornecedores, reservas e e-mails".
-- Estado sem resultados: "Nada encontrado para «termo»".
+Quando `search.trim()` tiver ao menos 2 caracteres:
 
-### 3. Busca server-side (`src/server/search.functions.ts`, novo)
-- Server function `globalSearch({ q: string })` que dispara em paralelo consultas Supabase com `ilike` (case-insensitive) nas colunas listadas acima.
-- Respeita as RLS já existentes — cada tabela retorna apenas o que o usuário pode ver.
-- Para e-mails, busca em `subject`, `from_name`, `from_email`, `snippet` e `body_text` (este último com `ilike '%q%'`; se vazio, ainda assim os outros campos cobrem).
-- Retorna `{ leads: [...], customers: [...], suppliers: [...], bookings: [...], emails: [...] }`, cada item com `id`, `label`, `subtitle` e qualquer chave necessária para navegação.
+1. **Buscar thread_ids candidatos por conteúdo** na tabela `emails` (filtrando por `owner_email`):
+   ```ts
+   const like = `%${term}%`;
+   const { data: hits } = await supabase
+     .from("emails")
+     .select("thread_id")
+     .in("owner_email", authorizedEmails!)
+     .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
+     .limit(500);
+   const threadIds = Array.from(new Set((hits ?? []).map(h => h.thread_id).filter(Boolean)));
+   ```
 
-### 4. Navegação ao clicar em e-mail
-- Ao selecionar um e-mail nos resultados, navegar para `/email?gmail_id=<id>` (ou `email_id` quando for registro local).
-- Pequeno ajuste em `src/components/email/EmailPanel.tsx` para ler esse query param ao montar e abrir o thread/mensagem correspondente. Mantém o buscador interno da aba de e-mail intacto.
+2. **Buscar nas próprias threads** (assunto, snippet, participantes — esta inclui destinatários):
+   ```ts
+   let q = supabase.from("email_threads").select("*")
+     .in("owner_email", authorizedEmails!)
+     .contains("labels", [activeLabel])
+     .order("last_message_at", { ascending: false }).limit(200);
 
-## Detalhes técnicos
+   const orParts = [
+     `subject.ilike.${like}`,
+     `snippet.ilike.${like}`,
+     // array overlap como string Postgres: {term}
+     `participants.cs.{${term.replace(/[",{}\\]/g, "")}}`,
+   ];
+   if (threadIds.length) orParts.push(`id.in.(${threadIds.map(id => `"${id}"`).join(",")})`);
+   q = q.or(orParts.join(","));
+   ```
 
-```text
-AppShell header
- ├── [Search button] ← novo
- ├── AssistantFab (Sparkles)
- ├── NotificationBell
- ├── Lang select
- └── Currency select
-```
+   - `participants.cs.{term}` (`contains`) cobre buscas exatas de e-mail; para parcial dentro do array, o caminho é via `emails.from_email`/`to_emails` (item 1).
+   - Para incluir `to_emails` (array em `emails`), adicionamos no `or` da consulta de `emails`: `to_emails.cs.{term}` (apenas para correspondência completa de endereço). Para parcial, `from_email`/`subject` já capturam a maior parte.
 
-- O `Command`/`CommandDialog` do cmdk já cuida de teclado, foco e acessibilidade.
-- Debounce com `setTimeout` simples dentro do componente; cancelar em cleanup.
-- Server function chamada via `useServerFn` + `useQuery` (`@tanstack/react-query`) para cache automático.
-- Limite por consulta: 5 linhas/tabela para manter latência baixa.
+3. **Manter o limite de 200 threads** e ordenação por `last_message_at`.
+
+4. **Sanitização**: escapar `%`, `,`, `(`, `)`, `"` no termo antes de montar o `or`, evitando quebrar a sintaxe PostgREST.
+
+5. **Debounce de 250 ms** no `search` para não disparar duas consultas a cada tecla.
+
+6. **Indicador de carregamento**: usar o `syncing`/novo `searching` para mostrar spinner pequeno no campo enquanto busca.
+
+### Sem mudanças em backend / RLS
+
+- As policies de `emails` e `email_threads` já restringem por `owner_email` do usuário; o pré-filtro `.in("owner_email", authorizedEmails!)` mantém o escopo.
+- Nenhuma migração ou nova função é necessária.
 
 ## Fora do escopo
 
-- Não altera o buscador local da aba de e-mail (continua filtrando a lista aberta).
-- Não cria índices de full-text search (FTS) — fica como evolução futura se a performance pedir.
-- Não toca em RLS existente.
+- Não alteramos o buscador global (lupa do header), que já cobre busca em e-mails em todo o sistema.
+- Não criamos índice full-text (FTS); se o volume crescer, fica como evolução futura.
+- Anexos (nome do arquivo) não entram nessa rodada — exige join em `email_attachments`.

@@ -46,8 +46,9 @@ export function AiTriageDialog({
 }) {
   const analyzeFn = useServerFn(emailAnalyze);
   const translateFn = useServerFn(emailTranslate);
-  const { user } = useAuth();
-  const { subordinates } = useSubordinates();
+  const { user, roles } = useAuth();
+  const { subordinates, loading: loadingSubs } = useSubordinates();
+  const canAssign = roles.some((r) => ["admin", "diretor", "gerente", "supervisor"].includes(r));
   const [loading, setLoading] = useState(false);
   const [sug, setSug] = useState<Suggestion | null>(null);
   const [mode, setMode] = useState<"summary" | "lead" | "task">("summary");

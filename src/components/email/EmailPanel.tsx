@@ -57,13 +57,16 @@ type SyncProgressState = {
   active: boolean;
   hidden: boolean;
   currentLabel: SyncLabel | null;
+  currentMonthLabel: string | null;
+  currentMonthIndex: number; // 1-based for display
+  totalMonths: number;
   totalSynced: number;
   perLabel: Record<SyncLabel, { count: number; threads: number; status: LabelStatus }>;
 };
 const initialPerLabel = (): SyncProgressState["perLabel"] =>
   SYNC_LABELS.reduce((acc, l) => { acc[l] = { count: 0, threads: 0, status: "pending" }; return acc; }, {} as SyncProgressState["perLabel"]);
 const initialSyncProgress = (): SyncProgressState => ({
-  active: false, hidden: false, currentLabel: null, totalSynced: 0, perLabel: initialPerLabel(),
+  active: false, hidden: false, currentLabel: null, currentMonthLabel: null, currentMonthIndex: 0, totalMonths: 12, totalSynced: 0, perLabel: initialPerLabel(),
 });
 
 function formatRelative(iso: string | null) {

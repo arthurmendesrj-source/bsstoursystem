@@ -126,7 +126,7 @@ export function AiTriageDialog({
         estimated_value: lValue ? Number(lValue) : null,
         expected_travel_date: lDate || null,
         notes: lNotes || null,
-        created_by: uid, assigned_to: uid,
+        created_by: uid, assigned_to: assignedTo || uid,
       }).select("id").single();
       if (error) throw new Error(error.message);
       // link emails to lead
@@ -156,7 +156,7 @@ export function AiTriageDialog({
         category: tCategory, priority: tPriority,
         due_date: tDue ? new Date(tDue).toISOString() : null,
         source: "email", email_id: emailId,
-        created_by: uid, assigned_to: uid,
+        created_by: uid, assigned_to: assignedTo || uid,
       });
       if (error) throw new Error(error.message);
       toast.success("Atividade criada");

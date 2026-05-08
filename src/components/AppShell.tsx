@@ -27,6 +27,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
+import { GlobalSearchTrigger } from "@/components/GlobalSearch";
 import { useAuth } from "@/lib/auth";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";

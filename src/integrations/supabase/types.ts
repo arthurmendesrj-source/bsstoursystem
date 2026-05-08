@@ -2543,6 +2543,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_email_accounts: {
+        Row: {
+          created_at: string
+          email_address: string
+          id: string
+          is_primary: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_address: string
+          id?: string
+          is_primary?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_address?: string
+          id?: string
+          is_primary?: boolean
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_field_permissions: {
         Row: {
           can_edit: boolean | null

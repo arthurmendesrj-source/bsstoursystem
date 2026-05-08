@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment } from "@/server/gmail-mirror.functions";
+import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror } from "@/server/gmail-mirror.functions";
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -88,6 +88,23 @@ export type EmailPanelProps = {
 export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
   const listLabelsFn = useServerFn(gmailListLabels);
   const fullSyncFn = useServerFn(gmailFullSync);
+  const startFullMirrorFn = useServerFn(gmailStartFullMirror);
+  const [startingMirror, setStartingMirror] = useState(false);
+
+  const startFullMirror = async () => {
+    setStartingMirror(true);
+    try {
+      const r = await startFullMirrorFn({ data: undefined as never });
+      toast.success(`Importação completa iniciada — ${r.queueLength} pastas na fila. O processo continuará em segundo plano.`);
+      await loadFolders();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Erro ao iniciar importação";
+      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
+      else toast.error(msg);
+    } finally {
+      setStartingMirror(false);
+    }
+  };
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);
@@ -522,6 +539,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
                 <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
                   Personalizado…
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
+                  {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
+                  <span className="flex-1">Importar tudo (cópia fiel)</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -548,6 +570,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
                 Personalizado…
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
+                {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
+                <span className="flex-1">Importar tudo (cópia fiel)</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

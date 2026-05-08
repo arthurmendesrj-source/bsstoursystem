@@ -353,13 +353,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar e-mails" className="pl-9" />
         </div>
-        {activeLabel === "INBOX" && (
-          <Tabs value={activeCategory} onValueChange={setActiveCategory}>
-            <TabsList className="w-full grid grid-cols-4 h-8">
-              {CATEGORIES.map((c) => <TabsTrigger key={c.id} value={c.id} className="text-xs">{c.name}</TabsTrigger>)}
-            </TabsList>
-          </Tabs>
-        )}
       </div>
       <ScrollArea className="flex-1">
         {threads.length === 0 ? (

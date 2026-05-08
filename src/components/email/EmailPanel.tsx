@@ -285,6 +285,29 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return <LeadEmailMini leadId={leadId} className={className} />;
   }
 
+  // ---------- ESTADO SEM CAIXA VINCULADA ----------
+  if (authorizedEmails === null) {
+    return (
+      <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>
+        Carregando…
+      </div>
+    );
+  }
+  if (!hasMailbox) {
+    return (
+      <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center bg-background", className)}>
+        <div className="max-w-md text-center px-6 py-10 rounded-lg border bg-card">
+          <Mail className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-lg font-semibold mb-2">Nenhuma conta de email vinculada</h2>
+          <p className="text-sm text-muted-foreground">
+            Sua caixa de entrada ainda não está conectada a uma conta de email.
+            Solicite ao administrador que vincule sua conta para visualizar mensagens aqui.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // ---------- RENDER ----------
   return (
     <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>

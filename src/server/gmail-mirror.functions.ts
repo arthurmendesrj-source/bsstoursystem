@@ -314,38 +314,42 @@ async function rebuildThread(supabase: any, owner: string, threadId: string) {
   }, { onConflict: "id" });
 }
 
-// ---------------- FULL SYNC ----------------
+// ---------------- FULL SYNC (resumable, one page per call) ----------------
+// Each invocation lists ONE page of message IDs (up to 500) and fetches them.
+// Progress is persisted in email_sync_state.full_sync_page_token. The UI
+// re-invokes until { done: true }.
 export const gmailFullSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { maxPerLabel?: number }) => d)
+  .inputValidator((d?: { restart?: boolean }) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase } = context;
-    const max = data.maxPerLabel ?? 100;
 
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
     const owner = profile.emailAddress.toLowerCase();
 
-    // Walk all messages (most recent N) — Gmail returns across all labels except SPAM/TRASH by default;
-    // we use q empty + includeSpamTrash to cover everything.
-    const collected = new Set<string>();
-    let pageToken: string | undefined = undefined;
-    let fetched = 0;
-    do {
-      const params = new URLSearchParams();
-      params.set("maxResults", "100");
-      params.set("includeSpamTrash", "true");
-      if (pageToken) params.set("pageToken", pageToken);
-      const res = (await gw(`/users/me/messages?${params.toString()}`)) as { messages?: { id: string }[]; nextPageToken?: string };
-      (res.messages ?? []).forEach((m) => collected.add(m.id));
-      pageToken = res.nextPageToken;
-      fetched = collected.size;
-    } while (pageToken && fetched < max);
+    const { data: state } = await supabase
+      .from("email_sync_state")
+      .select("full_sync_page_token, full_sync_in_progress, full_sync_total_synced, full_sync_started_at")
+      .eq("owner_email", owner)
+      .maybeSingle();
 
-    const ids = Array.from(collected).slice(0, max);
+    const restart = !!data.restart;
+    const pageToken: string | undefined = restart ? undefined : ((state as any)?.full_sync_page_token ?? undefined);
+    let totalSynced: number = restart ? 0 : ((state as any)?.full_sync_total_synced ?? 0);
+    const startedAt = restart || !(state as any)?.full_sync_started_at ? new Date().toISOString() : (state as any).full_sync_started_at;
 
-    // Fetch and persist with limited concurrency
+    const params = new URLSearchParams();
+    params.set("maxResults", "500");
+    params.set("includeSpamTrash", "true");
+    if (pageToken) params.set("pageToken", pageToken);
+    const list = (await gw(`/users/me/messages?${params.toString()}`)) as {
+      messages?: { id: string }[]; nextPageToken?: string;
+    };
+    const ids = (list.messages ?? []).map((m) => m.id);
+    const nextPageToken: string | undefined = list.nextPageToken;
+
     const threadIds = new Set<string>();
-    const CONCURRENCY = 6;
+    const CONCURRENCY = 5;
     for (let i = 0; i < ids.length; i += CONCURRENCY) {
       const batch = ids.slice(i, i + CONCURRENCY);
       const results = await Promise.all(batch.map(async (id) => {
@@ -357,16 +361,29 @@ export const gmailFullSync = createServerFn({ method: "POST" })
 
     for (const tid of threadIds) await rebuildThread(supabase, owner, tid);
 
-    // Save sync state
+    totalSynced += ids.length;
+    const done = !nextPageToken;
+
     await supabase.from("email_sync_state").upsert({
       owner_email: owner,
       last_history_id: profile.historyId ? Number(profile.historyId) : null,
-      last_full_sync_at: new Date().toISOString(),
+      last_full_sync_at: done ? new Date().toISOString() : null,
       last_incremental_sync_at: new Date().toISOString(),
+      full_sync_page_token: done ? null : nextPageToken,
+      full_sync_in_progress: !done,
+      full_sync_started_at: done ? null : startedAt,
+      full_sync_total_synced: done ? 0 : totalSynced,
       updated_at: new Date().toISOString(),
     }, { onConflict: "owner_email" });
 
-    return { synced: ids.length, threads: threadIds.size, owner };
+    return {
+      done,
+      syncedThisRun: ids.length,
+      totalSynced,
+      threads: threadIds.size,
+      owner,
+      hasMore: !done,
+    };
   });
 
 // ---------------- INCREMENTAL SYNC ----------------

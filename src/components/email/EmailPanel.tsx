@@ -94,14 +94,46 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [composeBody, setComposeBody] = useState("");
   const [sending, setSending] = useState(false);
 
-  // ---------- LOADERS ----------
-  const loadFolders = useCallback(async () => {
-    const { data } = await supabase.from("email_labels").select("*").order("name");
-    setFolders((data ?? []) as Folder[]);
+  // Contas de email vinculadas ao usuário logado. null = ainda carregando.
+  const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) { if (!cancelled) setAuthorizedEmails([]); return; }
+      const { data } = await supabase
+        .from("user_email_accounts")
+        .select("email_address")
+        .eq("user_id", uid);
+      if (cancelled) return;
+      setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
+    })();
+    return () => { cancelled = true; };
   }, []);
 
+  const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
+
+  // ---------- LOADERS ----------
+  const loadFolders = useCallback(async () => {
+    if (!hasMailbox) { setFolders([]); return; }
+    const { data } = await supabase
+      .from("email_labels")
+      .select("*")
+      .in("owner_email", authorizedEmails!)
+      .order("name");
+    setFolders((data ?? []) as Folder[]);
+  }, [hasMailbox, authorizedEmails]);
+
   const loadThreads = useCallback(async () => {
-    let q = supabase.from("email_threads").select("*").order("last_message_at", { ascending: false }).limit(200);
+    if (!hasMailbox) { setThreads([]); return; }
+    let q = supabase
+      .from("email_threads")
+      .select("*")
+      .in("owner_email", authorizedEmails!)
+      .order("last_message_at", { ascending: false })
+      .limit(200);
     // filter by label
     if (activeLabel === "INBOX") {
       q = q.contains("labels", ["INBOX", activeCategory]);
@@ -116,7 +148,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, activeCategory, search]);
+  }, [activeLabel, activeCategory, search, hasMailbox, authorizedEmails]);
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);

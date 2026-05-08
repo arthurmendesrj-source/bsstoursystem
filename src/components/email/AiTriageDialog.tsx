@@ -305,13 +305,17 @@ export function AiTriageDialog({
               </div>
               <div><Label>Vencimento</Label><Input type="datetime-local" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
             </div>
-            {subordinates.length > 0 && (
+            {canAssign && (
               <div>
                 <Label>Atribuir a</Label>
                 <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {loadingSubs && <SelectItem value="__loading" disabled>Carregando…</SelectItem>}
+                    {!loadingSubs && subordinates.length === 0 && (
+                      <SelectItem value="__empty" disabled>Nenhum subordinado disponível</SelectItem>
+                    )}
                     {subordinates.map((s) => (
                       <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
                     ))}

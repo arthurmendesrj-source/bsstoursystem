@@ -428,6 +428,106 @@ export async function runFullSyncTick(supabase: SupabaseClient, owner: string): 
   };
 }
 
+// ---------------- Wipe (batched, resumable) ----------------
+// One small step per call. Returns { done } so the cron can stop calling.
+const WIPE_BUCKET = "email-attachments";
+const WIPE_CHUNK = 200;
+
+export async function enqueueWipe(supabase: SupabaseClient, owner: string) {
+  await supabase.from("email_sync_state").upsert({
+    owner_email: owner,
+    full_sync_in_progress: false,
+    full_sync_label_queue: [],
+    full_sync_page_token: null,
+    full_sync_current_label: null,
+    full_sync_current_month_offset: 0,
+    full_sync_empty_streak: 0,
+    wipe_status: "wiping",
+    wipe_step: "storage",
+    wipe_deleted_count: 0,
+    wipe_started_at: new Date().toISOString(),
+    wipe_finished_at: null,
+    wipe_error: null,
+    updated_at: new Date().toISOString(),
+  }, { onConflict: "owner_email" });
+}
+
+export async function runWipeBatch(supabase: SupabaseClient, owner: string): Promise<{ done: boolean; step: string; deleted: number }> {
+  const { data: st } = await supabase.from("email_sync_state")
+    .select("wipe_status, wipe_step, wipe_deleted_count").eq("owner_email", owner).maybeSingle();
+  const s: any = st;
+  if (!s || s.wipe_status !== "wiping") return { done: true, step: "idle", deleted: 0 };
+  let step: string = s.wipe_step ?? "storage";
+  let deleted: number = Number(s.wipe_deleted_count ?? 0);
+
+  try {
+    if (step === "storage") {
+      const { data: folders } = await supabase.storage.from(WIPE_BUCKET).list(owner, { limit: 50 });
+      if (!folders || folders.length === 0) {
+        step = "attachments";
+      } else {
+        const sub = `${owner}/${folders[0].name}`;
+        const { data: files } = await supabase.storage.from(WIPE_BUCKET).list(sub, { limit: 1000 });
+        if (files && files.length > 0) {
+          await supabase.storage.from(WIPE_BUCKET).remove(files.map((f: any) => `${sub}/${f.name}`));
+        }
+      }
+    } else if (step === "attachments") {
+      const { data: rows } = await supabase.from("email_attachments").select("id").limit(WIPE_CHUNK);
+      const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+      if (ids.length === 0) step = "emails";
+      else {
+        await supabase.from("email_attachments").delete().in("id", ids);
+        deleted += ids.length;
+      }
+    } else if (step === "emails") {
+      const { data: rows } = await supabase.from("emails").select("id").eq("owner_email", owner).limit(WIPE_CHUNK);
+      const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+      if (ids.length === 0) step = "threads";
+      else {
+        await supabase.from("emails").delete().in("id", ids);
+        deleted += ids.length;
+      }
+    } else if (step === "threads") {
+      const { data: rows } = await supabase.from("email_threads").select("id").eq("owner_email", owner).limit(WIPE_CHUNK);
+      const ids = ((rows ?? []) as Array<{ id: string }>).map((r) => r.id);
+      if (ids.length === 0) step = "labels";
+      else await supabase.from("email_threads").delete().in("id", ids);
+    } else if (step === "labels") {
+      await supabase.from("email_labels").delete().eq("owner_email", owner);
+      step = "reset";
+    } else if (step === "reset") {
+      await supabase.from("email_sync_state").update({
+        full_sync_total_synced: 0,
+        last_history_id: null,
+        last_full_sync_at: null,
+        last_incremental_sync_at: null,
+        full_sync_started_at: null,
+      }).eq("owner_email", owner);
+      // Bootstrap fresh full mirror
+      await startFullMirror(supabase);
+      await supabase.from("email_sync_state").update({
+        wipe_status: "done",
+        wipe_step: null,
+        wipe_finished_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("owner_email", owner);
+      return { done: true, step: "done", deleted };
+    }
+
+    await supabase.from("email_sync_state").update({
+      wipe_step: step, wipe_deleted_count: deleted, updated_at: new Date().toISOString(),
+    }).eq("owner_email", owner);
+    return { done: false, step, deleted };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await supabase.from("email_sync_state").update({
+      wipe_status: "failed", wipe_error: msg, updated_at: new Date().toISOString(),
+    }).eq("owner_email", owner);
+    return { done: true, step: "failed", deleted };
+  }
+}
+
 // ---------------- Incremental sync ----------------
 export async function runIncrementalSync(supabase: SupabaseClient, owner: string): Promise<{ added: number; deleted: number; needsFullSync?: boolean }> {
   const { data: state } = await supabase

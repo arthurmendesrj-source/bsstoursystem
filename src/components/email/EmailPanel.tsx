@@ -32,15 +32,7 @@ const SYSTEM_NAMES_PT: Record<string, string> = {
   INBOX: "Caixa de entrada", STARRED: "Com estrela", IMPORTANT: "Importante",
   SENT: "Enviados", DRAFT: "Rascunhos", SPAM: "Spam", TRASH: "Lixeira",
 };
-const CATEGORIES = [
-  { id: "CATEGORY_PERSONAL", name: "Principal" },
-  { id: "CATEGORY_SOCIAL", name: "Social" },
-  { id: "CATEGORY_PROMOTIONS", name: "Promoções" },
-  { id: "CATEGORY_UPDATES", name: "Atualizações" },
-];
-
 const LS_COLLAPSED = "email.sidebar.collapsed";
-const LS_SIZES = "email.panels.sizes";
 
 function formatRelative(iso: string | null) {
   if (!iso) return "";

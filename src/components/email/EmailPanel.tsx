@@ -35,6 +35,22 @@ const SYSTEM_NAMES_PT: Record<string, string> = {
 };
 const LS_COLLAPSED = "email.sidebar.collapsed";
 
+const SYNC_LABELS = ["INBOX", "SENT", "DRAFT", "SPAM", "TRASH", "IMPORTANT", "STARRED"] as const;
+type SyncLabel = typeof SYNC_LABELS[number];
+type LabelStatus = "pending" | "active" | "done";
+type SyncProgressState = {
+  active: boolean;
+  hidden: boolean;
+  currentLabel: SyncLabel | null;
+  totalSynced: number;
+  perLabel: Record<SyncLabel, { count: number; threads: number; status: LabelStatus }>;
+};
+const initialPerLabel = (): SyncProgressState["perLabel"] =>
+  SYNC_LABELS.reduce((acc, l) => { acc[l] = { count: 0, threads: 0, status: "pending" }; return acc; }, {} as SyncProgressState["perLabel"]);
+const initialSyncProgress = (): SyncProgressState => ({
+  active: false, hidden: false, currentLabel: null, totalSynced: 0, perLabel: initialPerLabel(),
+});
+
 function formatRelative(iso: string | null) {
   if (!iso) return "";
   const d = new Date(iso);

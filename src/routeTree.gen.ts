@@ -49,7 +49,6 @@ import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
 import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
-import { Route as ApiPublicGmailCronTickRouteImport } from './routes/api/public/gmail-cron-tick'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
@@ -262,11 +261,6 @@ const ApiPublicGmailPollRoute = ApiPublicGmailPollRouteImport.update({
   path: '/api/public/gmail-poll',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicGmailCronTickRoute = ApiPublicGmailCronTickRouteImport.update({
-  id: '/api/public/gmail-cron-tick',
-  path: '/api/public/gmail-cron-tick',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   id: '/api/assistant/chat',
   path: '/api/assistant/chat',
@@ -355,7 +349,6 @@ export interface FileRoutesByFullPath {
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/public/gmail-cron-tick': typeof ApiPublicGmailCronTickRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
@@ -407,7 +400,6 @@ export interface FileRoutesByTo {
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/public/gmail-cron-tick': typeof ApiPublicGmailCronTickRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
@@ -460,7 +452,6 @@ export interface FileRoutesById {
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/public/gmail-cron-tick': typeof ApiPublicGmailCronTickRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
@@ -514,7 +505,6 @@ export interface FileRouteTypes {
     | '/suppliers/rates-validation'
     | '/suppliers/references'
     | '/api/assistant/chat'
-    | '/api/public/gmail-cron-tick'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
     | '/api/public/gmail/activity'
@@ -566,7 +556,6 @@ export interface FileRouteTypes {
     | '/suppliers/rates-validation'
     | '/suppliers/references'
     | '/api/assistant/chat'
-    | '/api/public/gmail-cron-tick'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
     | '/api/public/gmail/activity'
@@ -618,7 +607,6 @@ export interface FileRouteTypes {
     | '/suppliers/rates-validation'
     | '/suppliers/references'
     | '/api/assistant/chat'
-    | '/api/public/gmail-cron-tick'
     | '/api/public/gmail-poll'
     | '/users_/$userId/permissions'
     | '/api/public/gmail/activity'
@@ -657,7 +645,6 @@ export interface RootRouteChildren {
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
-  ApiPublicGmailCronTickRoute: typeof ApiPublicGmailCronTickRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
   ApiPublicGmailActivityRoute: typeof ApiPublicGmailActivityRoute
@@ -952,13 +939,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGmailPollRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/gmail-cron-tick': {
-      id: '/api/public/gmail-cron-tick'
-      path: '/api/public/gmail-cron-tick'
-      fullPath: '/api/public/gmail-cron-tick'
-      preLoaderRoute: typeof ApiPublicGmailCronTickRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/assistant/chat': {
       id: '/api/assistant/chat'
       path: '/api/assistant/chat'
@@ -1135,7 +1115,6 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
-  ApiPublicGmailCronTickRoute: ApiPublicGmailCronTickRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
   ApiPublicGmailActivityRoute: ApiPublicGmailActivityRoute,

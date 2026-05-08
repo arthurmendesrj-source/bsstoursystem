@@ -1,35 +1,46 @@
 ## Objetivo
 
-Simplificar o `EmailPanel` mantendo apenas a sidebar colapsável (com ícones) e removendo os painéis redimensionáveis e as abas de categorias do Gmail (Principal / Social / Promoções / Atualizações).
+Restaurar atribuição a subordinados na Triagem IA (Diretor/Gerente atribuem Lead/Atividade criados a usuários abaixo na hierarquia) e adicionar botão de tradução do email com seleção de idioma.
 
 ## Mudanças
 
-### 1. Remover painéis redimensionáveis
-- Remover o uso de `ResizablePanelGroup` / `ResizablePanel` / `ResizableHandle` em `src/components/email/EmailPanel.tsx`.
-- Remover o import de `@/components/ui/resizable`.
-- Remover o estado `panelSizes`, a constante `LS_SIZES`, o `useMemo` de `initialSizes` e o `onLayout` que persistia em `localStorage`.
-- Voltar para um layout fixo com flex:
-  - Sidebar (`w-60` quando expandida, `w-14` quando colapsada).
-  - Lista de threads com largura fixa (`w-80` / `w-96`).
-  - Leitor ocupando o restante (`flex-1`).
+### 1. Atribuição a subordinados em `AiTriageDialog.tsx`
 
-### 2. Remover categorias do Gmail
-- Remover a constante `CATEGORIES` (Principal / Social / Promoções / Atualizações).
-- Remover o estado `activeCategory` e `setActiveCategory`.
-- Remover o `<Tabs>` de categorias renderizado acima da lista de threads.
-- Remover qualquer uso de `activeCategory` na query de threads (filtro por label de categoria), passando a listar threads apenas pelo `activeLabel` (INBOX, STARRED, etc.).
-- Remover o import de `Tabs, TabsList, TabsTrigger` se não houver mais uso no arquivo.
+- Importar `useSubordinates` de `@/lib/hierarchy` e `useAuth` de `@/lib/auth`.
+- Adicionar estado `assignedTo` (default = `user.id` do usuário atual).
+- Renderizar um `Select "Atribuir a"` em ambos os modos (`lead` e `task`):
+  - Opção padrão: "Eu (próprio usuário)".
+  - Opções adicionais: lista de `subordinates` (nome + role).
+  - Só aparece se `subordinates.length > 0` (ou seja, somente Diretor/Gerente/Supervisor verão).
+- `createLead`: usar `assigned_to: assignedTo`, mantendo `created_by: uid`.
+- `createTask`: usar `assigned_to: assignedTo`, mantendo `created_by: uid`.
 
-### 3. Manter o que já funciona
-- Sidebar colapsável continua igual: toggle persiste em `localStorage` (`email.sidebar.collapsed`); colapsada mostra apenas ícones com `Tooltip`; expandida mostra nomes + contadores.
-- Duplo clique abre popup independente (`Dialog` com `ThreadReader`) — sem alteração.
-- `ThreadReader` (com botões Triagem IA e Associar) — sem alteração.
-- Backend de sync e realtime — sem alteração.
+### 2. Tradução do email na Triagem IA
+
+**Backend** — adicionar `emailTranslate` em `src/server/gmail.functions.ts`:
+- `createServerFn({ method: "POST" })` com middleware de auth (igual ao `emailAnalyze`).
+- Input: `{ gmail_id: string, target_language: string }`.
+- Carrega o email pelo `gmail_id` (mesmo padrão do `emailAnalyze`), extrai corpo texto.
+- Chama Lovable AI Gateway (`google/gemini-2.5-flash`) com prompt: "Traduza o email a seguir para {target_language}, preservando formatação e quebras de linha. Retorne APENAS o texto traduzido."
+- Retorna `{ translated: string }`.
+
+**Frontend** — em `AiTriageDialog.tsx`, no bloco `mode === "summary"`:
+- Adicionar `Select` de idioma com opções: Português, Inglês, Espanhol, Francês, Italiano, Alemão (default: Português).
+- Botão "Traduzir email" ao lado do select.
+- Ao clicar, chama `emailTranslate` via `useServerFn`, mostra loader, e renderiza o texto traduzido em uma caixa abaixo do resumo (com `whitespace-pre-wrap`).
+- Estado: `translating`, `translation`, `targetLang`.
+
+### 3. Manter intacto
+
+- `EmailPanel.tsx`, `ThreadReader.tsx`, `AssociateDialog.tsx`: sem alteração.
+- Lógica de criar Lead / Atividade / Ignorar mantida — apenas adiciona campo `assigned_to`.
 
 ## Arquivos afetados
 
-- `src/components/email/EmailPanel.tsx` — remover ResizablePanelGroup, categorias e estados associados; voltar a layout flex fixo.
+- `src/components/email/AiTriageDialog.tsx` — adicionar select de subordinados + bloco de tradução.
+- `src/server/gmail.functions.ts` — nova `emailTranslate`.
 
 ## Fora do escopo
 
-- Não alterar `ThreadReader.tsx`, `AiTriageDialog.tsx`, `AssociateDialog.tsx`, `resizable.tsx` nem o backend.
+- Não alterar layout do `EmailPanel`, `ThreadReader`, sidebar ou backend de sync.
+- Não traduzir anexos (apenas corpo do email).

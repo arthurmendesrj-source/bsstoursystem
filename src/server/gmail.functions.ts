@@ -410,3 +410,45 @@ export const emailAnalyze = createServerFn({ method: "POST" })
 
     return { suggestion: suggestion as { [k: string]: unknown & {} }, from, subject };
   });
+
+// ---------------- translate email body with AI ----------------
+export const emailTranslate = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { gmail_id: string; target_language: string }) => data)
+  .handler(async ({ data }) => {
+    const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const full = (await gw(`/users/me/messages/${encodeURIComponent(data.gmail_id)}?format=full`)) as {
+      payload?: GmailPart;
+    };
+    const headers = full.payload?.headers;
+    const subject = findHeader(headers, "Subject") ?? "";
+    const { html, text } = extractBody(full.payload);
+    const body = (text || html.replace(/<[^>]+>/g, " ")).slice(0, 12000);
+
+    const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          {
+            role: "system",
+            content: `Você é um tradutor profissional. Traduza fielmente o assunto e o corpo do e-mail a seguir para ${data.target_language}, preservando formatação, quebras de linha e estrutura. Retorne APENAS o texto traduzido, no formato:\nAssunto: <assunto traduzido>\n\n<corpo traduzido>`,
+          },
+          { role: "user", content: `Assunto: ${subject}\n\n${body}` },
+        ],
+      }),
+    });
+
+    if (!aiRes.ok) {
+      const errText = await aiRes.text();
+      if (aiRes.status === 429) throw new Error("Limite de requisições da IA atingido. Tente novamente em instantes.");
+      if (aiRes.status === 402) throw new Error("Créditos da IA esgotados.");
+      throw new Error(`AI gateway ${aiRes.status}: ${errText}`);
+    }
+    const aiJson = await aiRes.json();
+    const translated: string = aiJson?.choices?.[0]?.message?.content ?? "";
+    return { translated };
+  });

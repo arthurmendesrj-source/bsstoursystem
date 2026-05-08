@@ -6,11 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Languages } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { emailAnalyze } from "@/server/gmail.functions";
+import { emailAnalyze, emailTranslate } from "@/server/gmail.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import { useSubordinates } from "@/lib/hierarchy";
 
 type Suggestion = {
   summary?: string;
@@ -43,10 +45,19 @@ export function AiTriageDialog({
   subject?: string;
 }) {
   const analyzeFn = useServerFn(emailAnalyze);
+  const translateFn = useServerFn(emailTranslate);
+  const { user } = useAuth();
+  const { subordinates } = useSubordinates();
   const [loading, setLoading] = useState(false);
   const [sug, setSug] = useState<Suggestion | null>(null);
   const [mode, setMode] = useState<"summary" | "lead" | "task">("summary");
   const [saving, setSaving] = useState(false);
+  const [assignedTo, setAssignedTo] = useState<string>("");
+
+  // translation
+  const [targetLang, setTargetLang] = useState<string>("Português");
+  const [translating, setTranslating] = useState(false);
+  const [translation, setTranslation] = useState<string>("");
 
   // lead form
   const [lName, setLName] = useState("");
@@ -67,6 +78,8 @@ export function AiTriageDialog({
   useEffect(() => {
     if (!open || !gmailId) return;
     setSug(null); setMode("summary"); setLoading(true);
+    setTranslation(""); setTranslating(false);
+    setAssignedTo(user?.id ?? "");
     analyzeFn({ data: { gmail_id: gmailId } })
       .then((r: any) => {
         const s = r?.suggestion ?? {};
@@ -85,7 +98,21 @@ export function AiTriageDialog({
       })
       .catch((e) => toast.error(e instanceof Error ? e.message : "Erro IA"))
       .finally(() => setLoading(false));
-  }, [open, gmailId]);
+  }, [open, gmailId, user?.id]);
+
+  const doTranslate = async () => {
+    if (!gmailId) return;
+    setTranslating(true);
+    try {
+      const r: any = await translateFn({ data: { gmail_id: gmailId, target_language: targetLang } });
+      setTranslation(r?.translated ?? "");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao traduzir");
+    } finally {
+      setTranslating(false);
+    }
+  };
+
 
   const createLead = async () => {
     if (!lName.trim()) { toast.error("Nome obrigatório"); return; }
@@ -99,7 +126,7 @@ export function AiTriageDialog({
         estimated_value: lValue ? Number(lValue) : null,
         expected_travel_date: lDate || null,
         notes: lNotes || null,
-        created_by: uid, assigned_to: uid,
+        created_by: uid, assigned_to: assignedTo || uid,
       }).select("id").single();
       if (error) throw new Error(error.message);
       // link emails to lead
@@ -129,7 +156,7 @@ export function AiTriageDialog({
         category: tCategory, priority: tPriority,
         due_date: tDue ? new Date(tDue).toISOString() : null,
         source: "email", email_id: emailId,
-        created_by: uid, assigned_to: uid,
+        created_by: uid, assigned_to: assignedTo || uid,
       });
       if (error) throw new Error(error.message);
       toast.success("Atividade criada");
@@ -177,6 +204,32 @@ export function AiTriageDialog({
                 )}
               </div>
             </div>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Languages className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Traduzir email</Label>
+                <div className="flex-1" />
+                <Select value={targetLang} onValueChange={setTargetLang}>
+                  <SelectTrigger className="w-[160px] h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Português">Português</SelectItem>
+                    <SelectItem value="Inglês">Inglês</SelectItem>
+                    <SelectItem value="Espanhol">Espanhol</SelectItem>
+                    <SelectItem value="Francês">Francês</SelectItem>
+                    <SelectItem value="Italiano">Italiano</SelectItem>
+                    <SelectItem value="Alemão">Alemão</SelectItem>
+                    <SelectItem value="Japonês">Japonês</SelectItem>
+                    <SelectItem value="Chinês">Chinês</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => void doTranslate()} disabled={translating}>
+                  {translating ? <><Loader2 className="h-3 w-3 animate-spin mr-1" />Traduzindo…</> : "Traduzir"}
+                </Button>
+              </div>
+              {translation && (
+                <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/40 rounded p-2 max-h-72 overflow-y-auto">{translation}</pre>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground">
               Recomendação da IA: <strong>{sug.suggested_action === "create_lead" ? "Criar Lead" : sug.suggested_action === "create_task" ? "Criar Atividade" : "Ignorar"}</strong>
             </div>
@@ -198,6 +251,20 @@ export function AiTriageDialog({
               <div><Label>Valor estimado</Label><Input type="number" value={lValue} onChange={(e) => setLValue(e.target.value)} /></div>
               <div><Label>Data viagem</Label><Input type="date" value={lDate} onChange={(e) => setLDate(e.target.value)} /></div>
             </div>
+            {subordinates.length > 0 && (
+              <div>
+                <Label>Atribuir a</Label>
+                <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Notas</Label><Textarea rows={4} value={lNotes} onChange={(e) => setLNotes(e.target.value)} /></div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setMode("summary")}>Voltar</Button>
@@ -233,6 +300,20 @@ export function AiTriageDialog({
               </div>
               <div><Label>Vencimento</Label><Input type="datetime-local" value={tDue} onChange={(e) => setTDue(e.target.value)} /></div>
             </div>
+            {subordinates.length > 0 && (
+              <div>
+                <Label>Atribuir a</Label>
+                <Select value={assignedTo || (user?.id ?? "")} onValueChange={setAssignedTo}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {user?.id && <SelectItem value={user.id}>Eu</SelectItem>}
+                    {subordinates.map((s) => (
+                      <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div><Label>Descrição</Label><Textarea rows={5} value={tDescription} onChange={(e) => setTDescription(e.target.value)} /></div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setMode("summary")}>Voltar</Button>

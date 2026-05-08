@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror } from "@/server/gmail-mirror.functions";
+import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror } from "@/server/gmail-mirror.functions";
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -104,6 +104,33 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     } finally {
       setStartingMirror(false);
     }
+  };
+  const cancelFullMirrorFn = useServerFn(gmailCancelFullMirror);
+  const resetFullMirrorFn = useServerFn(gmailResetFullMirror);
+  const [cancellingMirror, setCancellingMirror] = useState(false);
+  const [resettingMirror, setResettingMirror] = useState(false);
+
+  const cancelFullMirror = async () => {
+    if (typeof window !== "undefined" && !window.confirm("Cancelar a sincronização em andamento? O progresso atual será mantido, mas a fila restante será limpa.")) return;
+    setCancellingMirror(true);
+    try {
+      await cancelFullMirrorFn({ data: undefined as never });
+      toast.success("Sincronização cancelada");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao cancelar");
+    } finally { setCancellingMirror(false); }
+  };
+
+  const resetFullMirror = async () => {
+    if (typeof window !== "undefined" && !window.confirm("Reiniciar a sincronização do zero? O contador de mensagens será zerado e a fila será recriada com todas as pastas.")) return;
+    setResettingMirror(true);
+    try {
+      const r = await resetFullMirrorFn({ data: undefined as never });
+      toast.success(`Sincronização reiniciada — ${r.queueLength} pastas na fila`);
+      await loadFolders();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao reiniciar");
+    } finally { setResettingMirror(false); }
   };
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
@@ -763,6 +790,18 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
         </div>
       )}
+      <div className="flex items-center gap-2 pt-1">
+        {mirror!.in_progress && (
+          <Button size="sm" variant="outline" disabled={cancellingMirror} onClick={() => void cancelFullMirror()}>
+            {cancellingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1.5" />}
+            Cancelar
+          </Button>
+        )}
+        <Button size="sm" variant="outline" disabled={resettingMirror} onClick={() => void resetFullMirror()}>
+          {resettingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+          Reiniciar do zero
+        </Button>
+      </div>
     </div>
   ) : null;
 

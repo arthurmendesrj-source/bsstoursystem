@@ -78,6 +78,8 @@ export function AiTriageDialog({
   useEffect(() => {
     if (!open || !gmailId) return;
     setSug(null); setMode("summary"); setLoading(true);
+    setTranslation(""); setTranslating(false);
+    setAssignedTo(user?.id ?? "");
     analyzeFn({ data: { gmail_id: gmailId } })
       .then((r: any) => {
         const s = r?.suggestion ?? {};
@@ -96,7 +98,21 @@ export function AiTriageDialog({
       })
       .catch((e) => toast.error(e instanceof Error ? e.message : "Erro IA"))
       .finally(() => setLoading(false));
-  }, [open, gmailId]);
+  }, [open, gmailId, user?.id]);
+
+  const doTranslate = async () => {
+    if (!gmailId) return;
+    setTranslating(true);
+    try {
+      const r: any = await translateFn({ data: { gmail_id: gmailId, target_language: targetLang } });
+      setTranslation(r?.translated ?? "");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Erro ao traduzir");
+    } finally {
+      setTranslating(false);
+    }
+  };
+
 
   const createLead = async () => {
     if (!lName.trim()) { toast.error("Nome obrigatório"); return; }

@@ -1,95 +1,131 @@
-## Objetivo
 
-Renomear o botão **"Gerar Proposta Executiva"** para **"Gerar Documento"** e expandir o dialog para oferecer **3 tipos de saída**:
+# Caixa de E-mail estilo Gmail (clone completo, somente leitura)
 
-1. **Proposta Executiva** — documento comercial atual (descritivo executivo + tabela de preços + cronograma).
-2. **Programa Turístico** — documento promocional/informativo das cidades e itens em cotação, no formato de apresentação de pacote turístico (sem foco em preço).
-3. **Proposta Executiva + Programa Turístico** — combinação dos dois em um único arquivo (Programa primeiro como apresentação, depois a Proposta Executiva).
+Objetivo: a caixa atual mostra apenas a INBOX (com algumas pastas básicas) e exige clique manual para sincronizar. Vamos transformá-la num **clone Gmail completo** que **espelha em tempo real** todas as caixas/labels do Gmail conectado, sem escrever de volta no Gmail (somente leitura).
 
-## 1. UI — `ExecutiveProposalDialog.tsx` → `GenerateDocumentDialog.tsx`
+---
 
-Renomear arquivo e componente. Manter assinatura (`quoteId`, `open`, `onOpenChange`, `onGenerated`).
+## 1. Banco de dados (migration)
 
-Novo campo no topo do dialog (radio cards, default `executive`):
+Adicionar tudo que falta para representar o estado completo do Gmail:
 
+**Tabela `emails`** — novas colunas:
+- `history_id` (bigint) — ID do histórico Gmail da mensagem
+- `internal_date` (timestamptz) — data interna do Gmail (ordenação correta)
+- `size_estimate` (int)
+- `is_starred` (bool, default false), `is_important` (bool, default false)
+- `category` (text) — PRIMARY/SOCIAL/PROMOTIONS/UPDATES/FORUMS
+
+**Nova tabela `email_threads`**: `id` (text, PK = threadId), `subject`, `snippet`, `participants` (text[]), `last_message_at`, `message_count`, `is_unread`, `is_starred`, `is_important`, `labels` (text[]), `has_attachments`.
+
+**Nova tabela `email_labels`**: `id` (text, PK = labelId Gmail), `name`, `type` (system/user), `color_bg`, `color_text`, `unread_count`, `total_count`, `parent_id`.
+
+**Nova tabela `email_attachments`**: `id`, `email_id` (FK), `attachment_id` (Gmail), `filename`, `mime_type`, `size`, `cached_url` (nullable, se já baixado para storage).
+
+**Nova tabela `email_sync_state`** (singleton por workspace/usuário): `user_email`, `last_history_id`, `last_full_sync_at`, `watch_expiration` (para Gmail push).
+
+**RLS**: mesmas regras já usadas em `emails` (leitura para autenticados, escrita para staff).
+
+---
+
+## 2. Server functions Gmail (src/server/gmail.functions.ts e novos arquivos)
+
+Expandir a integração para cobrir o Gmail completo:
+
+- `gmailListLabels` — `GET /users/me/labels` → popula `email_labels` com cores, contadores, sistema vs custom.
+- `gmailFullSync` — varre `messages.list` paginado por **todas as labels do sistema** (INBOX, SENT, DRAFT, SPAM, TRASH, STARRED, IMPORTANT, CHAT) + categorias (CATEGORY_PERSONAL, _SOCIAL, _PROMOTIONS, _UPDATES, _FORUMS) + labels customizadas. Salva `historyId` mais recente em `email_sync_state`.
+- `gmailIncrementalSync` — usa `users.history.list?startHistoryId=...` e processa eventos `messageAdded`, `messageDeleted`, `labelAdded`, `labelRemoved` para manter espelho atualizado. Atualiza `email_sync_state.last_history_id`.
+- `gmailGetThread` — `GET /users/me/threads/{id}?format=full` para abrir conversa inteira (lista de mensagens em ordem).
+- `gmailGetAttachment` — `GET /users/me/messages/{id}/attachments/{attId}` → faz download base64 e responde como blob (ou cacheia em storage).
+- `gmailWatch` / webhook (opcional): `users.watch` configurando Pub/Sub. **Adiar** — usaremos polling agressivo no curto prazo (ver §4).
+
+Todos respeitam o padrão `createServerFn` + `requireSupabaseAuth` já existente.
+
+---
+
+## 3. UI — Clone Gmail (`src/components/email/EmailPanel.tsx` reescrito)
+
+Layout 3 colunas estilo Gmail, todo com tokens semânticos do `styles.css`:
+
+```text
+┌──────────┬─────────────────────┬──────────────────────────┐
+│ Sidebar  │ Lista de threads    │ Leitura da conversa      │
+│  Compose │ (busca + filtros)   │ (mensagens em accordion) │
+│  Inbox   │                     │                          │
+│  Starred │ avatar | from       │ headers + corpo HTML     │
+│  Snoozed │  subject — snippet  │ anexos clicáveis         │
+│  Sent    │  data | labels      │ ações (estrela, lixeira  │
+│  Drafts  │                     │ local, etiquetas locais) │
+│  Spam    │                     │                          │
+│  Trash   │                     │                          │
+│  ───     │                     │                          │
+│  Categ.  │                     │                          │
+│  Labels  │                     │                          │
+└──────────┴─────────────────────┴──────────────────────────┘
 ```
-○ Proposta Executiva       — documento comercial com preços e cronograma
-○ Programa Turístico       — apresentação promocional das cidades e itens
-○ Proposta + Programa      — um arquivo único combinando ambos
-```
 
-Comportamento dos demais campos conforme a escolha:
+Funcionalidades:
+- **Sidebar** carregada de `email_labels` (system primeiro, custom depois) com badges de contagem e cores reais do Gmail.
+- **Categorias** (Primary/Social/Promotions/Updates) como abas dentro da Inbox (igual Gmail web).
+- **Lista de threads** (não mais de mensagens individuais): agrupa por `thread_id`, mostra remetentes encadeados (`A, B, você 3`), assunto, snippet, data relativa, ícones de anexo/estrela/importante, chips de labels coloridas. Ordenação por `internal_date DESC`.
+- **Busca** em tempo real (debounced) sobre `subject/snippet/from`. Suporte a operadores estilo Gmail (`from:`, `has:attachment`, `is:unread`, `label:`).
+- **Leitor de thread**: abre conversa inteira via `gmailGetThread`, mostra cada mensagem como card colapsável (último expandido). Renderiza HTML em iframe sandbox para isolamento + segurança.
+- **Anexos**: lista com ícone, nome, tamanho, botão baixar (chama `gmailGetAttachment`).
+- **Atalhos de teclado** estilo Gmail: `j/k` navegar, `Enter` abrir, `e` arquivar (local), `#` lixeira (local), `s` estrela (local), `/` focar busca, `c` compor, `Esc` voltar.
+- **Compose** mantém UX atual (responder/encaminhar/novo) — único ponto que escreve no Gmail (envio), permitido pelas escopos já configurados.
+- **Ações de organização** (arquivar, lixeira, estrela, marcar lida, aplicar label) ficam **somente locais** no banco (conforme escolha do usuário) — Gmail não é alterado.
+- **Manter** funcionalidades CRM já existentes: triagem com IA, criar lead, criar atividade, associar a lead/cliente/fornecedor (movidas para um painel lateral "CRM" no leitor).
 
-- **Proposta Executiva**: mostra todos os campos atuais (modo de preço, formato, idioma, tom, toggles de roteiro/cronograma, briefing).
-- **Programa Turístico**: oculta `price_mode` e o toggle "cronograma consolidado". Mantém formato, idioma, tom, briefing e o toggle "incluir roteiro dia a dia". Adiciona toggle **"Incluir destaques das cidades"** (default on) e **"Incluir descrição dos hotéis e serviços"** (default on).
-- **Proposta + Programa**: mostra a união dos campos (price_mode aplicado apenas à parte da proposta).
+Arquivos novos:
+- `src/components/email/EmailSidebar.tsx`
+- `src/components/email/EmailThreadList.tsx`
+- `src/components/email/EmailThreadReader.tsx`
+- `src/components/email/EmailComposeDialog.tsx` (extraído)
+- `src/components/email/EmailCrmPanel.tsx` (triagem IA + associações, mantém código atual)
+- `src/components/email/useGmailKeyboard.ts`
+- `src/components/email/useGmailSearch.ts`
 
-Botão de ação muda o label conforme o tipo selecionado: "Gerar Proposta Executiva" / "Gerar Programa Turístico" / "Gerar Documento Completo".
+`EmailPanel.tsx` vira o orquestrador (estado global + roteamento entre os 3 painéis).
 
-## 2. `ProposalEditor.tsx`
+---
 
-Trocar:
-- Label `Gerar Proposta Executiva` → `Gerar Documento`
-- Ícone `FileCheck` → `FileText` (ou manter `FileCheck`)
-- Import: `ExecutiveProposalDialog` → `GenerateDocumentDialog`
+## 4. Sincronização "tempo real"
 
-## 3. Backend — `supabase/functions/generate-proposal-doc/index.ts`
+Estratégia híbrida (Gmail Push real exige Google Cloud Pub/Sub, fora do escopo direto):
 
-Aceitar novo parâmetro `doc_type: "executive" | "tour_program" | "combined"` (default `executive`). Mantém `format`, `price_mode`, `language`, `tone`, `briefing`, toggles existentes + novos:
-- `include_city_highlights` (boolean)
-- `include_item_descriptions` (boolean)
+1. **Full sync inicial** ao primeiro acesso (popula tudo).
+2. **Incremental sync** via `historyId` — chamado:
+   - Ao abrir o painel.
+   - A cada **30s** enquanto a aba está visível (`document.visibilityState === 'visible'` + `setInterval`).
+   - Ao voltar foco para a janela.
+3. **Realtime Supabase**: habilitar realtime nas tabelas `emails` e `email_threads`; o front faz `subscribe` e atualiza lista/contadores instantaneamente quando o sync grava novas linhas. Isso garante propagação imediata para qualquer aba aberta após o sync.
+4. **Cron server-side opcional** (futuro): rota `/api/public/cron/gmail-sync` chamada por pg_cron a cada 1 min para sincronizar mesmo com app fechado — anotado como próximo passo, não incluso nesta entrega para evitar custos surpresa.
 
-### Mudanças no prompt da IA (tool `build_proposal_content`)
+---
 
-Adicionar novos campos no schema:
-- `tour_program`: objeto com:
-  - `intro`: parágrafo de abertura promocional do pacote (3-5 frases).
-  - `cities[]`: `{ name, country?, highlights: string[], short_description }` para cada cidade do roteiro.
-  - `inclusions_narrative`: texto descritivo (não-tabular) apresentando hotéis ("hospedagem em hotel 5★ no centro histórico…"), voos e serviços de forma promocional.
-  - `closing`: chamada final inspiracional.
+## 5. Performance & UX
 
-A IA deve gerar `tour_program` quando `doc_type` for `tour_program` ou `combined`, e `executive_summary` quando for `executive` ou `combined`.
+- Paginação virtual na lista (react-window) para suportar milhares de threads.
+- Cache de corpo HTML (já está no banco — `body_html`).
+- Skeletons enquanto carrega; toasts discretos para sync em background.
+- Indicador "Sincronizando…" sutil no topo da sidebar.
 
-### Builder de blocos
+---
 
-Novo módulo lógico `buildTourProgramBlocks(content, items, flights, lead)`:
-- Capa/título: "Programa Turístico — {destino}"
-- Intro promocional
-- Para cada cidade: nome como heading, descrição curta, lista de destaques
-- Roteiro dia a dia (reaproveita a lógica existente de `days[]` com `schedule[]` e datas)
-- Narrativa de inclusões (hotéis com check-in/out, voos, principais serviços) — **sem coluna de preço**
-- Fechamento
+## Resumo dos arquivos
 
-Função `buildExecutiveBlocks(...)` (refactor do que já existe): descritivo executivo + tabela de preços (respeitando `price_mode`) + cronograma consolidado.
+**Migration**: novas colunas em `emails`; novas tabelas `email_threads`, `email_labels`, `email_attachments`, `email_sync_state`; realtime habilitado em `emails` e `email_threads`.
 
-Roteamento por `doc_type`:
-- `executive` → `buildExecutiveBlocks(...)`
-- `tour_program` → `buildTourProgramBlocks(...)`
-- `combined` → `[...buildTourProgramBlocks(...), pageBreak, ...buildExecutiveBlocks(...)]`
+**Server**: `src/server/gmail.functions.ts` expandido com `gmailListLabels`, `gmailFullSync`, `gmailIncrementalSync`, `gmailGetThread`, `gmailGetAttachment`.
 
-Renderização (`renderDocx` / `renderPdf`) e upload para storage permanecem iguais. Nome do arquivo derivado do `doc_type`:
-- `proposta-executiva-{quote}.{ext}`
-- `programa-turistico-{quote}.{ext}`
-- `proposta-completa-{quote}.{ext}`
+**UI**: `EmailPanel.tsx` reescrito + 6 novos componentes/hooks em `src/components/email/`.
 
-## 4. i18n
+**i18n**: novas chaves para todos os labels do sistema, categorias, atalhos e estados.
 
-Em `src/lib/i18n.tsx`:
-- `generateExecutiveProposal` → mantém, agora reusado internamente
-- novas: `generateDocument`, `docTypeExecutive`, `docTypeTourProgram`, `docTypeCombined`, `generateTourProgram`, `generateCompleteDocument`, `includeCityHighlights`, `includeItemDescriptions`
+---
 
-## 5. Arquivos
+## Confirmações antes de implementar
 
-**Renomear/editar**
-- `src/components/proposal/ExecutiveProposalDialog.tsx` → `GenerateDocumentDialog.tsx` (novo seletor de tipo + lógica condicional dos campos)
-- `src/components/proposal/ProposalEditor.tsx` (label, ícone e import)
-- `supabase/functions/generate-proposal-doc/index.ts` (param `doc_type`, novos campos da tool, builder de blocos do programa, roteamento)
-- `src/lib/i18n.tsx`
-
-**Sem mudanças no banco** — `quote_documents.format` já aceita pdf/docx; podemos opcionalmente persistir `doc_type` no campo `metadata`/`title` do documento gerado.
-
-## Pontos a confirmar
-
-1. **Programa Turístico — preços**: confirma que NÃO deve aparecer **nenhuma** referência a valores no Programa Turístico (nem total)? (Seguirei como sem preços por padrão.)
-2. **Combinado — ordem**: Programa primeiro e Proposta Executiva depois? Ou inverter?
-3. **Imagens das cidades no Programa**: por enquanto **somente texto** (sem buscar/gerar imagens) — OK manter assim nesta primeira versão e evoluir depois?
+1. Confirma que o **envio** de e-mail (responder/encaminhar) **deve continuar funcionando** (única escrita no Gmail)? Ou virar 100% somente leitura sem envio?
+2. OK avançar **sem Gmail Push real (Pub/Sub)** nesta entrega, usando polling de 30s + realtime Supabase como "tempo real"?
+3. **Anexos**: baixar sob demanda (clicar = chama API e devolve blob) é suficiente, ou prefere pré-download para storage do Lovable Cloud (mais espaço, mais rápido)?

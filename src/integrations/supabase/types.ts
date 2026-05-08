@@ -568,22 +568,192 @@ export type Database = {
         }
         Relationships: []
       }
+      email_attachments: {
+        Row: {
+          attachment_id: string
+          cached_url: string | null
+          created_at: string
+          email_id: string
+          filename: string | null
+          id: string
+          mime_type: string | null
+          part_id: string | null
+          size: number | null
+        }
+        Insert: {
+          attachment_id: string
+          cached_url?: string | null
+          created_at?: string
+          email_id: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          part_id?: string | null
+          size?: number | null
+        }
+        Update: {
+          attachment_id?: string
+          cached_url?: string | null
+          created_at?: string
+          email_id?: string
+          filename?: string | null
+          id?: string
+          mime_type?: string | null
+          part_id?: string | null
+          size?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_attachments_email_id_fkey"
+            columns: ["email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_labels: {
+        Row: {
+          color_bg: string | null
+          color_text: string | null
+          id: string
+          label_list_visibility: string | null
+          message_list_visibility: string | null
+          name: string
+          owner_email: string
+          total_count: number
+          type: string
+          unread_count: number
+          updated_at: string
+        }
+        Insert: {
+          color_bg?: string | null
+          color_text?: string | null
+          id: string
+          label_list_visibility?: string | null
+          message_list_visibility?: string | null
+          name: string
+          owner_email: string
+          total_count?: number
+          type?: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Update: {
+          color_bg?: string | null
+          color_text?: string | null
+          id?: string
+          label_list_visibility?: string | null
+          message_list_visibility?: string | null
+          name?: string
+          owner_email?: string
+          total_count?: number
+          type?: string
+          unread_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_sync_state: {
+        Row: {
+          last_full_sync_at: string | null
+          last_history_id: number | null
+          last_incremental_sync_at: string | null
+          owner_email: string
+          updated_at: string
+          watch_expiration: string | null
+        }
+        Insert: {
+          last_full_sync_at?: string | null
+          last_history_id?: number | null
+          last_incremental_sync_at?: string | null
+          owner_email: string
+          updated_at?: string
+          watch_expiration?: string | null
+        }
+        Update: {
+          last_full_sync_at?: string | null
+          last_history_id?: number | null
+          last_incremental_sync_at?: string | null
+          owner_email?: string
+          updated_at?: string
+          watch_expiration?: string | null
+        }
+        Relationships: []
+      }
+      email_threads: {
+        Row: {
+          has_attachments: boolean
+          history_id: number | null
+          id: string
+          is_important: boolean
+          is_starred: boolean
+          is_unread: boolean
+          labels: string[]
+          last_message_at: string | null
+          message_count: number
+          owner_email: string
+          participants: string[]
+          snippet: string | null
+          subject: string | null
+          updated_at: string
+        }
+        Insert: {
+          has_attachments?: boolean
+          history_id?: number | null
+          id: string
+          is_important?: boolean
+          is_starred?: boolean
+          is_unread?: boolean
+          labels?: string[]
+          last_message_at?: string | null
+          message_count?: number
+          owner_email: string
+          participants?: string[]
+          snippet?: string | null
+          subject?: string | null
+          updated_at?: string
+        }
+        Update: {
+          has_attachments?: boolean
+          history_id?: number | null
+          id?: string
+          is_important?: boolean
+          is_starred?: boolean
+          is_unread?: boolean
+          labels?: string[]
+          last_message_at?: string | null
+          message_count?: number
+          owner_email?: string
+          participants?: string[]
+          snippet?: string | null
+          subject?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       emails: {
         Row: {
           ai_suggestion: Json | null
           body_html: string | null
           body_text: string | null
+          category: string | null
           created_at: string
           customer_id: string | null
           from_email: string | null
           from_name: string | null
           gmail_id: string
           has_attachments: boolean
+          history_id: number | null
           id: string
+          internal_date: string | null
+          is_important: boolean
+          is_starred: boolean
           is_unread: boolean
           labels: string[] | null
           lead_id: string | null
           received_at: string | null
+          size_estimate: number | null
           snippet: string | null
           subject: string | null
           supplier_id: string | null
@@ -595,17 +765,23 @@ export type Database = {
           ai_suggestion?: Json | null
           body_html?: string | null
           body_text?: string | null
+          category?: string | null
           created_at?: string
           customer_id?: string | null
           from_email?: string | null
           from_name?: string | null
           gmail_id: string
           has_attachments?: boolean
+          history_id?: number | null
           id?: string
+          internal_date?: string | null
+          is_important?: boolean
+          is_starred?: boolean
           is_unread?: boolean
           labels?: string[] | null
           lead_id?: string | null
           received_at?: string | null
+          size_estimate?: number | null
           snippet?: string | null
           subject?: string | null
           supplier_id?: string | null
@@ -617,17 +793,23 @@ export type Database = {
           ai_suggestion?: Json | null
           body_html?: string | null
           body_text?: string | null
+          category?: string | null
           created_at?: string
           customer_id?: string | null
           from_email?: string | null
           from_name?: string | null
           gmail_id?: string
           has_attachments?: boolean
+          history_id?: number | null
           id?: string
+          internal_date?: string | null
+          is_important?: boolean
+          is_starred?: boolean
           is_unread?: boolean
           labels?: string[] | null
           lead_id?: string | null
           received_at?: string | null
+          size_estimate?: number | null
           snippet?: string | null
           subject?: string | null
           supplier_id?: string | null

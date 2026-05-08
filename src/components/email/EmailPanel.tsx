@@ -84,6 +84,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [threadMessages, setThreadMessages] = useState<ThreadMessage[] | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
   const [composeOpen, setComposeOpen] = useState<null | { mode: "reply" | "forward" | "new"; msg?: ThreadMessage }>(null);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");

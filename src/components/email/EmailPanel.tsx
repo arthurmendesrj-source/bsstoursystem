@@ -201,16 +201,21 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const doFullSync = async () => {
     setSyncing(true);
     let total = 0;
+    const labelNames: Record<string, string> = {
+      INBOX: "Caixa de entrada", SENT: "Enviados", DRAFT: "Rascunhos",
+      SPAM: "Spam", TRASH: "Lixeira", IMPORTANT: "Importantes", STARRED: "Com estrela",
+    };
     try {
       await listLabelsFn({ data: undefined as never });
-      for (let i = 0; i < 200; i++) {
-        const r = await fullSyncFn({ data: { restart: i === 0 } });
+      for (let i = 0; i < 400; i++) {
+        const r = await fullSyncFn({ data: { restart: i === 0, windowDays: 180 } });
         total = r.totalSynced || total + r.syncedThisRun;
-        toast.message("Sincronizando…", { description: `${total} mensagens, ${r.threads} conversas neste lote` });
+        const labelLabel = labelNames[r.label] ?? r.label;
+        toast.message(`Sincronizando ${labelLabel}…`, { description: `${total} mensagens, ${r.threads} conversas neste lote` });
         await loadFolders(); await loadThreads();
         if (r.done) break;
       }
-      toast.success(`Sincronização concluída — ${total} mensagens`);
+      toast.success(`Sincronização concluída — últimos 6 meses`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
       if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");

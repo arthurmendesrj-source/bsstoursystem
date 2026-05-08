@@ -29,6 +29,10 @@ export const Route = createFileRoute("/api/public/gmail-poll")({
                 results[owner] = { type: "wipe", ...(await runWipeBatch(supabaseAdmin as any, owner)) };
               } else if (r.full_sync_in_progress) {
                 results[owner] = { type: "full", ...(await runFullSyncTick(supabaseAdmin as any, owner)) };
+              } else if (!r.last_full_sync_at) {
+                // Aguarda o usuário iniciar o mirror completo manualmente.
+                // Sem isto, o incremental usaria um last_history_id antigo e quebraria.
+                results[owner] = { type: "skip_waiting_full_sync" };
               } else {
                 const idleMs = r.last_incremental_sync_at
                   ? Date.now() - new Date(r.last_incremental_sync_at).getTime() : Infinity;

@@ -752,6 +752,7 @@ export type Database = {
           is_unread: boolean
           labels: string[] | null
           lead_id: string | null
+          owner_email: string | null
           received_at: string | null
           size_estimate: number | null
           snippet: string | null
@@ -780,6 +781,7 @@ export type Database = {
           is_unread?: boolean
           labels?: string[] | null
           lead_id?: string | null
+          owner_email?: string | null
           received_at?: string | null
           size_estimate?: number | null
           snippet?: string | null
@@ -808,6 +810,7 @@ export type Database = {
           is_unread?: boolean
           labels?: string[] | null
           lead_id?: string | null
+          owner_email?: string | null
           received_at?: string | null
           size_estimate?: number | null
           snippet?: string | null
@@ -2852,6 +2855,10 @@ export type Database = {
       slugify: { Args: { _t: string }; Returns: string }
       slugify_text: { Args: { input: string }; Returns: string }
       unaccent: { Args: { "": string }; Returns: string }
+      user_has_email_account: {
+        Args: { _email: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role:

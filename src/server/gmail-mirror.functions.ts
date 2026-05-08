@@ -17,18 +17,33 @@ function authHeaders() {
 }
 
 async function gw(path: string, init?: RequestInit) {
-  const res = await fetch(`${GATEWAY_URL}${path}`, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers as Record<string, string> | undefined) },
-  });
-  const text = await res.text();
-  let data: unknown = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!res.ok) {
+  const maxAttempts = 4;
+  let lastErr: unknown = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let res: Response;
+    try {
+      res = await fetch(`${GATEWAY_URL}${path}`, {
+        ...init,
+        headers: { ...authHeaders(), ...(init?.headers as Record<string, string> | undefined) },
+      });
+    } catch (e) {
+      lastErr = e;
+      if (attempt < maxAttempts) { await new Promise((r) => setTimeout(r, 400 * attempt)); continue; }
+      throw e;
+    }
+    const text = await res.text();
+    let data: unknown = null;
+    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+    if (res.ok) return data as any;
+    // Retry on transient upstream errors
+    if ((res.status === 502 || res.status === 503 || res.status === 504 || res.status === 429) && attempt < maxAttempts) {
+      await new Promise((r) => setTimeout(r, 500 * attempt));
+      lastErr = new Error(`Gmail API ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
+      continue;
+    }
     throw new Error(`Gmail API ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return data as any;
+  throw lastErr instanceof Error ? lastErr : new Error("Gmail API: unknown error");
 }
 
 function decodeB64Url(s: string) {

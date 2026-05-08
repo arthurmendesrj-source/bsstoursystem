@@ -659,6 +659,7 @@ export type Database = {
       }
       email_sync_state: {
         Row: {
+          full_sync_current_label: string | null
           full_sync_in_progress: boolean
           full_sync_page_token: string | null
           full_sync_started_at: string | null
@@ -671,6 +672,7 @@ export type Database = {
           watch_expiration: string | null
         }
         Insert: {
+          full_sync_current_label?: string | null
           full_sync_in_progress?: boolean
           full_sync_page_token?: string | null
           full_sync_started_at?: string | null
@@ -683,6 +685,7 @@ export type Database = {
           watch_expiration?: string | null
         }
         Update: {
+          full_sync_current_label?: string | null
           full_sync_in_progress?: boolean
           full_sync_page_token?: string | null
           full_sync_started_at?: string | null

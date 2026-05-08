@@ -16,10 +16,11 @@ export const Route = createFileRoute("/api/public/gmail-poll")({
         try {
           const { data: states } = await supabaseAdmin
             .from("email_sync_state")
-            .select("owner_email, wipe_status, full_sync_in_progress, last_incremental_sync_at");
+            .select("owner_email, wipe_status, full_sync_in_progress, last_incremental_sync_at, last_full_sync_at");
           const rows = (states ?? []) as Array<{
             owner_email: string; wipe_status: string | null;
             full_sync_in_progress: boolean | null; last_incremental_sync_at: string | null;
+            last_full_sync_at: string | null;
           }>;
           for (const r of rows) {
             const owner = r.owner_email;
@@ -28,6 +29,10 @@ export const Route = createFileRoute("/api/public/gmail-poll")({
                 results[owner] = { type: "wipe", ...(await runWipeBatch(supabaseAdmin as any, owner)) };
               } else if (r.full_sync_in_progress) {
                 results[owner] = { type: "full", ...(await runFullSyncTick(supabaseAdmin as any, owner)) };
+              } else if (!r.last_full_sync_at) {
+                // Aguarda o usuário iniciar o mirror completo manualmente.
+                // Sem isto, o incremental usaria um last_history_id antigo e quebraria.
+                results[owner] = { type: "skip_waiting_full_sync" };
               } else {
                 const idleMs = r.last_incremental_sync_at
                   ? Date.now() - new Date(r.last_incremental_sync_at).getTime() : Infinity;

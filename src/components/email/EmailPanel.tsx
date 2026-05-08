@@ -60,7 +60,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");
-  const [activeCategory, setActiveCategory] = useState<string>("CATEGORY_PERSONAL");
+  
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [search, setSearch] = useState("");
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);

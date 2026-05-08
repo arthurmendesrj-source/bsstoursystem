@@ -100,6 +100,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [loadingThread, setLoadingThread] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
+  const [syncWindowDays, setSyncWindowDays] = useState<number>(() => {
+    if (typeof window === "undefined") return 180;
+    const v = Number(localStorage.getItem(LS_SYNC_DAYS));
+    return Number.isFinite(v) && v >= 1 && v <= 3650 ? v : 180;
+  });
+  useEffect(() => { try { localStorage.setItem(LS_SYNC_DAYS, String(syncWindowDays)); } catch {} }, [syncWindowDays]);
+  const [customDaysOpen, setCustomDaysOpen] = useState(false);
+  const [customDaysInput, setCustomDaysInput] = useState<string>(String(syncWindowDays));
   const [composeOpen, setComposeOpen] = useState<null | { mode: "reply" | "forward" | "new"; msg?: ThreadMessage }>(null);
   const [composeTo, setComposeTo] = useState("");
   const [composeSubject, setComposeSubject] = useState("");

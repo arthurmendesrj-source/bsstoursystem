@@ -176,7 +176,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         if ((r as any)?.needsFullSync) return; // ignore silently
       } catch (e) { /* silent */ }
     };
-    timer = setInterval(tick, 30_000);
+    timer = setInterval(tick, 15_000);
     void tick();
     const onVisibility = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVisibility);

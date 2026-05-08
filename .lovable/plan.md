@@ -1,40 +1,25 @@
-## Objetivo
+## Problema
 
-Hoje a conexão Gmail do projeto (`booking@adatours.com`) é compartilhada por toda a workspace — qualquer usuário logado que abra `/email` enxerga essa caixa. Você quer que, enquanto não houver vínculo com uma conta de email real por usuário, apenas a **Alexandra Ermolaeva** veja a caixa `booking@adatours.com`. Os demais usuários devem ver um estado vazio com um aviso de "vincule sua conta de email".
+A caixa está vazia porque o `owner_email` salvo no banco está como `Booking@adatours.com` (com B maiúsculo, como o Gmail retorna), mas o `user_email_accounts.email_address` está como `booking@adatours.com` (minúsculo). O `EmailPanel` faz `.toLowerCase()` nos emails autorizados e filtra com `.in("owner_email", [...])` — comparação case-sensitive, então nenhuma linha bate.
 
-## Como vamos resolver (curto prazo, sem OAuth por usuário)
+Estado atual no banco:
+- `emails`: 300 linhas com `Booking@adatours.com` + 50 órfãs sem owner
+- `email_threads`: 120 linhas com `Booking@adatours.com`
+- `email_labels`: 15 linhas com `Booking@adatours.com`
+- `user_email_accounts`: `booking@adatours.com`
 
-Criar um mapeamento por usuário → endereço de email autorizado, e filtrar tudo no painel `/email` por esse endereço.
+## Correção
 
-### 1. Banco de dados
-- Nova tabela `user_email_accounts`:
-  - `user_id` (uuid, FK lógico para `auth.users`)
-  - `email_address` (text) — ex: `booking@adatours.com`
-  - `is_primary` (bool)
-  - `created_at`
-- RLS: usuário só lê/edita as próprias linhas; admin lê tudo.
-- Seed inicial: vincular `booking@adatours.com` ao `user_id` da Alexandra (`733024b9-2dbe-4319-a98f-4815e59a5ac2`).
+### 1. Migration — normalizar dados existentes e prevenir recorrência
+- `UPDATE` em `emails`, `email_threads`, `email_labels`, `email_sync_state` para `owner_email = lower(owner_email)`.
+- Apagar as 50 linhas órfãs em `emails` com `owner_email` vazio/nulo (lixo de sync antiga, sem dono → bloqueado por RLS de qualquer jeito).
+- Adicionar constraint `CHECK (owner_email = lower(owner_email))` nas 4 tabelas para garantir consistência futura.
+- Garantir o mesmo em `user_email_accounts.email_address` (já está ok, mas adicionar a constraint).
 
-### 2. Backend (server functions de email)
-- Em `gmail-mirror.functions.ts` e nas leituras do painel:
-  - Buscar `user_email_accounts` do `auth.uid()` atual.
-  - Se o usuário **não tem** nenhum email vinculado → retornar listas vazias (labels, threads, mensagens) sem chamar o Gmail Gateway.
-  - Se tem → filtrar `emails`/`email_threads`/`email_labels` por `account_email IN (...)` do usuário (adicionando coluna `account_email` nas tabelas espelhadas se ainda não existir).
-- A sincronização (`gmailFullSync`/`gmailIncrementalSync`) só roda para usuários com vínculo. Cada email gravado recebe `account_email = 'booking@adatours.com'`.
+### 2. Código — `src/server/gmail-mirror.functions.ts`
+- Normalizar `const owner = profile.emailAddress.toLowerCase()` em `gmailListLabels`, `gmailFullSync` e `gmailIncrementalSync`, antes de usar em qualquer upsert ou query.
 
-### 3. Frontend (`EmailPanel.tsx`)
-- Ao montar, consultar `user_email_accounts` do usuário logado.
-- Se vazio → mostrar tela "Nenhuma conta de email vinculada. Solicite ao administrador para vincular sua conta." (sem sidebar/threads, sem botão Sincronizar).
-- Se tiver → comportamento atual, porém com filtros aplicados pelo backend.
-- Esconder/desabilitar o botão "Sincronizar Gmail" para quem não tem vínculo.
-
-### 4. Resultado
-- Alexandra: vê normalmente `booking@adatours.com`.
-- Outros usuários: caixa de entrada vazia + aviso, sem nenhuma mensagem de outros.
-- Quando quiser liberar para outro usuário, basta inserir 1 linha em `user_email_accounts` (futuramente, uma tela de admin).
-
-## Próximo passo (futuro, fora deste plano)
-Quando cada usuário for ter o **próprio Gmail real**, migrar de "connector compartilhado" para **OAuth Google por usuário** (tokens guardados em `user_email_accounts`). Isso é uma mudança maior e fica para depois.
-
-## Pergunta
-Quer que eu já adicione uma **tela simples de admin** ("Vincular conta de email a usuário") junto, ou por enquanto só o seed da Alexandra via migration e os outros vínculos a gente faz sob demanda?
+### 3. Validação
+- Após migration, rodar query confirmando todos os `owner_email` em minúsculo.
+- Pedir à Alexandra recarregar `/email` — a caixa de entrada deve mostrar as 120 conversas existentes imediatamente (sem precisar resync).
+- Botão "Sincronizar Gmail" continuará funcionando e gravará em minúsculo.

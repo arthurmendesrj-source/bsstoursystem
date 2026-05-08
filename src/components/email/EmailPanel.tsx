@@ -637,6 +637,34 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           </DialogContent>
         </Dialog>
 
+        {/* CUSTOM SYNC PERIOD */}
+        <Dialog open={customDaysOpen} onOpenChange={setCustomDaysOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader><DialogTitle>Período personalizado</DialogTitle></DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="custom-days">Dias para trás (1 a 3650)</Label>
+              <Input
+                id="custom-days"
+                type="number"
+                min={1}
+                max={3650}
+                value={customDaysInput}
+                onChange={(e) => setCustomDaysInput(e.target.value)}
+                autoFocus
+              />
+              <p className="text-xs text-muted-foreground">Atual: {formatWindowLabel(syncWindowDays)}</p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCustomDaysOpen(false)}>Cancelar</Button>
+              <Button onClick={() => {
+                const n = Math.max(1, Math.min(3650, Math.floor(Number(customDaysInput) || 0)));
+                if (!n) return;
+                setCustomDaysOpen(false);
+                void doFullSync(n);
+              }}>Sincronizar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* COMPOSE */}
         <Dialog open={!!composeOpen} onOpenChange={(o) => !o && setComposeOpen(null)}>
           <DialogContent className="sm:max-w-2xl">

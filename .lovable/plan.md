@@ -1,103 +1,56 @@
 ## Diagnóstico
 
-O problema principal não é o banco: o backend está saudável. O que está quebrando a sincronização é a arquitetura atual:
+- O estado atual mostra `wipe_status = wiping` em `booking@adatours.com`, mas a fila do cron não está drenando — por isso nada foi apagado (688 emails, 23 threads, 92 anexos, 15 labels ainda no banco).
+- Você quer remover o botão **Esvaziar tudo e ressincronizar** do painel `/email` e fazer a limpeza completa agora, manualmente, pelo chat.
+- Depois que o banco e o storage estiverem 100% vazios, você mesmo vai disparar a sincronização nova pelo fluxo correto (pasta por pasta, mês a mês).
 
-- O botão **Esvaziar tudo e ressincronizar** tenta apagar anexos, mensagens, labels e ainda reiniciar a importação dentro de uma única requisição do app. Isso pode passar do limite e gerar **upstream request timeout**.
-- O agendador está chamando `/api/public/gmail-cron-tick`, mas no site publicado essa rota retorna **404**, então o full mirror novo não está sendo drenado em segundo plano.
-- Ainda existe uma rota antiga `/api/public/gmail-poll` rodando, com lógica legada de sincronização por janela `newer_than`, que conflita com o modelo novo pasta por pasta/mês a mês.
-- O estado atual está travado em `booking@adatours.com`, `INBOX`, mês `0`, com fila ativa, mas sem avanço confiável.
+## Plano
 
-## Solução definitiva
+### 1. Remover o botão e o diálogo de "Esvaziar"
 
-Vou transformar limpeza e importação em tarefas pequenas, idempotentes e retomáveis, para nenhuma requisição precisar fazer tudo de uma vez.
+Em `src/components/email/EmailPanel.tsx`:
 
-### 1. Criar estado de limpeza por etapas
+- remover o botão **Esvaziar tudo e ressincronizar** do `MirrorPanel`
+- remover o `Dialog` de confirmação (com input "ESVAZIAR")
+- remover os estados `wipeOpen`, `wipeConfirmText`, `wipingMirror`
+- remover a função `wipeAndRestart` e o `useServerFn(gmailWipeAndRestart)`
+- remover o import de `Trash2` se não for mais usado
 
-Adicionar campos em `email_sync_state` para controlar uma limpeza assíncrona:
+Em `src/server/gmail-mirror.functions.ts`:
 
-- status da limpeza: `idle`, `wiping`, `failed`, `done`
-- etapa atual: anexos, mensagens, threads, labels, reset
-- contador removido
-- erro, se houver
-- data de início/fim
+- remover o export `gmailWipeAndRestart` e a função auxiliar `wipeOwnerStorage`
+- remover o import de `enqueueWipe`
 
-Assim o botão não espera a limpeza terminar; ele apenas inicia a operação e retorna rápido.
+Em `src/server/gmail-mirror.server.ts`:
 
-### 2. Trocar o botão destrutivo para “enfileirar limpeza”
+- remover `enqueueWipe` e `runWipeBatch` (não serão mais usados)
 
-O fluxo com confirmação digitando **ESVAZIAR** continua, mas a função chamada pelo botão vai:
+Em `src/routes/api/public/gmail-poll.ts`:
 
-- cancelar qualquer sync em andamento
-- limpar a fila atual
-- marcar `wipe_status = wiping`
-- retornar imediatamente
+- remover o ramo `wipe_status === "wiping"` e o import de `runWipeBatch`
+- manter apenas full-sync tick e incremental
 
-Nada de apagar tudo dentro da mesma requisição da UI.
+### 2. Limpar tudo agora via chat (sem botão)
 
-### 3. Fazer o cron processar limpeza em lotes pequenos
+Vou executar na ordem:
 
-A rota pública do cron será ajustada para, a cada chamada:
+1. **Storage**: listar e remover recursivamente `email-attachments/booking@adatours.com/**`
+2. **Banco** (migração): apagar `email_attachments` → `emails` → `email_threads` → `email_labels` do owner
+3. **Estado**: zerar completamente `email_sync_state` para o owner: `wipe_status = idle`, `wipe_step = null`, `wipe_deleted_count = 0`, `full_sync_in_progress = false`, `full_sync_label_queue = []`, `full_sync_page_token = null`, `full_sync_current_label = null`, `full_sync_current_month_offset = 0`, `full_sync_empty_streak = 0`, `full_sync_total_synced = 0`, `last_history_id = null`, `last_incremental_sync_at = null`
 
-1. se houver limpeza pendente, remover apenas um lote pequeno;
-2. atualizar o progresso;
-3. só quando a limpeza terminar, recriar labels e iniciar a nova fila do full mirror.
+Resultado: caixa 100% zerada, sem nenhum botão destrutivo, pronta para você iniciar a nova sincronização manualmente quando quiser.
 
-Lotes planejados:
+### 3. Confirmação no painel
 
-- anexos no storage por pastas pequenas
-- `email_attachments` em chunks
-- `emails` em chunks
-- `email_threads` em chunks
-- `email_labels` no final
-- reset total do estado
+Após a limpeza, o painel `/email` deve mostrar:
 
-### 4. Unificar a rota de cron publicada
-
-Manter `/api/public/gmail-poll` como compatibilidade, mas trocar sua lógica para chamar o mesmo motor novo de `gmail-cron-tick`.
-
-Isso resolve dois problemas:
-
-- se o agendador antigo ainda chamar `/gmail-poll`, ele passa a executar o fluxo correto;
-- se o agendador novo chamar `/gmail-cron-tick`, ambos usam a mesma lógica.
-
-### 5. Criar/ajustar agendamento no banco
-
-Adicionar migração para garantir que exista um job chamando uma rota existente e publicada em intervalo curto.
-
-Também vou remover/neutralizar conflito com a lógica antiga para evitar duas sincronizações diferentes brigando pelos mesmos dados.
-
-### 6. Reduzir o peso de cada tick do Gmail
-
-Ajustar `runFullSyncTick` para ser mais resiliente:
-
-- diminuir `maxResults` por tick;
-- baixar mensagens/anexos com concorrência menor;
-- registrar erro de item individual sem derrubar a sincronização toda;
-- avançar cursor apenas depois de persistir com sucesso;
-- manter labels nativos do Gmail em `emails.labels`, sem mover email para pasta artificial.
-
-A regra fica: **o app só mostra um email em uma pasta se o Gmail retornou esse label no próprio email**.
-
-### 7. Melhorar o painel em `/email`
-
-Mostrar claramente:
-
-- se está limpando ou sincronizando;
-- etapa da limpeza;
-- total removido;
-- pasta atual;
-- mês atual;
-- total sincronizado;
-- erro recuperável, se houver;
-- botões para cancelar e reiniciar sem travar a tela.
+- 0 emails, 0 threads, 0 anexos
+- nenhum sync em andamento
+- somente os botões existentes de "Listar labels", "Iniciar mirror completo", "Sincronizar incremental" (e cancelar/reset se já existem)
 
 ## Resultado esperado
 
-Depois de aprovado e implementado:
-
-- clicar em **Esvaziar tudo e ressincronizar** não deve mais gerar timeout;
-- a limpeza roda em segundo plano até zerar tudo;
-- a nova sincronização começa automaticamente depois da limpeza;
-- a importação avança pasta por pasta e mês a mês;
-- nenhum email será alocado em pasta diferente da indicada pelos labels reais do Gmail;
-- se um tick falhar, o próximo retoma do último estado salvo.
+- Botão "Esvaziar" e todo o caminho destrutivo removidos do código.
+- Banco e storage do `booking@adatours.com` completamente vazios.
+- Estado de sincronização totalmente resetado.
+- Você inicia a nova sincronização pelo fluxo correto, sem nenhuma rota de wipe automática no caminho.

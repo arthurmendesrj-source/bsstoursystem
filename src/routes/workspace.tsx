@@ -251,7 +251,7 @@ function WorkspacePage() {
     let content: React.ReactNode = null;
     if (key === "email") {
       title = t("intEmail");
-      content = <div className="h-full"><EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} /></div>;
+      content = <div className="h-full"><EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader /></div>;
     } else if (key === "activities") {
       title = t("activities");
       content = <div className="p-4"><ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} /></div>;
@@ -559,7 +559,7 @@ function WorkspacePage() {
                   {!hasLead || !lead ? (
                     <EmptyTab text={t("selectLeadToView")} />
                   ) : (
-                    <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} />
+                    <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader />
                   )}
                 </AccordionContent>
               </AccordionItem>

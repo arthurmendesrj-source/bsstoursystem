@@ -17,8 +17,9 @@ import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachme
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { ThreadMessage } from "@/components/email/ThreadReader";
+import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";
 import { ThreadWindowManager, type ThreadWindowManagerHandle } from "@/components/email/ThreadWindowManager";
+import { Maximize2 } from "lucide-react";
 
 type Folder = { id: string; name: string; type: string; unread_count: number; total_count: number; color_bg: string | null; color_text: string | null };
 type ThreadRow = {
@@ -85,9 +86,10 @@ export type EmailPanelProps = {
   leadId?: string;
   customerId?: string | null;
   className?: string;
+  inlineReader?: boolean;
 };
 
-export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
+export function EmailPanel({ mode, leadId, customerId: _customerId, className, inlineReader = false }: EmailPanelProps) {
   const listLabelsFn = useServerFn(gmailListLabels);
   const listLiveFn = useServerFn(gmailListLive);
   const incSyncFn = useServerFn(gmailIncrementalSync);
@@ -512,8 +514,30 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 
   const openThread = (t: ThreadRow) => {
     setSelectedThreadId(t.id);
+    if (!inlineReader) {
+      windowsRef.current?.openOrFocus({ id: t.id, subject: t.subject, is_starred: t.is_starred });
+    }
+  };
+
+  const openThreadInWindow = (t: ThreadRow) => {
     windowsRef.current?.openOrFocus({ id: t.id, subject: t.subject, is_starred: t.is_starred });
   };
+
+  const [inlineMessages, setInlineMessages] = useState<ThreadMessage[] | null>(null);
+  const [inlineLoading, setInlineLoading] = useState(false);
+  useEffect(() => {
+    if (!inlineReader || !selectedThreadId) { setInlineMessages(null); return; }
+    let cancel = false;
+    setInlineLoading(true);
+    setInlineMessages(null);
+    fetchThreadMessages(selectedThreadId)
+      .then((m) => { if (!cancel) setInlineMessages(m); })
+      .catch((e) => { if (!cancel) toast.error(e instanceof Error ? e.message : "Erro"); })
+      .finally(() => { if (!cancel) setInlineLoading(false); });
+    void markThreadRead(selectedThreadId);
+    return () => { cancel = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedThreadId, inlineReader]);
 
   const markThreadRead = async (threadId: string) => {
     const t = threads.find((x) => x.id === threadId);
@@ -803,6 +827,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       search={search}
       setSearch={setSearch}
       onOpenThread={openThread}
+      onDoubleClickThread={inlineReader ? openThreadInWindow : undefined}
       onLocalStar={(t) => void localStar(t)}
       loadingMore={loadingMore}
       canLoadMore={threads.length > 0 && (!!nextPageToken || lastPageFull)}
@@ -813,11 +838,51 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     />
   );
 
+  const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? null;
+
+  const InlineReaderPane = inlineReader ? (
+    <div className="flex-1 min-w-0 flex flex-col bg-background">
+      {selectedThread ? (
+        <>
+          <div className="flex items-center justify-end gap-1 px-2 py-1 border-b">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              title="Abrir em janela"
+              onClick={() => { openThreadInWindow(selectedThread); }}
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ThreadReader
+              thread={{ id: selectedThread.id, subject: selectedThread.subject, is_starred: selectedThread.is_starred }}
+              messages={inlineMessages}
+              loading={inlineLoading}
+              onStar={() => void localStar(selectedThread)}
+              onArchive={() => void archiveThread(selectedThread.id)}
+              onTrash={() => void trashThread(selectedThread.id)}
+              onReply={(m) => openCompose(m, "reply")}
+              onForward={(m) => openCompose(m, "forward")}
+              onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+          Selecione uma conversa
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
         {Sidebar}
-        <div className="flex-1 min-w-0 max-w-[560px] border-r">{ThreadList}</div>
+        <div className={cn("min-w-0 border-r", inlineReader ? "w-[380px] shrink-0" : "flex-1 max-w-[560px]")}>{ThreadList}</div>
+        {InlineReaderPane}
 
         {AddAccountDialog}
 
@@ -858,7 +923,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
 }
 
 function ThreadListSection({
-  threads, selectedThreadId, search, setSearch, onOpenThread, onLocalStar,
+  threads, selectedThreadId, search, setSearch, onOpenThread, onDoubleClickThread, onLocalStar,
   loadingMore, canLoadMore, atEnd, onLoadMore, MirrorPanel, SyncProgressPanel,
 }: {
   threads: ThreadRow[];
@@ -866,6 +931,7 @@ function ThreadListSection({
   search: string;
   setSearch: (s: string) => void;
   onOpenThread: (t: ThreadRow) => void;
+  onDoubleClickThread?: (t: ThreadRow) => void;
   onLocalStar: (t: ThreadRow) => void;
   loadingMore: boolean;
   canLoadMore: boolean;
@@ -910,6 +976,7 @@ function ThreadListSection({
                 >
                   <button
                     onClick={() => onOpenThread(t)}
+                    onDoubleClick={onDoubleClickThread ? (e) => { e.preventDefault(); e.stopPropagation(); onDoubleClickThread(t); } : undefined}
                     className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
                       selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
                       t.is_unread && "bg-card font-medium")}

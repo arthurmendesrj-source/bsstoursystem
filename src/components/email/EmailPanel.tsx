@@ -123,10 +123,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [composeBody, setComposeBody] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Popup independente
-  const [popupThreadId, setPopupThreadId] = useState<string | null>(null);
-  const [popupMessages, setPopupMessages] = useState<ThreadMessage[] | null>(null);
-  const [popupLoading, setPopupLoading] = useState(false);
+  // Janelas flutuantes (manager)
+  const windowsRef = useRef<ThreadWindowManagerHandle>(null);
 
   // sidebar collapsed
   const [collapsed, setCollapsed] = useState<boolean>(() => {

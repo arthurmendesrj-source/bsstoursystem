@@ -385,6 +385,12 @@ function BookingDetailPage() {
         customerId={booking.customer_id}
         onPick={(p) => { if (associateItem) handleProofPick(associateItem, p); }}
       />
+
+      <VoucherDialog
+        voucherId={openVoucherId}
+        open={!!openVoucherId}
+        onOpenChange={(v) => !v && setOpenVoucherId(null)}
+      />
     </div>
   );
 }

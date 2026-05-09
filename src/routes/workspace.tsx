@@ -203,7 +203,7 @@ function WorkspacePage() {
     if (leadId) loadLead(leadId);
     else {
       setLead(null);
-      setTasks([]); setInteractions([]); setQuotes([]); setBookings([]);
+      setTasks([]); setInteractions([]); setQuotes([]); setBookings([]); setBookingPax({}); setBookingSuppliers({});
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [leadId]);

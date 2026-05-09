@@ -687,8 +687,31 @@ function ProposalsTab({
   const { can } = usePermissions();
   const canCreateQuote = can("quotes", "create");
   const { format: fmtCurrency } = useCurrency();
+  const win = useWorkspaceWindows();
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  const openInWindow = (q: Quote) => {
+    win.openWindow({
+      id: `${mode}:${q.id}`,
+      title: `${mode === "invoice" ? t("invoice") : t("proposals")} #${q.id.slice(0, 8)}`,
+      sizeKey: mode,
+      defaultSize: { width: 1000, height: 680 },
+      content: (
+        <div className="p-4">
+          <ProposalEditor
+            quoteId={q.id}
+            leadId={leadId}
+            leadCode={leadCode}
+            customerId={customerId}
+            mode={mode}
+            onSaved={onChanged}
+            onClose={() => win.closeWindow(`${mode}:${q.id}`)}
+          />
+        </div>
+      ),
+    });
+  };
 
   const invoiceCodeFor = (q: Quote) =>
     leadCode ? `IN${leadCode}` : `IN${q.id.slice(0, 8).toUpperCase()}`;

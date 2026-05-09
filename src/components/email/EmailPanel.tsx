@@ -86,9 +86,10 @@ export type EmailPanelProps = {
   leadId?: string;
   customerId?: string | null;
   className?: string;
+  inlineReader?: boolean;
 };
 
-export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
+export function EmailPanel({ mode, leadId, customerId: _customerId, className, inlineReader = false }: EmailPanelProps) {
   const listLabelsFn = useServerFn(gmailListLabels);
   const listLiveFn = useServerFn(gmailListLive);
   const incSyncFn = useServerFn(gmailIncrementalSync);

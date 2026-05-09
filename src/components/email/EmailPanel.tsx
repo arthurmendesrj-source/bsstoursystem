@@ -855,7 +855,101 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   );
 }
 
-// Stub mínimo para modo lead
+function ThreadListSection({
+  threads, selectedThreadId, search, setSearch, onOpenThread, onLocalStar,
+  loadingMore, canLoadMore, atEnd, onLoadMore, MirrorPanel, SyncProgressPanel,
+}: {
+  threads: ThreadRow[];
+  selectedThreadId: string | null;
+  search: string;
+  setSearch: (s: string) => void;
+  onOpenThread: (t: ThreadRow) => void;
+  onLocalStar: (t: ThreadRow) => void;
+  loadingMore: boolean;
+  canLoadMore: boolean;
+  atEnd: boolean;
+  onLoadMore: () => void;
+  MirrorPanel: React.ReactNode;
+  SyncProgressPanel: React.ReactNode;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: threads.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 78,
+    overscan: 8,
+    getItemKey: (index) => threads[index]?.id ?? index,
+  });
+  const items = rowVirtualizer.getVirtualItems();
+  return (
+    <section className="flex flex-col h-full bg-background min-w-0">
+      {MirrorPanel}
+      {SyncProgressPanel}
+      <div className="p-3 border-b space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar e-mails" className="pl-9" />
+        </div>
+      </div>
+      <div ref={parentRef} className="flex-1 min-h-0 overflow-auto">
+        {threads.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa</div>
+        ) : (
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+            {items.map((vi) => {
+              const t = threads[vi.index];
+              if (!t) return null;
+              return (
+                <div
+                  key={vi.key}
+                  data-index={vi.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
+                >
+                  <button
+                    onClick={() => onOpenThread(t)}
+                    className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
+                      selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
+                      t.is_unread && "bg-card font-medium")}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); onLocalStar(t); }} className="shrink-0 mt-0.5">
+                      <Star className={cn("h-4 w-4", t.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <div className={cn("text-sm truncate flex-1", t.is_unread && "font-semibold")}>
+                          {t.participants.slice(0, 2).join(", ")}{t.message_count > 1 && <span className="text-muted-foreground"> ({t.message_count})</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">{formatRelative(t.last_message_at)}</div>
+                      </div>
+                      <div className="text-sm truncate">{t.subject || "(sem assunto)"}</div>
+                      <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                        {t.has_attachments && <Paperclip className="h-3 w-3" />}
+                        <span className="truncate">{t.snippet}</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {canLoadMore && (
+          <div className="p-3">
+            <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={onLoadMore}>
+              {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
+              Carregar mais antigos
+            </Button>
+          </div>
+        )}
+        {atEnd && (
+          <div className="p-3 text-center text-xs text-muted-foreground">Fim da pasta</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function LeadEmailMini({ leadId, className }: { leadId: string; className?: string }) {
   type Row = { id: string; from_name: string | null; from_email: string | null; subject: string | null; snippet: string | null; internal_date: string | null; received_at: string | null };
   const [rows, setRows] = useState<Row[]>([]);

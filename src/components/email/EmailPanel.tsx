@@ -16,7 +16,8 @@ import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachme
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";
+import type { ThreadMessage } from "@/components/email/ThreadReader";
+import { ThreadWindowManager, type ThreadWindowManagerHandle } from "@/components/email/ThreadWindowManager";
 
 type Folder = { id: string; name: string; type: string; unread_count: number; total_count: number; color_bg: string | null; color_text: string | null };
 type ThreadRow = {
@@ -104,8 +105,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [search, setSearch] = useState("");
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [threadMessages, setThreadMessages] = useState<ThreadMessage[] | null>(null);
-  const [loadingThread, setLoadingThread] = useState(false);
+  // (leitor agora vive em janelas; estados removidos)
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
   const [syncWindowDays, setSyncWindowDays] = useState<number>(() => {
@@ -122,10 +122,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [composeBody, setComposeBody] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Popup independente
-  const [popupThreadId, setPopupThreadId] = useState<string | null>(null);
-  const [popupMessages, setPopupMessages] = useState<ThreadMessage[] | null>(null);
-  const [popupLoading, setPopupLoading] = useState(false);
+  // Janelas flutuantes (manager)
+  const windowsRef = useRef<ThreadWindowManagerHandle>(null);
 
   // sidebar collapsed
   const [collapsed, setCollapsed] = useState<boolean>(() => {
@@ -430,24 +428,17 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return r.messages as ThreadMessage[];
   };
 
-  const openThread = async (t: ThreadRow) => {
-    setSelectedThreadId(t.id); setThreadMessages(null); setLoadingThread(true);
-    try {
-      setThreadMessages(await fetchThreadMessages(t.id));
-      if (t.is_unread) {
-        await supabase.from("email_threads").update({ is_unread: false }).eq("id", t.id);
-        await supabase.from("emails").update({ is_unread: false }).eq("thread_id", t.id);
-        setThreads((prev) => prev.map((x) => x.id === t.id ? { ...x, is_unread: false } : x));
-      }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
-    finally { setLoadingThread(false); }
+  const openThread = (t: ThreadRow) => {
+    setSelectedThreadId(t.id);
+    windowsRef.current?.openOrFocus({ id: t.id, subject: t.subject, is_starred: t.is_starred });
   };
 
-  const openPopup = async (t: ThreadRow) => {
-    setPopupThreadId(t.id); setPopupMessages(null); setPopupLoading(true);
-    try { setPopupMessages(await fetchThreadMessages(t.id)); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
-    finally { setPopupLoading(false); }
+  const markThreadRead = async (threadId: string) => {
+    const t = threads.find((x) => x.id === threadId);
+    if (!t || !t.is_unread) return;
+    await supabase.from("email_threads").update({ is_unread: false }).eq("id", threadId);
+    await supabase.from("emails").update({ is_unread: false }).eq("thread_id", threadId);
+    setThreads((prev) => prev.map((x) => x.id === threadId ? { ...x, is_unread: false } : x));
   };
 
   const downloadAttachment = async (msgId: string, att: { attachment_id: string; filename: string; mime_type: string }) => {
@@ -472,19 +463,19 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     await supabase.from("emails").update({ is_starred: next }).eq("thread_id", t.id);
     setThreads((prev) => prev.map((x) => x.id === t.id ? { ...x, is_starred: next } : x));
   };
-  const localArchive = async () => {
-    if (!selectedThreadId) return;
-    const t = threads.find((x) => x.id === selectedThreadId); if (!t) return;
-    await supabase.from("email_threads").update({ labels: t.labels.filter((l) => l !== "INBOX") }).eq("id", selectedThreadId);
-    setSelectedThreadId(null); setThreadMessages(null); await loadThreads();
+  const archiveThread = async (threadId: string) => {
+    const t = threads.find((x) => x.id === threadId); if (!t) return;
+    await supabase.from("email_threads").update({ labels: t.labels.filter((l) => l !== "INBOX") }).eq("id", threadId);
+    if (selectedThreadId === threadId) setSelectedThreadId(null);
+    await loadThreads();
   };
-  const localTrash = async () => {
-    if (!selectedThreadId) return;
-    const t = threads.find((x) => x.id === selectedThreadId); if (!t) return;
+  const trashThread = async (threadId: string) => {
+    const t = threads.find((x) => x.id === threadId); if (!t) return;
     const labs = Array.from(new Set([...t.labels.filter((l) => l !== "INBOX"), "TRASH"]));
-    await supabase.from("email_threads").update({ labels: labs }).eq("id", selectedThreadId);
-    await supabase.from("emails").update({ labels: labs }).eq("thread_id", selectedThreadId);
-    setSelectedThreadId(null); setThreadMessages(null); await loadThreads();
+    await supabase.from("email_threads").update({ labels: labs }).eq("id", threadId);
+    await supabase.from("emails").update({ labels: labs }).eq("thread_id", threadId);
+    if (selectedThreadId === threadId) setSelectedThreadId(null);
+    await loadThreads();
   };
 
   const openCompose = (m: ThreadMessage, kind: "reply" | "forward") => {
@@ -508,7 +499,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const sidebarUser = useMemo(() => folders.filter((f) => f.type === "user").sort((a, b) => a.name.localeCompare(b.name)), [folders]);
 
   const selected = threads.find((t) => t.id === selectedThreadId) ?? null;
-  const popupThread = threads.find((t) => t.id === popupThreadId) ?? null;
+  void selected;
 
   if (mode === "lead" && leadId) return <LeadEmailMini leadId={leadId} className={className} />;
 
@@ -568,7 +559,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const Icon = isUser ? Tag : (SYSTEM_ICONS[f.id] ?? Mail);
     const active = activeLabel === f.id;
     const label = isUser ? f.name : (SYSTEM_NAMES_PT[f.id] ?? f.name);
-    const onClick = () => { setActiveLabel(f.id); setSelectedThreadId(null); setThreadMessages(null); };
+    const onClick = () => { setActiveLabel(f.id); setSelectedThreadId(null); };
     if (collapsed) {
       return (
         <Tooltip key={f.id} delayDuration={200}>
@@ -738,8 +729,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa</div>
         ) : threads.map((t) => (
           <button key={t.id}
-            onClick={() => void openThread(t)}
-            onDoubleClick={() => void openPopup(t)}
+            onClick={() => openThread(t)}
             className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
               selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
               t.is_unread && "bg-card font-medium")}>
@@ -776,53 +766,29 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     </section>
   );
 
-  const Reader = !selected ? (
-    <div className="flex-1 flex items-center justify-center text-muted-foreground h-full bg-background">
-      <div className="text-center">
-        <Mail className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>Selecione uma conversa</p>
-        <p className="text-xs mt-2">Dica: duplo clique abre em popup</p>
-      </div>
-    </div>
-  ) : (
-    <ThreadReader
-      thread={{ id: selected.id, subject: selected.subject, is_starred: selected.is_starred }}
-      messages={threadMessages}
-      loading={loadingThread}
-      onArchive={() => void localArchive()}
-      onTrash={() => void localTrash()}
-      onStar={() => void localStar(selected)}
-      onReply={(m) => openCompose(m, "reply")}
-      onForward={(m) => openCompose(m, "forward")}
-      onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
-    />
-  );
-
   return (
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
         {Sidebar}
-        <div className="w-96 shrink-0 border-r">{ThreadList}</div>
-        <div className="flex-1 min-w-0">{Reader}</div>
+        <div className="flex-1 min-w-0">{ThreadList}</div>
 
         {AddAccountDialog}
 
-        {/* POPUP independente */}
-        <Dialog open={!!popupThreadId} onOpenChange={(o) => { if (!o) { setPopupThreadId(null); setPopupMessages(null); } }}>
-          <DialogContent className="sm:max-w-5xl h-[85vh] p-0 flex flex-col gap-0">
-            <div className="sr-only"><DialogHeader><DialogTitle>Conversa</DialogTitle></DialogHeader></div>
-            {popupThread && (
-              <ThreadReader
-                thread={{ id: popupThread.id, subject: popupThread.subject, is_starred: popupThread.is_starred }}
-                messages={popupMessages}
-                loading={popupLoading}
-                onReply={(m) => openCompose(m, "reply")}
-                onForward={(m) => openCompose(m, "forward")}
-                onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Janelas flutuantes das conversas */}
+        <ThreadWindowManager
+          ref={windowsRef}
+          fetchMessages={fetchThreadMessages}
+          onMarkRead={(tid) => void markThreadRead(tid)}
+          onStar={(t) => {
+            const row = threads.find((x) => x.id === t.id);
+            if (row) void localStar(row);
+          }}
+          onArchive={(tid) => void archiveThread(tid)}
+          onTrash={(tid) => void trashThread(tid)}
+          onReply={(m) => openCompose(m, "reply")}
+          onForward={(m) => openCompose(m, "forward")}
+          onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
+        />
 
         {/* COMPOSE */}
         <Dialog open={!!composeOpen} onOpenChange={(o) => !o && setComposeOpen(null)}>

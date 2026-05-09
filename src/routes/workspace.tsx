@@ -713,7 +713,7 @@ function WorkspacePage() {
                           title="Duplo-clique para abrir em janela"
                           className="cursor-pointer hover:bg-muted/40 rounded-md"
                         >
-                          {renderBookingCard(b, false)}
+                          {renderBookingCard(b, true)}
                         </div>
                       ))}
                     </div>

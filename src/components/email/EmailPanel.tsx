@@ -523,22 +523,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     windowsRef.current?.openOrFocus({ id: t.id, subject: t.subject, is_starred: t.is_starred });
   };
 
-  const [inlineMessages, setInlineMessages] = useState<ThreadMessage[] | null>(null);
-  const [inlineLoading, setInlineLoading] = useState(false);
-  useEffect(() => {
-    if (!inlineReader || !selectedThreadId) { setInlineMessages(null); return; }
-    let cancel = false;
-    setInlineLoading(true);
-    setInlineMessages(null);
-    fetchThreadMessages(selectedThreadId)
-      .then((m) => { if (!cancel) setInlineMessages(m); })
-      .catch((e) => { if (!cancel) toast.error(e instanceof Error ? e.message : "Erro"); })
-      .finally(() => { if (!cancel) setInlineLoading(false); });
-    void markThreadRead(selectedThreadId);
-    return () => { cancel = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedThreadId, inlineReader]);
-
   const markThreadRead = async (threadId: string) => {
     const t = threads.find((x) => x.id === threadId);
     if (!t || !t.is_unread) return;

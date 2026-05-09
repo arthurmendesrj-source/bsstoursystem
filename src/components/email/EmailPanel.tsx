@@ -429,24 +429,17 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return r.messages as ThreadMessage[];
   };
 
-  const openThread = async (t: ThreadRow) => {
-    setSelectedThreadId(t.id); setThreadMessages(null); setLoadingThread(true);
-    try {
-      setThreadMessages(await fetchThreadMessages(t.id));
-      if (t.is_unread) {
-        await supabase.from("email_threads").update({ is_unread: false }).eq("id", t.id);
-        await supabase.from("emails").update({ is_unread: false }).eq("thread_id", t.id);
-        setThreads((prev) => prev.map((x) => x.id === t.id ? { ...x, is_unread: false } : x));
-      }
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
-    finally { setLoadingThread(false); }
+  const openThread = (t: ThreadRow) => {
+    setSelectedThreadId(t.id);
+    windowsRef.current?.openOrFocus({ id: t.id, subject: t.subject, is_starred: t.is_starred });
   };
 
-  const openPopup = async (t: ThreadRow) => {
-    setPopupThreadId(t.id); setPopupMessages(null); setPopupLoading(true);
-    try { setPopupMessages(await fetchThreadMessages(t.id)); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
-    finally { setPopupLoading(false); }
+  const markThreadRead = async (threadId: string) => {
+    const t = threads.find((x) => x.id === threadId);
+    if (!t || !t.is_unread) return;
+    await supabase.from("email_threads").update({ is_unread: false }).eq("id", threadId);
+    await supabase.from("emails").update({ is_unread: false }).eq("thread_id", threadId);
+    setThreads((prev) => prev.map((x) => x.id === threadId ? { ...x, is_unread: false } : x));
   };
 
   const downloadAttachment = async (msgId: string, att: { attachment_id: string; filename: string; mime_type: string }) => {

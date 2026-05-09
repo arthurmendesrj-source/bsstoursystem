@@ -86,6 +86,7 @@ export function AiTriageDialog({
     if (!open || !gmailId) return;
     setSug(null); setMode("summary"); setLoading(true);
     setTranslation(""); setTranslating(false);
+    setLinkedTo(null);
     setAssignedTo(user?.id ?? "");
     analyzeFn({ data: { gmail_id: gmailId } })
       .then((r: any) => {

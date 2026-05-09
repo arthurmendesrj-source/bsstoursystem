@@ -369,78 +369,49 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [mode, hasMailbox]);
 
-  const doFullSync = async (daysOverride?: number) => {
-    const days = Math.max(1, Math.min(3650, daysOverride ?? syncWindowDays));
-    if (daysOverride) setSyncWindowDays(days);
-    const totalMonths = Math.max(1, Math.ceil(days / 30));
-    setSyncing(true);
-    setSyncProgress({
-      active: true, hidden: false, currentLabel: "INBOX",
-      currentMonthLabel: null, currentMonthIndex: 1, totalMonths,
-      totalSynced: 0,
-      perLabel: { ...initialPerLabel(), INBOX: { count: 0, threads: 0, status: "active" } },
-    });
-    let total = 0;
+  // Atualiza a caixa atual buscando direto no Gmail (1 página, leve).
+  const refreshLive = async (opts?: { append?: boolean }) => {
+    const append = !!opts?.append;
+    if (append) setLoadingMore(true); else setRefreshing(true);
     try {
       await listLabelsFn({ data: undefined as never });
-      const maxIters = 7 /*labels*/ * totalMonths * 30 /*pages safety*/;
-      for (let i = 0; i < maxIters; i++) {
-        // Retry transient failures (gateway timeout) up to 3 times — server state is preserved
-        let r: Awaited<ReturnType<typeof fullSyncFn>> | null = null;
-        let attempt = 0;
-        while (true) {
-          try {
-            r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
-            break;
-          } catch (err) {
-            attempt++;
-            const msg = err instanceof Error ? err.message : String(err);
-            const transient = /timeout|504|503|502|429|upstream/i.test(msg);
-            if (!transient || attempt >= 3) throw err;
-            await new Promise((res) => setTimeout(res, 1000 * attempt + 1000));
-          }
-        }
-        if (!r) break;
-        total = r.totalSynced || total + r.syncedThisRun;
-        const lbl = r.label as SyncLabel;
-        const next = (r.nextLabel ?? null) as SyncLabel | null;
-        setSyncProgress((prev) => {
-          if (!SYNC_LABELS.includes(lbl)) return prev;
-          const perLabel = { ...prev.perLabel };
-          perLabel[lbl] = {
-            count: perLabel[lbl].count + r.syncedThisRun,
-            threads: perLabel[lbl].threads + r.threads,
-            status: r.done || (next && next !== lbl) ? "done" : "active",
-          };
-          if (next && next !== lbl && SYNC_LABELS.includes(next) && perLabel[next].status === "pending") {
-            perLabel[next] = { ...perLabel[next], status: "active" };
-          }
-          if (r.done) {
-            for (const l of SYNC_LABELS) if (perLabel[l].status !== "done") perLabel[l].status = "done";
-          }
-          return {
-            ...prev,
-            currentLabel: r.done ? null : (next ?? lbl),
-            currentMonthLabel: r.monthLabel ?? prev.currentMonthLabel,
-            currentMonthIndex: r.done ? prev.totalMonths : ((r.nextMonthOffset ?? 0) + 1),
-            totalMonths: r.totalMonths ?? prev.totalMonths,
-            totalSynced: total,
-            perLabel,
-          };
-        });
-        await loadFolders(); await loadThreads();
-        if (r.done) break;
-        await new Promise((res) => setTimeout(res, 150));
-      }
-      toast.success(`Sincronização concluída — ${formatWindowLabel(days)}`);
-      setTimeout(() => setSyncProgress((p) => ({ ...p, active: false })), 3000);
+      const r = await listLiveFn({
+        data: {
+          labelId: activeLabel,
+          pageToken: append ? (nextPageToken ?? undefined) : undefined,
+          maxResults: 50,
+          q: search.trim() || undefined,
+        },
+      });
+      setNextPageToken(r.nextPageToken);
+      await loadFolders();
+      await loadThreads();
+      if (!append) toast.success(`Atualizado — ${r.count} mensagens carregadas`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
+      const msg = e instanceof Error ? e.message : "Erro ao atualizar";
       if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
       else toast.error(msg);
-      setSyncProgress((p) => ({ ...p, active: false }));
-    } finally { setSyncing(false); }
+    } finally {
+      if (append) setLoadingMore(false); else setRefreshing(false);
+    }
   };
+
+  // Quando muda a label/busca, zera paginação e dispara um fetch ao vivo da 1ª página.
+  useEffect(() => {
+    setNextPageToken(null);
+    if (!hasMailbox || mode !== "full") return;
+    void (async () => {
+      try {
+        const r = await listLiveFn({
+          data: { labelId: activeLabel, maxResults: 50, q: search.trim() || undefined },
+        });
+        setNextPageToken(r.nextPageToken);
+        await loadFolders();
+        await loadThreads();
+      } catch { /* silent — cache continua exibido */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLabel, hasMailbox, mode]);
 
   const fetchThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
     const r = await getThreadFn({ data: { threadId } });

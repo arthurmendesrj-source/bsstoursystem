@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror } from "@/server/gmail-mirror.functions";
+import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailListLive } from "@/server/gmail-mirror.functions";
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -87,58 +87,15 @@ export type EmailPanelProps = {
 
 export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
   const listLabelsFn = useServerFn(gmailListLabels);
-  const fullSyncFn = useServerFn(gmailFullSync);
-  const startFullMirrorFn = useServerFn(gmailStartFullMirror);
-  const [startingMirror, setStartingMirror] = useState(false);
-
-  const startFullMirror = async () => {
-    setStartingMirror(true);
-    try {
-      const r = await startFullMirrorFn({ data: undefined as never });
-      toast.success(`Importação completa iniciada — ${r.queueLength} pastas na fila. O processo continuará em segundo plano.`);
-      await loadFolders();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao iniciar importação";
-      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
-      else toast.error(msg);
-    } finally {
-      setStartingMirror(false);
-    }
-  };
-  const cancelFullMirrorFn = useServerFn(gmailCancelFullMirror);
-  const resetFullMirrorFn = useServerFn(gmailResetFullMirror);
-  const [cancellingMirror, setCancellingMirror] = useState(false);
-  const [resettingMirror, setResettingMirror] = useState(false);
-
-  const cancelFullMirror = async () => {
-    if (typeof window !== "undefined" && !window.confirm("Cancelar a sincronização em andamento? O progresso atual será mantido, mas a fila restante será limpa.")) return;
-    setCancellingMirror(true);
-    try {
-      await cancelFullMirrorFn({ data: undefined as never });
-      toast.success("Sincronização cancelada");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao cancelar");
-    } finally { setCancellingMirror(false); }
-  };
-
-  const resetFullMirror = async () => {
-    if (typeof window !== "undefined" && !window.confirm("Reiniciar a sincronização do zero? O contador de mensagens será zerado e a fila será recriada com todas as pastas.")) return;
-    setResettingMirror(true);
-    try {
-      const r = await resetFullMirrorFn({ data: undefined as never });
-      toast.success(`Sincronização reiniciada — ${r.queueLength} pastas na fila`);
-      await loadFolders();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao reiniciar");
-    } finally { setResettingMirror(false); }
-  };
-
-  // (botão "Esvaziar" removido — limpeza é feita via chat/admin)
-
+  const listLiveFn = useServerFn(gmailListLive);
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);
   const sendFn = useServerFn(gmailSend);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");

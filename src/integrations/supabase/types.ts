@@ -3085,6 +3085,7 @@ export type Database = {
         | "gerente"
         | "supervisor"
         | "operador"
+        | "coordenador"
       booking_status:
         | "pre_reserva"
         | "confirmada"
@@ -3267,6 +3268,7 @@ export const Constants = {
         "gerente",
         "supervisor",
         "operador",
+        "coordenador",
       ],
       booking_status: [
         "pre_reserva",

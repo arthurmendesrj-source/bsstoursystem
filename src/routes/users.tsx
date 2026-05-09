@@ -387,26 +387,23 @@ function InviteDialog({ isAdmin, onClose, onDone }: { isAdmin: boolean; onClose:
   const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
-  const [selectedRoles, setSelectedRoles] = useState<AppRole[]>([]);
+  const [role, setRole] = useState<AppRole | "">("");
   const [submitting, setSubmitting] = useState(false);
 
-  const availableRoles = ROLES.filter((r) => isAdmin || !PROTECTED.includes(r));
-
-  const toggleRole = (r: AppRole) => {
-    setSelectedRoles((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);
-  };
+  const availableRoles = INVITE_ROLES.filter((r) => isAdmin || r !== "diretor");
 
   const submit = async () => {
     if (!email.trim()) { toast.error("Informe o e-mail"); return; }
+    if (!role) { toast.error("Selecione o papel"); return; }
     setSubmitting(true);
     try {
       await callAdminUsers("invite", {
         email: email.trim(),
         full_name: fullName.trim() || undefined,
-        roles: selectedRoles,
+        roles: [role],
       });
       toast.success("Convite enviado");
-      setEmail(""); setFullName(""); setSelectedRoles([]);
+      setEmail(""); setFullName(""); setRole("");
       onDone();
     } catch (e) {
       toast.error((e as Error).message);
@@ -424,21 +421,24 @@ function InviteDialog({ isAdmin, onClose, onDone }: { isAdmin: boolean; onClose:
         <div>
           <Label htmlFor="inv-email">E-mail *</Label>
           <Input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="usuario@empresa.com" />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Este será o endereço da caixa de entrada do usuário no app. A conexão com o Gmail é feita pelo próprio usuário após o primeiro login.
+          </p>
         </div>
         <div>
           <Label htmlFor="inv-name">Nome (opcional)</Label>
           <Input id="inv-name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
         </div>
         <div>
-          <Label>Papéis iniciais</Label>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {availableRoles.map((r) => (
-              <label key={r} className="flex items-center gap-2 text-sm">
-                <Checkbox checked={selectedRoles.includes(r)} onCheckedChange={() => toggleRole(r)} />
-                {t(r)}
-              </label>
-            ))}
-          </div>
+          <Label>Papel *</Label>
+          <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione um papel" /></SelectTrigger>
+            <SelectContent>
+              {availableRoles.map((r) => (
+                <SelectItem key={r} value={r}>{t(r)}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
       <DialogFooter>

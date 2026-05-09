@@ -869,8 +869,8 @@ function ThreadListSection({
   canLoadMore: boolean;
   atEnd: boolean;
   onLoadMore: () => void;
-  MirrorPanel: React.ReactNode;
-  SyncProgressPanel: React.ReactNode;
+  MirrorPanel: ReactNode;
+  SyncProgressPanel: ReactNode;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({

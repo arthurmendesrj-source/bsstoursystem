@@ -110,7 +110,7 @@ function BookingDetailPage() {
       setCustomerName(c?.full_name ?? "");
     }
     if (b.quote_id) {
-      const { data: qi } = await supabase.from("quote_items").select("id,description,quantity,unit_price,total,kind").eq("quote_id", b.quote_id).order("created_at", { ascending: true });
+      const { data: qi } = await supabase.from("quote_items").select(ITEM_FIELDS).eq("quote_id", b.quote_id).order("created_at", { ascending: true });
       setItems((qi ?? []) as QuoteItem[]);
     } else {
       setItems([]);

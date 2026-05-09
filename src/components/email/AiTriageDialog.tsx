@@ -62,6 +62,10 @@ export function AiTriageDialog({
   const [translating, setTranslating] = useState(false);
   const [translation, setTranslation] = useState<string>("");
 
+  // associate
+  const [associateOpen, setAssociateOpen] = useState(false);
+  const [linkedTo, setLinkedTo] = useState<{ kind: string; label: string } | null>(null);
+
   // lead form
   const [lName, setLName] = useState("");
   const [lEmail, setLEmail] = useState("");

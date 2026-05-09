@@ -638,7 +638,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const Icon = isUser ? Tag : (SYSTEM_ICONS[f.id] ?? Mail);
     const active = activeLabel === f.id;
     const label = isUser ? f.name : (SYSTEM_NAMES_PT[f.id] ?? f.name);
-    const onClick = () => { setActiveLabel(f.id); setSelectedThreadId(null); };
+    const onClick = () => { switchLabel(f.id); };
     if (collapsed) {
       return (
         <Tooltip key={f.id} delayDuration={200}>

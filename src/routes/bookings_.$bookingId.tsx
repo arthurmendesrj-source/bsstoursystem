@@ -455,7 +455,7 @@ function BookingDetailPage() {
                     <Input type="number" step="0.01" min={0} value={item.unit_price ?? 0} onChange={(e) => updateItemLocal(item.id, { unit_price: Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { unit_price: Number(e.target.value) })} />
                   </div>
                   <div>
-                    <Label className="text-xs">{t("total")}</Label>
+                    <Label className="text-xs">{t("totalToPay")}</Label>
                     <div className="h-9 flex items-center text-sm font-medium">
                       <MaskedField module="quotes" field="total_amount" value={format(Number(item.total ?? 0), booking.currency as "BRL")} />
                     </div>

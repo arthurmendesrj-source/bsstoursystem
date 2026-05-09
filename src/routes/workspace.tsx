@@ -818,12 +818,31 @@ function ProposalsTab({
 function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Task[]; onChanged: () => void }) {
   const { t } = useI18n();
   const { user } = useAuth();
+  const win = useWorkspaceWindows();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"baixa" | "media" | "alta">("media");
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const openTaskWindow = (task: Task) => {
+    const id = `task:${task.id}`;
+    win.openWindow({
+      id,
+      title: task.title,
+      sizeKey: "task",
+      defaultSize: { width: 720, height: 520 },
+      content: (
+        <TaskWindow
+          task={task}
+          leadId={leadId}
+          onChanged={onChanged}
+          onClose={() => win.closeWindow(id)}
+        />
+      ),
+    });
+  };
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();

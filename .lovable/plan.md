@@ -1,63 +1,29 @@
-## Mudança de layout do email
+## Objetivo
 
-### Estado atual
-A tela `/email` é dividida em três colunas: **Sidebar de pastas | Lista de conversas (384px) | Leitor da conversa (flex)**. Clique simples abre o leitor inline; duplo clique abre um modal centralizado sem controles de janela.
+Permitir que o usuário ajuste manualmente a altura da caixa de conteúdo do email (o iframe dentro de cada mensagem na janela de leitura), arrastando a borda inferior para cima/baixo.
 
-### Novo layout
+## Mudança
 
-**1. Tela só com a lista**
-- Remover a coluna `Reader` da direita.
-- A lista de conversas (`ThreadList`) ocupa toda a área disponível ao lado do sidebar de pastas.
-- Clique simples passa a abrir a conversa em uma **janela flutuante**.
+Arquivo: `src/components/email/ThreadReader.tsx`
 
-**2. Janelas flutuantes (múltiplas)**
-Substituir o `<Dialog>` atual por janelas estilo desktop. Suportar **várias janelas abertas simultaneamente**:
+Hoje o iframe da mensagem usa `className="w-full min-h-[200px] border-0"` com altura fixa mínima. Vamos:
 
-- Cada conversa aberta vira uma janela independente, com sua própria posição, tamanho e estado.
-- Clicar em uma conversa já aberta traz a janela dela para frente (foco) em vez de duplicar.
-- Cada nova janela abre levemente deslocada da anterior (cascade) para não ficarem todas empilhadas.
-- Z-index gerenciado: a janela clicada vai para o topo.
+1. Envolver o `<iframe>` (e o `<pre>` do fallback texto) em um `<div>` wrapper com:
+   - `resize: vertical`
+   - `overflow: auto`
+   - altura inicial (`height: 400px`) e `min-height: 120px`, `max-height: 80vh`
+   - borda discreta para indicar a área redimensionável
+2. O iframe interno passa a `h-full w-full` para preencher o wrapper.
+3. Persistir a última altura escolhida em `localStorage` (chave `email.reader.msgHeight`) para que, ao abrir outras mensagens, a altura preferida seja reusada. Salvamos no `onMouseUp` do wrapper lendo `el.getBoundingClientRect().height`.
 
-Cada janela tem:
-- **Barra de título** com assunto + botões: **Minimizar (–)**, **Restaurar/Maximizar (□)**, **Fechar (×)**.
-- **Arrastar pela barra de título** para reposicionar.
-- **Redimensionar pelas bordas e cantos** (handles em todos os lados).
-- Três estados:
-  - *Normal*: tamanho/posição livres (padrão inicial: 900×640, com cascade de +30px por janela).
-  - *Maximizado*: ocupa toda a área útil (abaixo do header do app). Botão alterna para "Restaurar".
-  - *Minimizado*: a janela some do palco e aparece como pílula na **barra inferior** (estilo Gmail) com o assunto + botão restaurar + botão fechar. Múltiplas pílulas ficam lado a lado na barra inferior.
+Resultado:
+- Aparece uma alça nativa do navegador no canto inferior direito do quadro da mensagem.
+- Usuário arrasta para baixo/cima e ajusta só a altura (largura continua acompanhando a janela).
+- A próxima mensagem aberta já vem com a altura preferida.
 
-**3. Barra inferior de janelas minimizadas**
-- Fixa no rodapé da tela `/email`, alinhada à direita.
-- Mostra cada janela minimizada como pílula clicável.
-- Clique restaura a janela ao tamanho/posição anteriores.
+## Validação
 
-**4. Persistência leve**
-- Guardar tamanho/posição padrão da última janela em `localStorage` para que novas janelas reabram com proporções familiares.
-- Não persistir o conjunto de janelas abertas entre recarregamentos (escopo de sessão).
-
-### Detalhes técnicos
-
-- Instalar `react-rnd` (≈9 KB gzip) para arrastar + redimensionar.
-- Criar `src/components/email/ThreadWindow.tsx` — componente único de janela (barra de título, controles, drag/resize, estados).
-- Criar `src/components/email/ThreadWindowManager.tsx` — gerencia o array de janelas abertas, z-index, foco, cascade, e renderiza a barra inferior de minimizadas.
-- Em `EmailPanel.tsx`:
-  - Remover o bloco `Reader` e a coluna `flex-1` que o continha.
-  - Substituir o `<Dialog>` da conversa pelo `<ThreadWindowManager>`.
-  - `openThread` passa a fazer "abrir nova janela ou focar existente" via API do manager.
-  - Cada janela carrega suas próprias mensagens via `gmailGetThread` (já existe), com seu próprio estado de loading.
-  - Manter o `<Dialog>` de **Compose** como modal (não muda).
-
-### Validação
-- Abrir 3+ conversas e verificar que cada uma vira uma janela independente, posicionadas em cascade.
-- Arrastar, redimensionar, minimizar, maximizar, restaurar e fechar funcionam por janela.
-- Janelas minimizadas aparecem como pílulas no rodapé e restauram ao clicar.
-- Clicar na conversa de uma janela já aberta traz ela ao topo em vez de criar outra.
-- Clicar em qualquer janela leva ela ao topo (z-index).
-- Compose continua funcionando como antes.
-
-### Arquivos envolvidos
-- `src/components/email/EmailPanel.tsx` (remove coluna Reader, integra o manager).
-- `src/components/email/ThreadWindow.tsx` (novo).
-- `src/components/email/ThreadWindowManager.tsx` (novo).
-- `package.json` (adiciona `react-rnd`).
+- Abrir uma janela de email → arrastar a borda inferior do quadro da mensagem → altura muda suavemente.
+- Fechar e abrir outra mensagem → vem com a mesma altura definida antes.
+- Janela maximizada e janela normal: ambos casos funcionam, sem quebrar o scroll externo do `ScrollArea`.
+- Mensagens com anexos: anexos seguem aparecendo abaixo, fora da área redimensionável.

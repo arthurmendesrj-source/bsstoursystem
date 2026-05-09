@@ -126,11 +126,25 @@ export function ThreadReader({
                 </div>
               </header>
               <div className="p-4">
-                {m.bodyHtml ? (
-                  <iframe srcDoc={m.bodyHtml} sandbox="" className="w-full min-h-[200px] border-0" title={`msg-${m.id}`} />
-                ) : (
-                  <pre className="whitespace-pre-wrap text-sm font-sans">{m.bodyText || m.snippet}</pre>
-                )}
+                <div
+                  className="w-full border rounded bg-background overflow-auto"
+                  style={{
+                    resize: "vertical",
+                    height: (typeof window !== "undefined" && Number(localStorage.getItem("email.reader.msgHeight"))) || 400,
+                    minHeight: 120,
+                    maxHeight: "80vh",
+                  }}
+                  onMouseUp={(e) => {
+                    const h = Math.round((e.currentTarget as HTMLDivElement).getBoundingClientRect().height);
+                    if (h > 0) { try { localStorage.setItem("email.reader.msgHeight", String(h)); } catch { /* ignore */ } }
+                  }}
+                >
+                  {m.bodyHtml ? (
+                    <iframe srcDoc={m.bodyHtml} sandbox="" className="w-full h-full border-0 block" title={`msg-${m.id}`} />
+                  ) : (
+                    <pre className="whitespace-pre-wrap text-sm font-sans p-2">{m.bodyText || m.snippet}</pre>
+                  )}
+                </div>
                 {m.attachments.length > 0 && (
                   <>
                     <Separator className="my-3" />

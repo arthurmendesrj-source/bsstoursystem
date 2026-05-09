@@ -1,42 +1,80 @@
-## Por que ainda não está pronto
+# Auditoria completa antes da sincronização
 
-Existem **dois** cron jobs Gmail rodando a cada minuto, chamando rotas diferentes:
+Verifiquei código + estado do banco + cron. Encontrei **3 problemas que precisam ser corrigidos juntos** antes de você clicar em "Iniciar mirror completo".
 
-| Job | URL | Status |
+## Estado atual (booking@adatours.com)
+
+| Item | Valor | OK? |
 |---|---|---|
-| `gmail-incremental-poll` | `/api/public/gmail-poll` | ✅ Já tem a guarda nova (espera mirror completo) |
-| `gmail-mirror-tick` | `/api/public/gmail-cron-tick` | ❌ Rota legada, sem guarda — continua chamando `runIncrementalSync` e reescrevendo `last_history_id` para o valor antigo (`33256984`) |
+| Cron `gmail-incremental-poll` | ativo, único, aponta para `/api/public/gmail-poll` | ✅ |
+| Guarda no `gmail-poll` | espera `last_full_sync_at` antes de incremental | ✅ |
+| `last_full_sync_at` | `NULL` | ✅ |
+| `full_sync_in_progress` | `false` | ✅ |
+| `wipe_status` | `idle` | ✅ |
+| `emails` / `threads` / `labels` no DB | 0 / 0 / 0 (já limpos) | ✅ |
+| **`last_history_id`** | **`33256984`** (cursor antigo) | ❌ |
+| **`last_incremental_sync_at`** | `2026-05-09 00:28:01` (antigo) | ❌ |
 
-Ou seja: toda vez que limpo o estado, o `gmail-cron-tick` roda em segundos e reescreve. Por isso o cursor antigo "ressuscita".
+## Problemas no código que vão quebrar o ciclo
 
-## Correções
+### Problema 1 — `startFullMirror` não captura o historyId atual
+`src/server/gmail-mirror.server.ts:292` — o upsert que inicia o mirror não toca em `last_history_id`. Resultado: o valor antigo `33256984` permanece. Quando o mirror terminar e o incremental destravar, o Gmail responde **404 "history not found"** no primeiro tick.
 
-### 1. Apagar a rota legada
-Deletar `src/routes/api/public/gmail-cron-tick.ts`. A rota nova `gmail-poll.ts` já cobre 100% do que ela fazia (wipe + full sync + incremental + guarda).
+### Problema 2 — `runFullSyncTick` (done=true) também não atualiza `last_history_id`
+Linha 419: ao concluir, só seta `last_full_sync_at = now()`. Não refresca o cursor. Mesmo efeito do problema 1.
 
-### 2. Desagendar o cron legado
-```sql
-SELECT cron.unschedule('gmail-mirror-tick');
+### Problema 3 — `runIncrementalSync` em 404 não auto-recupera
+Linha 562: ao receber 404, retorna `{ needsFullSync: true }` mas **não limpa** `last_history_id` nem reagenda nada. O cron vai logar 404 silenciosamente a cada minuto até alguém intervir manualmente.
+
+## Correções (uma única passada)
+
+### 1. `startFullMirror` — snapshot do historyId no início
+
+```ts
+// src/server/gmail-mirror.server.ts dentro de startFullMirror, antes do upsert
+const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
+// no upsert, adicionar:
+last_history_id: profile.historyId ? Number(profile.historyId) : null,
 ```
-Mantém apenas `gmail-incremental-poll` (que aponta para `/api/public/gmail-poll`, a versão correta).
 
-### 3. Limpar o estado novamente
+Isso garante que, quando o full sync acabar, o incremental parte do "agora" do Gmail (o próprio mirror cobre o passado).
+
+### 2. `runIncrementalSync` em 404 — limpar cursor
+
+```ts
+// linha 562 — em vez de só retornar:
+if (String(e.message || "").includes("404")) {
+  await supabase.from("email_sync_state").update({
+    last_history_id: null, last_full_sync_at: null,
+    updated_at: new Date().toISOString(),
+  }).eq("owner_email", owner);
+  return { added: 0, deleted: 0, needsFullSync: true };
+}
+```
+
+Assim, se algum dia o cursor expirar, o sistema volta sozinho ao estado "esperando mirror completo" em vez de loopar 404.
+
+### 3. Limpar o estado atual no banco
+
 ```sql
 UPDATE email_sync_state
 SET last_history_id = NULL,
     last_incremental_sync_at = NULL,
-    last_full_sync_at = NULL
+    last_full_sync_at = NULL,
+    updated_at = now()
 WHERE owner_email = 'booking@adatours.com';
 ```
-Agora vai ficar limpo permanentemente — só o cron novo (com a guarda) sobrou.
 
-### 4. Verificar
-Reler o estado depois de 1–2 minutos para confirmar que `last_history_id` continua `NULL` e que aparece `skip_waiting_full_sync` nos logs do `gmail-poll`.
+A guarda continua segurando o cron porque `last_full_sync_at` permanece `NULL` até o mirror terminar.
 
-## Resultado
+## Fluxo esperado depois das correções
 
-Sobra um único cron correto que:
-- Avança wipe se houver
-- Avança full sync se em progresso
-- **Pula incremental** enquanto `last_full_sync_at` for `NULL` (ou seja, espera você clicar em "Iniciar mirror completo")
-- Só liga incremental depois que o mirror completo terminar pelo menos uma vez
+1. Você clica em **Iniciar mirror completo** → captura `historyId` atual + marca `full_sync_in_progress=true`.
+2. Cron roda `runFullSyncTick` a cada minuto, label por label, mês a mês.
+3. Quando esvazia a fila → `last_full_sync_at = now()`, `full_sync_in_progress = false`.
+4. Próximo tick destrava o incremental, usa o `last_history_id` capturado no passo 1 → sem 404.
+5. Bonus: se em algum momento futuro o cursor expirar (>7 dias parado), o sistema reseta sozinho.
+
+## Resumo
+
+Aplicando os 3 itens acima numa única tarefa, **sim**, fica pronto para a sincronização completa correta. Sem essas correções, vai dar 404 no instante em que o full sync terminar.

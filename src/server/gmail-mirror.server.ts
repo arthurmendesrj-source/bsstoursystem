@@ -292,6 +292,9 @@ const HARD_MONTH_CAP = 360; // 30 years safety cap
 export async function startFullMirror(supabase: SupabaseClient): Promise<{ owner: string; queue: string[] }> {
   const { owner, labels } = await listAndPersistLabels(supabase);
   const queue = buildLabelQueue(labels);
+  // Snapshot the current Gmail historyId so the post-mirror incremental sync
+  // starts from "now" instead of a stale cursor that would 404.
+  const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
   await supabase.from("email_sync_state").upsert({
     owner_email: owner,
     full_sync_in_progress: true,
@@ -303,7 +306,9 @@ export async function startFullMirror(supabase: SupabaseClient): Promise<{ owner
     full_sync_total_synced: 0,
     full_sync_window_days: null, // null = open-ended (full history)
     full_sync_empty_streak: 0,
-    last_incremental_sync_at: new Date().toISOString(),
+    last_history_id: profile.historyId ? Number(profile.historyId) : null,
+    last_incremental_sync_at: null,
+    last_full_sync_at: null,
     updated_at: new Date().toISOString(),
   }, { onConflict: "owner_email" });
   return { owner, queue };
@@ -559,7 +564,16 @@ export async function runIncrementalSync(supabase: SupabaseClient, owner: string
     let res: any;
     try { res = await gw(`/users/me/history?${params.toString()}`); }
     catch (e: any) {
-      if (String(e.message || "").includes("404")) return { added: 0, deleted: 0, needsFullSync: true };
+      if (String(e.message || "").includes("404")) {
+        // Cursor expired (>7 days). Reset state so the cron stops looping
+        // 404s and waits for a fresh full mirror to be started manually.
+        await supabase.from("email_sync_state").update({
+          last_history_id: null,
+          last_full_sync_at: null,
+          updated_at: new Date().toISOString(),
+        }).eq("owner_email", owner);
+        return { added: 0, deleted: 0, needsFullSync: true };
+      }
       throw e;
     }
     const history = (res?.history ?? []) as Array<{

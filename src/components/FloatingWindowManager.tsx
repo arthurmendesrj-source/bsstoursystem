@@ -56,7 +56,7 @@ function saveLastRect(sizeKey: string, r: WinRect) {
   try { localStorage.setItem(`window.last.${sizeKey}`, JSON.stringify(r)); } catch { /* ignore */ }
 }
 
-export const FloatingWindowManager = forwardRef<FloatingWindowManagerHandle, Record<string, never>>(function FloatingWindowManager(_props, ref) {
+export const FloatingWindowManager = forwardRef<FloatingWindowManagerHandle>(function FloatingWindowManager(_props, ref) {
   const [windows, setWindows] = useState<Win[]>([]);
   const zCounter = useRef(10);
   const cascadeIdx = useRef(0);

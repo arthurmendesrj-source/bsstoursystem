@@ -817,7 +817,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
         {Sidebar}
-        <div className="flex-1 min-w-0">{ThreadList}</div>
+        <div className="flex-1 min-w-0 max-w-[560px] border-r">{ThreadList}</div>
 
         {AddAccountDialog}
 

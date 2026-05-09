@@ -295,9 +295,9 @@ export function TriageEmailPanel() {
                 </Button>
                 <div className="flex items-center gap-1">
                   <Button size="sm" variant="ghost" asChild title="Abrir no Email">
-                    <Link to="/email" search={{ thread: em.thread_id ?? undefined } as never}>
+                    <a href={`/email?thread=${encodeURIComponent(em.thread_id ?? "")}`}>
                       <ExternalLink className="h-4 w-4" />
-                    </Link>
+                    </a>
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => void markAsRead(em)} title="Marcar como lido">
                     <Check className="h-4 w-4" />

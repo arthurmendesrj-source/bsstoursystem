@@ -243,20 +243,27 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const safe = term.replace(/[%,()"\\]/g, " ").trim();
     const like = safe ? `%${safe}%` : "";
 
-    // Para pastas de "saída", o agregado de email_threads contém também
-    // mensagens da contraparte (uma resposta sua faz a thread inteira aparecer
-    // em SENT). Para refletir o que o Gmail mostra em "Enviados/Rascunhos/etc.",
-    // listamos direto da tabela emails e tomamos a mensagem mais recente
-    // por thread que tem o label ativo.
+    // Para pastas de "saída/sistema" (Enviados, Rascunhos, Spam, Lixeira), a
+    // tabela email_threads agrega labels da conversa inteira — uma resposta
+    // sua faz toda a thread aparecer em SENT/INBOX simultaneamente. Para
+    // refletir o que o Gmail exibe, listamos direto da tabela emails,
+    // exigindo que a mensagem tenha aquele label, e (para SENT/DRAFT) que o
+    // remetente seja o próprio dono da caixa.
     const OUTBOUND = new Set(["SENT", "DRAFT", "TRASH", "SPAM"]);
     if (OUTBOUND.has(activeLabel)) {
+      const owners = authorizedEmails!;
       let q = supabase
         .from("emails")
-        .select("id, thread_id, subject, snippet, from_email, from_name, to_emails, internal_date, is_starred, is_unread, is_important, has_attachments, labels, body_text")
-        .in("owner_email", authorizedEmails!)
+        .select("id, thread_id, subject, snippet, from_email, from_name, to_emails, internal_date, is_starred, is_unread, is_important, has_attachments, labels, body_text, owner_email")
+        .in("owner_email", owners)
         .contains("labels", [activeLabel])
         .order("internal_date", { ascending: false })
         .limit(500);
+      // Para Enviados/Rascunhos: garante que a mensagem foi enviada PELA conta.
+      if (activeLabel === "SENT" || activeLabel === "DRAFT") {
+        const ownerOrFilter = owners.map((o) => `from_email.ilike.${o}`).join(",");
+        q = q.or(ownerOrFilter);
+      }
       if (safe) {
         q = q.or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`);
       }
@@ -264,12 +271,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       if (error) { toast.error(error.message); return; }
       const seen = new Set<string>();
       const rows: ThreadRow[] = [];
-      for (const m of (data ?? []) as Array<{ id: string; thread_id: string | null; subject: string | null; snippet: string | null; from_email: string | null; from_name: string | null; to_emails: string[] | null; internal_date: string | null; is_starred: boolean; is_unread: boolean; is_important: boolean; has_attachments: boolean; labels: string[] | null }>) {
+      for (const m of (data ?? []) as Array<{ id: string; thread_id: string | null; subject: string | null; snippet: string | null; from_email: string | null; from_name: string | null; to_emails: string[] | null; internal_date: string | null; is_starred: boolean; is_unread: boolean; is_important: boolean; has_attachments: boolean; labels: string[] | null; owner_email: string | null }>) {
         const tid = m.thread_id ?? m.id;
         if (seen.has(tid)) continue;
         seen.add(tid);
-        const participants = activeLabel === "SENT"
-          ? (m.to_emails ?? [])
+        const participants = (activeLabel === "SENT" || activeLabel === "DRAFT")
+          ? (m.to_emails && m.to_emails.length > 0
+              ? m.to_emails.map((t) => `Para: ${t}`)
+              : ["Para: (sem destinatário)"])
           : [m.from_name || m.from_email || "(sem remetente)"];
         rows.push({
           id: tid,

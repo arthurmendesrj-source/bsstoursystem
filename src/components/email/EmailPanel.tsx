@@ -827,6 +827,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       search={search}
       setSearch={setSearch}
       onOpenThread={openThread}
+      onDoubleClickThread={inlineReader ? openThreadInWindow : undefined}
       onLocalStar={(t) => void localStar(t)}
       loadingMore={loadingMore}
       canLoadMore={threads.length > 0 && (!!nextPageToken || lastPageFull)}
@@ -837,11 +838,51 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     />
   );
 
+  const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? null;
+
+  const InlineReaderPane = inlineReader ? (
+    <div className="flex-1 min-w-0 flex flex-col bg-background">
+      {selectedThread ? (
+        <>
+          <div className="flex items-center justify-end gap-1 px-2 py-1 border-b">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              title="Abrir em janela"
+              onClick={() => { openThreadInWindow(selectedThread); }}
+            >
+              <Maximize2 className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ThreadReader
+              thread={{ id: selectedThread.id, subject: selectedThread.subject, is_starred: selectedThread.is_starred }}
+              messages={inlineMessages}
+              loading={inlineLoading}
+              onStar={() => void localStar(selectedThread)}
+              onArchive={() => void archiveThread(selectedThread.id)}
+              onTrash={() => void trashThread(selectedThread.id)}
+              onReply={(m) => openCompose(m, "reply")}
+              onForward={(m) => openCompose(m, "forward")}
+              onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">
+          Selecione uma conversa
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
         {Sidebar}
-        <div className="flex-1 min-w-0 max-w-[560px] border-r">{ThreadList}</div>
+        <div className={cn("min-w-0 border-r", inlineReader ? "w-[380px] shrink-0" : "flex-1 max-w-[560px]")}>{ThreadList}</div>
+        {InlineReaderPane}
 
         {AddAccountDialog}
 

@@ -464,19 +464,19 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     await supabase.from("emails").update({ is_starred: next }).eq("thread_id", t.id);
     setThreads((prev) => prev.map((x) => x.id === t.id ? { ...x, is_starred: next } : x));
   };
-  const localArchive = async () => {
-    if (!selectedThreadId) return;
-    const t = threads.find((x) => x.id === selectedThreadId); if (!t) return;
-    await supabase.from("email_threads").update({ labels: t.labels.filter((l) => l !== "INBOX") }).eq("id", selectedThreadId);
-    setSelectedThreadId(null); setThreadMessages(null); await loadThreads();
+  const archiveThread = async (threadId: string) => {
+    const t = threads.find((x) => x.id === threadId); if (!t) return;
+    await supabase.from("email_threads").update({ labels: t.labels.filter((l) => l !== "INBOX") }).eq("id", threadId);
+    if (selectedThreadId === threadId) setSelectedThreadId(null);
+    await loadThreads();
   };
-  const localTrash = async () => {
-    if (!selectedThreadId) return;
-    const t = threads.find((x) => x.id === selectedThreadId); if (!t) return;
+  const trashThread = async (threadId: string) => {
+    const t = threads.find((x) => x.id === threadId); if (!t) return;
     const labs = Array.from(new Set([...t.labels.filter((l) => l !== "INBOX"), "TRASH"]));
-    await supabase.from("email_threads").update({ labels: labs }).eq("id", selectedThreadId);
-    await supabase.from("emails").update({ labels: labs }).eq("thread_id", selectedThreadId);
-    setSelectedThreadId(null); setThreadMessages(null); await loadThreads();
+    await supabase.from("email_threads").update({ labels: labs }).eq("id", threadId);
+    await supabase.from("emails").update({ labels: labs }).eq("thread_id", threadId);
+    if (selectedThreadId === threadId) setSelectedThreadId(null);
+    await loadThreads();
   };
 
   const openCompose = (m: ThreadMessage, kind: "reply" | "forward") => {

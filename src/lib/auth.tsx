@@ -35,6 +35,7 @@ export type AppRole =
   | "admin"
   | "diretor"
   | "gerente"
+  | "coordenador"
   | "supervisor"
   | "operador"
   // legacy (mantidos para compatibilidade durante migração)

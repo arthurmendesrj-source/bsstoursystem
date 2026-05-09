@@ -10,8 +10,8 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-type AppRole = "admin" | "diretor" | "gerente" | "supervisor" | "operador";
-const ALLOWED_ROLES: AppRole[] = ["admin", "diretor", "gerente", "supervisor", "operador"];
+type AppRole = "admin" | "diretor" | "gerente" | "coordenador" | "supervisor" | "operador";
+const ALLOWED_ROLES: AppRole[] = ["admin", "diretor", "gerente", "coordenador", "supervisor", "operador"];
 const PROTECTED_ROLES: AppRole[] = ["admin", "diretor"];
 
 function json(body: unknown, status = 200) {
@@ -157,6 +157,13 @@ Deno.serve(async (req) => {
         const rows = requestedRoles.map((role) => ({ user_id: invited.user!.id, role }));
         await admin.from("user_roles").insert(rows);
       }
+      // Garante que o e-mail do convite vire a caixa primária do usuário
+      await admin
+        .from("user_email_accounts")
+        .upsert(
+          { user_id: invited.user.id, email_address: email.toLowerCase(), is_primary: true },
+          { onConflict: "user_id,email_address" }
+        );
       await audit({
         action: "invite",
         target_user_id: invited.user.id,

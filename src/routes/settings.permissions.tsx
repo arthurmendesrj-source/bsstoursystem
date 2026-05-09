@@ -23,7 +23,7 @@ export const Route = createFileRoute("/settings/permissions")({
   ),
 });
 
-const ROLES: AppRole[] = ["admin", "diretor", "gerente", "supervisor", "operador"];
+const ROLES: AppRole[] = ["admin", "diretor", "gerente", "coordenador", "supervisor", "operador"];
 const ACTIONS = [
   { key: "can_view", label: "Ver" },
   { key: "can_create", label: "Criar" },

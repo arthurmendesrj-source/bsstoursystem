@@ -5,7 +5,7 @@ import { useAuth, type AppRole } from "@/lib/auth";
 export type Subordinate = { user_id: string; full_name: string; role: AppRole };
 
 const RANK: Record<AppRole, number> = {
-  admin: 4, diretor: 3, gerente: 2, supervisor: 1, operador: 0,
+  admin: 5, diretor: 4, gerente: 3, coordenador: 2, supervisor: 1, operador: 0,
   vendedor: 0, operacional: 0, financeiro: 0,
 };
 

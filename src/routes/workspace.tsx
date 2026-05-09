@@ -41,6 +41,8 @@ import { cn } from "@/lib/utils";
 import { EmailPanel } from "@/components/email/EmailPanel";
 import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
+import { WorkspaceWindowsProvider, useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
+import { TaskWindow } from "@/components/workspace/windows/TaskWindow";
 
 type WorkspaceSearch = { lead?: string };
 
@@ -51,7 +53,9 @@ export const Route = createFileRoute("/workspace")({
   component: () => (
     <AuthGate>
       <AppShell>
-        <WorkspacePage />
+        <WorkspaceWindowsProvider>
+          <WorkspacePage />
+        </WorkspaceWindowsProvider>
       </AppShell>
     </AuthGate>
   ),

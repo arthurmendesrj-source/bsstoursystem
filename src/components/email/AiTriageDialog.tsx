@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, Languages } from "lucide-react";
+import { Sparkles, Loader2, Languages, Link2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { emailAnalyze, emailTranslate } from "@/server/gmail.functions";
@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { linkEmailThread } from "@/lib/linkEmailToEntity";
 import { useAuth } from "@/lib/auth";
 import { useSubordinates } from "@/lib/hierarchy";
+import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 
 type Suggestion = {
   summary?: string;
@@ -61,6 +62,10 @@ export function AiTriageDialog({
   const [translating, setTranslating] = useState(false);
   const [translation, setTranslation] = useState<string>("");
 
+  // associate
+  const [associateOpen, setAssociateOpen] = useState(false);
+  const [linkedTo, setLinkedTo] = useState<{ kind: string; label: string } | null>(null);
+
   // lead form
   const [lName, setLName] = useState("");
   const [lEmail, setLEmail] = useState("");
@@ -81,6 +86,7 @@ export function AiTriageDialog({
     if (!open || !gmailId) return;
     setSug(null); setMode("summary"); setLoading(true);
     setTranslation(""); setTranslating(false);
+    setLinkedTo(null);
     setAssignedTo(user?.id ?? "");
     analyzeFn({ data: { gmail_id: gmailId } })
       .then((r: any) => {
@@ -112,6 +118,54 @@ export function AiTriageDialog({
       toast.error(e instanceof Error ? e.message : "Erro ao traduzir");
     } finally {
       setTranslating(false);
+    }
+  };
+
+  const onAssociate = async (e: AssociateEntity) => {
+    if (!threadId) { toast.error("Thread indisponível"); return; }
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id ?? null;
+      let n = 0;
+      if (e.kind === "lead") {
+        n = await linkEmailThread(threadId, { lead_id: e.lead_id, customer_id: e.customer_id ?? undefined });
+      } else if (e.kind === "customer") {
+        n = await linkEmailThread(threadId, { customer_id: e.customer_id });
+      } else if (e.kind === "supplier") {
+        n = await linkEmailThread(threadId, { supplier_id: e.supplier_id });
+      } else if (e.kind === "booking") {
+        // emails table has no booking_id; mirror to email_message_links per message
+        const { data: msgs } = await supabase
+          .from("emails")
+          .select("gmail_id, thread_id, from_email, subject, snippet")
+          .eq("thread_id", threadId);
+        const rows = (msgs ?? []).map((m: any) => ({
+          gmail_message_id: m.gmail_id,
+          gmail_thread_id: m.thread_id,
+          from_email: m.from_email,
+          subject: m.subject,
+          snippet: m.snippet,
+          booking_id: e.id,
+          lead_id: e.lead_id,
+          customer_id: e.customer_id,
+          created_by: uid,
+        }));
+        if (rows.length > 0) {
+          const { error } = await supabase.from("email_message_links").insert(rows);
+          if (error) throw new Error(error.message);
+        }
+        n = rows.length;
+      } else if (e.kind === "quote") {
+        // quote not in chosen scope; treat as lead/customer link if available
+        n = await linkEmailThread(threadId, {
+          lead_id: e.lead_id ?? undefined,
+          customer_id: e.customer_id ?? undefined,
+        });
+      }
+      setLinkedTo({ kind: e.kind, label: e.label });
+      toast.success(`Vinculado · ${n} mensagem(ns)`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao associar");
     }
   };
 
@@ -243,6 +297,29 @@ export function AiTriageDialog({
                 <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/40 rounded p-2 max-h-72 overflow-y-auto">{translation}</pre>
               )}
             </div>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Associar a registro existente</Label>
+                <div className="flex-1" />
+                {linkedTo ? (
+                  <Button size="sm" variant="outline" onClick={() => setAssociateOpen(true)}>Trocar</Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setAssociateOpen(true)}>
+                    <Link2 className="h-3 w-3 mr-1" /> Associar
+                  </Button>
+                )}
+              </div>
+              {linkedTo ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-muted-foreground capitalize">{linkedTo.kind}:</span>
+                  <span className="font-medium">{linkedTo.label}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Vincule este e-mail a um lead, cliente, fornecedor ou reserva já cadastrado.</p>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground">
               Recomendação da IA: <strong>{sug.suggested_action === "create_lead" ? "Criar Lead" : sug.suggested_action === "create_task" ? "Criar Atividade" : "Ignorar"}</strong>
             </div>
@@ -343,6 +420,13 @@ export function AiTriageDialog({
           </div>
         )}
       </DialogContent>
+      <AssociateDialog
+        open={associateOpen}
+        onOpenChange={setAssociateOpen}
+        tabs={["lead", "customer", "supplier", "booking"]}
+        title="Associar e-mail a registro"
+        onPick={(e) => void onAssociate(e)}
+      />
     </Dialog>
   );
 }

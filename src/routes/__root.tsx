@@ -74,9 +74,12 @@ function RootComponent() {
         <AuthProvider>
           <ViewAsProvider>
             <PermissionsProvider>
-              <Outlet />
-              <PermissionFieldHighlighter />
-              <Toaster />
+              <TooltipProvider delayDuration={400}>
+                <Outlet />
+                <PermissionFieldHighlighter />
+                <GlobalButtonTooltips />
+                <Toaster />
+              </TooltipProvider>
             </PermissionsProvider>
           </ViewAsProvider>
         </AuthProvider>

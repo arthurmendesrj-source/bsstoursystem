@@ -131,11 +131,12 @@ export function AiTriageDialog({
         created_by: uid, assigned_to: assignedTo || uid,
       }).select("id").single();
       if (error) throw new Error(error.message);
-      // link emails to lead
+      // link this thread + register in email_message_links
+      let linked = 0;
       if (threadId && data?.id) {
-        await supabase.from("emails").update({ lead_id: data.id }).eq("thread_id", threadId);
+        linked = await linkEmailThread(threadId, { lead_id: data.id });
       }
-      toast.success("Lead criado");
+      toast.success(`Lead criado${linked ? ` · ${linked} mensagens vinculadas` : ""}`);
       onOpenChange(false);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSaving(false); }
@@ -147,17 +148,27 @@ export function AiTriageDialog({
     try {
       const { data: u } = await supabase.auth.getUser();
       const uid = u.user?.id;
-      // find an email_id for this thread
+      // find an email_id for this thread + inherit lead/customer if any
       let emailId: string | null = null;
+      let leadFromThread: string | null = null;
+      let customerFromThread: string | null = null;
       if (threadId) {
-        const { data: er } = await supabase.from("emails").select("id, lead_id").eq("thread_id", threadId).limit(1).maybeSingle();
+        const { data: er } = await supabase
+          .from("emails")
+          .select("id, lead_id, customer_id")
+          .eq("thread_id", threadId)
+          .limit(1)
+          .maybeSingle();
         emailId = er?.id ?? null;
+        leadFromThread = er?.lead_id ?? null;
+        customerFromThread = er?.customer_id ?? null;
       }
       const { error } = await supabase.from("tasks").insert({
         title: tTitle, description: tDescription || null,
         category: tCategory, priority: tPriority,
         due_date: tDue ? new Date(tDue).toISOString() : null,
         source: "email", email_id: emailId,
+        lead_id: leadFromThread, customer_id: customerFromThread,
         created_by: uid, assigned_to: assignedTo || uid,
       });
       if (error) throw new Error(error.message);

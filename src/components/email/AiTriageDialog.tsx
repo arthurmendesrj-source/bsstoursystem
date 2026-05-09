@@ -161,6 +161,36 @@ export function AiTriageDialog({
           lead_id: e.lead_id ?? undefined,
           customer_id: e.customer_id ?? undefined,
         });
+      } else if (e.kind === "activity") {
+        // mirror to email_message_links per message with activity_id
+        const { data: msgs } = await supabase
+          .from("emails")
+          .select("gmail_id, thread_id, from_email, subject, snippet")
+          .eq("thread_id", threadId);
+        const rows = (msgs ?? []).map((m: any) => ({
+          gmail_message_id: m.gmail_id,
+          gmail_thread_id: m.thread_id,
+          from_email: m.from_email,
+          subject: m.subject,
+          snippet: m.snippet,
+          activity_id: e.activity_id,
+          booking_id: e.booking_id,
+          lead_id: e.lead_id,
+          customer_id: e.customer_id,
+          created_by: uid,
+        }));
+        if (rows.length > 0) {
+          const { error } = await supabase.from("email_message_links").insert(rows as any);
+          if (error) throw new Error(error.message);
+        }
+        // also keep emails.lead_id/customer_id in sync via RPC when available
+        if (e.lead_id || e.customer_id) {
+          await linkEmailThread(threadId, {
+            lead_id: e.lead_id ?? undefined,
+            customer_id: e.customer_id ?? undefined,
+          });
+        }
+        n = rows.length;
       }
       setLinkedTo({ kind: e.kind, label: e.label });
       toast.success(`Vinculado · ${n} mensagem(ns)`);

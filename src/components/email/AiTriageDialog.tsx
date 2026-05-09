@@ -121,6 +121,54 @@ export function AiTriageDialog({
     }
   };
 
+  const onAssociate = async (e: AssociateEntity) => {
+    if (!threadId) { toast.error("Thread indisponível"); return; }
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      const uid = u.user?.id ?? null;
+      let n = 0;
+      if (e.kind === "lead") {
+        n = await linkEmailThread(threadId, { lead_id: e.lead_id, customer_id: e.customer_id ?? undefined });
+      } else if (e.kind === "customer") {
+        n = await linkEmailThread(threadId, { customer_id: e.customer_id });
+      } else if (e.kind === "supplier") {
+        n = await linkEmailThread(threadId, { supplier_id: e.supplier_id });
+      } else if (e.kind === "booking") {
+        // emails table has no booking_id; mirror to email_message_links per message
+        const { data: msgs } = await supabase
+          .from("emails")
+          .select("gmail_id, thread_id, from_email, subject, snippet")
+          .eq("thread_id", threadId);
+        const rows = (msgs ?? []).map((m: any) => ({
+          gmail_message_id: m.gmail_id,
+          gmail_thread_id: m.thread_id,
+          from_email: m.from_email,
+          subject: m.subject,
+          snippet: m.snippet,
+          booking_id: e.id,
+          lead_id: e.lead_id,
+          customer_id: e.customer_id,
+          created_by: uid,
+        }));
+        if (rows.length > 0) {
+          const { error } = await supabase.from("email_message_links").insert(rows);
+          if (error) throw new Error(error.message);
+        }
+        n = rows.length;
+      } else if (e.kind === "quote") {
+        // quote not in chosen scope; treat as lead/customer link if available
+        n = await linkEmailThread(threadId, {
+          lead_id: e.lead_id ?? undefined,
+          customer_id: e.customer_id ?? undefined,
+        });
+      }
+      setLinkedTo({ kind: e.kind, label: e.label });
+      toast.success(`Vinculado · ${n} mensagem(ns)`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao associar");
+    }
+  };
+
 
   const createLead = async () => {
     if (!lName.trim()) { toast.error("Nome obrigatório"); return; }

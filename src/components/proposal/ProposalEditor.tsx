@@ -563,15 +563,6 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             <FileText className="h-4 w-4 mr-1" /> Gerar Documento
           </Button>
           <Can module="quotes" action="edit">
-            <Button variant="outline" size="sm" onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
-              <Hotel className="h-4 w-4 mr-1" /> {t("addHotel")}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => { setEditingService(null); setServiceDialogOpen(true); }}>
-              <Wrench className="h-4 w-4 mr-1" /> {t("addService")}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => { setEditingFlight(null); setFlightDialogOpen(true); }}>
-              <Plane className="h-4 w-4 mr-1" /> Adicionar voo
-            </Button>
             <Button size="sm" onClick={save} disabled={saving}>
               <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
             </Button>
@@ -692,6 +683,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           if (confirm("Tem certeza que deseja excluir este hotel?")) removeItem(idx);
         }}
         onEdit={(id) => openEditHotel(id)}
+        onAdd={canEdit ? () => { setEditingHotel(null); setHotelDialogOpen(true); } : undefined}
+        addLabel={t("addHotel")}
+        icon={<Hotel className="h-4 w-4" />}
       />
 
       <ItemTable
@@ -705,6 +699,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           if (confirm("Tem certeza que deseja excluir este serviço?")) removeItem(idx);
         }}
         onEdit={(id) => openEditService(id)}
+        onAdd={canEdit ? () => { setEditingService(null); setServiceDialogOpen(true); } : undefined}
+        addLabel={t("addService")}
+        icon={<Wrench className="h-4 w-4" />}
       />
 
       <div className="rounded-md border">
@@ -855,6 +852,9 @@ function ItemTable({
   onChange,
   onRemove,
   onEdit,
+  onAdd,
+  addLabel,
+  icon,
 }: {
   title: string;
   kind: ProposalItemKind;
@@ -864,6 +864,9 @@ function ItemTable({
   onChange: (idx: number, patch: Partial<ItemRow>) => void;
   onRemove: (idx: number) => void;
   onEdit?: (id: string) => void;
+  onAdd?: () => void;
+  addLabel?: string;
+  icon?: React.ReactNode;
 }) {
   const { t } = useI18n();
   const { canField } = usePermissions();
@@ -872,19 +875,21 @@ function ItemTable({
   const editCost = canField("quotes", "unit_cost", "edit");
   const editMarkup = canField("quotes", "markup_pct", "edit");
   const isHotel = kind === "hotel";
-  if (rows.length === 0) {
-    return (
-      <div>
-        <h3 className="text-sm font-semibold mb-2">{title}</h3>
-        <div className="rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">{t("noData")}</div>
-      </div>
-    );
-  }
   return (
-    <div>
-      <h3 className="text-sm font-semibold mb-2">{title}</h3>
-      <div className="rounded-md border overflow-x-auto">
-        <table className="w-full text-sm">
+    <div className="rounded-md border">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+        <div className="text-sm font-medium flex items-center gap-2">{icon} {title}</div>
+        {onAdd && !readOnly && (
+          <Button size="sm" variant="outline" onClick={onAdd}>
+            <Plus className="h-4 w-4 mr-1" /> {addLabel ?? "Adicionar"}
+          </Button>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <div className="p-3 text-sm text-muted-foreground">{t("noData")}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs">
             <tr>
               {isHotel ? (
@@ -1010,7 +1015,8 @@ function ItemTable({
             })}
           </tbody>
         </table>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

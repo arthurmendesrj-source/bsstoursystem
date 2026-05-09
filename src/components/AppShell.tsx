@@ -85,6 +85,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const items = [
     { to: "/inbox-ia", label: "Inbox IA", icon: Sparkles },
+    { to: "/inbox-ia/email", label: "Triagem Email", icon: Sparkles },
     { to: "/email", label: t("email"), icon: Mail },
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },

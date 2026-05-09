@@ -294,7 +294,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           has_attachments: m.has_attachments,
           labels: m.labels ?? [],
         });
-        if (rows.length >= 200) break;
+        if (rows.length >= pageSize) break;
       }
       setThreads(rows);
       return;

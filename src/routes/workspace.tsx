@@ -688,7 +688,6 @@ function ProposalsTab({
   const canCreateQuote = can("quotes", "create");
   const { format: fmtCurrency } = useCurrency();
   const win = useWorkspaceWindows();
-  const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
 
   const openInWindow = (q: Quote) => {
@@ -696,7 +695,7 @@ function ProposalsTab({
       id: `${mode}:${q.id}`,
       title: `${mode === "invoice" ? t("invoice") : t("proposals")} #${q.id.slice(0, 8)}`,
       sizeKey: mode,
-      defaultSize: { width: 1000, height: 680 },
+      defaultSize: { width: 1200, height: 760 },
       content: (
         <div className="p-4">
           <ProposalEditor
@@ -735,7 +734,7 @@ function ProposalsTab({
     setCreating(false);
     if (error) return toast.error(error.message);
     onChanged();
-    setOpenId(data.id);
+    openInWindow({ ...(data as any), status: "rascunho", total_amount: 0, currency: "USD", created_at: new Date().toISOString() } as Quote);
   };
 
   return (
@@ -758,9 +757,8 @@ function ProposalsTab({
             return (
               <button
                 key={q.id}
-                onClick={() => setOpenId(q.id)}
-                onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenId(null); openInWindow(q); }}
-                title="Duplo-clique para abrir em janela"
+                onClick={() => openInWindow(q)}
+                title="Abrir proposta"
                 className={cn(
                   "w-full text-left p-3 rounded-md border hover:bg-muted/40 flex items-center justify-between",
                   closed && "border-emerald-500/40 bg-emerald-500/5",
@@ -792,25 +790,6 @@ function ProposalsTab({
           })}
         </div>
       )}
-
-      <Dialog open={!!openId} onOpenChange={(o) => !o && setOpenId(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{mode === "invoice" ? t("invoice") : t("proposals")}</DialogTitle>
-          </DialogHeader>
-          {openId && (
-            <ProposalEditor
-              quoteId={openId}
-              leadId={leadId}
-              leadCode={leadCode}
-              customerId={customerId}
-              mode={mode}
-              onSaved={onChanged}
-              onClose={() => setOpenId(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

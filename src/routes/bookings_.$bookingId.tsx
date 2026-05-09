@@ -359,6 +359,18 @@ function BookingDetailPage() {
                         <RotateCcw className="mr-1 h-4 w-4" />{t("revertToPending")}
                       </Button>
                     ) : null}
+                    {status === "confirmado" && (
+                      vouchers[item.id] ? (
+                        <Button size="sm" variant="secondary" onClick={() => setOpenVoucherId(vouchers[item.id].id)}>
+                          <Ticket className="mr-1 h-4 w-4" />{t("openVoucher")}
+                          <span className="ml-2 text-xs opacity-70">{vouchers[item.id].code}</span>
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => generateItemVoucher(item)}>
+                          <Ticket className="mr-1 h-4 w-4" />{t("generateVoucher")}
+                        </Button>
+                      )
+                    )}
                   </div>
                 </div>
               </Card>
@@ -372,6 +384,12 @@ function BookingDetailPage() {
         onOpenChange={(v) => !v && setAssociateItem(null)}
         customerId={booking.customer_id}
         onPick={(p) => { if (associateItem) handleProofPick(associateItem, p); }}
+      />
+
+      <VoucherDialog
+        voucherId={openVoucherId}
+        open={!!openVoucherId}
+        onOpenChange={(v) => !v && setOpenVoucherId(null)}
       />
     </div>
   );

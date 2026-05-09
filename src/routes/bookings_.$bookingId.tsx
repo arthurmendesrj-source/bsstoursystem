@@ -277,6 +277,7 @@ function BookingDetailPage() {
     toast.success(t("saved"));
   };
 
+  const confirmedCount = useMemo(() => items.filter((i) => confs[i.id]?.status === "confirmado").length, [items, confs]);
   const allConfirmed = items.length > 0 && confirmedCount === items.length;
 
   const markBookingConfirmed = async () => {

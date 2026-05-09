@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 import { AiTriageDialog } from "@/components/email/AiTriageDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { linkEmailThread } from "@/lib/linkEmailToEntity";
 import { toast } from "sonner";
 
 export type ThreadMessage = {

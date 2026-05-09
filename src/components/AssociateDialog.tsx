@@ -112,16 +112,19 @@ async function searchActivities(term: string, like: string): Promise<AssociateEn
     );
   }
   const { data } = await q;
-  return ((data ?? []) as Array<{ id: string; description: string | null; city: string | null; activity_date: string | null; activity_time: string | null; kind: string; status: string; booking_id: string | null; bookings: { lead_id: string | null; customer_id: string | null } | null }>).map((a) => ({
-    kind: "activity",
-    id: a.id,
-    activity_id: a.id,
-    booking_id: a.booking_id,
-    lead_id: a.bookings?.lead_id ?? null,
-    customer_id: a.bookings?.customer_id ?? null,
-    label: `${a.kind} · ${a.description ?? "—"}${a.city ? ` (${a.city})` : ""}`,
-    sub: `${a.activity_date ?? ""} ${a.activity_time ?? ""}${a.booking_id ? ` · booking #${a.booking_id.slice(0, 8)}` : ""}`,
-  }));
+  return ((data ?? []) as unknown as Array<{ id: string; description: string | null; city: string | null; activity_date: string | null; activity_time: string | null; kind: string; status: string; booking_id: string | null; bookings: { lead_id: string | null; customer_id: string | null } | { lead_id: string | null; customer_id: string | null }[] | null }>).map((a) => {
+    const bk = Array.isArray(a.bookings) ? a.bookings[0] ?? null : a.bookings;
+    return {
+      kind: "activity",
+      id: a.id,
+      activity_id: a.id,
+      booking_id: a.booking_id,
+      lead_id: bk?.lead_id ?? null,
+      customer_id: bk?.customer_id ?? null,
+      label: `${a.kind} · ${a.description ?? "—"}${a.city ? ` (${a.city})` : ""}`,
+      sub: `${a.activity_date ?? ""} ${a.activity_time ?? ""}${a.booking_id ? ` · booking #${a.booking_id.slice(0, 8)}` : ""}`,
+    };
+  });
 }
 
 export function AssociateDialog({

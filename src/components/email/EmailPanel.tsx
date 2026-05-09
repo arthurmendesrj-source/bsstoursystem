@@ -311,7 +311,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
     }
     let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
-      .order("last_message_at", { ascending: false }).limit(200);
+      .order("last_message_at", { ascending: false }).limit(pageSize);
     q = q.contains("labels", [activeLabel]);
     if (safe) {
       const orParts = [`subject.ilike.${like}`, `snippet.ilike.${like}`];

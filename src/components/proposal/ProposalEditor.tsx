@@ -852,6 +852,9 @@ function ItemTable({
   onChange,
   onRemove,
   onEdit,
+  onAdd,
+  addLabel,
+  icon,
 }: {
   title: string;
   kind: ProposalItemKind;
@@ -861,6 +864,9 @@ function ItemTable({
   onChange: (idx: number, patch: Partial<ItemRow>) => void;
   onRemove: (idx: number) => void;
   onEdit?: (id: string) => void;
+  onAdd?: () => void;
+  addLabel?: string;
+  icon?: React.ReactNode;
 }) {
   const { t } = useI18n();
   const { canField } = usePermissions();
@@ -869,19 +875,21 @@ function ItemTable({
   const editCost = canField("quotes", "unit_cost", "edit");
   const editMarkup = canField("quotes", "markup_pct", "edit");
   const isHotel = kind === "hotel";
-  if (rows.length === 0) {
-    return (
-      <div>
-        <h3 className="text-sm font-semibold mb-2">{title}</h3>
-        <div className="rounded-md border border-dashed py-6 text-center text-xs text-muted-foreground">{t("noData")}</div>
-      </div>
-    );
-  }
   return (
-    <div>
-      <h3 className="text-sm font-semibold mb-2">{title}</h3>
-      <div className="rounded-md border overflow-x-auto">
-        <table className="w-full text-sm">
+    <div className="rounded-md border">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
+        <div className="text-sm font-medium flex items-center gap-2">{icon} {title}</div>
+        {onAdd && !readOnly && (
+          <Button size="sm" variant="outline" onClick={onAdd}>
+            <Plus className="h-4 w-4 mr-1" /> {addLabel ?? "Adicionar"}
+          </Button>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <div className="p-3 text-sm text-muted-foreground">{t("noData")}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
           <thead className="bg-muted/40 text-xs">
             <tr>
               {isHotel ? (

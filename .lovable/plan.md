@@ -1,80 +1,92 @@
-# Auditoria completa antes da sincronização
+Entendo sua frustração. Pelo que verifiquei agora, o problema não é apenas um cursor antigo: o desenho atual tenta “copiar o Gmail inteiro” em lotes pequenos, por labels/mês, dentro de rotas com limite de execução. Isso é frágil para uma caixa grande.
 
-Verifiquei código + estado do banco + cron. Encontrei **3 problemas que precisam ser corrigidos juntos** antes de você clicar em "Iniciar mirror completo".
+## O que está impedindo a sincronização completa hoje
 
-## Estado atual (booking@adatours.com)
+1. **O cron está falhando/interrompendo com frequência**
+   - Nos logs recentes, várias chamadas para `/api/public/gmail-poll` aparecem com status `0`, sinal de execução interrompida/timeout.
+   - Isso confirma que o processo de mirror completo é pesado demais para rodar com segurança desse jeito.
 
-| Item | Valor | OK? |
-|---|---|---|
-| Cron `gmail-incremental-poll` | ativo, único, aponta para `/api/public/gmail-poll` | ✅ |
-| Guarda no `gmail-poll` | espera `last_full_sync_at` antes de incremental | ✅ |
-| `last_full_sync_at` | `NULL` | ✅ |
-| `full_sync_in_progress` | `false` | ✅ |
-| `wipe_status` | `idle` | ✅ |
-| `emails` / `threads` / `labels` no DB | 0 / 0 / 0 (já limpos) | ✅ |
-| **`last_history_id`** | **`33256984`** (cursor antigo) | ❌ |
-| **`last_incremental_sync_at`** | `2026-05-09 00:28:01` (antigo) | ❌ |
+2. **A sincronização ainda está incompleta**
+   - Estado atual: `full_sync_in_progress = true`.
+   - Só existem cerca de **275 emails** e **134 threads** gravados até agora.
+   - Ou seja: quando você abre a tela, ela mostra os mesmos emails porque o banco ainda não tem uma cópia completa e confiável do Gmail.
 
-## Problemas no código que vão quebrar o ciclo
+3. **Existem dois caminhos de sincronização competindo**
+   - Botão de sincronização por período na interface.
+   - Mirror completo em segundo plano pelo cron.
+   - Isso aumenta risco de estado inconsistente, repetição, travamento e impressão de que “não mudou nada”.
 
-### Problema 1 — `startFullMirror` não captura o historyId atual
-`src/server/gmail-mirror.server.ts:292` — o upsert que inicia o mirror não toca em `last_history_id`. Resultado: o valor antigo `33256984` permanece. Quando o mirror terminar e o incremental destravar, o Gmail responde **404 "history not found"** no primeiro tick.
+4. **O mirror completo baixa corpo e anexos durante o lote**
+   - Isso pesa muito.
+   - Para contas com muitos emails/anexos, a chance de timeout é alta.
 
-### Problema 2 — `runFullSyncTick` (done=true) também não atualiza `last_history_id`
-Linha 419: ao concluir, só seta `last_full_sync_at = now()`. Não refresca o cursor. Mesmo efeito do problema 1.
+5. **Espelhar 100% do Gmail não é o caminho mais estável aqui**
+   - Gmail tem paginação, labels sobrepostos, histórico que expira e limites de API.
+   - Fazer uma cópia fiel, histórica e permanente dentro desse app exige uma arquitetura de worker/fila dedicada, não apenas cron chamando uma rota web.
 
-### Problema 3 — `runIncrementalSync` em 404 não auto-recupera
-Linha 562: ao receber 404, retorna `{ needsFullSync: true }` mas **não limpa** `last_history_id` nem reagenda nada. O cron vai logar 404 silenciosamente a cada minuto até alguém intervir manualmente.
+## Solução que eu consigo executar com mais segurança
 
-## Correções (uma única passada)
+Trocar o modelo de “espelhar todo o Gmail” por um modelo **Gmail como fonte da verdade + cache operacional limitado**.
 
-### 1. `startFullMirror` — snapshot do historyId no início
+Em vez de tentar copiar tudo, o app passa a funcionar assim:
 
-```ts
-// src/server/gmail-mirror.server.ts dentro de startFullMirror, antes do upsert
-const profile = (await gw(`/users/me/profile`)) as { emailAddress: string; historyId?: string };
-// no upsert, adicionar:
-last_history_id: profile.historyId ? Number(profile.historyId) : null,
+```text
+Tela de Email
+  -> busca a lista diretamente no Gmail em tempo real
+  -> salva no banco só o necessário para uso operacional
+  -> abre mensagens sob demanda
+  -> sincroniza automaticamente apenas emails recentes/importantes
 ```
 
-Isso garante que, quando o full sync acabar, o incremental parte do "agora" do Gmail (o próprio mirror cobre o passado).
+## O que será implementado
 
-### 2. `runIncrementalSync` em 404 — limpar cursor
+### 1. Remover o mirror completo como fluxo principal
 
-```ts
-// linha 562 — em vez de só retornar:
-if (String(e.message || "").includes("404")) {
-  await supabase.from("email_sync_state").update({
-    last_history_id: null, last_full_sync_at: null,
-    updated_at: new Date().toISOString(),
-  }).eq("owner_email", owner);
-  return { added: 0, deleted: 0, needsFullSync: true };
-}
-```
+- Parar de usar “Importar tudo / cópia fiel” como ação principal.
+- Manter ou remover visualmente esse botão para evitar falsa expectativa.
+- O app não vai mais depender de uma importação completa terminar para exibir emails.
 
-Assim, se algum dia o cursor expirar, o sistema volta sozinho ao estado "esperando mirror completo" em vez de loopar 404.
+### 2. Criar listagem direta do Gmail
 
-### 3. Limpar o estado atual no banco
+- Ao clicar em Caixa de entrada, Enviados, Spam, Lixeira etc., buscar direto no Gmail.
+- Usar paginação real do Gmail com `nextPageToken`.
+- Exibir os emails retornados imediatamente, sem esperar o banco completar.
 
-```sql
-UPDATE email_sync_state
-SET last_history_id = NULL,
-    last_incremental_sync_at = NULL,
-    last_full_sync_at = NULL,
-    updated_at = now()
-WHERE owner_email = 'booking@adatours.com';
-```
+### 3. Cache local simples e seguro
 
-A guarda continua segurando o cron porque `last_full_sync_at` permanece `NULL` até o mirror terminar.
+- Ao buscar uma página do Gmail, gravar/atualizar os emails no banco com deduplicação.
+- O banco vira cache, não “fonte absoluta”.
+- Se o cache falhar, a tela ainda pode buscar no Gmail.
 
-## Fluxo esperado depois das correções
+### 4. Abrir email sob demanda
 
-1. Você clica em **Iniciar mirror completo** → captura `historyId` atual + marca `full_sync_in_progress=true`.
-2. Cron roda `runFullSyncTick` a cada minuto, label por label, mês a mês.
-3. Quando esvazia a fila → `last_full_sync_at = now()`, `full_sync_in_progress = false`.
-4. Próximo tick destrava o incremental, usa o `last_history_id` capturado no passo 1 → sem 404.
-5. Bonus: se em algum momento futuro o cursor expirar (>7 dias parado), o sistema reseta sozinho.
+- A lista carrega metadados leves.
+- Corpo completo e anexos só são buscados quando o usuário abre a conversa.
+- Isso reduz drasticamente timeout e repetição.
 
-## Resumo
+### 5. Sincronização automática apenas recente
 
-Aplicando os 3 itens acima numa única tarefa, **sim**, fica pronto para a sincronização completa correta. Sem essas correções, vai dar 404 no instante em que o full sync terminar.
+- Cron passa a fazer uma tarefa pequena e previsível:
+  - buscar apenas emails novos/recentes;
+  - atualizar cache;
+  - nunca tentar varrer anos de histórico.
+- Se o histórico expirar, o app não quebra: volta a buscar por data recente.
+
+### 6. Simplificar a interface
+
+- Trocar “Sincronizar tudo” por ações mais confiáveis:
+  - **Atualizar caixa atual**
+  - **Carregar mais antigos**
+  - **Buscar no Gmail**
+- Mostrar status real: “Buscando no Gmail”, “Cache atualizado”, “Sem mais resultados”.
+
+## Resultado esperado
+
+- A tela passa a mostrar emails atuais sem depender de mirror completo.
+- O risco de timeout cai muito.
+- Emails antigos aparecem via paginação/busca, não por uma cópia total prévia.
+- O banco continua útil para vínculo com leads, reservas, clientes, tarefas e histórico interno.
+
+## Limitação honesta
+
+Eu não recomendo prometer “espelhamento completo e fiel de todo o Gmail” dentro desta arquitetura atual. A solução confiável que consigo executar é: **cliente Gmail operacional com cache local**, não um backup integral do Gmail.

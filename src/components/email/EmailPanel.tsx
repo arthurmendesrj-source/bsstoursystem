@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailFullSync, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailStartFullMirror, gmailCancelFullMirror, gmailResetFullMirror } from "@/server/gmail-mirror.functions";
+import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailListLive } from "@/server/gmail-mirror.functions";
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -87,58 +87,15 @@ export type EmailPanelProps = {
 
 export function EmailPanel({ mode, leadId, customerId: _customerId, className }: EmailPanelProps) {
   const listLabelsFn = useServerFn(gmailListLabels);
-  const fullSyncFn = useServerFn(gmailFullSync);
-  const startFullMirrorFn = useServerFn(gmailStartFullMirror);
-  const [startingMirror, setStartingMirror] = useState(false);
-
-  const startFullMirror = async () => {
-    setStartingMirror(true);
-    try {
-      const r = await startFullMirrorFn({ data: undefined as never });
-      toast.success(`Importação completa iniciada — ${r.queueLength} pastas na fila. O processo continuará em segundo plano.`);
-      await loadFolders();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao iniciar importação";
-      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
-      else toast.error(msg);
-    } finally {
-      setStartingMirror(false);
-    }
-  };
-  const cancelFullMirrorFn = useServerFn(gmailCancelFullMirror);
-  const resetFullMirrorFn = useServerFn(gmailResetFullMirror);
-  const [cancellingMirror, setCancellingMirror] = useState(false);
-  const [resettingMirror, setResettingMirror] = useState(false);
-
-  const cancelFullMirror = async () => {
-    if (typeof window !== "undefined" && !window.confirm("Cancelar a sincronização em andamento? O progresso atual será mantido, mas a fila restante será limpa.")) return;
-    setCancellingMirror(true);
-    try {
-      await cancelFullMirrorFn({ data: undefined as never });
-      toast.success("Sincronização cancelada");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao cancelar");
-    } finally { setCancellingMirror(false); }
-  };
-
-  const resetFullMirror = async () => {
-    if (typeof window !== "undefined" && !window.confirm("Reiniciar a sincronização do zero? O contador de mensagens será zerado e a fila será recriada com todas as pastas.")) return;
-    setResettingMirror(true);
-    try {
-      const r = await resetFullMirrorFn({ data: undefined as never });
-      toast.success(`Sincronização reiniciada — ${r.queueLength} pastas na fila`);
-      await loadFolders();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao reiniciar");
-    } finally { setResettingMirror(false); }
-  };
-
-  // (botão "Esvaziar" removido — limpeza é feita via chat/admin)
-
+  const listLiveFn = useServerFn(gmailListLive);
   const incSyncFn = useServerFn(gmailIncrementalSync);
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);
   const sendFn = useServerFn(gmailSend);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");
@@ -412,78 +369,49 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [mode, hasMailbox]);
 
-  const doFullSync = async (daysOverride?: number) => {
-    const days = Math.max(1, Math.min(3650, daysOverride ?? syncWindowDays));
-    if (daysOverride) setSyncWindowDays(days);
-    const totalMonths = Math.max(1, Math.ceil(days / 30));
-    setSyncing(true);
-    setSyncProgress({
-      active: true, hidden: false, currentLabel: "INBOX",
-      currentMonthLabel: null, currentMonthIndex: 1, totalMonths,
-      totalSynced: 0,
-      perLabel: { ...initialPerLabel(), INBOX: { count: 0, threads: 0, status: "active" } },
-    });
-    let total = 0;
+  // Atualiza a caixa atual buscando direto no Gmail (1 página, leve).
+  const refreshLive = async (opts?: { append?: boolean }) => {
+    const append = !!opts?.append;
+    if (append) setLoadingMore(true); else setRefreshing(true);
     try {
       await listLabelsFn({ data: undefined as never });
-      const maxIters = 7 /*labels*/ * totalMonths * 30 /*pages safety*/;
-      for (let i = 0; i < maxIters; i++) {
-        // Retry transient failures (gateway timeout) up to 3 times — server state is preserved
-        let r: Awaited<ReturnType<typeof fullSyncFn>> | null = null;
-        let attempt = 0;
-        while (true) {
-          try {
-            r = await fullSyncFn({ data: { restart: i === 0, windowDays: days } });
-            break;
-          } catch (err) {
-            attempt++;
-            const msg = err instanceof Error ? err.message : String(err);
-            const transient = /timeout|504|503|502|429|upstream/i.test(msg);
-            if (!transient || attempt >= 3) throw err;
-            await new Promise((res) => setTimeout(res, 1000 * attempt + 1000));
-          }
-        }
-        if (!r) break;
-        total = r.totalSynced || total + r.syncedThisRun;
-        const lbl = r.label as SyncLabel;
-        const next = (r.nextLabel ?? null) as SyncLabel | null;
-        setSyncProgress((prev) => {
-          if (!SYNC_LABELS.includes(lbl)) return prev;
-          const perLabel = { ...prev.perLabel };
-          perLabel[lbl] = {
-            count: perLabel[lbl].count + r.syncedThisRun,
-            threads: perLabel[lbl].threads + r.threads,
-            status: r.done || (next && next !== lbl) ? "done" : "active",
-          };
-          if (next && next !== lbl && SYNC_LABELS.includes(next) && perLabel[next].status === "pending") {
-            perLabel[next] = { ...perLabel[next], status: "active" };
-          }
-          if (r.done) {
-            for (const l of SYNC_LABELS) if (perLabel[l].status !== "done") perLabel[l].status = "done";
-          }
-          return {
-            ...prev,
-            currentLabel: r.done ? null : (next ?? lbl),
-            currentMonthLabel: r.monthLabel ?? prev.currentMonthLabel,
-            currentMonthIndex: r.done ? prev.totalMonths : ((r.nextMonthOffset ?? 0) + 1),
-            totalMonths: r.totalMonths ?? prev.totalMonths,
-            totalSynced: total,
-            perLabel,
-          };
-        });
-        await loadFolders(); await loadThreads();
-        if (r.done) break;
-        await new Promise((res) => setTimeout(res, 150));
-      }
-      toast.success(`Sincronização concluída — ${formatWindowLabel(days)}`);
-      setTimeout(() => setSyncProgress((p) => ({ ...p, active: false })), 3000);
+      const r = await listLiveFn({
+        data: {
+          labelId: activeLabel,
+          pageToken: append ? (nextPageToken ?? undefined) : undefined,
+          maxResults: 50,
+          q: search.trim() || undefined,
+        },
+      });
+      setNextPageToken(r.nextPageToken);
+      await loadFolders();
+      await loadThreads();
+      if (!append) toast.success(`Atualizado — ${r.count} mensagens carregadas`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Erro ao sincronizar";
+      const msg = e instanceof Error ? e.message : "Erro ao atualizar";
       if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
       else toast.error(msg);
-      setSyncProgress((p) => ({ ...p, active: false }));
-    } finally { setSyncing(false); }
+    } finally {
+      if (append) setLoadingMore(false); else setRefreshing(false);
+    }
   };
+
+  // Quando muda a label/busca, zera paginação e dispara um fetch ao vivo da 1ª página.
+  useEffect(() => {
+    setNextPageToken(null);
+    if (!hasMailbox || mode !== "full") return;
+    void (async () => {
+      try {
+        const r = await listLiveFn({
+          data: { labelId: activeLabel, maxResults: 50, q: search.trim() || undefined },
+        });
+        setNextPageToken(r.nextPageToken);
+        await loadFolders();
+        await loadThreads();
+      } catch { /* silent — cache continua exibido */ }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLabel, hasMailbox, mode]);
 
   const fetchThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
     const r = await getThreadFn({ data: { threadId } });
@@ -664,33 +592,17 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       <div className={cn("p-2 border-b flex items-center gap-2", collapsed && "flex-col")}>
         {!collapsed && (
           <div className="flex-1 flex">
-            <Button onClick={() => void doFullSync()} disabled={syncing} className="flex-1 justify-start gap-2 rounded-r-none" variant="default" size="sm">
-              <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-              <span className="truncate">{syncing ? "Sincronizando…" : `Sincronizar (${formatWindowLabel(syncWindowDays)})`}</span>
+            <Button onClick={() => void refreshLive()} disabled={refreshing} className="flex-1 justify-start gap-2 rounded-r-none" variant="default" size="sm">
+              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              <span className="truncate">{refreshing ? "Atualizando…" : "Atualizar caixa"}</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button disabled={syncing} variant="default" size="sm" className="px-2 rounded-l-none border-l border-primary-foreground/20">
+                <Button disabled={refreshing} variant="default" size="sm" className="px-2 rounded-l-none border-l border-primary-foreground/20">
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                {SYNC_PRESETS.map((p) => (
-                  <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
-                    <span className="flex-1">{p.label}</span>
-                    {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
-                  Personalizado…
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
-                  {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
-                  <span className="flex-1">Importar tudo (cópia fiel)</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
                   <Mail className="h-3.5 w-3.5 mr-2" />
                   <span className="flex-1">Adicionar conta de email…</span>
@@ -700,40 +612,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           </div>
         )}
         {collapsed && (
-          <DropdownMenu>
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button disabled={syncing} size="icon" variant="default" className="h-9 w-9">
-                    <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">Sincronizar Gmail ({formatWindowLabel(syncWindowDays)})</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="start" className="w-56">
-              {SYNC_PRESETS.map((p) => (
-                <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
-                  <span className="flex-1">{p.label}</span>
-                  {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
-                Personalizado…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
-                {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
-                <span className="flex-1">Importar tudo (cópia fiel)</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
-                <Mail className="h-3.5 w-3.5 mr-2" />
-                <span className="flex-1">Adicionar conta de email…</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button disabled={refreshing} size="icon" variant="default" className="h-9 w-9" onClick={() => void refreshLive()}>
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Atualizar caixa</TooltipContent>
+          </Tooltip>
         )}
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
@@ -823,68 +709,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   };
   const showMirrorPanel = !!mirror && !mirrorHidden && (mirror.in_progress || (mirror.total_synced > 0 && !!mirror.last_full_sync_at));
 
-  const MirrorPanel = showMirrorPanel ? (
-    <div className="border-b bg-card/50 p-3 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            {mirror!.in_progress ? (
-              <Loader2 className="h-3.5 w-3.5 text-primary animate-spin shrink-0" />
-            ) : (
-              <Check className="h-3.5 w-3.5 text-primary shrink-0" />
-            )}
-            <span className="text-sm font-semibold truncate">
-              {mirror!.in_progress ? "Importação em andamento" : "Importação concluída"}
-            </span>
-            <span className="text-[11px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary shrink-0">
-              {mirror!.in_progress ? "Em andamento" : "Concluído"}
-            </span>
-          </div>
-          <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-            <div>
-              <span className="font-medium text-foreground">Pasta atual:</span> {resolveLabelName(mirror!.current_label)}
-              {mirror!.in_progress && mirror!.label_queue.length > 0 && (
-                <> · {mirror!.label_queue.length} restantes na fila</>
-              )}
-            </div>
-            <div>
-              <span className="font-medium text-foreground">Mês atual:</span> {monthLabelFromOffset(mirror!.month_offset)}
-              <span className="text-muted-foreground/70"> (offset {mirror!.month_offset})</span>
-            </div>
-            <div>
-              <span className="font-medium text-foreground">Total sincronizado:</span>{" "}
-              <span className="tabular-nums">{mirror!.total_synced.toLocaleString("pt-BR")}</span> mensagens
-            </div>
-            {mirror!.last_full_sync_at && !mirror!.in_progress && (
-              <div className="text-muted-foreground/80">
-                Última atualização: {new Date(mirror!.last_full_sync_at).toLocaleString("pt-BR")}
-              </div>
-            )}
-          </div>
-        </div>
-        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => setMirrorHidden(true)}>
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      {mirror!.in_progress && (
-        <div className="h-1 rounded-full bg-muted overflow-hidden">
-          <div className="h-full w-1/3 bg-primary/70 animate-pulse rounded-full" />
-        </div>
-      )}
-      <div className="flex items-center gap-2 pt-1">
-        {mirror!.in_progress && (
-          <Button size="sm" variant="outline" disabled={cancellingMirror} onClick={() => void cancelFullMirror()}>
-            {cancellingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <X className="h-3.5 w-3.5 mr-1.5" />}
-            Cancelar
-          </Button>
-        )}
-        <Button size="sm" variant="outline" disabled={resettingMirror} onClick={() => void resetFullMirror()}>
-          {resettingMirror ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-          Reiniciar do zero
-        </Button>
-      </div>
-    </div>
-  ) : null;
+  const MirrorPanel = null;
 
   const ThreadList = (
     <section className="flex flex-col h-full bg-background min-w-0">
@@ -924,6 +749,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
             </div>
           </button>
         ))}
+        {nextPageToken && threads.length > 0 && (
+          <div className="p-3">
+            <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={() => void refreshLive({ append: true })}>
+              {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
+              Carregar mais antigos
+            </Button>
+          </div>
+        )}
       </ScrollArea>
     </section>
   );
@@ -976,34 +809,6 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           </DialogContent>
         </Dialog>
 
-        {/* CUSTOM SYNC PERIOD */}
-        <Dialog open={customDaysOpen} onOpenChange={setCustomDaysOpen}>
-          <DialogContent className="sm:max-w-sm">
-            <DialogHeader><DialogTitle>Período personalizado</DialogTitle></DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="custom-days">Dias para trás (1 a 3650)</Label>
-              <Input
-                id="custom-days"
-                type="number"
-                min={1}
-                max={3650}
-                value={customDaysInput}
-                onChange={(e) => setCustomDaysInput(e.target.value)}
-                autoFocus
-              />
-              <p className="text-xs text-muted-foreground">Atual: {formatWindowLabel(syncWindowDays)}</p>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCustomDaysOpen(false)}>Cancelar</Button>
-              <Button onClick={() => {
-                const n = Math.max(1, Math.min(3650, Math.floor(Number(customDaysInput) || 0)));
-                if (!n) return;
-                setCustomDaysOpen(false);
-                void doFullSync(n);
-              }}>Sincronizar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
         {/* COMPOSE */}
         <Dialog open={!!composeOpen} onOpenChange={(o) => !o && setComposeOpen(null)}>
           <DialogContent className="sm:max-w-2xl">

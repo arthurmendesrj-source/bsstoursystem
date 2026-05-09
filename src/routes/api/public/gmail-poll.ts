@@ -5,7 +5,7 @@
 // All work is small and idempotent so it never times out.
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import { runFullSyncTick, runIncrementalSync, runWipeBatch } from "@/server/gmail-mirror.server";
+import { runIncrementalSync, runWipeBatch } from "@/server/gmail-mirror.server";
 
 export const Route = createFileRoute("/api/public/gmail-poll")({
   server: {
@@ -27,16 +27,11 @@ export const Route = createFileRoute("/api/public/gmail-poll")({
             try {
               if (r.wipe_status === "wiping") {
                 results[owner] = { type: "wipe", ...(await runWipeBatch(supabaseAdmin as any, owner)) };
-              } else if (r.full_sync_in_progress) {
-                results[owner] = { type: "full", ...(await runFullSyncTick(supabaseAdmin as any, owner)) };
-              } else if (!r.last_full_sync_at) {
-                // Aguarda o usuário iniciar o mirror completo manualmente.
-                // Sem isto, o incremental usaria um last_history_id antigo e quebraria.
-                results[owner] = { type: "skip_waiting_full_sync" };
               } else {
+                // Apenas sincronização incremental (leve). Sem mirror histórico.
                 const idleMs = r.last_incremental_sync_at
                   ? Date.now() - new Date(r.last_incremental_sync_at).getTime() : Infinity;
-                if (idleMs > 5 * 60_000) {
+                if (idleMs > 60_000) {
                   results[owner] = { type: "inc", ...(await runIncrementalSync(supabaseAdmin as any, owner)) };
                 } else {
                   results[owner] = { type: "skip" };

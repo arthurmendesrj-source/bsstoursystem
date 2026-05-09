@@ -96,6 +96,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<number>(50);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");

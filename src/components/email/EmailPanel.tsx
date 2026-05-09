@@ -324,7 +324,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, search, hasMailbox, authorizedEmails]);
+  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize]);
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);

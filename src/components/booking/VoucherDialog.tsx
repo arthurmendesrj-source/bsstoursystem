@@ -256,6 +256,30 @@ export function VoucherDialog({ voucherId, open, onOpenChange }: Props) {
                   </div>
                   <Field label={t("voucherCustomer")} value={customerName} />
                   <Field label={t("voucherItem")} value={itemDescription} />
+                  {itemDetails && (
+                    <>
+                      <Field label={t("city")} value={itemDetails.city} />
+                      <Field label={t("category")} value={itemDetails.category} />
+                      {itemDetails.kind === "hotel" ? (
+                        <>
+                          <Field label={t("checkIn")} value={itemDetails.item_date} />
+                          <Field label={t("checkOut")} value={itemDetails.check_out} />
+                          <Field label={t("nights")} value={itemDetails.nights != null ? String(itemDetails.nights) : null} />
+                          <Field label={t("rooms")} value={itemDetails.rooms != null ? String(itemDetails.rooms) : null} />
+                          <Field label={t("mealPlan")} value={itemDetails.meal_plan} />
+                          <Field label={t("pax")} value={itemDetails.pax != null ? String(itemDetails.pax) : null} />
+                        </>
+                      ) : (
+                        <>
+                          <Field label={t("itemDate")} value={itemDetails.item_date} />
+                          <Field label={t("pax")} value={itemDetails.pax != null ? String(itemDetails.pax) : null} />
+                          <Field label={t("ways")} value={itemDetails.ways != null ? String(itemDetails.ways) : null} />
+                          <Field label={t("guideType")} value={itemDetails.guide_type} />
+                        </>
+                      )}
+                      <Field label={t("notes")} value={itemDetails.notes} multiline />
+                    </>
+                  )}
                   <Field label={t("voucherServiceDate")} value={voucher.service_date} />
                   <Field label={t("voucherMeetingTime")} value={voucher.meeting_time} />
                   <Field label={t("voucherMeetingPoint")} value={voucher.meeting_point} />

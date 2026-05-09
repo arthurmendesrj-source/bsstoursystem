@@ -683,6 +683,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           if (confirm("Tem certeza que deseja excluir este hotel?")) removeItem(idx);
         }}
         onEdit={(id) => openEditHotel(id)}
+        onAdd={canEdit ? () => { setEditingHotel(null); setHotelDialogOpen(true); } : undefined}
+        addLabel={t("addHotel")}
+        icon={<Hotel className="h-4 w-4" />}
       />
 
       <ItemTable
@@ -696,6 +699,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           if (confirm("Tem certeza que deseja excluir este serviço?")) removeItem(idx);
         }}
         onEdit={(id) => openEditService(id)}
+        onAdd={canEdit ? () => { setEditingService(null); setServiceDialogOpen(true); } : undefined}
+        addLabel={t("addService")}
+        icon={<Wrench className="h-4 w-4" />}
       />
 
       <div className="rounded-md border">

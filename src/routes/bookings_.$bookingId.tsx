@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProofAssociateDialog, type ProofPick } from "@/components/ProofAssociateDialog";
+import { VoucherDialog } from "@/components/booking/VoucherDialog";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
@@ -72,6 +73,8 @@ function BookingDetailPage() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [confs, setConfs] = useState<Record<string, Confirmation>>({});
+  const [vouchers, setVouchers] = useState<Record<string, { id: string; code: string }>>({});
+  const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
@@ -94,6 +97,12 @@ function BookingDetailPage() {
     const map: Record<string, Confirmation> = {};
     ((cfs ?? []) as Confirmation[]).forEach((c) => { map[c.quote_item_id] = c; });
     setConfs(map);
+    const { data: vs } = await supabase.from("vouchers").select("id,code,quote_item_id").eq("booking_id", bookingId);
+    const vMap: Record<string, { id: string; code: string }> = {};
+    ((vs ?? []) as { id: string; code: string; quote_item_id: string | null }[]).forEach((v) => {
+      if (v.quote_item_id) vMap[v.quote_item_id] = { id: v.id, code: v.code };
+    });
+    setVouchers(vMap);
     setLoading(false);
   };
 
@@ -179,6 +188,22 @@ function BookingDetailPage() {
   const setStatus = async (item: QuoteItem, status: string) => {
     await persist(item.id, { status });
     toast.success(t("saved"));
+  };
+
+  const generateItemVoucher = async (item: QuoteItem) => {
+    if (vouchers[item.id]) { setOpenVoucherId(vouchers[item.id].id); return; }
+    const code = `VCH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const { data, error } = await supabase.from("vouchers").insert({
+      booking_id: bookingId,
+      quote_item_id: item.id,
+      code,
+      created_by: user?.id ?? null,
+    } as never).select("id,code").single();
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("voucherCreated"));
+    const row = data as { id: string; code: string };
+    setVouchers((prev) => ({ ...prev, [item.id]: { id: row.id, code: row.code } }));
+    setOpenVoucherId(row.id);
   };
 
   const confirmedCount = useMemo(() => items.filter((i) => confs[i.id]?.status === "confirmado").length, [items, confs]);

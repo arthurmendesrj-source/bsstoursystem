@@ -2769,30 +2769,107 @@ export type Database = {
         }
         Relationships: []
       }
+      voucher_send_log: {
+        Row: {
+          body_text: string | null
+          created_at: string
+          error_message: string | null
+          gmail_message_id: string | null
+          id: string
+          sent_by: string | null
+          sent_cc: string | null
+          sent_to: string
+          status: string
+          subject: string | null
+          voucher_id: string
+        }
+        Insert: {
+          body_text?: string | null
+          created_at?: string
+          error_message?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          sent_by?: string | null
+          sent_cc?: string | null
+          sent_to: string
+          status: string
+          subject?: string | null
+          voucher_id: string
+        }
+        Update: {
+          body_text?: string | null
+          created_at?: string
+          error_message?: string | null
+          gmail_message_id?: string | null
+          id?: string
+          sent_by?: string | null
+          sent_cc?: string | null
+          sent_to?: string
+          status?: string
+          subject?: string | null
+          voucher_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "voucher_send_log_voucher_id_fkey"
+            columns: ["voucher_id"]
+            isOneToOne: false
+            referencedRelation: "vouchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vouchers: {
         Row: {
           booking_id: string
           code: string
+          created_by: string | null
+          customer_instructions: string | null
           emergency_contact: string | null
           id: string
           issued_at: string
           itinerary: string | null
+          meeting_point: string | null
+          meeting_time: string | null
+          notes: string | null
+          quote_item_id: string | null
+          service_date: string | null
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
           booking_id: string
           code: string
+          created_by?: string | null
+          customer_instructions?: string | null
           emergency_contact?: string | null
           id?: string
           issued_at?: string
           itinerary?: string | null
+          meeting_point?: string | null
+          meeting_time?: string | null
+          notes?: string | null
+          quote_item_id?: string | null
+          service_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           booking_id?: string
           code?: string
+          created_by?: string | null
+          customer_instructions?: string | null
           emergency_contact?: string | null
           id?: string
           issued_at?: string
           itinerary?: string | null
+          meeting_point?: string | null
+          meeting_time?: string | null
+          notes?: string | null
+          quote_item_id?: string | null
+          service_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -2800,6 +2877,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vouchers_quote_item_id_fkey"
+            columns: ["quote_item_id"]
+            isOneToOne: false
+            referencedRelation: "quote_items"
             referencedColumns: ["id"]
           },
         ]

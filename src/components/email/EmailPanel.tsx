@@ -923,7 +923,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 }
 
 function ThreadListSection({
-  threads, selectedThreadId, search, setSearch, onOpenThread, onLocalStar,
+  threads, selectedThreadId, search, setSearch, onOpenThread, onDoubleClickThread, onLocalStar,
   loadingMore, canLoadMore, atEnd, onLoadMore, MirrorPanel, SyncProgressPanel,
 }: {
   threads: ThreadRow[];
@@ -931,6 +931,7 @@ function ThreadListSection({
   search: string;
   setSearch: (s: string) => void;
   onOpenThread: (t: ThreadRow) => void;
+  onDoubleClickThread?: (t: ThreadRow) => void;
   onLocalStar: (t: ThreadRow) => void;
   loadingMore: boolean;
   canLoadMore: boolean;

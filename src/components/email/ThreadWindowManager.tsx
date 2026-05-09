@@ -144,7 +144,7 @@ export const ThreadWindowManager = forwardRef<ThreadWindowManagerHandle, Props>(
         {visible.map((w) => {
           const isMax = w.state === "max";
           const size = isMax
-            ? { width: typeof window !== "undefined" ? window.innerWidth : 1280, height: typeof window !== "undefined" ? window.innerHeight : 800 }
+            ? { width: viewport.w, height: viewport.h }
             : { width: w.rect.width, height: w.rect.height };
           const position = isMax ? { x: 0, y: 0 } : { x: w.rect.x, y: w.rect.y };
           return (

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type ReactNode } from "react";
 import { Inbox, Send, FileText, AlertOctagon, Trash2, Star, Tag, RefreshCw, Search, Paperclip, Mail, PanelLeftClose, PanelLeftOpen, Check, Loader2, Circle, X, ChevronDown } from "lucide-react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
@@ -94,16 +95,31 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const getAttachmentFn = useServerFn(gmailGetAttachment);
   const sendFn = useServerFn(gmailSend);
 
+  const PAGE_SIZE = 200;
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
+  const [lastPageFull, setLastPageFull] = useState<boolean>(false);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");
-  
+
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [search, setSearch] = useState("");
+
+  // Cache em memória por pasta (vive enquanto a página /email estiver aberta).
+  type LabelCache = { threads: ThreadRow[]; pageSize: number; nextPageToken: string | null; lastPageFull: boolean };
+  const cacheRef = useRef<Map<string, LabelCache>>(new Map());
+  // Mantém referência atual para snapshot na troca de pasta.
+  const snapshotRef = useRef<LabelCache>({ threads: [], pageSize: PAGE_SIZE, nextPageToken: null, lastPageFull: false });
+  useEffect(() => {
+    snapshotRef.current = { threads, pageSize, nextPageToken, lastPageFull };
+    // Só persiste no cache quando NÃO há busca ativa — pesquisa não deve
+    // sobrescrever a lista cumulativa da pasta.
+    if (!search.trim()) cacheRef.current.set(activeLabel, snapshotRef.current);
+  }, [threads, pageSize, nextPageToken, lastPageFull, activeLabel, search]);
+
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   // (leitor agora vive em janelas; estados removidos)
   const [syncing, setSyncing] = useState(false);
@@ -236,18 +252,22 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     setFolders((data ?? []) as Folder[]);
   }, [hasMailbox, authorizedEmails]);
 
+  const mergeUnique = useCallback((incoming: ThreadRow[], existing: ThreadRow[]): ThreadRow[] => {
+    const map = new Map<string, ThreadRow>();
+    for (const t of existing) map.set(t.id, t);
+    for (const t of incoming) map.set(t.id, t); // incoming overrides
+    const out = Array.from(map.values());
+    out.sort((a, b) => (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""));
+    return out;
+  }, []);
+
   const loadThreads = useCallback(async () => {
     if (!hasMailbox) { setThreads([]); return; }
     const term = search.trim();
     const safe = term.replace(/[%,()"\\]/g, " ").trim();
     const like = safe ? `%${safe}%` : "";
+    const isSearching = !!safe;
 
-    // Para pastas de "saída/sistema" (Enviados, Rascunhos, Spam, Lixeira), a
-    // tabela email_threads agrega labels da conversa inteira — uma resposta
-    // sua faz toda a thread aparecer em SENT/INBOX simultaneamente. Para
-    // refletir o que o Gmail exibe, listamos direto da tabela emails,
-    // exigindo que a mensagem tenha aquele label, e (para SENT/DRAFT) que o
-    // remetente seja o próprio dono da caixa.
     const OUTBOUND = new Set(["SENT", "DRAFT", "TRASH", "SPAM"]);
     if (OUTBOUND.has(activeLabel)) {
       const owners = authorizedEmails!;
@@ -257,8 +277,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         .in("owner_email", owners)
         .contains("labels", [activeLabel])
         .order("internal_date", { ascending: false })
-        .limit(Math.max(pageSize, 50) * 3);
-      // Para Enviados/Rascunhos: garante que a mensagem foi enviada PELA conta.
+        .limit(Math.max(pageSize, PAGE_SIZE) * 3);
       if (activeLabel === "SENT" || activeLabel === "DRAFT") {
         const ownerOrFilter = owners.map((o) => `from_email.ilike.${o}`).join(",");
         q = q.or(ownerOrFilter);
@@ -294,7 +313,9 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         });
         if (rows.length >= pageSize) break;
       }
-      setThreads(rows);
+      setLastPageFull(rows.length >= pageSize);
+      if (isSearching) setThreads(rows);
+      else setThreads((prev) => mergeUnique(rows, prev));
       return;
     }
 
@@ -321,8 +342,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     }
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
-    setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize]);
+    const rows = (data ?? []) as ThreadRow[];
+    setLastPageFull(rows.length >= pageSize);
+    if (isSearching) setThreads(rows);
+    else setThreads((prev) => mergeUnique(rows, prev));
+  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize, mergeUnique]);
+
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);
@@ -355,13 +380,38 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threads]);
 
+  // Realtime: aplica mudanças incrementalmente sem reescrever a lista inteira.
   useEffect(() => {
     const ch = supabase.channel("email-mirror")
-      .on("postgres_changes", { event: "*", schema: "public", table: "email_threads" }, () => loadThreads())
+      .on("postgres_changes", { event: "*", schema: "public", table: "email_threads" }, (payload) => {
+        const newRow = payload.new as ThreadRow | null;
+        const oldRow = payload.old as { id?: string } | null;
+        if (payload.eventType === "DELETE") {
+          if (!oldRow?.id) return;
+          setThreads((prev) => prev.filter((x) => x.id !== oldRow.id));
+          return;
+        }
+        if (!newRow) return;
+        const labels = newRow.labels ?? [];
+        const belongsHere = labels.includes(activeLabel);
+        setThreads((prev) => {
+          const idx = prev.findIndex((x) => x.id === newRow.id);
+          if (!belongsHere) {
+            // removeu da label atual
+            return idx >= 0 ? prev.filter((x) => x.id !== newRow.id) : prev;
+          }
+          if (idx >= 0) {
+            const copy = prev.slice();
+            copy[idx] = { ...prev[idx], ...newRow };
+            return copy;
+          }
+          return mergeUnique([newRow], prev);
+        });
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "email_labels" }, () => loadFolders())
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
-  }, [loadThreads, loadFolders]);
+  }, [loadFolders, activeLabel, mergeUnique]);
 
   const incRef = useRef(incSyncFn); incRef.current = incSyncFn;
   useEffect(() => {
@@ -377,51 +427,83 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [mode, hasMailbox]);
 
-  // Atualiza a caixa atual buscando direto no Gmail (1 página, leve).
+  // Atualiza a caixa atual buscando direto no Gmail (1 página de 200) ou
+  // — se o Gmail falhar — busca direto no banco a partir do que já temos.
   const refreshLive = async (opts?: { append?: boolean }) => {
     const append = !!opts?.append;
     if (append) setLoadingMore(true); else setRefreshing(true);
+    let liveOk = false;
     try {
       await listLabelsFn({ data: undefined as never });
       const r = await listLiveFn({
         data: {
           labelId: activeLabel,
           pageToken: append ? (nextPageToken ?? undefined) : undefined,
-          maxResults: 50,
+          maxResults: PAGE_SIZE,
           q: search.trim() || undefined,
         },
       });
       setNextPageToken(r.nextPageToken);
-      if (append) setPageSize((s) => s + 50);
-      await loadFolders();
-      await loadThreads();
+      liveOk = true;
       if (!append) toast.success(`Atualizado — ${r.count} mensagens carregadas`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao atualizar";
-      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
-      else toast.error(msg);
+      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) {
+        if (!append) toast.info("Nenhuma conta Gmail conectada");
+      } else if (!append) {
+        toast.error(msg);
+      }
+    }
+    try {
+      if (append) {
+        // Sempre cresce a janela em +200, mesmo se o live falhou —
+        // assim o botão sempre revela mais 200 do banco local.
+        setPageSize((s) => s + PAGE_SIZE);
+      }
+      await loadFolders();
+      await loadThreads();
     } finally {
       if (append) setLoadingMore(false); else setRefreshing(false);
     }
+    void liveOk;
   };
 
-  // Quando muda a label/busca, zera paginação e dispara um fetch ao vivo da 1ª página.
+  // Troca de pasta: salva snapshot da pasta atual e restaura cache da nova.
+  const switchLabel = useCallback((next: string) => {
+    if (next === activeLabel) return;
+    cacheRef.current.set(activeLabel, snapshotRef.current);
+    setActiveLabel(next);
+    setSelectedThreadId(null);
+    const cached = cacheRef.current.get(next);
+    if (cached) {
+      setThreads(cached.threads);
+      setPageSize(cached.pageSize);
+      setNextPageToken(cached.nextPageToken);
+      setLastPageFull(cached.lastPageFull);
+    } else {
+      setThreads([]);
+      setPageSize(PAGE_SIZE);
+      setNextPageToken(null);
+      setLastPageFull(false);
+    }
+  }, [activeLabel]);
+
+  // Em background, busca a 1ª página live da pasta ativa e mescla.
   useEffect(() => {
-    setNextPageToken(null);
-    setPageSize(50);
     if (!hasMailbox || mode !== "full") return;
     void (async () => {
       try {
         const r = await listLiveFn({
-          data: { labelId: activeLabel, maxResults: 50, q: search.trim() || undefined },
+          data: { labelId: activeLabel, maxResults: PAGE_SIZE, q: search.trim() || undefined },
         });
-        setNextPageToken(r.nextPageToken);
+        setNextPageToken((tok) => tok ?? r.nextPageToken);
         await loadFolders();
         await loadThreads();
       } catch { /* silent — cache continua exibido */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLabel, hasMailbox, mode]);
+
 
   const fetchThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
     const r = await getThreadFn({ data: { threadId } });
@@ -559,7 +641,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const Icon = isUser ? Tag : (SYSTEM_ICONS[f.id] ?? Mail);
     const active = activeLabel === f.id;
     const label = isUser ? f.name : (SYSTEM_NAMES_PT[f.id] ?? f.name);
-    const onClick = () => { setActiveLabel(f.id); setSelectedThreadId(null); };
+    const onClick = () => { switchLabel(f.id); };
     if (collapsed) {
       return (
         <Tooltip key={f.id} delayDuration={200}>
@@ -715,55 +797,20 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const MirrorPanel = null;
 
   const ThreadList = (
-    <section className="flex flex-col h-full bg-background min-w-0">
-      {MirrorPanel}
-      {SyncProgressPanel}
-      <div className="p-3 border-b space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar e-mails" className="pl-9" />
-        </div>
-      </div>
-      <ScrollArea className="flex-1">
-        {threads.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa</div>
-        ) : threads.map((t) => (
-          <button key={t.id}
-            onClick={() => openThread(t)}
-            className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
-              selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
-              t.is_unread && "bg-card font-medium")}>
-            <button onClick={(e) => { e.stopPropagation(); void localStar(t); }} className="shrink-0 mt-0.5">
-              <Star className={cn("h-4 w-4", t.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
-                <div className={cn("text-sm truncate flex-1", t.is_unread && "font-semibold")}>
-                  {t.participants.slice(0, 2).join(", ")}{t.message_count > 1 && <span className="text-muted-foreground"> ({t.message_count})</span>}
-                </div>
-                <div className="text-xs text-muted-foreground shrink-0">{formatRelative(t.last_message_at)}</div>
-              </div>
-              <div className="text-sm truncate">{t.subject || "(sem assunto)"}</div>
-              <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                {t.has_attachments && <Paperclip className="h-3 w-3" />}
-                <span className="truncate">{t.snippet}</span>
-              </div>
-            </div>
-          </button>
-        ))}
-        {threads.length > 0 && (nextPageToken || threads.length >= pageSize) && (
-          <div className="p-3">
-            <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={() => void refreshLive({ append: true })}>
-              {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
-              Carregar mais antigos
-            </Button>
-          </div>
-        )}
-        {threads.length > 0 && !nextPageToken && threads.length < pageSize && (
-          <div className="p-3 text-center text-xs text-muted-foreground">Fim da pasta</div>
-        )}
-      </ScrollArea>
-    </section>
+    <ThreadListSection
+      threads={threads}
+      selectedThreadId={selectedThreadId}
+      search={search}
+      setSearch={setSearch}
+      onOpenThread={openThread}
+      onLocalStar={(t) => void localStar(t)}
+      loadingMore={loadingMore}
+      canLoadMore={threads.length > 0 && (!!nextPageToken || lastPageFull)}
+      atEnd={threads.length > 0 && !nextPageToken && !lastPageFull}
+      onLoadMore={() => void refreshLive({ append: true })}
+      MirrorPanel={MirrorPanel}
+      SyncProgressPanel={SyncProgressPanel}
+    />
   );
 
   return (
@@ -810,7 +857,101 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   );
 }
 
-// Stub mínimo para modo lead
+function ThreadListSection({
+  threads, selectedThreadId, search, setSearch, onOpenThread, onLocalStar,
+  loadingMore, canLoadMore, atEnd, onLoadMore, MirrorPanel, SyncProgressPanel,
+}: {
+  threads: ThreadRow[];
+  selectedThreadId: string | null;
+  search: string;
+  setSearch: (s: string) => void;
+  onOpenThread: (t: ThreadRow) => void;
+  onLocalStar: (t: ThreadRow) => void;
+  loadingMore: boolean;
+  canLoadMore: boolean;
+  atEnd: boolean;
+  onLoadMore: () => void;
+  MirrorPanel: ReactNode;
+  SyncProgressPanel: ReactNode;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: threads.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 78,
+    overscan: 8,
+    getItemKey: (index) => threads[index]?.id ?? index,
+  });
+  const items = rowVirtualizer.getVirtualItems();
+  return (
+    <section className="flex flex-col h-full bg-background min-w-0">
+      {MirrorPanel}
+      {SyncProgressPanel}
+      <div className="p-3 border-b space-y-2">
+        <div className="relative">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar e-mails" className="pl-9" />
+        </div>
+      </div>
+      <div ref={parentRef} className="flex-1 min-h-0 overflow-auto">
+        {threads.length === 0 ? (
+          <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa</div>
+        ) : (
+          <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
+            {items.map((vi) => {
+              const t = threads[vi.index];
+              if (!t) return null;
+              return (
+                <div
+                  key={vi.key}
+                  data-index={vi.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
+                >
+                  <button
+                    onClick={() => onOpenThread(t)}
+                    className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
+                      selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
+                      t.is_unread && "bg-card font-medium")}
+                  >
+                    <button onClick={(e) => { e.stopPropagation(); onLocalStar(t); }} className="shrink-0 mt-0.5">
+                      <Star className={cn("h-4 w-4", t.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2">
+                        <div className={cn("text-sm truncate flex-1", t.is_unread && "font-semibold")}>
+                          {t.participants.slice(0, 2).join(", ")}{t.message_count > 1 && <span className="text-muted-foreground"> ({t.message_count})</span>}
+                        </div>
+                        <div className="text-xs text-muted-foreground shrink-0 whitespace-nowrap">{formatRelative(t.last_message_at)}</div>
+                      </div>
+                      <div className="text-sm truncate">{t.subject || "(sem assunto)"}</div>
+                      <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                        {t.has_attachments && <Paperclip className="h-3 w-3" />}
+                        <span className="truncate">{t.snippet}</span>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {canLoadMore && (
+          <div className="p-3">
+            <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={onLoadMore}>
+              {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
+              Carregar mais antigos
+            </Button>
+          </div>
+        )}
+        {atEnd && (
+          <div className="p-3 text-center text-xs text-muted-foreground">Fim da pasta</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function LeadEmailMini({ leadId, className }: { leadId: string; className?: string }) {
   type Row = { id: string; from_name: string | null; from_email: string | null; subject: string | null; snippet: string | null; internal_date: string | null; received_at: string | null };
   const [rows, setRows] = useState<Row[]>([]);

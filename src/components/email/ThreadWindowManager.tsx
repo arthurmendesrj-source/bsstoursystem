@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState, useCallback } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect } from "react";
 import { Rnd } from "react-rnd";
 import { Minus, Square, X, Copy as RestoreIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,15 @@ export const ThreadWindowManager = forwardRef<ThreadWindowManagerHandle, Props>(
   const [windows, setWindows] = useState<Win[]>([]);
   const zCounter = useRef(10);
   const cascadeIdx = useRef(0);
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1280,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const focus = useCallback((id: string) => {
     setWindows((prev) => {
@@ -135,9 +144,9 @@ export const ThreadWindowManager = forwardRef<ThreadWindowManagerHandle, Props>(
         {visible.map((w) => {
           const isMax = w.state === "max";
           const size = isMax
-            ? { width: typeof window !== "undefined" ? window.innerWidth : 1280, height: typeof window !== "undefined" ? window.innerHeight - 64 : 800 }
+            ? { width: viewport.w, height: viewport.h }
             : { width: w.rect.width, height: w.rect.height };
-          const position = isMax ? { x: 0, y: 64 } : { x: w.rect.x, y: w.rect.y };
+          const position = isMax ? { x: 0, y: 0 } : { x: w.rect.x, y: w.rect.y };
           return (
             <Rnd
               key={w.id}

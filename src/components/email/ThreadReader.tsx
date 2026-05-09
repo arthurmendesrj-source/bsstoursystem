@@ -103,8 +103,8 @@ export function ThreadReader({
           </Button>
         )}
       </div>
-      <ScrollArea className="flex-1">
-        <div className="p-4 space-y-3 max-w-4xl mx-auto">
+      <ScrollArea className="flex-1 min-h-0">
+        <div className="p-4 space-y-3 w-full">
           {loading && <div className="text-sm text-muted-foreground">Carregando…</div>}
           {messages?.map((m) => (
             <article key={m.id} className="border rounded-lg overflow-hidden bg-card">

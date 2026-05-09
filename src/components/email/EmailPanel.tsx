@@ -394,6 +394,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         },
       });
       setNextPageToken(r.nextPageToken);
+      if (append) setPageSize((s) => s + 50);
       await loadFolders();
       await loadThreads();
       if (!append) toast.success(`Atualizado — ${r.count} mensagens carregadas`);
@@ -409,6 +410,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   // Quando muda a label/busca, zera paginação e dispara um fetch ao vivo da 1ª página.
   useEffect(() => {
     setNextPageToken(null);
+    setPageSize(50);
     if (!hasMailbox || mode !== "full") return;
     void (async () => {
       try {

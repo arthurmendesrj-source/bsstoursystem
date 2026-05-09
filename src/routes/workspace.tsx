@@ -304,12 +304,12 @@ function WorkspacePage() {
             <span className="text-xs text-muted-foreground font-mono">#{b.id.slice(0, 8)}</span>
           </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><div className="text-muted-foreground text-xs">{t("departureDate") || "Embarque"}</div>{b.departure_date ? format(new Date(b.departure_date), "dd/MM/yyyy") : "—"}</div>
-            <div><div className="text-muted-foreground text-xs">{t("returnDate") || "Retorno"}</div>{b.return_date ? format(new Date(b.return_date), "dd/MM/yyyy") : "—"}</div>
+            <div><div className="text-muted-foreground text-xs">Embarque</div>{b.departure_date ? format(new Date(b.departure_date), "dd/MM/yyyy") : "—"}</div>
+            <div><div className="text-muted-foreground text-xs">Retorno</div>{b.return_date ? format(new Date(b.return_date), "dd/MM/yyyy") : "—"}</div>
           </div>
           <Separator />
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{t("total") || "Total"}</span>
+            <span className="text-sm text-muted-foreground">Total</span>
             <span className="font-semibold text-lg">
               <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
             </span>

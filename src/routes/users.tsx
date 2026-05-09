@@ -52,8 +52,9 @@ type AuthUserInfo = {
   created_at: string | null;
 };
 
-const ROLES: AppRole[] = ["admin", "diretor", "gerente", "supervisor", "operador"];
+const ROLES: AppRole[] = ["admin", "diretor", "gerente", "coordenador", "supervisor", "operador"];
 const PROTECTED: AppRole[] = ["admin", "diretor"];
+const INVITE_ROLES: AppRole[] = ["diretor", "gerente", "coordenador", "operador"];
 
 async function callAdminUsers(action: string, payload: Record<string, unknown> = {}) {
   const { data, error } = await supabase.functions.invoke("admin-users", {

@@ -97,6 +97,12 @@ function BookingDetailPage() {
     const map: Record<string, Confirmation> = {};
     ((cfs ?? []) as Confirmation[]).forEach((c) => { map[c.quote_item_id] = c; });
     setConfs(map);
+    const { data: vs } = await supabase.from("vouchers").select("id,code,quote_item_id").eq("booking_id", bookingId);
+    const vMap: Record<string, { id: string; code: string }> = {};
+    ((vs ?? []) as { id: string; code: string; quote_item_id: string | null }[]).forEach((v) => {
+      if (v.quote_item_id) vMap[v.quote_item_id] = { id: v.id, code: v.code };
+    });
+    setVouchers(vMap);
     setLoading(false);
   };
 

@@ -50,7 +50,29 @@ type QuoteItem = {
   unit_price: number;
   total: number;
   kind: string;
+  city?: string | null;
+  category?: string | null;
+  item_date?: string | null;
+  check_out?: string | null;
+  nights?: number | null;
+  rooms?: number | null;
+  meal_plan?: string | null;
+  pax?: number | null;
+  ways?: number | null;
+  guide_type?: string | null;
+  notes?: string | null;
 };
+
+const ITEM_FIELDS = "id,description,quantity,unit_price,total,kind,city,category,item_date,check_out,nights,rooms,meal_plan,pax,ways,guide_type,notes";
+
+function diffNights(a?: string | null, b?: string | null): number | null {
+  if (!a || !b) return null;
+  const d1 = new Date(a).getTime();
+  const d2 = new Date(b).getTime();
+  if (Number.isNaN(d1) || Number.isNaN(d2)) return null;
+  const n = Math.round((d2 - d1) / 86400000);
+  return n > 0 ? n : null;
+}
 
 type Confirmation = {
   id?: string;

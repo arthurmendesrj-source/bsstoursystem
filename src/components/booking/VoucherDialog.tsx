@@ -52,6 +52,12 @@ export function VoucherDialog({ voucherId, open, onOpenChange }: Props) {
   const sendFn = useServerFn(sendVoucherEmail);
   const [voucher, setVoucher] = useState<Voucher | null>(null);
   const [itemDescription, setItemDescription] = useState("");
+  const [itemDetails, setItemDetails] = useState<{
+    kind?: string | null; city?: string | null; category?: string | null;
+    item_date?: string | null; check_out?: string | null; nights?: number | null;
+    rooms?: number | null; meal_plan?: string | null; pax?: number | null;
+    ways?: number | null; guide_type?: string | null; notes?: string | null;
+  } | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [logs, setLogs] = useState<SendLog[]>([]);
@@ -92,10 +98,13 @@ export function VoucherDialog({ voucherId, open, onOpenChange }: Props) {
     if (v.quote_item_id) {
       const { data: qi } = await supabase
         .from("quote_items")
-        .select("description")
+        .select("description,kind,city,category,item_date,check_out,nights,rooms,meal_plan,pax,ways,guide_type,notes")
         .eq("id", v.quote_item_id)
         .maybeSingle();
       setItemDescription(qi?.description ?? "");
+      setItemDetails(qi ?? null);
+    } else {
+      setItemDetails(null);
     }
     const { data: b } = await supabase
       .from("bookings")
@@ -247,6 +256,30 @@ export function VoucherDialog({ voucherId, open, onOpenChange }: Props) {
                   </div>
                   <Field label={t("voucherCustomer")} value={customerName} />
                   <Field label={t("voucherItem")} value={itemDescription} />
+                  {itemDetails && (
+                    <>
+                      <Field label={t("city")} value={itemDetails.city} />
+                      <Field label={t("category")} value={itemDetails.category} />
+                      {itemDetails.kind === "hotel" ? (
+                        <>
+                          <Field label={t("checkIn")} value={itemDetails.item_date} />
+                          <Field label={t("checkOut")} value={itemDetails.check_out} />
+                          <Field label={t("nights")} value={itemDetails.nights != null ? String(itemDetails.nights) : null} />
+                          <Field label={t("rooms")} value={itemDetails.rooms != null ? String(itemDetails.rooms) : null} />
+                          <Field label={t("mealPlan")} value={itemDetails.meal_plan} />
+                          <Field label={t("pax")} value={itemDetails.pax != null ? String(itemDetails.pax) : null} />
+                        </>
+                      ) : (
+                        <>
+                          <Field label={t("itemDate")} value={itemDetails.item_date} />
+                          <Field label={t("pax")} value={itemDetails.pax != null ? String(itemDetails.pax) : null} />
+                          <Field label={t("ways")} value={itemDetails.ways != null ? String(itemDetails.ways) : null} />
+                          <Field label={t("guideType")} value={itemDetails.guide_type} />
+                        </>
+                      )}
+                      <Field label={t("notes")} value={itemDetails.notes} multiline />
+                    </>
+                  )}
                   <Field label={t("voucherServiceDate")} value={voucher.service_date} />
                   <Field label={t("voucherMeetingTime")} value={voucher.meeting_time} />
                   <Field label={t("voucherMeetingPoint")} value={voucher.meeting_point} />

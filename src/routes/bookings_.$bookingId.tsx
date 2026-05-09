@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket, Plus, Trash2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,29 @@ type QuoteItem = {
   unit_price: number;
   total: number;
   kind: string;
+  city?: string | null;
+  category?: string | null;
+  item_date?: string | null;
+  check_out?: string | null;
+  nights?: number | null;
+  rooms?: number | null;
+  meal_plan?: string | null;
+  pax?: number | null;
+  ways?: number | null;
+  guide_type?: string | null;
+  notes?: string | null;
 };
+
+const ITEM_FIELDS = "id,description,quantity,unit_price,total,kind,city,category,item_date,check_out,nights,rooms,meal_plan,pax,ways,guide_type,notes";
+
+function diffNights(a?: string | null, b?: string | null): number | null {
+  if (!a || !b) return null;
+  const d1 = new Date(a).getTime();
+  const d2 = new Date(b).getTime();
+  if (Number.isNaN(d1) || Number.isNaN(d2)) return null;
+  const n = Math.round((d2 - d1) / 86400000);
+  return n > 0 ? n : null;
+}
 
 type Confirmation = {
   id?: string;
@@ -88,7 +110,7 @@ function BookingDetailPage() {
       setCustomerName(c?.full_name ?? "");
     }
     if (b.quote_id) {
-      const { data: qi } = await supabase.from("quote_items").select("id,description,quantity,unit_price,total,kind").eq("quote_id", b.quote_id).order("created_at", { ascending: true });
+      const { data: qi } = await supabase.from("quote_items").select(ITEM_FIELDS).eq("quote_id", b.quote_id).order("created_at", { ascending: true });
       setItems((qi ?? []) as QuoteItem[]);
     } else {
       setItems([]);
@@ -206,6 +228,55 @@ function BookingDetailPage() {
     setOpenVoucherId(row.id);
   };
 
+  const updateItemLocal = (itemId: string, patch: Partial<QuoteItem>) => {
+    setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+  };
+
+  const persistItem = async (itemId: string, patch: Partial<QuoteItem>) => {
+    const current = items.find((i) => i.id === itemId);
+    if (!current) return;
+    const next: Partial<QuoteItem> = { ...patch };
+    // Recalculate nights for hotels when dates change
+    const itemDate = "item_date" in next ? next.item_date : current.item_date;
+    const checkOut = "check_out" in next ? next.check_out : current.check_out;
+    if (current.kind === "hotel" && ("item_date" in next || "check_out" in next)) {
+      next.nights = diffNights(itemDate, checkOut);
+    }
+    // Recalculate total when qty/price change
+    const qty = "quantity" in next ? Number(next.quantity ?? 0) : Number(current.quantity ?? 0);
+    const price = "unit_price" in next ? Number(next.unit_price ?? 0) : Number(current.unit_price ?? 0);
+    if ("quantity" in next || "unit_price" in next) {
+      next.total = qty * price;
+    }
+    updateItemLocal(itemId, next);
+    const { error } = await supabase.from("quote_items").update(next as never).eq("id", itemId);
+    if (error) toast.error(error.message);
+  };
+
+  const addItem = async (kind: string) => {
+    if (!booking?.quote_id) return;
+    const { data, error } = await supabase
+      .from("quote_items")
+      .insert({ quote_id: booking.quote_id, kind, description: "", quantity: 1, unit_price: 0, total: 0 } as never)
+      .select(ITEM_FIELDS)
+      .single();
+    if (error) { toast.error(error.message); return; }
+    setItems((prev) => [...prev, data as QuoteItem]);
+    toast.success(t("saved"));
+  };
+
+  const removeItem = async (item: QuoteItem) => {
+    if (!confirm(t("removeItemConfirm"))) return;
+    await supabase.from("vouchers").delete().eq("quote_item_id", item.id);
+    await supabase.from("booking_item_confirmations").delete().eq("quote_item_id", item.id);
+    const { error } = await supabase.from("quote_items").delete().eq("id", item.id);
+    if (error) { toast.error(error.message); return; }
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    setVouchers((prev) => { const cp = { ...prev }; delete cp[item.id]; return cp; });
+    setConfs((prev) => { const cp = { ...prev }; delete cp[item.id]; return cp; });
+    toast.success(t("saved"));
+  };
+
   const confirmedCount = useMemo(() => items.filter((i) => confs[i.id]?.status === "confirmado").length, [items, confs]);
   const allConfirmed = items.length > 0 && confirmedCount === items.length;
 
@@ -257,7 +328,26 @@ function BookingDetailPage() {
         </Card>
       )}
 
-      <h2 className="text-lg font-semibold">{t("bookingItems")}</h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-lg font-semibold">{t("bookingItems")}</h2>
+        {booking.quote_id && (
+          <div className="flex items-center gap-2">
+            <Select onValueChange={(v) => addItem(v)}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder={t("selectKind")} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hotel">Hotel</SelectItem>
+                <SelectItem value="service">Serviço</SelectItem>
+                <SelectItem value="transfer">Transfer</SelectItem>
+                <SelectItem value="tour">Tour</SelectItem>
+                <SelectItem value="outro">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={() => addItem("service")}>
+              <Plus className="mr-1 h-4 w-4" />{t("addItem")}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {!booking.quote_id ? (
         <Card className="p-6 text-sm text-muted-foreground">{t("noQuoteLinked")}</Card>
@@ -271,18 +361,110 @@ function BookingDetailPage() {
             const statusBadge = status === "confirmado" ? "bg-emerald-500/10 text-emerald-700"
               : status === "cancelado" ? "bg-red-500/10 text-red-700"
               : "bg-amber-500/10 text-amber-700";
+            const isHotel = item.kind === "hotel";
+            const isService = item.kind === "service" || item.kind === "transfer" || item.kind === "tour";
             return (
               <Card key={item.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="font-medium">{item.description}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.kind} · {t("quantity") || "Qtd"}: {item.quantity} · <MaskedField module="quotes" field="total_amount" value={format(Number(item.total), booking.currency as "BRL")} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="uppercase text-[10px]">{item.kind}</Badge>
+                      <Input
+                        className="font-medium border-0 px-0 focus-visible:ring-0 h-7"
+                        value={item.description ?? ""}
+                        onChange={(e) => updateItemLocal(item.id, { description: e.target.value })}
+                        onBlur={(e) => persistItem(item.id, { description: e.target.value })}
+                        placeholder={t("description")}
+                      />
                     </div>
                   </div>
                   <Badge variant="outline" className={statusBadge}>
                     {status === "confirmado" ? t("confirmed") : status === "cancelado" ? t("canceled") : t("pending")}
                   </Badge>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" onClick={() => removeItem(item)} title={t("removeItem")}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <Label className="text-xs">{t("city")}</Label>
+                    <Input value={item.city ?? ""} onChange={(e) => updateItemLocal(item.id, { city: e.target.value })} onBlur={(e) => persistItem(item.id, { city: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">{t("category")}</Label>
+                    <Input value={item.category ?? ""} onChange={(e) => updateItemLocal(item.id, { category: e.target.value })} onBlur={(e) => persistItem(item.id, { category: e.target.value })} />
+                  </div>
+                  {isHotel ? (
+                    <>
+                      <div>
+                        <Label className="text-xs">{t("checkIn")}</Label>
+                        <Input type="date" value={item.item_date ?? ""} onChange={(e) => persistItem(item.id, { item_date: e.target.value || null })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("checkOut")}</Label>
+                        <Input type="date" value={item.check_out ?? ""} onChange={(e) => persistItem(item.id, { check_out: e.target.value || null })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("nights")}</Label>
+                        <Input type="number" min={0} value={item.nights ?? ""} onChange={(e) => updateItemLocal(item.id, { nights: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { nights: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("rooms")}</Label>
+                        <Input type="number" min={0} value={item.rooms ?? ""} onChange={(e) => updateItemLocal(item.id, { rooms: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { rooms: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("mealPlan")}</Label>
+                        <Input value={item.meal_plan ?? ""} onChange={(e) => updateItemLocal(item.id, { meal_plan: e.target.value })} onBlur={(e) => persistItem(item.id, { meal_plan: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("pax")}</Label>
+                        <Input type="number" min={0} value={item.pax ?? ""} onChange={(e) => updateItemLocal(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <Label className="text-xs">{t("itemDate")}</Label>
+                        <Input type="date" value={item.item_date ?? ""} onChange={(e) => persistItem(item.id, { item_date: e.target.value || null })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("pax")}</Label>
+                        <Input type="number" min={0} value={item.pax ?? ""} onChange={(e) => updateItemLocal(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                      {isService && (
+                        <>
+                          <div>
+                            <Label className="text-xs">{t("ways")}</Label>
+                            <Input type="number" min={0} value={item.ways ?? ""} onChange={(e) => updateItemLocal(item.id, { ways: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { ways: e.target.value === "" ? null : Number(e.target.value) })} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">{t("guideType")}</Label>
+                            <Input value={item.guide_type ?? ""} onChange={(e) => updateItemLocal(item.id, { guide_type: e.target.value })} onBlur={(e) => persistItem(item.id, { guide_type: e.target.value })} />
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                  <div>
+                    <Label className="text-xs">{t("quantity")}</Label>
+                    <Input type="number" min={0} value={item.quantity ?? 0} onChange={(e) => updateItemLocal(item.id, { quantity: Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { quantity: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">{t("unitPrice")}</Label>
+                    <Input type="number" step="0.01" min={0} value={item.unit_price ?? 0} onChange={(e) => updateItemLocal(item.id, { unit_price: Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { unit_price: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">{t("totalToPay")}</Label>
+                    <div className="h-9 flex items-center text-sm font-medium">
+                      <MaskedField module="quotes" field="total_amount" value={format(Number(item.total ?? 0), booking.currency as "BRL")} />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs">{t("notes")}</Label>
+                  <Textarea rows={2} value={item.notes ?? ""} onChange={(e) => updateItemLocal(item.id, { notes: e.target.value })} onBlur={(e) => persistItem(item.id, { notes: e.target.value })} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

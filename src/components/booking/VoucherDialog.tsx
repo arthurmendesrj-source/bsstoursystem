@@ -52,6 +52,12 @@ export function VoucherDialog({ voucherId, open, onOpenChange }: Props) {
   const sendFn = useServerFn(sendVoucherEmail);
   const [voucher, setVoucher] = useState<Voucher | null>(null);
   const [itemDescription, setItemDescription] = useState("");
+  const [itemDetails, setItemDetails] = useState<{
+    kind?: string | null; city?: string | null; category?: string | null;
+    item_date?: string | null; check_out?: string | null; nights?: number | null;
+    rooms?: number | null; meal_plan?: string | null; pax?: number | null;
+    ways?: number | null; guide_type?: string | null; notes?: string | null;
+  } | null>(null);
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [logs, setLogs] = useState<SendLog[]>([]);

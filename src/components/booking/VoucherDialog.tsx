@@ -98,10 +98,13 @@ export function VoucherDialog({ voucherId, open, onOpenChange }: Props) {
     if (v.quote_item_id) {
       const { data: qi } = await supabase
         .from("quote_items")
-        .select("description")
+        .select("description,kind,city,category,item_date,check_out,nights,rooms,meal_plan,pax,ways,guide_type,notes")
         .eq("id", v.quote_item_id)
         .maybeSingle();
       setItemDescription(qi?.description ?? "");
+      setItemDetails(qi ?? null);
+    } else {
+      setItemDetails(null);
     }
     const { data: b } = await supabase
       .from("bookings")

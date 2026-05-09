@@ -592,33 +592,17 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       <div className={cn("p-2 border-b flex items-center gap-2", collapsed && "flex-col")}>
         {!collapsed && (
           <div className="flex-1 flex">
-            <Button onClick={() => void doFullSync()} disabled={syncing} className="flex-1 justify-start gap-2 rounded-r-none" variant="default" size="sm">
-              <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-              <span className="truncate">{syncing ? "Sincronizando…" : `Sincronizar (${formatWindowLabel(syncWindowDays)})`}</span>
+            <Button onClick={() => void refreshLive()} disabled={refreshing} className="flex-1 justify-start gap-2 rounded-r-none" variant="default" size="sm">
+              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              <span className="truncate">{refreshing ? "Atualizando…" : "Atualizar caixa"}</span>
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button disabled={syncing} variant="default" size="sm" className="px-2 rounded-l-none border-l border-primary-foreground/20">
+                <Button disabled={refreshing} variant="default" size="sm" className="px-2 rounded-l-none border-l border-primary-foreground/20">
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                {SYNC_PRESETS.map((p) => (
-                  <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
-                    <span className="flex-1">{p.label}</span>
-                    {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
-                  Personalizado…
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
-                  {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
-                  <span className="flex-1">Importar tudo (cópia fiel)</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
                   <Mail className="h-3.5 w-3.5 mr-2" />
                   <span className="flex-1">Adicionar conta de email…</span>
@@ -628,40 +612,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           </div>
         )}
         {collapsed && (
-          <DropdownMenu>
-            <Tooltip delayDuration={200}>
-              <TooltipTrigger asChild>
-                <DropdownMenuTrigger asChild>
-                  <Button disabled={syncing} size="icon" variant="default" className="h-9 w-9">
-                    <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
-                  </Button>
-                </DropdownMenuTrigger>
-              </TooltipTrigger>
-              <TooltipContent side="right">Sincronizar Gmail ({formatWindowLabel(syncWindowDays)})</TooltipContent>
-            </Tooltip>
-            <DropdownMenuContent align="start" className="w-56">
-              {SYNC_PRESETS.map((p) => (
-                <DropdownMenuItem key={p.days} onClick={() => void doFullSync(p.days)}>
-                  <span className="flex-1">{p.label}</span>
-                  {syncWindowDays === p.days && <Check className="h-3.5 w-3.5 text-primary" />}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setCustomDaysInput(String(syncWindowDays)); setCustomDaysOpen(true); }}>
-                Personalizado…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled={startingMirror} onClick={() => void startFullMirror()}>
-                {startingMirror ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
-                <span className="flex-1">Importar tudo (cópia fiel)</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
-                <Mail className="h-3.5 w-3.5 mr-2" />
-                <span className="flex-1">Adicionar conta de email…</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <Button disabled={refreshing} size="icon" variant="default" className="h-9 w-9" onClick={() => void refreshLive()}>
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Atualizar caixa</TooltipContent>
+          </Tooltip>
         )}
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>

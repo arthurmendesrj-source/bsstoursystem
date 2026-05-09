@@ -420,6 +420,13 @@ export function AiTriageDialog({
           </div>
         )}
       </DialogContent>
+      <AssociateDialog
+        open={associateOpen}
+        onOpenChange={setAssociateOpen}
+        tabs={["lead", "customer", "supplier", "booking"]}
+        title="Associar e-mail a registro"
+        onPick={(e) => void onAssociate(e)}
+      />
     </Dialog>
   );
 }

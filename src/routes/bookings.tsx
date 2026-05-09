@@ -71,7 +71,19 @@ function BookingsPage() {
     ]);
     const voucherMap = new Map<string, string>();
     ((v.data ?? []) as { booking_id: string; code: string }[]).forEach((row) => voucherMap.set(row.booking_id, row.code));
-    const bookings = ((b.data ?? []) as Booking[]).map((bk) => ({ ...bk, voucher_code: voucherMap.get(bk.id) ?? null }));
+    const ids = ((b.data ?? []) as Booking[]).map((bk) => bk.id);
+    let invMap = new Map<string, string>();
+    if (ids.length) {
+      const inv = await supabase.from("invoices").select("booking_id,number,created_at").in("booking_id", ids).order("created_at", { ascending: false });
+      ((inv.data ?? []) as { booking_id: string; number: string | null }[]).forEach((row) => {
+        if (row.booking_id && row.number && !invMap.has(row.booking_id)) invMap.set(row.booking_id, row.number);
+      });
+    }
+    const bookings = ((b.data ?? []) as Booking[]).map((bk) => ({
+      ...bk,
+      voucher_code: voucherMap.get(bk.id) ?? null,
+      invoice_number: invMap.get(bk.id) ?? null,
+    }));
     setRows(bookings);
     setCustomers(c.data ?? []);
     setPkgs(p.data ?? []);

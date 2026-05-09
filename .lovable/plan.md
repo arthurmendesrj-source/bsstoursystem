@@ -1,23 +1,28 @@
 
-# Proposta como janela flutuante (min/max/restaurar)
+# Leitura de e-mail no Atendimento: 1 clique inline + duplo-clique flutuante
 
-Hoje, ao clicar uma vez numa proposta/invoice em `/workspace`, ela abre num `Dialog` modal (sem controles de janela). O duplo-clique já abre em janela flutuante. O usuário quer que **toda abertura** da proposta tenha minimizar/maximizar/restaurar.
+Hoje em `/workspace`, o `EmailPanel` mostra apenas a lista de threads (largura `max-w-[560px]`) e o clique abre uma janela flutuante via `ThreadWindowManager`. Não há painel de leitura inline.
 
-## Mudança
+## Mudanças
 
-Em `src/routes/workspace.tsx`, dentro de `ProposalsTab`:
+### 1. `src/components/email/EmailPanel.tsx`
+- Adicionar nova prop `inlineReader?: boolean` (default `false` — não muda outras telas).
+- Quando `inlineReader` for `true`:
+  - Trocar comportamento do `onOpenThread` da `ThreadListSection`: em vez de chamar `windowsRef.openOrFocus`, apenas atualiza `selectedThreadId` (e marca como lido).
+  - Adicionar handler `onDoubleClick` na linha da thread → chama `windowsRef.current?.openOrFocus(...)` (comportamento atual).
+  - Renderizar um painel à direita da `ThreadList` quando há `selectedThreadId`: usa o componente `ThreadReader` já existente (`src/components/email/ThreadReader.tsx`), passando `fetchMessages`, `onReply`, `onForward`, `onStar`, `onArchive`, `onTrash`, `onDownloadAttachment` (mesmas funções já usadas pelo `ThreadWindowManager`).
+  - Layout: remover o `max-w-[560px]` da lista quando inline, e usar `flex` com lista (`w-[380px] shrink-0 border-r`) + reader (`flex-1 min-w-0`).
+  - Botão "abrir em janela" no header do reader inline (ícone `Maximize2`) que chama `openOrFocus` e limpa `selectedThreadId`.
 
-1. Remover o `Dialog`/`DialogContent` que envolve `<ProposalEditor>`.
-2. Remover o estado `openId` (não é mais necessário).
-3. No `onClick` da linha da proposta, chamar a mesma função `openInWindow(q)` que hoje é usada no `onDoubleClick`.
-4. Remover o `onDoubleClick` específico (vira redundante) — manter apenas `onClick` abrindo a janela.
-5. Aumentar o `defaultSize` padrão da janela de proposta para `{ width: 1200, height: 760 }` (mais perto do antigo `max-w-5xl max-h-[90vh]` do dialog) e manter `sizeKey: mode` para lembrar tamanho por tipo (proposal/invoice separados).
+### 2. `src/routes/workspace.tsx`
+- Passar `inlineReader` ao `EmailPanel` quando renderizado dentro da aba/seção de Atendimento (linha ~562 e na função `openSection("email")`).
 
-Resultado: clicar numa proposta abre direto a janela flutuante com `ProposalEditor` dentro, com header padrão (minimizar, maximizar, restaurar, fechar) — igual ao e-mail e às demais janelas do workspace. O `onSaved` continua atualizando a lista; `onClose` fecha a janela via `win.closeWindow`.
+### 3. `ThreadListSection`
+- Aceitar prop opcional `onDoubleClickThread` e ligar no `onDoubleClick` do botão da thread (somente quando passado).
 
 ## Validação
-
-1. Abrir `/workspace?lead=...`, expandir Propostas, clicar 1x numa proposta → abre janela flutuante (não modal).
-2. Botões da barra de título: minimizar manda para a barra inferior; maximizar ocupa viewport; restaurar volta ao tamanho anterior; fechar encerra.
-3. Salvar item dentro da proposta atualiza a lista da aba sem fechar a janela.
-4. Mesmo comportamento para o modo `invoice`.
+1. `/workspace?lead=...` → expandir Email: lista à esquerda, área vazia "Selecione uma conversa" à direita.
+2. 1 clique numa thread → conteúdo aparece inline à direita; thread fica destacada e marcada como lida.
+3. Duplo-clique numa thread → abre a janela flutuante (com min/max/restaurar) como hoje.
+4. Botão maximizar no header do reader inline → abre a mesma thread em janela flutuante.
+5. Página `/email` (que usa `EmailPanel` sem `inlineReader`) continua igual: clique único abre janela flutuante.

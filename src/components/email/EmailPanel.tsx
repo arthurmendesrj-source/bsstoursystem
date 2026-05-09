@@ -17,6 +17,7 @@ import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";
+import { ThreadWindowManager, type ThreadWindowManagerHandle } from "@/components/email/ThreadWindowManager";
 
 type Folder = { id: string; name: string; type: string; unread_count: number; total_count: number; color_bg: string | null; color_text: string | null };
 type ThreadRow = {

@@ -39,6 +39,7 @@ type Booking = {
   customer_id: string | null;
   package_id: string | null;
   voucher_code?: string | null;
+  invoice_number?: string | null;
 };
 
 const STATUSES = ["pre_reserva", "confirmada", "em_viagem", "concluida", "cancelada"];
@@ -70,7 +71,19 @@ function BookingsPage() {
     ]);
     const voucherMap = new Map<string, string>();
     ((v.data ?? []) as { booking_id: string; code: string }[]).forEach((row) => voucherMap.set(row.booking_id, row.code));
-    const bookings = ((b.data ?? []) as Booking[]).map((bk) => ({ ...bk, voucher_code: voucherMap.get(bk.id) ?? null }));
+    const ids = ((b.data ?? []) as Booking[]).map((bk) => bk.id);
+    let invMap = new Map<string, string>();
+    if (ids.length) {
+      const inv = await supabase.from("invoices").select("booking_id,number,created_at").in("booking_id", ids).order("created_at", { ascending: false });
+      ((inv.data ?? []) as { booking_id: string; number: string | null }[]).forEach((row) => {
+        if (row.booking_id && row.number && !invMap.has(row.booking_id)) invMap.set(row.booking_id, row.number);
+      });
+    }
+    const bookings = ((b.data ?? []) as Booking[]).map((bk) => ({
+      ...bk,
+      voucher_code: voucherMap.get(bk.id) ?? null,
+      invoice_number: invMap.get(bk.id) ?? null,
+    }));
     setRows(bookings);
     setCustomers(c.data ?? []);
     setPkgs(p.data ?? []);
@@ -152,11 +165,12 @@ function BookingsPage() {
             <DialogHeader><DialogTitle>{t("new")} {t("bookings")}</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
               <div>
-                <Label>{t("customers")}</Label>
+                <Label>{t("customers")} *</Label>
                 <Select value={form.customer_id} onValueChange={(v) => setForm({ ...form, customer_id: v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>{customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}</SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">Cliente e nº de invoice devem ser preenchidos. A invoice pode ser gerada após salvar a reserva.</p>
               </div>
               <div>
                 <Label>{t("packages")}</Label>
@@ -200,6 +214,7 @@ function BookingsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>{t("invoiceNumber")}</TableHead>
               <TableHead>{t("customers")}</TableHead>
               <TableHead>{t("packages")}</TableHead>
               <TableHead>{t("departureDate")}</TableHead>
@@ -211,9 +226,16 @@ function BookingsPage() {
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : rows.map((b) => (
               <TableRow key={b.id}>
+                <TableCell>
+                  {b.invoice_number ? (
+                    <Badge variant="outline" className="font-mono">{b.invoice_number}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30" title={t("noInvoiceForBooking")}>sem invoice</Badge>
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
                 <TableCell>{pkgName(b.package_id)}</TableCell>
                 <TableCell>{b.departure_date ?? "—"}</TableCell>

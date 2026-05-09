@@ -1,42 +1,43 @@
 ## Objetivo
-Permitir que Admin/Diretor convidem novos usuários definindo o papel (Diretor, Gerente, Coordenador, Operador), e que o e-mail do convite vire automaticamente a caixa de e-mail principal do usuário (cada um com seu próprio Gmail).
+Padronizar a comunicação do "Sistema de Reserva" nas duas janelas: a do Atendimento (`/workspace`) e a da barra de ferramentas (`/bookings`), exibindo sempre **Cliente** e **Nº de Invoice** (de `invoices.number` vinculada por `booking_id`).
 
-## Situação atual
-- A tela `/users` já tem o `InviteDialog` (`src/routes/users.tsx`) que envia `action: "invite"` para a edge function `admin-users` com `email`, `full_name` e `roles[]`.
-- A edge `admin-users` já cria o convite via `inviteUserByEmail` e insere os papéis em `user_roles`.
-- Enum `app_role` atual: `admin, diretor, gerente, supervisor, operador` (+ legados `vendedor/operacional/financeiro`). **Não existe `coordenador`.**
-- Tabela `user_email_accounts` já existe e é usada pela Triagem IA para vincular cada usuário ao(s) seu(s) e-mail(s) Gmail. Hoje o e-mail do convidado **não** é inserido automaticamente lá.
+## 1. Janela do Atendimento (`src/routes/workspace.tsx`)
 
-## Mudanças
+Carregar invoices junto das reservas e expandir os cards.
 
-### 1. Banco — adicionar papel "coordenador" e auto-cadastrar e-mail primário
-Migration:
-- `ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'coordenador';`
-- Atualizar `role_rank()` para posicionar coordenador entre supervisor(1) e gerente(2):
-  - admin=5, diretor=4, gerente=3, **coordenador=2**, supervisor=1, operador=0.
-- Seed das permissões padrão (`role_module_permissions` / `role_field_permissions`) para `coordenador` (espelhar supervisor por padrão).
-- Trigger `on_invite_seed_email_account`: ao criar/confirmar usuário em `auth.users`, se ainda não tem registro em `user_email_accounts`, inserir `(user_id, lower(email), is_primary=true)`. Implementado estendendo `handle_new_user()` para também inserir em `user_email_accounts` (ON CONFLICT DO NOTHING).
+- Em `loadLead()` (≈ linha 148), adicionar busca paralela:
+  - `supabase.from("invoices").select("id,number,booking_id,status,total").in("booking_id", bookingIds)` após carregar `bookingsRes`.
+  - `supabase.from("booking_pax").select("id,booking_id,is_primary,customer_id, customers(full_name)").in("booking_id", bookingIds)`.
+  - `supabase.from("booking_suppliers").select("id,booking_id,service_type,status,cost,currency, suppliers(name)").in("booking_id", bookingIds)`.
+- Estender o tipo `Booking` para incluir `customer_id`, e novos states `bookingInvoices`, `bookingPax`, `bookingSuppliers` (mapas por `booking_id`).
+- No accordion **Reservation** (linhas 620-650) e na janela flutuante `openSection("reservation")` (linhas 264-283):
+  - Cabeçalho do card: `Cliente: <nome do customer principal> · Invoice: <invoices.number ou "—">`.
+  - Subseção colapsável "Itens da reserva" listando:
+    - Passageiros (booking_pax.customers.full_name + tag "principal").
+    - Serviços/fornecedores (booking_suppliers.service_type · supplier.name · status · custo).
+  - Manter datas, status e total.
+- `openBookingWindow(b)` (linhas 294-320): trocar título para `Reserva ${invoiceNumber ?? "—"} · ${customerName}` e adicionar as duas seções (passageiros e serviços) no corpo.
 
-### 2. Edge function `admin-users` (`invite` + `resend_invite`)
-- Restringir `invite` a `admin` ou `diretor` (já está).
-- Validar que `roles` ⊂ `{diretor, gerente, coordenador, operador}` (admin pode atribuir qualquer; diretor não pode atribuir admin/diretor — manter regra atual e adicionar coordenador à allow-list).
-- Após `inviteUserByEmail` bem-sucedido, fazer `upsert` em `user_email_accounts (user_id, email_address=lower(email), is_primary=true)` como rede de segurança (caso o trigger não tenha rodado ainda).
+## 2. Janela da barra de ferramentas (`src/routes/bookings.tsx`)
 
-### 3. UI `InviteDialog` (`src/routes/users.tsx`)
-- Trocar o grid de checkboxes por um **Select de papel único** com opções: Diretor, Gerente, Coordenador, Operador (Diretor escondido para quem não é admin).
-- Texto auxiliar abaixo do campo de e-mail: "Este será o endereço da caixa de entrada do usuário no app. A conexão com o Gmail é feita pelo próprio usuário após o primeiro login."
-- Manter `email` + `full_name`; enviar `roles: [selectedRole]`.
+Adicionar coluna **Invoice** como primeira da tabela e garantir que sempre venha preenchida (com aviso quando faltar).
 
-### 4. i18n
-- Adicionar tradução para `coordenador` em `src/lib/i18n.tsx`.
+- Carregar invoices junto na função `load()` (linha 62):
+  - `supabase.from("invoices").select("id,number,booking_id").in("booking_id", bookingIds)` e mapear `invoice_number` em cada `Booking`.
+- Estender tipo `Booking` com `invoice_number?: string | null`.
+- `<TableHeader>` (linhas 201-211): inserir `<TableHead>Invoice</TableHead>` ANTES de `Cliente`.
+- `<TableBody>` (linha 217): nova primeira célula com `b.invoice_number` em badge `font-mono`; quando ausente, mostrar badge âmbar `"sem invoice"` + tooltip "Gere uma invoice para esta reserva".
+- Ajustar `colSpan={7}` → `colSpan={8}` no estado vazio.
+- Diálogo "Nova reserva" (linhas 149-195):
+  - Marcar **Cliente** com `*` e adicionar texto auxiliar "Cliente e nº de invoice devem ser preenchidos. A invoice pode ser gerada após salvar a reserva.".
+  - Após `INSERT bookings` bem-sucedido (linha 92-99), exibir toast extra: "Reserva criada — gere a invoice para concluir." quando `customer_id` presente mas sem invoice ainda. Não bloquear o fluxo.
+- `Link "Abrir reserva"` continua igual; cabeçalho da página `/bookings/$bookingId` fica fora do escopo desta iteração.
 
-### 5. Lista de papéis no front
-- `ROLES` em `src/routes/users.tsx` e `src/lib/auth.tsx` (tipo `AppRole`) incluir `"coordenador"`.
-- `src/routes/users_.$userId.permissions.tsx` (matriz de permissões) incluir coluna do coordenador.
+## 3. i18n (`src/lib/i18n.tsx`)
+
+Adicionar chaves em pt/en/es: `invoiceNumber` ("Invoice"/"Invoice"/"Factura"), `noInvoiceForBooking` ("Sem invoice — gere uma invoice para esta reserva."), `bookingItems` ("Itens da reserva"/"Booking items"/"Items de la reserva"), `passengers` ("Passageiros"/"Passengers"/"Pasajeros"), `services` ("Serviços"/"Services"/"Servicios").
 
 ## Fora de escopo
-- Conexão OAuth do Gmail de cada usuário (já existe fluxo separado via connector Google).
-- Mudanças na hierarquia de subordinados além do `role_rank` ajustado.
-
-## Pergunta rápida
-Confirma o **rank do Coordenador entre Supervisor e Gerente** (Coordenador > Supervisor)? Se preferir Coordenador < Supervisor, ajusto antes de executar.
+- Geração automática de invoice no insert de reserva (usuário escolheu "não bloquear, só exibir aviso").
+- Mudança nas RLS / migrations (todas as tabelas necessárias já existem com RLS).
+- Edição da rota `bookings_.$bookingId.tsx`.

@@ -89,7 +89,9 @@ type Lead = {
 type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean; priority: "baixa" | "media" | "alta"; started_at: string | null; completed_at: string | null };
 type Interaction = { id: string; type: string; subject: string | null; content: string | null; occurred_at: string };
 type Quote = { id: string; status: string; total_amount: number; currency: string; valid_until: string | null; created_at: string };
-type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null };
+type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null; customer_id: string | null; invoice_number?: string | null; customer_name?: string | null };
+type BookingPaxRow = { id: string; booking_id: string; is_primary: boolean; full_name: string };
+type BookingSupplierRow = { id: string; booking_id: string; service_type: string | null; status: string | null; cost: number | null; currency: string | null; supplier_name: string | null };
 
 function statusColor(s: string) {
   return s === "fechado" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" :
@@ -114,6 +116,8 @@ function WorkspacePage() {
   // emails removed: Email tab uses EmailPanel which loads its own data
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingPax, setBookingPax] = useState<Record<string, BookingPaxRow[]>>({});
+  const [bookingSuppliers, setBookingSuppliers] = useState<Record<string, BookingSupplierRow[]>>({});
   const [loadingLead, setLoadingLead] = useState(false);
 
   // Forms
@@ -150,13 +154,48 @@ function WorkspacePage() {
       supabase.from("tasks").select("id,title,description,due_date,completed,priority,started_at,completed_at").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", id).order("occurred_at", { ascending: false }),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", id).order("created_at", { ascending: false }),
-      supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", id).order("created_at", { ascending: false }),
+      supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date,customer_id").eq("lead_id", id).order("created_at", { ascending: false }),
     ]);
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
     setQuotes((quotesRes.data as Quote[]) ?? []);
-    setBookings((bookingsRes.data as Booking[]) ?? []);
+    const baseBookings = (bookingsRes.data as Booking[]) ?? [];
+    const bookingIds = baseBookings.map((b) => b.id);
+    const customerIds = Array.from(new Set(baseBookings.map((b) => b.customer_id).filter(Boolean) as string[]));
+    let invoiceMap = new Map<string, string>();
+    let custMap = new Map<string, string>();
+    let paxByBooking: Record<string, BookingPaxRow[]> = {};
+    let suppByBooking: Record<string, BookingSupplierRow[]> = {};
+    if (bookingIds.length) {
+      const [invRes, paxRes, suppRes, custRes] = await Promise.all([
+        supabase.from("invoices").select("booking_id,number,created_at").in("booking_id", bookingIds).order("created_at", { ascending: false }),
+        supabase.from("booking_pax").select("id,booking_id,is_primary,customer_id,customers(full_name)").in("booking_id", bookingIds),
+        supabase.from("booking_suppliers").select("id,booking_id,service_type,status,cost,currency,suppliers(name)").in("booking_id", bookingIds),
+        customerIds.length ? supabase.from("customers").select("id,full_name").in("id", customerIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+      ]);
+      ((invRes.data ?? []) as { booking_id: string; number: string | null }[]).forEach((row) => {
+        if (row.booking_id && row.number && !invoiceMap.has(row.booking_id)) invoiceMap.set(row.booking_id, row.number);
+      });
+      ((custRes.data ?? []) as { id: string; full_name: string }[]).forEach((c) => custMap.set(c.id, c.full_name));
+      ((paxRes.data ?? []) as Array<{ id: string; booking_id: string; is_primary: boolean; customers: { full_name: string } | null }>).forEach((row) => {
+        const list = paxByBooking[row.booking_id] ?? [];
+        list.push({ id: row.id, booking_id: row.booking_id, is_primary: !!row.is_primary, full_name: row.customers?.full_name ?? "—" });
+        paxByBooking[row.booking_id] = list;
+      });
+      ((suppRes.data ?? []) as Array<{ id: string; booking_id: string; service_type: string | null; status: string | null; cost: number | null; currency: string | null; suppliers: { name: string } | null }>).forEach((row) => {
+        const list = suppByBooking[row.booking_id] ?? [];
+        list.push({ id: row.id, booking_id: row.booking_id, service_type: row.service_type, status: row.status, cost: row.cost, currency: row.currency, supplier_name: row.suppliers?.name ?? null });
+        suppByBooking[row.booking_id] = list;
+      });
+    }
+    setBookings(baseBookings.map((b) => ({
+      ...b,
+      invoice_number: invoiceMap.get(b.id) ?? null,
+      customer_name: b.customer_id ? (custMap.get(b.customer_id) ?? null) : null,
+    })));
+    setBookingPax(paxByBooking);
+    setBookingSuppliers(suppByBooking);
     setLoadingLead(false);
   };
 
@@ -164,7 +203,7 @@ function WorkspacePage() {
     if (leadId) loadLead(leadId);
     else {
       setLead(null);
-      setTasks([]); setInteractions([]); setQuotes([]); setBookings([]);
+      setTasks([]); setInteractions([]); setQuotes([]); setBookings([]); setBookingPax({}); setBookingSuppliers({});
     }
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [leadId]);
@@ -264,21 +303,10 @@ function WorkspacePage() {
     } else {
       title = t("reservation");
       content = (
-        <div className="p-4 space-y-2">
+        <div className="p-4 space-y-3">
           {bookings.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
-          ) : bookings.map((b) => (
-            <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
-              <div>
-                <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
-                <div className="text-xs text-muted-foreground mt-1">
-                  {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
-                  {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
-                </div>
-              </div>
-              <div className="font-semibold"><MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} /></div>
-            </div>
-          ))}
+          ) : bookings.map((b) => renderBookingCard(b, true))}
         </div>
       );
     }
@@ -291,31 +319,81 @@ function WorkspacePage() {
     });
   };
 
-  const openBookingWindow = (b: Booking) => {
-    win.openWindow({
-      id: `booking:${b.id}`,
-      title: `${t("reservation")} · ${b.status}`,
-      sizeKey: "booking",
-      defaultSize: { width: 720, height: 500 },
-      content: (
-        <div className="p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
-            <span className="text-xs text-muted-foreground font-mono">#{b.id.slice(0, 8)}</span>
+  const renderBookingCard = (b: Booking, expanded: boolean) => {
+    const pax = bookingPax[b.id] ?? [];
+    const supps = bookingSuppliers[b.id] ?? [];
+    const customerLabel = b.customer_name ?? pax.find((p) => p.is_primary)?.full_name ?? pax[0]?.full_name ?? "—";
+    return (
+      <div key={b.id} className="rounded-md border bg-card">
+        <div className="p-3 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
+              {b.invoice_number ? (
+                <Badge variant="outline" className="font-mono">{t("invoiceNumber")}: {b.invoice_number}</Badge>
+              ) : (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30" title={t("noInvoiceForBooking")}>{t("invoiceNumber")}: —</Badge>
+              )}
+            </div>
+            <div className="text-sm font-medium mt-1 truncate">{customerLabel}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
+              {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div><div className="text-muted-foreground text-xs">Embarque</div>{b.departure_date ? format(new Date(b.departure_date), "dd/MM/yyyy") : "—"}</div>
-            <div><div className="text-muted-foreground text-xs">Retorno</div>{b.return_date ? format(new Date(b.return_date), "dd/MM/yyyy") : "—"}</div>
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Total</span>
-            <span className="font-semibold text-lg">
-              <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
-            </span>
+          <div className="font-semibold text-right whitespace-nowrap">
+            <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
           </div>
         </div>
-      ),
+        {expanded && (pax.length > 0 || supps.length > 0) && (
+          <div className="border-t p-3 space-y-2">
+            {pax.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("passengers")}</div>
+                <ul className="text-sm space-y-0.5">
+                  {pax.map((p) => (
+                    <li key={p.id} className="flex items-center gap-2">
+                      <span>{p.full_name}</span>
+                      {p.is_primary && <Badge variant="outline" className="text-[10px] py-0 px-1.5">principal</Badge>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {supps.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{t("services")}</div>
+                <ul className="text-sm space-y-0.5">
+                  {supps.map((s) => (
+                    <li key={s.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        {s.service_type ?? "—"}{s.supplier_name ? ` · ${s.supplier_name}` : ""}
+                        {s.status ? ` · ${s.status}` : ""}
+                      </span>
+                      {s.cost != null && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(s.cost), (s.currency ?? "BRL") as "BRL")} />
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const openBookingWindow = (b: Booking) => {
+    const customerLabel = b.customer_name ?? (bookingPax[b.id] ?? []).find((p) => p.is_primary)?.full_name ?? "—";
+    win.openWindow({
+      id: `booking:${b.id}`,
+      title: `${t("reservation")} ${b.invoice_number ? `· ${b.invoice_number}` : ""} · ${customerLabel}`,
+      sizeKey: "booking",
+      defaultSize: { width: 760, height: 600 },
+      content: <div className="p-4">{renderBookingCard(b, true)}</div>,
     });
   };
 
@@ -633,16 +711,9 @@ function WorkspacePage() {
                           key={b.id}
                           onDoubleClick={() => openBookingWindow(b)}
                           title="Duplo-clique para abrir em janela"
-                          className="p-3 rounded-md border flex items-center justify-between cursor-pointer hover:bg-muted/40"
+                          className="cursor-pointer hover:bg-muted/40 rounded-md"
                         >
-                          <div>
-                            <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
-                              {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
-                            </div>
-                          </div>
-                          <div className="font-semibold"><MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} /></div>
+                          {renderBookingCard(b, true)}
                         </div>
                       ))}
                     </div>

@@ -377,13 +377,38 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threads]);
 
+  // Realtime: aplica mudanças incrementalmente sem reescrever a lista inteira.
   useEffect(() => {
     const ch = supabase.channel("email-mirror")
-      .on("postgres_changes", { event: "*", schema: "public", table: "email_threads" }, () => loadThreads())
+      .on("postgres_changes", { event: "*", schema: "public", table: "email_threads" }, (payload) => {
+        const newRow = payload.new as ThreadRow | null;
+        const oldRow = payload.old as { id?: string } | null;
+        if (payload.eventType === "DELETE") {
+          if (!oldRow?.id) return;
+          setThreads((prev) => prev.filter((x) => x.id !== oldRow.id));
+          return;
+        }
+        if (!newRow) return;
+        const labels = newRow.labels ?? [];
+        const belongsHere = labels.includes(activeLabel);
+        setThreads((prev) => {
+          const idx = prev.findIndex((x) => x.id === newRow.id);
+          if (!belongsHere) {
+            // removeu da label atual
+            return idx >= 0 ? prev.filter((x) => x.id !== newRow.id) : prev;
+          }
+          if (idx >= 0) {
+            const copy = prev.slice();
+            copy[idx] = { ...prev[idx], ...newRow };
+            return copy;
+          }
+          return mergeUnique([newRow], prev);
+        });
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "email_labels" }, () => loadFolders())
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
-  }, [loadThreads, loadFolders]);
+  }, [loadFolders, activeLabel, mergeUnique]);
 
   const incRef = useRef(incSyncFn); incRef.current = incSyncFn;
   useEffect(() => {
@@ -399,51 +424,83 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisibility); };
   }, [mode, hasMailbox]);
 
-  // Atualiza a caixa atual buscando direto no Gmail (1 página, leve).
+  // Atualiza a caixa atual buscando direto no Gmail (1 página de 200) ou
+  // — se o Gmail falhar — busca direto no banco a partir do que já temos.
   const refreshLive = async (opts?: { append?: boolean }) => {
     const append = !!opts?.append;
     if (append) setLoadingMore(true); else setRefreshing(true);
+    let liveOk = false;
     try {
       await listLabelsFn({ data: undefined as never });
       const r = await listLiveFn({
         data: {
           labelId: activeLabel,
           pageToken: append ? (nextPageToken ?? undefined) : undefined,
-          maxResults: 50,
+          maxResults: PAGE_SIZE,
           q: search.trim() || undefined,
         },
       });
       setNextPageToken(r.nextPageToken);
-      if (append) setPageSize((s) => s + 50);
-      await loadFolders();
-      await loadThreads();
+      liveOk = true;
       if (!append) toast.success(`Atualizado — ${r.count} mensagens carregadas`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao atualizar";
-      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) toast.info("Nenhuma conta Gmail conectada");
-      else toast.error(msg);
+      if (msg.includes("project_not_authorized") || msg.includes("GOOGLE_MAIL_API_KEY")) {
+        if (!append) toast.info("Nenhuma conta Gmail conectada");
+      } else if (!append) {
+        toast.error(msg);
+      }
+    }
+    try {
+      if (append) {
+        // Sempre cresce a janela em +200, mesmo se o live falhou —
+        // assim o botão sempre revela mais 200 do banco local.
+        setPageSize((s) => s + PAGE_SIZE);
+      }
+      await loadFolders();
+      await loadThreads();
     } finally {
       if (append) setLoadingMore(false); else setRefreshing(false);
     }
+    void liveOk;
   };
 
-  // Quando muda a label/busca, zera paginação e dispara um fetch ao vivo da 1ª página.
+  // Troca de pasta: salva snapshot da pasta atual e restaura cache da nova.
+  const switchLabel = useCallback((next: string) => {
+    if (next === activeLabel) return;
+    cacheRef.current.set(activeLabel, snapshotRef.current);
+    setActiveLabel(next);
+    setSelectedThreadId(null);
+    const cached = cacheRef.current.get(next);
+    if (cached) {
+      setThreads(cached.threads);
+      setPageSize(cached.pageSize);
+      setNextPageToken(cached.nextPageToken);
+      setLastPageFull(cached.lastPageFull);
+    } else {
+      setThreads([]);
+      setPageSize(PAGE_SIZE);
+      setNextPageToken(null);
+      setLastPageFull(false);
+    }
+  }, [activeLabel]);
+
+  // Em background, busca a 1ª página live da pasta ativa e mescla.
   useEffect(() => {
-    setNextPageToken(null);
-    setPageSize(50);
     if (!hasMailbox || mode !== "full") return;
     void (async () => {
       try {
         const r = await listLiveFn({
-          data: { labelId: activeLabel, maxResults: 50, q: search.trim() || undefined },
+          data: { labelId: activeLabel, maxResults: PAGE_SIZE, q: search.trim() || undefined },
         });
-        setNextPageToken(r.nextPageToken);
+        setNextPageToken((tok) => tok ?? r.nextPageToken);
         await loadFolders();
         await loadThreads();
       } catch { /* silent — cache continua exibido */ }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeLabel, hasMailbox, mode]);
+
 
   const fetchThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
     const r = await getThreadFn({ data: { threadId } });

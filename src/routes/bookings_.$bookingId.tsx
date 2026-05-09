@@ -325,9 +325,13 @@ function BookingDetailPage() {
                         <RotateCcw className="mr-1 h-4 w-4" />{t("reopenItem")}
                       </Button>
                     )}
-                    {status !== "cancelado" ? (
+                    {status === "pendente" ? (
                       <Button size="sm" variant="outline" onClick={() => setStatus(item, "cancelado")}>
                         <XCircle className="mr-1 h-4 w-4" />{t("cancelItem")}
+                      </Button>
+                    ) : status === "cancelado" ? (
+                      <Button size="sm" variant="outline" onClick={() => setStatus(item, "pendente")}>
+                        <RotateCcw className="mr-1 h-4 w-4" />{t("revertToPending")}
                       </Button>
                     ) : null}
                   </div>

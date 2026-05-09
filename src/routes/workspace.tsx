@@ -552,8 +552,8 @@ function WorkspacePage() {
           <CardContent className="p-4">
             <Accordion type="multiple" defaultValue={["email"]} className="w-full">
               <AccordionItem value="email">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><Mail className="h-4 w-4" />{t("intEmail")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("email"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><Mail className="h-4 w-4" />{t("intEmail")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -565,8 +565,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="activities">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />{t("activities")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("activities"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><CheckCircle2 className="h-4 w-4" />{t("activities")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -578,8 +578,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="proposals">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><StickyNote className="h-4 w-4" />{t("proposals")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("proposals"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><StickyNote className="h-4 w-4" />{t("proposals")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -598,8 +598,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="invoice">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" />{t("invoice")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("invoice"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><Briefcase className="h-4 w-4" />{t("invoice")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -618,8 +618,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="reservation">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><CalendarIcon className="h-4 w-4" />{t("reservation")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("reservation"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><CalendarIcon className="h-4 w-4" />{t("reservation")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead ? (
@@ -629,7 +629,12 @@ function WorkspacePage() {
                   ) : (
                     <div className="space-y-2">
                       {bookings.map((b) => (
-                        <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
+                        <div
+                          key={b.id}
+                          onDoubleClick={() => openBookingWindow(b)}
+                          title="Duplo-clique para abrir em janela"
+                          className="p-3 rounded-md border flex items-center justify-between cursor-pointer hover:bg-muted/40"
+                        >
                           <div>
                             <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
                             <div className="text-xs text-muted-foreground mt-1">

@@ -659,6 +659,7 @@ export type Database = {
       }
       email_message_links: {
         Row: {
+          activity_id: string | null
           booking_id: string | null
           created_at: string
           created_by: string | null
@@ -672,6 +673,7 @@ export type Database = {
           subject: string | null
         }
         Insert: {
+          activity_id?: string | null
           booking_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -685,6 +687,7 @@ export type Database = {
           subject?: string | null
         }
         Update: {
+          activity_id?: string | null
           booking_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -698,6 +701,13 @@ export type Database = {
           subject?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "email_message_links_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "operations_activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "email_message_links_booking_id_fkey"
             columns: ["booking_id"]

@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Loader2, Languages } from "lucide-react";
+import { Sparkles, Loader2, Languages, Link2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { emailAnalyze, emailTranslate } from "@/server/gmail.functions";
@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { linkEmailThread } from "@/lib/linkEmailToEntity";
 import { useAuth } from "@/lib/auth";
 import { useSubordinates } from "@/lib/hierarchy";
+import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 
 type Suggestion = {
   summary?: string;

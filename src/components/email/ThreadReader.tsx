@@ -80,7 +80,7 @@ export function ThreadReader({
         .from("emails").select("id").eq("thread_id", thread.id);
       const ids = ((msgIds ?? []) as { id: string }[]).map((r) => r.id);
       if (ids.length > 0) {
-        const taskUpdate: Record<string, string> = {};
+        const taskUpdate: { lead_id?: string; customer_id?: string } = {};
         if (targets.lead_id) taskUpdate.lead_id = targets.lead_id;
         if (targets.customer_id) taskUpdate.customer_id = targets.customer_id;
         if (Object.keys(taskUpdate).length > 0) {

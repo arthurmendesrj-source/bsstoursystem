@@ -249,18 +249,22 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     setFolders((data ?? []) as Folder[]);
   }, [hasMailbox, authorizedEmails]);
 
+  const mergeUnique = useCallback((incoming: ThreadRow[], existing: ThreadRow[]): ThreadRow[] => {
+    const map = new Map<string, ThreadRow>();
+    for (const t of existing) map.set(t.id, t);
+    for (const t of incoming) map.set(t.id, t); // incoming overrides
+    const out = Array.from(map.values());
+    out.sort((a, b) => (b.last_message_at ?? "").localeCompare(a.last_message_at ?? ""));
+    return out;
+  }, []);
+
   const loadThreads = useCallback(async () => {
     if (!hasMailbox) { setThreads([]); return; }
     const term = search.trim();
     const safe = term.replace(/[%,()"\\]/g, " ").trim();
     const like = safe ? `%${safe}%` : "";
+    const isSearching = !!safe;
 
-    // Para pastas de "saída/sistema" (Enviados, Rascunhos, Spam, Lixeira), a
-    // tabela email_threads agrega labels da conversa inteira — uma resposta
-    // sua faz toda a thread aparecer em SENT/INBOX simultaneamente. Para
-    // refletir o que o Gmail exibe, listamos direto da tabela emails,
-    // exigindo que a mensagem tenha aquele label, e (para SENT/DRAFT) que o
-    // remetente seja o próprio dono da caixa.
     const OUTBOUND = new Set(["SENT", "DRAFT", "TRASH", "SPAM"]);
     if (OUTBOUND.has(activeLabel)) {
       const owners = authorizedEmails!;
@@ -270,8 +274,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         .in("owner_email", owners)
         .contains("labels", [activeLabel])
         .order("internal_date", { ascending: false })
-        .limit(Math.max(pageSize, 50) * 3);
-      // Para Enviados/Rascunhos: garante que a mensagem foi enviada PELA conta.
+        .limit(Math.max(pageSize, PAGE_SIZE) * 3);
       if (activeLabel === "SENT" || activeLabel === "DRAFT") {
         const ownerOrFilter = owners.map((o) => `from_email.ilike.${o}`).join(",");
         q = q.or(ownerOrFilter);
@@ -307,7 +310,9 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         });
         if (rows.length >= pageSize) break;
       }
-      setThreads(rows);
+      setLastPageFull(rows.length >= pageSize);
+      if (isSearching) setThreads(rows);
+      else setThreads((prev) => mergeUnique(rows, prev));
       return;
     }
 
@@ -334,8 +339,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     }
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
-    setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize]);
+    const rows = (data ?? []) as ThreadRow[];
+    setLastPageFull(rows.length >= pageSize);
+    if (isSearching) setThreads(rows);
+    else setThreads((prev) => mergeUnique(rows, prev));
+  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize, mergeUnique]);
+
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);

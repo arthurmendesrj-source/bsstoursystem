@@ -1,28 +1,20 @@
 
-# Leitura de e-mail no Atendimento: 1 clique inline + duplo-clique flutuante
+# Email no Atendimento: abrir só com duplo-clique
 
-Hoje em `/workspace`, o `EmailPanel` mostra apenas a lista de threads (largura `max-w-[560px]`) e o clique abre uma janela flutuante via `ThreadWindowManager`. Não há painel de leitura inline.
+Reverter o painel inline. Em `/workspace`, o e-mail deve seguir o mesmo padrão dos outros itens (atividade, proposta, invoice, reserva): **duplo-clique abre em janela flutuante** com min/max/restaurar; clique simples apenas seleciona/destaca a linha (sem abrir nada).
 
 ## Mudanças
 
-### 1. `src/components/email/EmailPanel.tsx`
-- Adicionar nova prop `inlineReader?: boolean` (default `false` — não muda outras telas).
-- Quando `inlineReader` for `true`:
-  - Trocar comportamento do `onOpenThread` da `ThreadListSection`: em vez de chamar `windowsRef.openOrFocus`, apenas atualiza `selectedThreadId` (e marca como lido).
-  - Adicionar handler `onDoubleClick` na linha da thread → chama `windowsRef.current?.openOrFocus(...)` (comportamento atual).
-  - Renderizar um painel à direita da `ThreadList` quando há `selectedThreadId`: usa o componente `ThreadReader` já existente (`src/components/email/ThreadReader.tsx`), passando `fetchMessages`, `onReply`, `onForward`, `onStar`, `onArchive`, `onTrash`, `onDownloadAttachment` (mesmas funções já usadas pelo `ThreadWindowManager`).
-  - Layout: remover o `max-w-[560px]` da lista quando inline, e usar `flex` com lista (`w-[380px] shrink-0 border-r`) + reader (`flex-1 min-w-0`).
-  - Botão "abrir em janela" no header do reader inline (ícone `Maximize2`) que chama `openOrFocus` e limpa `selectedThreadId`.
-
-### 2. `src/routes/workspace.tsx`
-- Passar `inlineReader` ao `EmailPanel` quando renderizado dentro da aba/seção de Atendimento (linha ~562 e na função `openSection("email")`).
-
-### 3. `ThreadListSection`
-- Aceitar prop opcional `onDoubleClickThread` e ligar no `onDoubleClick` do botão da thread (somente quando passado).
+### `src/components/email/EmailPanel.tsx`
+- Em modo `inlineReader`:
+  - `onOpenThread` (clique simples) passa a apenas atualizar `selectedThreadId` para destacar a linha — **não** abre janela e **não** carrega mensagens.
+  - Remover o painel `InlineReaderPane` e o estado/efeito `inlineMessages`/`inlineLoading`.
+  - Voltar a lista a ocupar a largura total disponível (`flex-1 min-w-0`, sem `max-w-[560px]`).
+  - Manter `onDoubleClickThread={openThreadInWindow}` para abrir a janela flutuante via `ThreadWindowManager`.
+- Sem `inlineReader` (página `/email`): comportamento atual segue intacto.
 
 ## Validação
-1. `/workspace?lead=...` → expandir Email: lista à esquerda, área vazia "Selecione uma conversa" à direita.
-2. 1 clique numa thread → conteúdo aparece inline à direita; thread fica destacada e marcada como lida.
-3. Duplo-clique numa thread → abre a janela flutuante (com min/max/restaurar) como hoje.
-4. Botão maximizar no header do reader inline → abre a mesma thread em janela flutuante.
-5. Página `/email` (que usa `EmailPanel` sem `inlineReader`) continua igual: clique único abre janela flutuante.
+1. `/workspace?lead=...` → expandir Email.
+2. 1 clique numa thread → linha fica destacada, nada abre.
+3. Duplo-clique numa thread → abre a caixa de leitura em janela flutuante (min/max/restaurar/fechar).
+4. `/email` continua funcionando como antes (clique abre janela direto).

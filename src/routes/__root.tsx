@@ -8,6 +8,8 @@ import { I18nProvider } from "@/lib/i18n";
 import { CurrencyProvider } from "@/lib/currency";
 import { Toaster } from "@/components/ui/sonner";
 import { PermissionFieldHighlighter } from "@/components/PermissionFieldHighlighter";
+import { GlobalButtonTooltips } from "@/components/GlobalButtonTooltips";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 function NotFoundComponent() {
   return (
@@ -72,9 +74,12 @@ function RootComponent() {
         <AuthProvider>
           <ViewAsProvider>
             <PermissionsProvider>
-              <Outlet />
-              <PermissionFieldHighlighter />
-              <Toaster />
+              <TooltipProvider delayDuration={400}>
+                <Outlet />
+                <PermissionFieldHighlighter />
+                <GlobalButtonTooltips />
+                <Toaster />
+              </TooltipProvider>
             </PermissionsProvider>
           </ViewAsProvider>
         </AuthProvider>

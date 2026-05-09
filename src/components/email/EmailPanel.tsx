@@ -94,16 +94,29 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const getAttachmentFn = useServerFn(gmailGetAttachment);
   const sendFn = useServerFn(gmailSend);
 
+  const PAGE_SIZE = 200;
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
-  const [pageSize, setPageSize] = useState<number>(50);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
+  const [lastPageFull, setLastPageFull] = useState<boolean>(false);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");
-  
+
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [search, setSearch] = useState("");
+
+  // Cache em memória por pasta (vive enquanto a página /email estiver aberta).
+  type LabelCache = { threads: ThreadRow[]; pageSize: number; nextPageToken: string | null; lastPageFull: boolean };
+  const cacheRef = useRef<Map<string, LabelCache>>(new Map());
+  // Mantém referência atual para snapshot na troca de pasta.
+  const snapshotRef = useRef<LabelCache>({ threads: [], pageSize: PAGE_SIZE, nextPageToken: null, lastPageFull: false });
+  useEffect(() => {
+    snapshotRef.current = { threads, pageSize, nextPageToken, lastPageFull };
+    cacheRef.current.set(activeLabel, snapshotRef.current);
+  }, [threads, pageSize, nextPageToken, lastPageFull, activeLabel]);
+
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   // (leitor agora vive em janelas; estados removidos)
   const [syncing, setSyncing] = useState(false);

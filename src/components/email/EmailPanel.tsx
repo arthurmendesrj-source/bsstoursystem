@@ -105,8 +105,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [search, setSearch] = useState("");
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [threadMessages, setThreadMessages] = useState<ThreadMessage[] | null>(null);
-  const [loadingThread, setLoadingThread] = useState(false);
+  // (leitor agora vive em janelas; estados removidos)
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState<SyncProgressState>(initialSyncProgress);
   const [syncWindowDays, setSyncWindowDays] = useState<number>(() => {

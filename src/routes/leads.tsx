@@ -71,7 +71,7 @@ function LeadsPage() {
     e.preventDefault();
     if (!user) return;
     const ownerId = effectiveId ?? user.id;
-    const { error } = await supabase.from("leads").insert({
+    const { data: created, error } = await supabase.from("leads").insert({
       name: form.name,
       email: form.email || null,
       phone: form.phone || null,
@@ -80,14 +80,20 @@ function LeadsPage() {
       status: form.status as "novo",
       created_by: user.id,
       assigned_to: form.assigned_to || ownerId,
-    });
-    if (error) toast.error(error.message);
-    else {
+    }).select("id").single();
+    if (error) { toast.error(error.message); return; }
+    // Auto-link existing email threads from this contact's address
+    if (form.email && created?.id) {
+      const { linkThreadsByEmail } = await import("@/lib/linkEmailToEntity");
+      const n = await linkThreadsByEmail(form.email, { lead_id: created.id });
+      if (n > 0) toast.success(`Lead criado · ${n} thread(s) de e-mail vinculadas`);
+      else toast.success(t("saved"));
+    } else {
       toast.success(t("saved"));
-      setOpen(false);
-      setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
-      load();
     }
+    setOpen(false);
+    setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
+    load();
   };
 
   const updateStatus = async (id: string, status: string) => {

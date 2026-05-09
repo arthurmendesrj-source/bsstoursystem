@@ -2941,6 +2941,15 @@ export type Database = {
         Args: { _manager: string; _target: string }
         Returns: boolean
       }
+      link_email_thread: {
+        Args: {
+          _customer_id?: string
+          _lead_id?: string
+          _supplier_id?: string
+          _thread_id: string
+        }
+        Returns: number
+      }
       match_itineraries: {
         Args: {
           match_count?: number

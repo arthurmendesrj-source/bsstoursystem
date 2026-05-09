@@ -261,13 +261,25 @@ function ActivitiesPage() {
       created_by: user.id,
       assigned_to: form.assigned_to || targetUserId || user.id,
     });
-    if (error) toast.error(error.message);
-    else {
-      toast.success(t("saved"));
-      setDialogOpen(false);
-      setForm({ title: "", description: "", due_date: "", priority: "media", category: "suporte", lead_id: "", assigned_to: "" });
-      loadData();
+    if (error) { toast.error(error.message); return; }
+    // Auto-link emails by lead's email
+    if (form.lead_id) {
+      const { data: leadRow } = await supabase
+        .from("leads").select("email, customer_id").eq("id", form.lead_id).maybeSingle();
+      const leadEmail = (leadRow as { email: string | null } | null)?.email ?? null;
+      if (leadEmail) {
+        const { linkThreadsByEmail } = await import("@/lib/linkEmailToEntity");
+        const n = await linkThreadsByEmail(leadEmail, {
+          lead_id: form.lead_id,
+          customer_id: (leadRow as { customer_id: string | null } | null)?.customer_id ?? null,
+        });
+        if (n > 0) toast.success(`${n} thread(s) de e-mail vinculadas`);
+      }
     }
+    toast.success(t("saved"));
+    setDialogOpen(false);
+    setForm({ title: "", description: "", due_date: "", priority: "media", category: "suporte", lead_id: "", assigned_to: "" });
+    loadData();
   };
 
   const priorityColor = (p: string) =>

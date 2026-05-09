@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { AssociateDialog, type AssociateEntity } from "@/components/AssociateDialog";
 import { AiTriageDialog } from "@/components/email/AiTriageDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { linkEmailThread } from "@/lib/linkEmailToEntity";
 import { toast } from "sonner";
 
 export type ThreadMessage = {
@@ -60,25 +61,33 @@ export function ThreadReader({
   const onAssociate = async (e: AssociateEntity) => {
     setAssocOpen(false);
     try {
-      const update: Record<string, string | null> = {
-        lead_id: null, customer_id: null, supplier_id: null,
-      };
-      if (e.kind === "lead") { update.lead_id = e.lead_id; update.customer_id = e.customer_id; }
-      else if (e.kind === "customer") { update.customer_id = e.customer_id; }
-      else if (e.kind === "supplier") { update.supplier_id = e.supplier_id; }
-      else if (e.kind === "quote" || e.kind === "booking") {
-        if (e.lead_id) update.lead_id = e.lead_id;
-        if (e.customer_id) update.customer_id = e.customer_id;
+      const targets: { lead_id?: string; customer_id?: string; supplier_id?: string } = {};
+      if (e.kind === "lead") {
+        targets.lead_id = e.lead_id;
+        if (e.customer_id) targets.customer_id = e.customer_id;
+      } else if (e.kind === "customer") {
+        targets.customer_id = e.customer_id;
+      } else if (e.kind === "supplier") {
+        targets.supplier_id = e.supplier_id;
+      } else if (e.kind === "quote" || e.kind === "booking") {
+        if (e.lead_id) targets.lead_id = e.lead_id;
+        if (e.customer_id) targets.customer_id = e.customer_id;
       }
-      // remove nulls so we don't wipe other fields
-      const cleaned: { lead_id?: string; customer_id?: string; supplier_id?: string } = {};
-      if (update.lead_id) cleaned.lead_id = update.lead_id;
-      if (update.customer_id) cleaned.customer_id = update.customer_id;
-      if (update.supplier_id) cleaned.supplier_id = update.supplier_id;
-      if (Object.keys(cleaned).length === 0) { toast.error("Sem dados para associar"); return; }
-      const { error } = await supabase.from("emails").update(cleaned).eq("thread_id", thread.id);
-      if (error) throw new Error(error.message);
-      toast.success(`Associado a ${e.label}`);
+      if (Object.keys(targets).length === 0) { toast.error("Sem dados para associar"); return; }
+      const n = await linkEmailThread(thread.id, targets);
+      // Backfill tasks already linked via email_id to messages of this thread
+      const { data: msgIds } = await supabase
+        .from("emails").select("id").eq("thread_id", thread.id);
+      const ids = ((msgIds ?? []) as { id: string }[]).map((r) => r.id);
+      if (ids.length > 0) {
+        const taskUpdate: { lead_id?: string; customer_id?: string } = {};
+        if (targets.lead_id) taskUpdate.lead_id = targets.lead_id;
+        if (targets.customer_id) taskUpdate.customer_id = targets.customer_id;
+        if (Object.keys(taskUpdate).length > 0) {
+          await supabase.from("tasks").update(taskUpdate).in("email_id", ids).is("lead_id", null);
+        }
+      }
+      toast.success(`Associado a ${e.label}${n ? ` · ${n} mensagens` : ""}`);
     } catch (err) { toast.error(err instanceof Error ? err.message : "Erro ao associar"); }
   };
 

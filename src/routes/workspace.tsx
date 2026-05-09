@@ -711,16 +711,9 @@ function WorkspacePage() {
                           key={b.id}
                           onDoubleClick={() => openBookingWindow(b)}
                           title="Duplo-clique para abrir em janela"
-                          className="p-3 rounded-md border flex items-center justify-between cursor-pointer hover:bg-muted/40"
+                          className="cursor-pointer hover:bg-muted/40 rounded-md"
                         >
-                          <div>
-                            <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
-                              {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
-                            </div>
-                          </div>
-                          <div className="font-semibold"><MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} /></div>
+                          {renderBookingCard(b, false)}
                         </div>
                       ))}
                     </div>

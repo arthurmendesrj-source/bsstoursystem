@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { emailAnalyze, emailTranslate } from "@/server/gmail.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { linkEmailThread } from "@/lib/linkEmailToEntity";
 import { useAuth } from "@/lib/auth";
 import { useSubordinates } from "@/lib/hierarchy";
 

@@ -115,8 +115,10 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const snapshotRef = useRef<LabelCache>({ threads: [], pageSize: PAGE_SIZE, nextPageToken: null, lastPageFull: false });
   useEffect(() => {
     snapshotRef.current = { threads, pageSize, nextPageToken, lastPageFull };
-    cacheRef.current.set(activeLabel, snapshotRef.current);
-  }, [threads, pageSize, nextPageToken, lastPageFull, activeLabel]);
+    // Só persiste no cache quando NÃO há busca ativa — pesquisa não deve
+    // sobrescrever a lista cumulativa da pasta.
+    if (!search.trim()) cacheRef.current.set(activeLabel, snapshotRef.current);
+  }, [threads, pageSize, nextPageToken, lastPageFull, activeLabel, search]);
 
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   // (leitor agora vive em janelas; estados removidos)

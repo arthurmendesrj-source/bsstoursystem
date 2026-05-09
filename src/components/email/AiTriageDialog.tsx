@@ -297,6 +297,29 @@ export function AiTriageDialog({
                 <pre className="text-sm whitespace-pre-wrap font-sans bg-muted/40 rounded p-2 max-h-72 overflow-y-auto">{translation}</pre>
               )}
             </div>
+            <div className="rounded-lg border p-3 space-y-2">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-xs uppercase tracking-wide text-muted-foreground">Associar a registro existente</Label>
+                <div className="flex-1" />
+                {linkedTo ? (
+                  <Button size="sm" variant="outline" onClick={() => setAssociateOpen(true)}>Trocar</Button>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => setAssociateOpen(true)}>
+                    <Link2 className="h-3 w-3 mr-1" /> Associar
+                  </Button>
+                )}
+              </div>
+              {linkedTo ? (
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span className="text-muted-foreground capitalize">{linkedTo.kind}:</span>
+                  <span className="font-medium">{linkedTo.label}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Vincule este e-mail a um lead, cliente, fornecedor ou reserva já cadastrado.</p>
+              )}
+            </div>
             <div className="text-xs text-muted-foreground">
               Recomendação da IA: <strong>{sug.suggested_action === "create_lead" ? "Criar Lead" : sug.suggested_action === "create_task" ? "Criar Atividade" : "Ignorar"}</strong>
             </div>

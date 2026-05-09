@@ -328,7 +328,26 @@ function BookingDetailPage() {
         </Card>
       )}
 
-      <h2 className="text-lg font-semibold">{t("bookingItems")}</h2>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h2 className="text-lg font-semibold">{t("bookingItems")}</h2>
+        {booking.quote_id && (
+          <div className="flex items-center gap-2">
+            <Select onValueChange={(v) => addItem(v)}>
+              <SelectTrigger className="w-[160px]"><SelectValue placeholder={t("selectKind")} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hotel">Hotel</SelectItem>
+                <SelectItem value="service">Serviço</SelectItem>
+                <SelectItem value="transfer">Transfer</SelectItem>
+                <SelectItem value="tour">Tour</SelectItem>
+                <SelectItem value="outro">Outro</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={() => addItem("service")}>
+              <Plus className="mr-1 h-4 w-4" />{t("addItem")}
+            </Button>
+          </div>
+        )}
+      </div>
 
       {!booking.quote_id ? (
         <Card className="p-6 text-sm text-muted-foreground">{t("noQuoteLinked")}</Card>
@@ -342,18 +361,110 @@ function BookingDetailPage() {
             const statusBadge = status === "confirmado" ? "bg-emerald-500/10 text-emerald-700"
               : status === "cancelado" ? "bg-red-500/10 text-red-700"
               : "bg-amber-500/10 text-amber-700";
+            const isHotel = item.kind === "hotel";
+            const isService = item.kind === "service" || item.kind === "transfer" || item.kind === "tour";
             return (
               <Card key={item.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="font-medium">{item.description}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {item.kind} · {t("quantity") || "Qtd"}: {item.quantity} · <MaskedField module="quotes" field="total_amount" value={format(Number(item.total), booking.currency as "BRL")} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="uppercase text-[10px]">{item.kind}</Badge>
+                      <Input
+                        className="font-medium border-0 px-0 focus-visible:ring-0 h-7"
+                        value={item.description ?? ""}
+                        onChange={(e) => updateItemLocal(item.id, { description: e.target.value })}
+                        onBlur={(e) => persistItem(item.id, { description: e.target.value })}
+                        placeholder={t("description")}
+                      />
                     </div>
                   </div>
                   <Badge variant="outline" className={statusBadge}>
                     {status === "confirmado" ? t("confirmed") : status === "cancelado" ? t("canceled") : t("pending")}
                   </Badge>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" onClick={() => removeItem(item)} title={t("removeItem")}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <Label className="text-xs">{t("city")}</Label>
+                    <Input value={item.city ?? ""} onChange={(e) => updateItemLocal(item.id, { city: e.target.value })} onBlur={(e) => persistItem(item.id, { city: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">{t("category")}</Label>
+                    <Input value={item.category ?? ""} onChange={(e) => updateItemLocal(item.id, { category: e.target.value })} onBlur={(e) => persistItem(item.id, { category: e.target.value })} />
+                  </div>
+                  {isHotel ? (
+                    <>
+                      <div>
+                        <Label className="text-xs">{t("checkIn")}</Label>
+                        <Input type="date" value={item.item_date ?? ""} onChange={(e) => persistItem(item.id, { item_date: e.target.value || null })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("checkOut")}</Label>
+                        <Input type="date" value={item.check_out ?? ""} onChange={(e) => persistItem(item.id, { check_out: e.target.value || null })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("nights")}</Label>
+                        <Input type="number" min={0} value={item.nights ?? ""} onChange={(e) => updateItemLocal(item.id, { nights: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { nights: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("rooms")}</Label>
+                        <Input type="number" min={0} value={item.rooms ?? ""} onChange={(e) => updateItemLocal(item.id, { rooms: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { rooms: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("mealPlan")}</Label>
+                        <Input value={item.meal_plan ?? ""} onChange={(e) => updateItemLocal(item.id, { meal_plan: e.target.value })} onBlur={(e) => persistItem(item.id, { meal_plan: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("pax")}</Label>
+                        <Input type="number" min={0} value={item.pax ?? ""} onChange={(e) => updateItemLocal(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <Label className="text-xs">{t("itemDate")}</Label>
+                        <Input type="date" value={item.item_date ?? ""} onChange={(e) => persistItem(item.id, { item_date: e.target.value || null })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">{t("pax")}</Label>
+                        <Input type="number" min={0} value={item.pax ?? ""} onChange={(e) => updateItemLocal(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { pax: e.target.value === "" ? null : Number(e.target.value) })} />
+                      </div>
+                      {isService && (
+                        <>
+                          <div>
+                            <Label className="text-xs">{t("ways")}</Label>
+                            <Input type="number" min={0} value={item.ways ?? ""} onChange={(e) => updateItemLocal(item.id, { ways: e.target.value === "" ? null : Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { ways: e.target.value === "" ? null : Number(e.target.value) })} />
+                          </div>
+                          <div>
+                            <Label className="text-xs">{t("guideType")}</Label>
+                            <Input value={item.guide_type ?? ""} onChange={(e) => updateItemLocal(item.id, { guide_type: e.target.value })} onBlur={(e) => persistItem(item.id, { guide_type: e.target.value })} />
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                  <div>
+                    <Label className="text-xs">{t("quantity")}</Label>
+                    <Input type="number" min={0} value={item.quantity ?? 0} onChange={(e) => updateItemLocal(item.id, { quantity: Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { quantity: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">{t("unitPrice")}</Label>
+                    <Input type="number" step="0.01" min={0} value={item.unit_price ?? 0} onChange={(e) => updateItemLocal(item.id, { unit_price: Number(e.target.value) })} onBlur={(e) => persistItem(item.id, { unit_price: Number(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label className="text-xs">{t("total")}</Label>
+                    <div className="h-9 flex items-center text-sm font-medium">
+                      <MaskedField module="quotes" field="total_amount" value={format(Number(item.total ?? 0), booking.currency as "BRL")} />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-xs">{t("notes")}</Label>
+                  <Textarea rows={2} value={item.notes ?? ""} onChange={(e) => updateItemLocal(item.id, { notes: e.target.value })} onBlur={(e) => persistItem(item.id, { notes: e.target.value })} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">

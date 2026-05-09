@@ -767,53 +767,29 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     </section>
   );
 
-  const Reader = !selected ? (
-    <div className="flex-1 flex items-center justify-center text-muted-foreground h-full bg-background">
-      <div className="text-center">
-        <Mail className="h-12 w-12 mx-auto mb-3 opacity-30" />
-        <p>Selecione uma conversa</p>
-        <p className="text-xs mt-2">Dica: duplo clique abre em popup</p>
-      </div>
-    </div>
-  ) : (
-    <ThreadReader
-      thread={{ id: selected.id, subject: selected.subject, is_starred: selected.is_starred }}
-      messages={threadMessages}
-      loading={loadingThread}
-      onArchive={() => void localArchive()}
-      onTrash={() => void localTrash()}
-      onStar={() => void localStar(selected)}
-      onReply={(m) => openCompose(m, "reply")}
-      onForward={(m) => openCompose(m, "forward")}
-      onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
-    />
-  );
-
   return (
     <TooltipProvider>
       <div className={cn("flex h-[calc(100vh-4rem)] bg-background", className)}>
         {Sidebar}
-        <div className="w-96 shrink-0 border-r">{ThreadList}</div>
-        <div className="flex-1 min-w-0">{Reader}</div>
+        <div className="flex-1 min-w-0">{ThreadList}</div>
 
         {AddAccountDialog}
 
-        {/* POPUP independente */}
-        <Dialog open={!!popupThreadId} onOpenChange={(o) => { if (!o) { setPopupThreadId(null); setPopupMessages(null); } }}>
-          <DialogContent className="sm:max-w-5xl h-[85vh] p-0 flex flex-col gap-0">
-            <div className="sr-only"><DialogHeader><DialogTitle>Conversa</DialogTitle></DialogHeader></div>
-            {popupThread && (
-              <ThreadReader
-                thread={{ id: popupThread.id, subject: popupThread.subject, is_starred: popupThread.is_starred }}
-                messages={popupMessages}
-                loading={popupLoading}
-                onReply={(m) => openCompose(m, "reply")}
-                onForward={(m) => openCompose(m, "forward")}
-                onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
-              />
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Janelas flutuantes das conversas */}
+        <ThreadWindowManager
+          ref={windowsRef}
+          fetchMessages={fetchThreadMessages}
+          onMarkRead={(tid) => void markThreadRead(tid)}
+          onStar={(t) => {
+            const row = threads.find((x) => x.id === t.id);
+            if (row) void localStar(row);
+          }}
+          onArchive={(tid) => void archiveThread(tid)}
+          onTrash={(tid) => void trashThread(tid)}
+          onReply={(m) => openCompose(m, "reply")}
+          onForward={(m) => openCompose(m, "forward")}
+          onDownloadAttachment={(id, a) => void downloadAttachment(id, a)}
+        />
 
         {/* COMPOSE */}
         <Dialog open={!!composeOpen} onOpenChange={(o) => !o && setComposeOpen(null)}>

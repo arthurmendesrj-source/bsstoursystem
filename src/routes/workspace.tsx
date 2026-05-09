@@ -790,25 +790,6 @@ function ProposalsTab({
           })}
         </div>
       )}
-
-      <Dialog open={!!openId} onOpenChange={(o) => !o && setOpenId(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{mode === "invoice" ? t("invoice") : t("proposals")}</DialogTitle>
-          </DialogHeader>
-          {openId && (
-            <ProposalEditor
-              quoteId={openId}
-              leadId={leadId}
-              leadCode={leadCode}
-              customerId={customerId}
-              mode={mode}
-              onSaved={onChanged}
-              onClose={() => setOpenId(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

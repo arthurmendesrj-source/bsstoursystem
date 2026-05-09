@@ -190,6 +190,13 @@ function BookingDetailPage() {
     else { toast.success(t("saved")); load(); }
   };
 
+  const reopenBooking = async () => {
+    if (!confirm(t("reopenBookingConfirm"))) return;
+    const { error } = await supabase.from("bookings").update({ status: "pre_reserva" as "pre_reserva" }).eq("id", bookingId);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); load(); }
+  };
+
   if (loading) return <div className="p-8 text-muted-foreground">{t("loading")}</div>;
   if (!booking) return <div className="p-8">{t("noData")}</div>;
 
@@ -209,6 +216,9 @@ function BookingDetailPage() {
         </div>
         {allConfirmed && booking.status !== "confirmada" && (
           <Button onClick={markBookingConfirmed}><CheckCircle2 className="mr-2 h-4 w-4" />{t("markBookingConfirmed")}</Button>
+        )}
+        {booking.status === "confirmada" && (
+          <Button variant="outline" onClick={reopenBooking}><RotateCcw className="mr-2 h-4 w-4" />{t("reopenBooking")}</Button>
         )}
       </div>
 
@@ -315,9 +325,13 @@ function BookingDetailPage() {
                         <RotateCcw className="mr-1 h-4 w-4" />{t("reopenItem")}
                       </Button>
                     )}
-                    {status !== "cancelado" ? (
+                    {status === "pendente" ? (
                       <Button size="sm" variant="outline" onClick={() => setStatus(item, "cancelado")}>
                         <XCircle className="mr-1 h-4 w-4" />{t("cancelItem")}
+                      </Button>
+                    ) : status === "cancelado" ? (
+                      <Button size="sm" variant="outline" onClick={() => setStatus(item, "pendente")}>
+                        <RotateCcw className="mr-1 h-4 w-4" />{t("revertToPending")}
                       </Button>
                     ) : null}
                   </div>

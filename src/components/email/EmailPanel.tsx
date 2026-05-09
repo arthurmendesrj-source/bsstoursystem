@@ -17,8 +17,9 @@ import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachme
 import { gmailSend } from "@/server/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import type { ThreadMessage } from "@/components/email/ThreadReader";
+import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";
 import { ThreadWindowManager, type ThreadWindowManagerHandle } from "@/components/email/ThreadWindowManager";
+import { Maximize2 } from "lucide-react";
 
 type Folder = { id: string; name: string; type: string; unread_count: number; total_count: number; color_bg: string | null; color_text: string | null };
 type ThreadRow = {

@@ -154,13 +154,48 @@ function WorkspacePage() {
       supabase.from("tasks").select("id,title,description,due_date,completed,priority,started_at,completed_at").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", id).order("occurred_at", { ascending: false }),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", id).order("created_at", { ascending: false }),
-      supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", id).order("created_at", { ascending: false }),
+      supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date,customer_id").eq("lead_id", id).order("created_at", { ascending: false }),
     ]);
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
     setQuotes((quotesRes.data as Quote[]) ?? []);
-    setBookings((bookingsRes.data as Booking[]) ?? []);
+    const baseBookings = (bookingsRes.data as Booking[]) ?? [];
+    const bookingIds = baseBookings.map((b) => b.id);
+    const customerIds = Array.from(new Set(baseBookings.map((b) => b.customer_id).filter(Boolean) as string[]));
+    let invoiceMap = new Map<string, string>();
+    let custMap = new Map<string, string>();
+    let paxByBooking: Record<string, BookingPaxRow[]> = {};
+    let suppByBooking: Record<string, BookingSupplierRow[]> = {};
+    if (bookingIds.length) {
+      const [invRes, paxRes, suppRes, custRes] = await Promise.all([
+        supabase.from("invoices").select("booking_id,number,created_at").in("booking_id", bookingIds).order("created_at", { ascending: false }),
+        supabase.from("booking_pax").select("id,booking_id,is_primary,customer_id,customers(full_name)").in("booking_id", bookingIds),
+        supabase.from("booking_suppliers").select("id,booking_id,service_type,status,cost,currency,suppliers(name)").in("booking_id", bookingIds),
+        customerIds.length ? supabase.from("customers").select("id,full_name").in("id", customerIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+      ]);
+      ((invRes.data ?? []) as { booking_id: string; number: string | null }[]).forEach((row) => {
+        if (row.booking_id && row.number && !invoiceMap.has(row.booking_id)) invoiceMap.set(row.booking_id, row.number);
+      });
+      ((custRes.data ?? []) as { id: string; full_name: string }[]).forEach((c) => custMap.set(c.id, c.full_name));
+      ((paxRes.data ?? []) as Array<{ id: string; booking_id: string; is_primary: boolean; customers: { full_name: string } | null }>).forEach((row) => {
+        const list = paxByBooking[row.booking_id] ?? [];
+        list.push({ id: row.id, booking_id: row.booking_id, is_primary: !!row.is_primary, full_name: row.customers?.full_name ?? "—" });
+        paxByBooking[row.booking_id] = list;
+      });
+      ((suppRes.data ?? []) as Array<{ id: string; booking_id: string; service_type: string | null; status: string | null; cost: number | null; currency: string | null; suppliers: { name: string } | null }>).forEach((row) => {
+        const list = suppByBooking[row.booking_id] ?? [];
+        list.push({ id: row.id, booking_id: row.booking_id, service_type: row.service_type, status: row.status, cost: row.cost, currency: row.currency, supplier_name: row.suppliers?.name ?? null });
+        suppByBooking[row.booking_id] = list;
+      });
+    }
+    setBookings(baseBookings.map((b) => ({
+      ...b,
+      invoice_number: invoiceMap.get(b.id) ?? null,
+      customer_name: b.customer_id ? (custMap.get(b.customer_id) ?? null) : null,
+    })));
+    setBookingPax(paxByBooking);
+    setBookingSuppliers(suppByBooking);
     setLoadingLead(false);
   };
 

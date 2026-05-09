@@ -943,7 +943,7 @@ function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Ta
             const inProgress = !!task.started_at && !task.completed;
             const isExpanded = expandedId === task.id;
             return (
-              <div key={task.id} className={cn("rounded-md border", task.completed && "opacity-60")}>
+              <div key={task.id} onDoubleClick={() => openTaskWindow(task)} title="Duplo-clique para abrir em janela" className={cn("rounded-md border", task.completed && "opacity-60")}>
                 <div className="flex items-start gap-3 p-3">
                   <button onClick={(e) => { e.stopPropagation(); toggleComplete(task); }} className="mt-0.5" aria-label="toggle">
                     {task.completed

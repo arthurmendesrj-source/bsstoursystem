@@ -1,68 +1,94 @@
+
 ## Objetivo
 
-Na tela `/bookings/:id`, para cada item:
+Nova rota **/inbox-ia/email** dedicada à **Função Email da Inbox IA**: o operador escolhe pasta + período, vê a lista de e-mails **não lidos** e dispara a **Triagem IA** direto na linha, sem precisar abrir o e-mail.
 
-1. Mostrar todas as informações da proposta (cidade, categoria, datas, check-in/out, diárias, quartos, plano de refeição, pax, trechos, tipo de guia, observações).
-2. **Permitir editar inline** todos esses campos.
-3. **Permitir adicionar e remover itens** direto na reserva.
-4. **Refletir as alterações no voucher** já gerado (campos editáveis e visualização).
+---
 
-Como a reserva usa `quote_items` (via `booking.quote_id`), adicionar/editar/remover itens aqui altera a mesma cotação.
+## Fluxo do usuário
 
-## Mudanças
+1. Entra em **Inbox IA → Email** (nova rota).
+2. Escolhe a **conta de email** (se tiver mais de uma vinculada).
+3. Escolhe a **pasta** (Inbox, Importante, Spam, ou qualquer label do Gmail).
+4. Escolhe o **período** (Hoje, Últimos 7 dias, 30 dias, 90 dias, ou range custom).
+5. Vê a **lista de e-mails não lidos** desse recorte, ordenados pelo mais recente.
+6. Em cada linha, três ações: **Triagem IA** (principal), **Abrir** (opcional), **Marcar como lido**.
+7. Clicar em **Triagem IA** abre o `AiTriageDialog` já existente — sem abrir a thread.
+8. Após decisão (criar lead / criar atividade / ignorar), o e-mail some da lista (foi tratado).
 
-### 1. `src/routes/bookings_.$bookingId.tsx`
+Há também um botão **"Atualizar do Gmail"** no topo (modo híbrido): por padrão lê do banco espelhado; sob demanda dispara `gmailIncrementalSync` para puxar o que chegou desde o último sync.
 
-- Ampliar o `select` de `quote_items` para todos os campos:
-  ```ts
-  .select("id,description,quantity,unit_price,total,kind,city,category,item_date,check_out,nights,rooms,meal_plan,pax,ways,guide_type,notes")
-  ```
-- Atualizar o tipo `QuoteItem` com esses campos opcionais.
-- **Edição inline** (mesma lógica já usada para `confs`):
-  - `persistItem(itemId, patch)` → `supabase.from("quote_items").update(patch).eq("id", itemId)`.
-  - Salva em `onBlur`/`onValueChange`; estado otimista.
-  - Recalcula `nights = diffNights(item_date, check_out)` para hotel quando datas mudam.
-  - Recalcula `total = quantity * unit_price` quando quantidade ou preço mudam.
-- **Adicionar item**:
-  - Botão "Adicionar item" no topo da lista, com `Select` de `kind` (`hotel`, `service`, `transfer`, `tour`, `outro`).
-  - `addItem(kind)` → `supabase.from("quote_items").insert({ quote_id: booking.quote_id, kind, description: "", quantity: 1, unit_price: 0, total: 0 })`.
-  - Bloqueado quando a reserva não tem `quote_id`.
-- **Remover item**:
-  - Ícone "lixeira" no card com `confirm()` de segurança.
-  - `removeItem(id)`:
-    - Apaga voucher do item (`vouchers` por `quote_item_id`) e `booking_item_confirmations` correspondentes — limpeza explícita para evitar lixo.
-    - `supabase.from("quote_items").delete().eq("id", id)`.
-    - Recarrega a lista.
-- **Layout do card**: substituir o subtítulo simples por uma grade `grid-cols-2 md:grid-cols-4 gap-3` com campos condicionais ao `kind`:
-  - **Hotel**: `city`, `category`, `item_date` (Check-in), `check_out` (Check-out), `nights`, `rooms`, `meal_plan`, `pax`, `quantity`, `unit_price`.
-  - **Serviço/Transfer/Tour**: `city`, `category`, `item_date`, `pax`, `ways`, `guide_type`, `quantity`, `unit_price`.
-  - **Outro**: `city`, `category`, `item_date`, `pax`, `quantity`, `unit_price`.
-  - `notes`: Textarea 2 linhas.
-  - Linha de total (somente leitura): `quantity × unit_price = total`.
-- Permissão: respeitar `has_module_permission('bookings','edit')` para edição/adição/remoção; campos ficam `disabled` caso contrário.
+---
 
-### 2. `src/components/booking/VoucherDialog.tsx`
+## Layout da tela
 
-- **Visualização**: incluir os mesmos campos da proposta vinculada ao item (`quote_items`) — check-in/out, diárias, quartos, plano, pax, ways, tipo de guia, cidade, categoria, observações — junto aos campos próprios do voucher (`meeting_point`, `meeting_time`, `service_date`, `customer_instructions`).
-- **Modo edição**: continuar editando os campos próprios do voucher; mostrar os campos do item como **somente leitura** com link "Editar na reserva" (fecha o diálogo). Mantém a verdade única no `quote_items`.
-- **Reflexo automático**: a query do diálogo já recarrega o item ao abrir, então edições feitas na reserva aparecem imediatamente na próxima abertura.
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ Inbox IA · Email                                            │
+│ [Conta ▾]  [Pasta ▾]  [Período ▾]   [↻ Atualizar do Gmail] │
+├─────────────────────────────────────────────────────────────┤
+│ 24 e-mails não lidos · período: últimos 7 dias              │
+├─────────────────────────────────────────────────────────────┤
+│ ● Maria Silva · maria@...           há 2h    [✨ Triagem]  │
+│   Cotação para Bariloche 5 noites                           │
+│   "Olá, gostaria de uma proposta para..."   [Abrir] [✓Lido]│
+├─────────────────────────────────────────────────────────────┤
+│ ● João Souza · joao@...             há 5h    [✨ Triagem]  │
+│   ...                                                       │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### 3. `src/lib/i18n.tsx`
+---
 
-- Adicionar pt/en/es: `checkIn`, `checkOut`, `nights`, `rooms`, `mealPlan`, `pax`, `ways`, `guideType`, `category`, `city`, `itemDate`, `unitPrice`, `addItem`, `removeItem`, `removeItemConfirm`, `selectKind`, `editInBooking`. Reaproveitar `quantity`, `notes`, `total`, `description`, `saved`.
+## Detalhes técnicos
 
-## Fora de escopo
+### Arquivos novos
+- **`src/routes/inbox-ia.email.tsx`** — nova rota dentro do shell autenticado, monta `<TriageEmailPanel />`.
+- **`src/components/inbox-ia/TriageEmailPanel.tsx`** — componente principal com filtros + lista + ações.
 
-- Mudanças de schema (todos os campos já existem em `quote_items`).
-- Edição em massa / drag-and-drop de itens.
-- Histórico de alterações de itens (continua via `activity_log` se já estiver configurado para `quote_items`).
+### Reaproveitamento (sem duplicar lógica)
+- **Pastas/contas**: reutiliza queries já existentes (`user_email_accounts`, `email_labels`).
+- **Lista de e-mails não lidos**: query nova em `emails` (não em `email_threads`, porque queremos granularidade por mensagem) com `is_unread = true`, `owner_email IN (contas)`, `internal_date >= cutoff`, `labels @> [pasta]`.
+- **Sync sob demanda**: chama `gmailIncrementalSync` (já existente) no clique do botão "Atualizar do Gmail".
+- **Triagem IA**: reusa `AiTriageDialog` (já existe e faz tudo: analisar, criar lead, criar atividade, ignorar).
+- **Marcar como lido**: chama `gmailModify` com `removeLabelIds: ["UNREAD"]` + atualiza otimisticamente.
+
+### Período
+Botões rápidos: **Hoje**, **7d**, **30d**, **90d**, **Custom** (abre dois date pickers). Default: 7d. Persistido em `localStorage` (`inboxia.email.window`).
+
+### Pasta
+Dropdown com pastas do sistema (Inbox, Importante, Spam, Lixeira, etc.) + labels do usuário, populadas de `email_labels`. Default: **INBOX**. Persistido em `localStorage` (`inboxia.email.label`).
+
+### Conta
+Se só tem 1 conta vinculada, esconde o dropdown. Se >1, mostra todas e permite "Todas".
+
+### Estado vazio
+- Sem conta vinculada → CTA para ir em /email vincular.
+- Sem e-mails não lidos no recorte → mensagem "Nenhum e-mail não lido neste período. [Atualizar do Gmail]".
+
+### Após triagem
+Quando `AiTriageDialog` fecha com sucesso (lead/atividade criada ou ignorado), removemos a linha da lista local. Para "Ignorar", o dialog já marca a thread como lida.
+
+### Menu lateral
+Adicionar item **"Email"** como sub-item de **Inbox IA** no `AppShell` (ou criar uma seção colapsável "Inbox IA" com sub-itens "Ações" e "Email").
+
+---
+
+## Fora de escopo (para próximos passos)
+
+- Triagem em lote (selecionar vários e processar de uma vez) — pode vir depois.
+- Triagem automática em background (cron lê não-lidos e enfileira sugestões em `assistant_actions`).
+- Outras pastas além da inbox (já suportado pelo dropdown, mas não testado a fundo).
+- Edição inline do payload sugerido pela IA antes de aprovar.
+
+---
 
 ## Validação
 
-- Editar `check_out` num hotel atualiza `nights` e persiste.
-- Editar `quantity`/`unit_price` recalcula `total`.
-- Selecionar `meal_plan`/`guide_type`/`category` salva.
-- Adicionar item novo aparece no card e na cotação vinculada.
-- Remover item: voucher e confirmação correspondentes desaparecem; cotação reflete a remoção.
-- Abrir voucher de um item editado mostra os novos valores.
-- Usuário sem permissão `bookings.edit` vê tudo em modo leitura, sem botões de adicionar/remover.
+- Abrir `/inbox-ia/email` lista corretamente os não lidos do INBOX dos últimos 7 dias.
+- Trocar pasta/período recarrega a lista.
+- "Atualizar do Gmail" puxa novos e-mails e atualiza a lista.
+- Botão **Triagem IA** na linha abre o dialog sem abrir a thread.
+- Após criar lead/atividade, o e-mail desaparece da lista.
+- "Marcar como lido" chama Gmail e remove a linha.
+- Permissões: respeita `user_email_accounts` (cada user só vê suas contas).

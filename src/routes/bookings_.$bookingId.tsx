@@ -73,6 +73,8 @@ function BookingDetailPage() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [items, setItems] = useState<QuoteItem[]>([]);
   const [confs, setConfs] = useState<Record<string, Confirmation>>({});
+  const [vouchers, setVouchers] = useState<Record<string, { id: string; code: string }>>({});
+  const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>("");
   const [loading, setLoading] = useState(true);
 

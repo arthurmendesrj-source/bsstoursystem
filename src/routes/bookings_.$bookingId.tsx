@@ -228,7 +228,55 @@ function BookingDetailPage() {
     setOpenVoucherId(row.id);
   };
 
-  const confirmedCount = useMemo(() => items.filter((i) => confs[i.id]?.status === "confirmado").length, [items, confs]);
+  const updateItemLocal = (itemId: string, patch: Partial<QuoteItem>) => {
+    setItems((prev) => prev.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+  };
+
+  const persistItem = async (itemId: string, patch: Partial<QuoteItem>) => {
+    const current = items.find((i) => i.id === itemId);
+    if (!current) return;
+    const next: Partial<QuoteItem> = { ...patch };
+    // Recalculate nights for hotels when dates change
+    const itemDate = "item_date" in next ? next.item_date : current.item_date;
+    const checkOut = "check_out" in next ? next.check_out : current.check_out;
+    if (current.kind === "hotel" && ("item_date" in next || "check_out" in next)) {
+      next.nights = diffNights(itemDate, checkOut);
+    }
+    // Recalculate total when qty/price change
+    const qty = "quantity" in next ? Number(next.quantity ?? 0) : Number(current.quantity ?? 0);
+    const price = "unit_price" in next ? Number(next.unit_price ?? 0) : Number(current.unit_price ?? 0);
+    if ("quantity" in next || "unit_price" in next) {
+      next.total = qty * price;
+    }
+    updateItemLocal(itemId, next);
+    const { error } = await supabase.from("quote_items").update(next as never).eq("id", itemId);
+    if (error) toast.error(error.message);
+  };
+
+  const addItem = async (kind: string) => {
+    if (!booking?.quote_id) return;
+    const { data, error } = await supabase
+      .from("quote_items")
+      .insert({ quote_id: booking.quote_id, kind, description: "", quantity: 1, unit_price: 0, total: 0 } as never)
+      .select(ITEM_FIELDS)
+      .single();
+    if (error) { toast.error(error.message); return; }
+    setItems((prev) => [...prev, data as QuoteItem]);
+    toast.success(t("saved"));
+  };
+
+  const removeItem = async (item: QuoteItem) => {
+    if (!confirm(t("removeItemConfirm"))) return;
+    await supabase.from("vouchers").delete().eq("quote_item_id", item.id);
+    await supabase.from("booking_item_confirmations").delete().eq("quote_item_id", item.id);
+    const { error } = await supabase.from("quote_items").delete().eq("id", item.id);
+    if (error) { toast.error(error.message); return; }
+    setItems((prev) => prev.filter((i) => i.id !== item.id));
+    setVouchers((prev) => { const cp = { ...prev }; delete cp[item.id]; return cp; });
+    setConfs((prev) => { const cp = { ...prev }; delete cp[item.id]; return cp; });
+    toast.success(t("saved"));
+  };
+
   const allConfirmed = items.length > 0 && confirmedCount === items.length;
 
   const markBookingConfirmed = async () => {

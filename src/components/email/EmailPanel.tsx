@@ -730,8 +730,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa</div>
         ) : threads.map((t) => (
           <button key={t.id}
-            onClick={() => void openThread(t)}
-            onDoubleClick={() => void openPopup(t)}
+            onClick={() => openThread(t)}
             className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
               selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
               t.is_unread && "bg-card font-medium")}>

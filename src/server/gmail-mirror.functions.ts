@@ -15,6 +15,108 @@ export const gmailListLabels = createServerFn({ method: "POST" })
     return { count: r.labels.length, owner: r.owner };
   });
 
+// ---------------- LIST LIVE FROM GMAIL (lightweight metadata) ----------------
+// Busca diretamente no Gmail uma página de mensagens da label, salva metadados
+// no cache (emails + email_threads) e devolve as conversas mais recentes
+// imediatamente. Não baixa corpo nem anexos — isso é feito sob demanda em
+// gmailGetThread quando o usuário abre a conversa.
+export const gmailListLive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { labelId: string; pageToken?: string; maxResults?: number; q?: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
+    const owner = profile.emailAddress.toLowerCase();
+
+    const params = new URLSearchParams();
+    params.set("maxResults", String(Math.min(100, Math.max(10, data.maxResults ?? 50))));
+    if (data.labelId) params.set("labelIds", data.labelId);
+    if (data.q) params.set("q", data.q);
+    if (data.pageToken) params.set("pageToken", data.pageToken);
+    if (data.labelId === "SPAM" || data.labelId === "TRASH") params.set("includeSpamTrash", "true");
+
+    const list = (await gw(`/users/me/messages?${params.toString()}`)) as {
+      messages?: { id: string; threadId: string }[]; nextPageToken?: string;
+    };
+    const items = list.messages ?? [];
+
+    // Busca metadados (cabeçalhos) em paralelo, em lotes pequenos.
+    const CONC = 8;
+    const threadIds = new Set<string>();
+    const upserts: any[] = [];
+    for (let i = 0; i < items.length; i += CONC) {
+      const batch = items.slice(i, i + CONC);
+      const results = await Promise.all(batch.map(async (m) => {
+        try {
+          const r = (await gw(`/users/me/messages/${encodeURIComponent(m.id)}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`)) as {
+            id: string; threadId: string; labelIds?: string[]; snippet?: string; internalDate?: string;
+            historyId?: string; sizeEstimate?: number; payload?: GmailPart;
+          };
+          const headers = r.payload?.headers;
+          const from = parseFrom(findHeader(headers, "From"));
+          const to = (findHeader(headers, "To") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+          const subject = findHeader(headers, "Subject") ?? "";
+          const dateHeader = findHeader(headers, "Date");
+          const internalDate = r.internalDate ? new Date(Number(r.internalDate)).toISOString() : (dateHeader ? new Date(dateHeader).toISOString() : new Date().toISOString());
+          const labels = r.labelIds ?? [];
+          return {
+            owner_email: owner, gmail_id: r.id, thread_id: r.threadId,
+            from_email: from.email, from_name: from.name, to_emails: to,
+            subject, snippet: r.snippet ?? "",
+            received_at: internalDate, internal_date: internalDate, labels,
+            is_unread: labels.includes("UNREAD"),
+            is_starred: labels.includes("STARRED"),
+            is_important: labels.includes("IMPORTANT"),
+            has_attachments: false,
+            history_id: r.historyId ? Number(r.historyId) : null,
+            size_estimate: r.sizeEstimate ?? null,
+          };
+        } catch (e) {
+          console.error("listLive metadata fail", m.id, e);
+          return null;
+        }
+      }));
+      for (const row of results) {
+        if (!row) continue;
+        upserts.push(row);
+        threadIds.add(row.thread_id);
+      }
+    }
+
+    if (upserts.length) {
+      const { error } = await supabase.from("emails").upsert(upserts, { onConflict: "gmail_id" });
+      if (error) console.error("listLive emails upsert", error.message);
+    }
+
+    // Reconstrói as threads tocadas a partir do cache (operação leve).
+    for (const tid of threadIds) {
+      const { data: msgs } = await supabase
+        .from("emails")
+        .select("from_email, from_name, to_emails, subject, snippet, internal_date, labels, is_unread, is_starred, is_important, has_attachments")
+        .eq("thread_id", tid).order("internal_date", { ascending: true });
+      const list = (msgs ?? []) as any[];
+      if (list.length === 0) continue;
+      const participants = Array.from(new Set(list.flatMap((m) => [m.from_name || m.from_email, ...(m.to_emails ?? [])]).filter(Boolean)));
+      const last = list[list.length - 1];
+      const allLabels = Array.from(new Set(list.flatMap((m) => m.labels ?? [])));
+      await supabase.from("email_threads").upsert({
+        id: tid, owner_email: owner, subject: list[0].subject ?? "", snippet: last.snippet ?? "",
+        participants, last_message_at: last.internal_date, message_count: list.length,
+        is_unread: list.some((m) => m.is_unread), is_starred: list.some((m) => m.is_starred),
+        is_important: list.some((m) => m.is_important), has_attachments: list.some((m) => m.has_attachments),
+        labels: allLabels, updated_at: new Date().toISOString(),
+      }, { onConflict: "id" });
+    }
+
+    return {
+      owner,
+      labelId: data.labelId,
+      count: upserts.length,
+      threads: threadIds.size,
+      nextPageToken: list.nextPageToken ?? null,
+    };
+  });
+
 // ---------------- START FULL MIRROR ----------------
 export const gmailStartFullMirror = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

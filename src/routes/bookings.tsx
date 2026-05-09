@@ -39,6 +39,7 @@ type Booking = {
   customer_id: string | null;
   package_id: string | null;
   voucher_code?: string | null;
+  invoice_number?: string | null;
 };
 
 const STATUSES = ["pre_reserva", "confirmada", "em_viagem", "concluida", "cancelada"];

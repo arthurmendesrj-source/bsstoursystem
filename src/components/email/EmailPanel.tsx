@@ -500,7 +500,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const sidebarUser = useMemo(() => folders.filter((f) => f.type === "user").sort((a, b) => a.name.localeCompare(b.name)), [folders]);
 
   const selected = threads.find((t) => t.id === selectedThreadId) ?? null;
-  const popupThread = threads.find((t) => t.id === popupThreadId) ?? null;
+  void selected;
 
   if (mode === "lead" && leadId) return <LeadEmailMini leadId={leadId} className={className} />;
 

@@ -41,6 +41,8 @@ import { cn } from "@/lib/utils";
 import { EmailPanel } from "@/components/email/EmailPanel";
 import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
+import { WorkspaceWindowsProvider, useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
+import { TaskWindow } from "@/components/workspace/windows/TaskWindow";
 
 type WorkspaceSearch = { lead?: string };
 
@@ -51,7 +53,9 @@ export const Route = createFileRoute("/workspace")({
   component: () => (
     <AuthGate>
       <AppShell>
-        <WorkspacePage />
+        <WorkspaceWindowsProvider>
+          <WorkspacePage />
+        </WorkspaceWindowsProvider>
       </AppShell>
     </AuthGate>
   ),
@@ -238,6 +242,82 @@ function WorkspacePage() {
 
   const sortedTasks = useMemo(() => tasks, [tasks]);
   const hasLead = Boolean(lead);
+  const win = useWorkspaceWindows();
+
+  type SectionKey = "email" | "activities" | "proposals" | "invoice" | "reservation";
+  const openSection = (key: SectionKey) => {
+    if (!lead) return;
+    let title = "";
+    let content: React.ReactNode = null;
+    if (key === "email") {
+      title = t("intEmail");
+      content = <div className="h-full"><EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} /></div>;
+    } else if (key === "activities") {
+      title = t("activities");
+      content = <div className="p-4"><ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} /></div>;
+    } else if (key === "proposals") {
+      title = t("proposals");
+      content = <div className="p-4"><ProposalsTab leadId={lead.id} leadCode={lead.code} customerId={lead.customer_id} quotes={quotes} onChanged={() => loadLead(lead.id)} mode="proposal" /></div>;
+    } else if (key === "invoice") {
+      title = t("invoice");
+      content = <div className="p-4"><ProposalsTab leadId={lead.id} leadCode={lead.code} customerId={lead.customer_id} quotes={quotes.filter((q) => q.status === "aprovada")} onChanged={() => loadLead(lead.id)} mode="invoice" /></div>;
+    } else {
+      title = t("reservation");
+      content = (
+        <div className="p-4 space-y-2">
+          {bookings.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
+          ) : bookings.map((b) => (
+            <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
+              <div>
+                <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
+                  {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
+                </div>
+              </div>
+              <div className="font-semibold"><MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} /></div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    win.openWindow({
+      id: `section:${key}:${lead.id}`,
+      title: `${lead.name} · ${title}`,
+      content,
+      sizeKey: `section.${key}`,
+      defaultSize: { width: 1100, height: 720 },
+    });
+  };
+
+  const openBookingWindow = (b: Booking) => {
+    win.openWindow({
+      id: `booking:${b.id}`,
+      title: `${t("reservation")} · ${b.status}`,
+      sizeKey: "booking",
+      defaultSize: { width: 720, height: 500 },
+      content: (
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
+            <span className="text-xs text-muted-foreground font-mono">#{b.id.slice(0, 8)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><div className="text-muted-foreground text-xs">Embarque</div>{b.departure_date ? format(new Date(b.departure_date), "dd/MM/yyyy") : "—"}</div>
+            <div><div className="text-muted-foreground text-xs">Retorno</div>{b.return_date ? format(new Date(b.return_date), "dd/MM/yyyy") : "—"}</div>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Total</span>
+            <span className="font-semibold text-lg">
+              <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
+            </span>
+          </div>
+        </div>
+      ),
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -472,8 +552,8 @@ function WorkspacePage() {
           <CardContent className="p-4">
             <Accordion type="multiple" defaultValue={["email"]} className="w-full">
               <AccordionItem value="email">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><Mail className="h-4 w-4" />{t("intEmail")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("email"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><Mail className="h-4 w-4" />{t("intEmail")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -485,8 +565,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="activities">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />{t("activities")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("activities"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><CheckCircle2 className="h-4 w-4" />{t("activities")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -498,8 +578,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="proposals">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><StickyNote className="h-4 w-4" />{t("proposals")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("proposals"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><StickyNote className="h-4 w-4" />{t("proposals")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -518,8 +598,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="invoice">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><Briefcase className="h-4 w-4" />{t("invoice")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("invoice"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><Briefcase className="h-4 w-4" />{t("invoice")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead || !lead ? (
@@ -538,8 +618,8 @@ function WorkspacePage() {
               </AccordionItem>
 
               <AccordionItem value="reservation">
-                <AccordionTrigger className="text-sm font-semibold">
-                  <span className="flex items-center gap-2"><CalendarIcon className="h-4 w-4" />{t("reservation")}</span>
+                <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("reservation"); }} title="Duplo-clique para abrir em janela">
+                  <span className="flex items-center gap-2 select-none"><CalendarIcon className="h-4 w-4" />{t("reservation")}</span>
                 </AccordionTrigger>
                 <AccordionContent>
                   {!hasLead ? (
@@ -549,7 +629,12 @@ function WorkspacePage() {
                   ) : (
                     <div className="space-y-2">
                       {bookings.map((b) => (
-                        <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
+                        <div
+                          key={b.id}
+                          onDoubleClick={() => openBookingWindow(b)}
+                          title="Duplo-clique para abrir em janela"
+                          className="p-3 rounded-md border flex items-center justify-between cursor-pointer hover:bg-muted/40"
+                        >
                           <div>
                             <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
                             <div className="text-xs text-muted-foreground mt-1">
@@ -602,8 +687,31 @@ function ProposalsTab({
   const { can } = usePermissions();
   const canCreateQuote = can("quotes", "create");
   const { format: fmtCurrency } = useCurrency();
+  const win = useWorkspaceWindows();
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+
+  const openInWindow = (q: Quote) => {
+    win.openWindow({
+      id: `${mode}:${q.id}`,
+      title: `${mode === "invoice" ? t("invoice") : t("proposals")} #${q.id.slice(0, 8)}`,
+      sizeKey: mode,
+      defaultSize: { width: 1000, height: 680 },
+      content: (
+        <div className="p-4">
+          <ProposalEditor
+            quoteId={q.id}
+            leadId={leadId}
+            leadCode={leadCode}
+            customerId={customerId}
+            mode={mode}
+            onSaved={onChanged}
+            onClose={() => win.closeWindow(`${mode}:${q.id}`)}
+          />
+        </div>
+      ),
+    });
+  };
 
   const invoiceCodeFor = (q: Quote) =>
     leadCode ? `IN${leadCode}` : `IN${q.id.slice(0, 8).toUpperCase()}`;
@@ -651,6 +759,8 @@ function ProposalsTab({
               <button
                 key={q.id}
                 onClick={() => setOpenId(q.id)}
+                onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenId(null); openInWindow(q); }}
+                title="Duplo-clique para abrir em janela"
                 className={cn(
                   "w-full text-left p-3 rounded-md border hover:bg-muted/40 flex items-center justify-between",
                   closed && "border-emerald-500/40 bg-emerald-500/5",
@@ -708,12 +818,31 @@ function ProposalsTab({
 function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Task[]; onChanged: () => void }) {
   const { t } = useI18n();
   const { user } = useAuth();
+  const win = useWorkspaceWindows();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [priority, setPriority] = useState<"baixa" | "media" | "alta">("media");
   const [saving, setSaving] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const openTaskWindow = (task: Task) => {
+    const id = `task:${task.id}`;
+    win.openWindow({
+      id,
+      title: task.title,
+      sizeKey: "task",
+      defaultSize: { width: 720, height: 520 },
+      content: (
+        <TaskWindow
+          task={task}
+          leadId={leadId}
+          onChanged={onChanged}
+          onClose={() => win.closeWindow(id)}
+        />
+      ),
+    });
+  };
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -814,7 +943,7 @@ function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Ta
             const inProgress = !!task.started_at && !task.completed;
             const isExpanded = expandedId === task.id;
             return (
-              <div key={task.id} className={cn("rounded-md border", task.completed && "opacity-60")}>
+              <div key={task.id} onDoubleClick={() => openTaskWindow(task)} title="Duplo-clique para abrir em janela" className={cn("rounded-md border", task.completed && "opacity-60")}>
                 <div className="flex items-start gap-3 p-3">
                   <button onClick={(e) => { e.stopPropagation(); toggleComplete(task); }} className="mt-0.5" aria-label="toggle">
                     {task.completed

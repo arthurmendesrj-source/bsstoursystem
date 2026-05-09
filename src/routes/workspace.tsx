@@ -242,6 +242,82 @@ function WorkspacePage() {
 
   const sortedTasks = useMemo(() => tasks, [tasks]);
   const hasLead = Boolean(lead);
+  const win = useWorkspaceWindows();
+
+  type SectionKey = "email" | "activities" | "proposals" | "invoice" | "reservation";
+  const openSection = (key: SectionKey) => {
+    if (!lead) return;
+    let title = "";
+    let content: React.ReactNode = null;
+    if (key === "email") {
+      title = t("intEmail");
+      content = <div className="h-full"><EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} /></div>;
+    } else if (key === "activities") {
+      title = t("activities");
+      content = <div className="p-4"><ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} /></div>;
+    } else if (key === "proposals") {
+      title = t("proposals");
+      content = <div className="p-4"><ProposalsTab leadId={lead.id} leadCode={lead.code} customerId={lead.customer_id} quotes={quotes} onChanged={() => loadLead(lead.id)} mode="proposal" /></div>;
+    } else if (key === "invoice") {
+      title = t("invoice");
+      content = <div className="p-4"><ProposalsTab leadId={lead.id} leadCode={lead.code} customerId={lead.customer_id} quotes={quotes.filter((q) => q.status === "aprovada")} onChanged={() => loadLead(lead.id)} mode="invoice" /></div>;
+    } else {
+      title = t("reservation");
+      content = (
+        <div className="p-4 space-y-2">
+          {bookings.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
+          ) : bookings.map((b) => (
+            <div key={b.id} className="p-3 rounded-md border flex items-center justify-between">
+              <div>
+                <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {b.departure_date && format(new Date(b.departure_date), "dd/MM/yyyy")}
+                  {b.return_date && ` → ${format(new Date(b.return_date), "dd/MM/yyyy")}`}
+                </div>
+              </div>
+              <div className="font-semibold"><MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} /></div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+    win.openWindow({
+      id: `section:${key}:${lead.id}`,
+      title: `${lead.name} · ${title}`,
+      content,
+      sizeKey: `section.${key}`,
+      defaultSize: { width: 1100, height: 720 },
+    });
+  };
+
+  const openBookingWindow = (b: Booking) => {
+    win.openWindow({
+      id: `booking:${b.id}`,
+      title: `${t("reservation")} · ${b.status}`,
+      sizeKey: "booking",
+      defaultSize: { width: 720, height: 500 },
+      content: (
+        <div className="p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="capitalize">{b.status.replace("_", " ")}</Badge>
+            <span className="text-xs text-muted-foreground font-mono">#{b.id.slice(0, 8)}</span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div><div className="text-muted-foreground text-xs">{t("departureDate") || "Embarque"}</div>{b.departure_date ? format(new Date(b.departure_date), "dd/MM/yyyy") : "—"}</div>
+            <div><div className="text-muted-foreground text-xs">{t("returnDate") || "Retorno"}</div>{b.return_date ? format(new Date(b.return_date), "dd/MM/yyyy") : "—"}</div>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">{t("total") || "Total"}</span>
+            <span className="font-semibold text-lg">
+              <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
+            </span>
+          </div>
+        </div>
+      ),
+    });
+  };
 
   return (
     <div className="space-y-4">

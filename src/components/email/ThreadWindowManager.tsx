@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState, useCallback } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState, useCallback, useEffect } from "react";
 import { Rnd } from "react-rnd";
 import { Minus, Square, X, Copy as RestoreIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";

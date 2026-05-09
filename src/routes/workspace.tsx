@@ -734,7 +734,7 @@ function ProposalsTab({
     setCreating(false);
     if (error) return toast.error(error.message);
     onChanged();
-    setOpenId(data.id);
+    openInWindow({ ...(data as any), status: "rascunho", total_amount: 0, currency: "USD", created_at: new Date().toISOString() } as Quote);
   };
 
   return (

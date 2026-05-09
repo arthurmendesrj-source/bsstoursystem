@@ -116,6 +116,8 @@ function WorkspacePage() {
   // emails removed: Email tab uses EmailPanel which loads its own data
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [bookingPax, setBookingPax] = useState<Record<string, BookingPaxRow[]>>({});
+  const [bookingSuppliers, setBookingSuppliers] = useState<Record<string, BookingSupplierRow[]>>({});
   const [loadingLead, setLoadingLead] = useState(false);
 
   // Forms

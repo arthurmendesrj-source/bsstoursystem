@@ -1,48 +1,68 @@
-## Causa
+## Objetivo
 
-A tabela `vouchers` tem apenas uma policy de escrita que exige `is_admin(auth.uid())` OU `has_role(auth.uid(), 'operacional')`. O role `operacional` nem existe no sistema (os roles são `admin`, `diretor`, `gerente`, `supervisor`, `operador`). Resultado: qualquer usuário não-admin recebe "new row violates row-level security policy" ao gerar voucher.
+Na tela `/bookings/:id`, para cada item:
 
-## Correção (migração)
+1. Mostrar todas as informações da proposta (cidade, categoria, datas, check-in/out, diárias, quartos, plano de refeição, pax, trechos, tipo de guia, observações).
+2. **Permitir editar inline** todos esses campos.
+3. **Permitir adicionar e remover itens** direto na reserva.
+4. **Refletir as alterações no voucher** já gerado (campos editáveis e visualização).
 
-Substituir as policies da tabela `vouchers` para usar o sistema de permissões por módulo já existente (`has_module_permission`), alinhado com o resto do app:
+Como a reserva usa `quote_items` (via `booking.quote_id`), adicionar/editar/remover itens aqui altera a mesma cotação.
 
-```sql
-DROP POLICY "Admin/op manage vouchers" ON public.vouchers;
-DROP POLICY "Authenticated read vouchers" ON public.vouchers;
+## Mudanças
 
--- Leitura: quem pode ver bookings
-CREATE POLICY "View vouchers" ON public.vouchers
-FOR SELECT TO authenticated
-USING (public.has_module_permission(auth.uid(), 'bookings', 'view'));
+### 1. `src/routes/bookings_.$bookingId.tsx`
 
--- Inserção: quem pode editar bookings; created_by deve ser o próprio usuário
-CREATE POLICY "Insert vouchers" ON public.vouchers
-FOR INSERT TO authenticated
-WITH CHECK (
-  public.has_module_permission(auth.uid(), 'bookings', 'edit')
-  AND created_by = auth.uid()
-);
+- Ampliar o `select` de `quote_items` para todos os campos:
+  ```ts
+  .select("id,description,quantity,unit_price,total,kind,city,category,item_date,check_out,nights,rooms,meal_plan,pax,ways,guide_type,notes")
+  ```
+- Atualizar o tipo `QuoteItem` com esses campos opcionais.
+- **Edição inline** (mesma lógica já usada para `confs`):
+  - `persistItem(itemId, patch)` → `supabase.from("quote_items").update(patch).eq("id", itemId)`.
+  - Salva em `onBlur`/`onValueChange`; estado otimista.
+  - Recalcula `nights = diffNights(item_date, check_out)` para hotel quando datas mudam.
+  - Recalcula `total = quantity * unit_price` quando quantidade ou preço mudam.
+- **Adicionar item**:
+  - Botão "Adicionar item" no topo da lista, com `Select` de `kind` (`hotel`, `service`, `transfer`, `tour`, `outro`).
+  - `addItem(kind)` → `supabase.from("quote_items").insert({ quote_id: booking.quote_id, kind, description: "", quantity: 1, unit_price: 0, total: 0 })`.
+  - Bloqueado quando a reserva não tem `quote_id`.
+- **Remover item**:
+  - Ícone "lixeira" no card com `confirm()` de segurança.
+  - `removeItem(id)`:
+    - Apaga voucher do item (`vouchers` por `quote_item_id`) e `booking_item_confirmations` correspondentes — limpeza explícita para evitar lixo.
+    - `supabase.from("quote_items").delete().eq("id", id)`.
+    - Recarrega a lista.
+- **Layout do card**: substituir o subtítulo simples por uma grade `grid-cols-2 md:grid-cols-4 gap-3` com campos condicionais ao `kind`:
+  - **Hotel**: `city`, `category`, `item_date` (Check-in), `check_out` (Check-out), `nights`, `rooms`, `meal_plan`, `pax`, `quantity`, `unit_price`.
+  - **Serviço/Transfer/Tour**: `city`, `category`, `item_date`, `pax`, `ways`, `guide_type`, `quantity`, `unit_price`.
+  - **Outro**: `city`, `category`, `item_date`, `pax`, `quantity`, `unit_price`.
+  - `notes`: Textarea 2 linhas.
+  - Linha de total (somente leitura): `quantity × unit_price = total`.
+- Permissão: respeitar `has_module_permission('bookings','edit')` para edição/adição/remoção; campos ficam `disabled` caso contrário.
 
--- Atualização: quem pode editar bookings
-CREATE POLICY "Update vouchers" ON public.vouchers
-FOR UPDATE TO authenticated
-USING (public.has_module_permission(auth.uid(), 'bookings', 'edit'))
-WITH CHECK (public.has_module_permission(auth.uid(), 'bookings', 'edit'));
+### 2. `src/components/booking/VoucherDialog.tsx`
 
--- Exclusão: somente admin
-CREATE POLICY "Delete vouchers" ON public.vouchers
-FOR DELETE TO authenticated
-USING (public.is_admin(auth.uid()));
-```
+- **Visualização**: incluir os mesmos campos da proposta vinculada ao item (`quote_items`) — check-in/out, diárias, quartos, plano, pax, ways, tipo de guia, cidade, categoria, observações — junto aos campos próprios do voucher (`meeting_point`, `meeting_time`, `service_date`, `customer_instructions`).
+- **Modo edição**: continuar editando os campos próprios do voucher; mostrar os campos do item como **somente leitura** com link "Editar na reserva" (fecha o diálogo). Mantém a verdade única no `quote_items`.
+- **Reflexo automático**: a query do diálogo já recarrega o item ao abrir, então edições feitas na reserva aparecem imediatamente na próxima abertura.
 
-Também aplicar o mesmo padrão a `voucher_send_log` (criada na última migração) caso esteja com policy semelhante restrita a `operacional`.
+### 3. `src/lib/i18n.tsx`
 
-## Validação
-
-- Logar como `gerente`/`diretor`/`supervisor`/`operador` com permissão `bookings.edit` → botão "Gerar voucher" funciona sem erro de RLS.
-- Admin continua funcionando.
-- Usuário sem permissão de bookings não consegue criar/ler vouchers.
+- Adicionar pt/en/es: `checkIn`, `checkOut`, `nights`, `rooms`, `mealPlan`, `pax`, `ways`, `guideType`, `category`, `city`, `itemDate`, `unitPrice`, `addItem`, `removeItem`, `removeItemConfirm`, `selectKind`, `editInBooking`. Reaproveitar `quantity`, `notes`, `total`, `description`, `saved`.
 
 ## Fora de escopo
 
-- Mudanças no fluxo de UI ou nas colunas da tabela.
+- Mudanças de schema (todos os campos já existem em `quote_items`).
+- Edição em massa / drag-and-drop de itens.
+- Histórico de alterações de itens (continua via `activity_log` se já estiver configurado para `quote_items`).
+
+## Validação
+
+- Editar `check_out` num hotel atualiza `nights` e persiste.
+- Editar `quantity`/`unit_price` recalcula `total`.
+- Selecionar `meal_plan`/`guide_type`/`category` salva.
+- Adicionar item novo aparece no card e na cotação vinculada.
+- Remover item: voucher e confirmação correspondentes desaparecem; cotação reflete a remoção.
+- Abrir voucher de um item editado mostra os novos valores.
+- Usuário sem permissão `bookings.edit` vê tudo em modo leitura, sem botões de adicionar/remover.

@@ -217,6 +217,9 @@ function BookingDetailPage() {
         {allConfirmed && booking.status !== "confirmada" && (
           <Button onClick={markBookingConfirmed}><CheckCircle2 className="mr-2 h-4 w-4" />{t("markBookingConfirmed")}</Button>
         )}
+        {booking.status === "confirmada" && (
+          <Button variant="outline" onClick={reopenBooking}><RotateCcw className="mr-2 h-4 w-4" />{t("reopenBooking")}</Button>
+        )}
       </div>
 
       {items.length > 0 && (

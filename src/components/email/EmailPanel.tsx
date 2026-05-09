@@ -761,13 +761,16 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
             </div>
           </button>
         ))}
-        {nextPageToken && threads.length > 0 && (
+        {threads.length > 0 && (nextPageToken || threads.length >= pageSize) && (
           <div className="p-3">
             <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={() => void refreshLive({ append: true })}>
               {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
               Carregar mais antigos
             </Button>
           </div>
+        )}
+        {threads.length > 0 && !nextPageToken && threads.length < pageSize && (
+          <div className="p-3 text-center text-xs text-muted-foreground">Fim da pasta</div>
         )}
       </ScrollArea>
     </section>

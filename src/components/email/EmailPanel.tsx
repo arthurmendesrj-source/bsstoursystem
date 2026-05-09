@@ -96,6 +96,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [pageSize, setPageSize] = useState<number>(50);
 
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeLabel, setActiveLabel] = useState<string>("INBOX");
@@ -258,7 +259,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         .in("owner_email", owners)
         .contains("labels", [activeLabel])
         .order("internal_date", { ascending: false })
-        .limit(500);
+        .limit(Math.max(pageSize, 50) * 3);
       // Para Enviados/Rascunhos: garante que a mensagem foi enviada PELA conta.
       if (activeLabel === "SENT" || activeLabel === "DRAFT") {
         const ownerOrFilter = owners.map((o) => `from_email.ilike.${o}`).join(",");
@@ -293,7 +294,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
           has_attachments: m.has_attachments,
           labels: m.labels ?? [],
         });
-        if (rows.length >= 200) break;
+        if (rows.length >= pageSize) break;
       }
       setThreads(rows);
       return;
@@ -310,7 +311,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
       threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
     }
     let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
-      .order("last_message_at", { ascending: false }).limit(200);
+      .order("last_message_at", { ascending: false }).limit(pageSize);
     q = q.contains("labels", [activeLabel]);
     if (safe) {
       const orParts = [`subject.ilike.${like}`, `snippet.ilike.${like}`];
@@ -323,7 +324,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
     const { data, error } = await q;
     if (error) { toast.error(error.message); return; }
     setThreads((data ?? []) as ThreadRow[]);
-  }, [activeLabel, search, hasMailbox, authorizedEmails]);
+  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize]);
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);
   useEffect(() => { void loadThreads(); }, [loadThreads]);
@@ -393,6 +394,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         },
       });
       setNextPageToken(r.nextPageToken);
+      if (append) setPageSize((s) => s + 50);
       await loadFolders();
       await loadThreads();
       if (!append) toast.success(`Atualizado — ${r.count} mensagens carregadas`);
@@ -408,6 +410,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   // Quando muda a label/busca, zera paginação e dispara um fetch ao vivo da 1ª página.
   useEffect(() => {
     setNextPageToken(null);
+    setPageSize(50);
     if (!hasMailbox || mode !== "full") return;
     void (async () => {
       try {
@@ -758,13 +761,16 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
             </div>
           </button>
         ))}
-        {nextPageToken && threads.length > 0 && (
+        {threads.length > 0 && (nextPageToken || threads.length >= pageSize) && (
           <div className="p-3">
             <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={() => void refreshLive({ append: true })}>
               {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
               Carregar mais antigos
             </Button>
           </div>
+        )}
+        {threads.length > 0 && !nextPageToken && threads.length < pageSize && (
+          <div className="p-3 text-center text-xs text-muted-foreground">Fim da pasta</div>
         )}
       </ScrollArea>
     </section>

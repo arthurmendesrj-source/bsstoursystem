@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket, Plus, Trash2 } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";

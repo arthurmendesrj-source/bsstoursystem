@@ -795,55 +795,20 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
   const MirrorPanel = null;
 
   const ThreadList = (
-    <section className="flex flex-col h-full bg-background min-w-0">
-      {MirrorPanel}
-      {SyncProgressPanel}
-      <div className="p-3 border-b space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Pesquisar e-mails" className="pl-9" />
-        </div>
-      </div>
-      <ScrollArea className="flex-1">
-        {threads.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">Nenhuma conversa</div>
-        ) : threads.map((t) => (
-          <button key={t.id}
-            onClick={() => openThread(t)}
-            className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
-              selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
-              t.is_unread && "bg-card font-medium")}>
-            <button onClick={(e) => { e.stopPropagation(); void localStar(t); }} className="shrink-0 mt-0.5">
-              <Star className={cn("h-4 w-4", t.is_starred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
-                <div className={cn("text-sm truncate flex-1", t.is_unread && "font-semibold")}>
-                  {t.participants.slice(0, 2).join(", ")}{t.message_count > 1 && <span className="text-muted-foreground"> ({t.message_count})</span>}
-                </div>
-                <div className="text-xs text-muted-foreground shrink-0">{formatRelative(t.last_message_at)}</div>
-              </div>
-              <div className="text-sm truncate">{t.subject || "(sem assunto)"}</div>
-              <div className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                {t.has_attachments && <Paperclip className="h-3 w-3" />}
-                <span className="truncate">{t.snippet}</span>
-              </div>
-            </div>
-          </button>
-        ))}
-        {threads.length > 0 && (nextPageToken || threads.length >= pageSize) && (
-          <div className="p-3">
-            <Button variant="outline" size="sm" className="w-full" disabled={loadingMore} onClick={() => void refreshLive({ append: true })}>
-              {loadingMore ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : null}
-              Carregar mais antigos
-            </Button>
-          </div>
-        )}
-        {threads.length > 0 && !nextPageToken && threads.length < pageSize && (
-          <div className="p-3 text-center text-xs text-muted-foreground">Fim da pasta</div>
-        )}
-      </ScrollArea>
-    </section>
+    <ThreadListSection
+      threads={threads}
+      selectedThreadId={selectedThreadId}
+      search={search}
+      setSearch={setSearch}
+      onOpenThread={openThread}
+      onLocalStar={(t) => void localStar(t)}
+      loadingMore={loadingMore}
+      canLoadMore={threads.length > 0 && (!!nextPageToken || lastPageFull)}
+      atEnd={threads.length > 0 && !nextPageToken && !lastPageFull}
+      onLoadMore={() => void refreshLive({ append: true })}
+      MirrorPanel={MirrorPanel}
+      SyncProgressPanel={SyncProgressPanel}
+    />
   );
 
   return (

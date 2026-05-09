@@ -964,21 +964,164 @@ function ThreadListSection({
 }
 
 function LeadEmailMini({ leadId, className }: { leadId: string; className?: string }) {
-  type Row = { id: string; from_name: string | null; from_email: string | null; subject: string | null; snippet: string | null; internal_date: string | null; received_at: string | null };
+  type Row = {
+    id: string; thread_id: string | null; from_name: string | null; from_email: string | null;
+    subject: string | null; snippet: string | null; internal_date: string | null; received_at: string | null;
+    is_starred: boolean | null;
+  };
   const [rows, setRows] = useState<Row[]>([]);
-  useEffect(() => {
-    void supabase.from("emails").select("id,from_name,from_email,subject,snippet,internal_date,received_at").eq("lead_id", leadId).order("internal_date", { ascending: false }).limit(50).then(({ data }) => setRows((data ?? []) as Row[]));
+  const windowsRef = useRef<ThreadWindowManagerHandle>(null);
+
+  const getThreadFn = useServerFn(gmailGetThread);
+  const getAttachmentFn = useServerFn(gmailGetAttachment);
+  const sendFn = useServerFn(gmailSend);
+
+  const [composeOpen, setComposeOpen] = useState<null | { mode: "reply" | "forward"; msg: ThreadMessage }>(null);
+  const [composeTo, setComposeTo] = useState("");
+  const [composeSubject, setComposeSubject] = useState("");
+  const [composeBody, setComposeBody] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const loadRows = useCallback(async () => {
+    const { data } = await supabase
+      .from("emails")
+      .select("id,thread_id,from_name,from_email,subject,snippet,internal_date,received_at,is_starred")
+      .eq("lead_id", leadId)
+      .order("internal_date", { ascending: false })
+      .limit(100);
+    const list = (data ?? []) as Row[];
+    // de-dup por thread_id (mantém o mais recente)
+    const seen = new Set<string>();
+    const dedup: Row[] = [];
+    for (const r of list) {
+      const key = r.thread_id ?? r.id;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      dedup.push(r);
+    }
+    setRows(dedup.slice(0, 50));
   }, [leadId]);
+
+  useEffect(() => { void loadRows(); }, [loadRows]);
+
+  const fetchMessages = async (threadId: string): Promise<ThreadMessage[]> => {
+    const r = await getThreadFn({ data: { threadId } });
+    return r.messages as ThreadMessage[];
+  };
+
+  const onMarkRead = async (threadId: string) => {
+    await supabase.from("email_threads").update({ is_unread: false }).eq("id", threadId);
+    await supabase.from("emails").update({ is_unread: false }).eq("thread_id", threadId);
+  };
+
+  const onStar = async (thread: { id: string; is_starred: boolean }) => {
+    const next = !thread.is_starred;
+    await supabase.from("email_threads").update({ is_starred: next }).eq("id", thread.id);
+    await supabase.from("emails").update({ is_starred: next }).eq("thread_id", thread.id);
+    setRows((prev) => prev.map((r) => (r.thread_id === thread.id ? { ...r, is_starred: next } : r)));
+  };
+
+  const onArchive = async (threadId: string) => {
+    const { data } = await supabase.from("email_threads").select("labels").eq("id", threadId).maybeSingle();
+    const labels = ((data?.labels as string[] | null) ?? []).filter((l) => l !== "INBOX");
+    await supabase.from("email_threads").update({ labels }).eq("id", threadId);
+  };
+
+  const onTrash = async (threadId: string) => {
+    const { data } = await supabase.from("email_threads").select("labels").eq("id", threadId).maybeSingle();
+    const cur = (data?.labels as string[] | null) ?? [];
+    const labels = Array.from(new Set([...cur.filter((l) => l !== "INBOX"), "TRASH"]));
+    await supabase.from("email_threads").update({ labels }).eq("id", threadId);
+    await supabase.from("emails").update({ labels }).eq("thread_id", threadId);
+    setRows((prev) => prev.filter((r) => r.thread_id !== threadId));
+  };
+
+  const onDownloadAttachment = async (msgId: string, att: { attachment_id: string; filename: string; mime_type: string }) => {
+    try {
+      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id } });
+      const b64 = r.dataB64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
+      const bin = atob(b64 + pad);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const blob = new Blob([arr], { type: att.mime_type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = att.filename; a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+  };
+
+  const openCompose = (m: ThreadMessage, kind: "reply" | "forward") => {
+    setComposeTo(kind === "reply" ? m.from.email : "");
+    setComposeSubject(kind === "reply"
+      ? (m.subject?.startsWith("Re:") ? m.subject : `Re: ${m.subject ?? ""}`)
+      : (m.subject?.startsWith("Fwd:") ? m.subject : `Fwd: ${m.subject ?? ""}`));
+    setComposeBody(`\n\n--- ${m.from.name || m.from.email} ${m.date ? `(${formatRelative(m.date)})` : ""} ---\n${m.bodyText || ""}`);
+    setComposeOpen({ mode: kind, msg: m });
+  };
+
+  const sendCompose = async () => {
+    if (!composeOpen?.msg) return;
+    if (!composeTo.trim()) { toast.error("Destinatário?"); return; }
+    setSending(true);
+    try {
+      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined } });
+      toast.success("Enviado"); setComposeOpen(null);
+    } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
+    finally { setSending(false); }
+  };
+
+  const openRow = (r: Row) => {
+    const tid = r.thread_id ?? r.id;
+    windowsRef.current?.openOrFocus({ id: tid, subject: r.subject, is_starred: !!r.is_starred });
+  };
+
   return (
     <div className={cn("p-3 space-y-2", className)}>
       {rows.length === 0 && <div className="text-sm text-muted-foreground">Nenhum e-mail vinculado.</div>}
       {rows.map((r) => (
-        <div key={r.id} className="border rounded p-3">
+        <button
+          key={r.id}
+          type="button"
+          onClick={() => openRow(r)}
+          className="w-full text-left border rounded p-3 hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+        >
           <div className="text-xs text-muted-foreground">{r.from_name || r.from_email} · {formatRelative(r.internal_date || r.received_at)}</div>
           <div className="font-medium text-sm">{r.subject}</div>
           <div className="text-xs text-muted-foreground line-clamp-2">{r.snippet}</div>
-        </div>
+        </button>
       ))}
+
+      <ThreadWindowManager
+        ref={windowsRef}
+        fetchMessages={fetchMessages}
+        onMarkRead={onMarkRead}
+        onStar={onStar}
+        onArchive={onArchive}
+        onTrash={onTrash}
+        onReply={(m) => openCompose(m, "reply")}
+        onForward={(m) => openCompose(m, "forward")}
+        onDownloadAttachment={onDownloadAttachment}
+      />
+
+      <Dialog open={!!composeOpen} onOpenChange={(o) => !o && setComposeOpen(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>{composeOpen?.mode === "reply" ? "Responder" : "Encaminhar"}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label>Para</Label>
+            <Input value={composeTo} onChange={(e) => setComposeTo(e.target.value)} />
+            <Label>Assunto</Label>
+            <Input value={composeSubject} onChange={(e) => setComposeSubject(e.target.value)} />
+            <Label>Mensagem</Label>
+            <Textarea value={composeBody} onChange={(e) => setComposeBody(e.target.value)} rows={10} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setComposeOpen(null)}>Cancelar</Button>
+            <Button onClick={sendCompose} disabled={sending}>{sending ? "Enviando…" : "Enviar"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -214,6 +214,7 @@ function BookingsPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>{t("invoiceNumber")}</TableHead>
               <TableHead>{t("customers")}</TableHead>
               <TableHead>{t("packages")}</TableHead>
               <TableHead>{t("departureDate")}</TableHead>
@@ -225,9 +226,16 @@ function BookingsPage() {
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{t("noData")}</TableCell></TableRow>
             ) : rows.map((b) => (
               <TableRow key={b.id}>
+                <TableCell>
+                  {b.invoice_number ? (
+                    <Badge variant="outline" className="font-mono">{b.invoice_number}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30" title={t("noInvoiceForBooking")}>sem invoice</Badge>
+                  )}
+                </TableCell>
                 <TableCell className="font-medium">{customerName(b.customer_id)}</TableCell>
                 <TableCell>{pkgName(b.package_id)}</TableCell>
                 <TableCell>{b.departure_date ?? "—"}</TableCell>

@@ -190,6 +190,22 @@ function BookingDetailPage() {
     toast.success(t("saved"));
   };
 
+  const generateItemVoucher = async (item: QuoteItem) => {
+    if (vouchers[item.id]) { setOpenVoucherId(vouchers[item.id].id); return; }
+    const code = `VCH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+    const { data, error } = await supabase.from("vouchers").insert({
+      booking_id: bookingId,
+      quote_item_id: item.id,
+      code,
+      created_by: user?.id ?? null,
+    } as never).select("id,code").single();
+    if (error) { toast.error(error.message); return; }
+    toast.success(t("voucherCreated"));
+    const row = data as { id: string; code: string };
+    setVouchers((prev) => ({ ...prev, [item.id]: { id: row.id, code: row.code } }));
+    setOpenVoucherId(row.id);
+  };
+
   const confirmedCount = useMemo(() => items.filter((i) => confs[i.id]?.status === "confirmado").length, [items, confs]);
   const allConfirmed = items.length > 0 && confirmedCount === items.length;
 

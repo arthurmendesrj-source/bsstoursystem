@@ -165,11 +165,12 @@ function BookingsPage() {
             <DialogHeader><DialogTitle>{t("new")} {t("bookings")}</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
               <div>
-                <Label>{t("customers")}</Label>
+                <Label>{t("customers")} *</Label>
                 <Select value={form.customer_id} onValueChange={(v) => setForm({ ...form, customer_id: v })}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>{customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>)}</SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground mt-1">Cliente e nº de invoice devem ser preenchidos. A invoice pode ser gerada após salvar a reserva.</p>
               </div>
               <div>
                 <Label>{t("packages")}</Label>

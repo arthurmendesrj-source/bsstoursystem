@@ -190,6 +190,13 @@ function BookingDetailPage() {
     else { toast.success(t("saved")); load(); }
   };
 
+  const reopenBooking = async () => {
+    if (!confirm(t("reopenBookingConfirm"))) return;
+    const { error } = await supabase.from("bookings").update({ status: "pre_reserva" as "pre_reserva" }).eq("id", bookingId);
+    if (error) toast.error(error.message);
+    else { toast.success(t("saved")); load(); }
+  };
+
   if (loading) return <div className="p-8 text-muted-foreground">{t("loading")}</div>;
   if (!booking) return <div className="p-8">{t("noData")}</div>;
 

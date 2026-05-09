@@ -759,6 +759,8 @@ function ProposalsTab({
               <button
                 key={q.id}
                 onClick={() => setOpenId(q.id)}
+                onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpenId(null); openInWindow(q); }}
+                title="Duplo-clique para abrir em janela"
                 className={cn(
                   "w-full text-left p-3 rounded-md border hover:bg-muted/40 flex items-center justify-between",
                   closed && "border-emerald-500/40 bg-emerald-500/5",

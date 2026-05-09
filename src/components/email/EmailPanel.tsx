@@ -976,6 +976,7 @@ function ThreadListSection({
                 >
                   <button
                     onClick={() => onOpenThread(t)}
+                    onDoubleClick={onDoubleClickThread ? (e) => { e.preventDefault(); e.stopPropagation(); onDoubleClickThread(t); } : undefined}
                     className={cn("w-full text-left px-3 py-2.5 border-b transition-colors flex gap-2",
                       selectedThreadId === t.id ? "bg-primary/10" : "hover:bg-muted/50",
                       t.is_unread && "bg-card font-medium")}

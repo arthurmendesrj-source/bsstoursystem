@@ -64,6 +64,15 @@ export const ThreadWindowManager = forwardRef<ThreadWindowManagerHandle, Props>(
   const [windows, setWindows] = useState<Win[]>([]);
   const zCounter = useRef(10);
   const cascadeIdx = useRef(0);
+  const [viewport, setViewport] = useState(() => ({
+    w: typeof window !== "undefined" ? window.innerWidth : 1280,
+    h: typeof window !== "undefined" ? window.innerHeight : 800,
+  }));
+  useEffect(() => {
+    const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const focus = useCallback((id: string) => {
     setWindows((prev) => {

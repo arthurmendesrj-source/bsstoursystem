@@ -474,6 +474,17 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     load();
   };
 
+  const unapprove = async () => {
+    if (!quote) return;
+    if (!canApprove) { toast.error("Sem permissão"); return; }
+    if (!confirm(t("reopenProposalConfirm"))) return;
+    const { error } = await supabase.from("quotes").update({ status: "enviada" }).eq("id", quote.id);
+    if (error) return toast.error(error.message);
+    toast.success(t("saved"));
+    onSaved?.();
+    load();
+  };
+
   const convertToBooking = async () => {
     if (!quote) return;
     if (!canCreateBooking) { toast.error("Sem permissão para criar reserva"); return; }

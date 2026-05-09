@@ -259,7 +259,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className }:
         .in("owner_email", owners)
         .contains("labels", [activeLabel])
         .order("internal_date", { ascending: false })
-        .limit(500);
+        .limit(Math.max(pageSize, 50) * 3);
       // Para Enviados/Rascunhos: garante que a mensagem foi enviada PELA conta.
       if (activeLabel === "SENT" || activeLabel === "DRAFT") {
         const ownerOrFilter = owners.map((o) => `from_email.ilike.${o}`).join(",");

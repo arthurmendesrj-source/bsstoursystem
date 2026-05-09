@@ -1,92 +1,69 @@
-Entendo sua frustração. Pelo que verifiquei agora, o problema não é apenas um cursor antigo: o desenho atual tenta “copiar o Gmail inteiro” em lotes pequenos, por labels/mês, dentro de rotas com limite de execução. Isso é frágil para uma caixa grande.
+## Diagnóstico
 
-## O que está impedindo a sincronização completa hoje
+O problema não é falta de capacidade de buscar o Gmail; é o modelo atual da lista.
 
-1. **O cron está falhando/interrompendo com frequência**
-   - Nos logs recentes, várias chamadas para `/api/public/gmail-poll` aparecem com status `0`, sinal de execução interrompida/timeout.
-   - Isso confirma que o processo de mirror completo é pesado demais para rodar com segurança desse jeito.
+Hoje existem duas fontes misturadas:
 
-2. **A sincronização ainda está incompleta**
-   - Estado atual: `full_sync_in_progress = true`.
-   - Só existem cerca de **275 emails** e **134 threads** gravados até agora.
-   - Ou seja: quando você abre a tela, ela mostra os mesmos emails porque o banco ainda não tem uma cópia completa e confiável do Gmail.
+1. **Tabela `email_threads` agrega labels da conversa inteira**
+   - Uma mesma conversa pode ter mensagens recebidas (`INBOX`) e mensagens enviadas (`SENT`).
+   - Por isso a thread agregada aparece com labels como `INBOX` e `SENT` ao mesmo tempo.
+   - Se a UI usar essa tabela para “Enviados”, aparecem conversas que também são da Caixa de entrada.
 
-3. **Existem dois caminhos de sincronização competindo**
-   - Botão de sincronização por período na interface.
-   - Mirror completo em segundo plano pelo cron.
-   - Isso aumenta risco de estado inconsistente, repetição, travamento e impressão de que “não mudou nada”.
+2. **A busca ao vivo até consulta `SENT`, mas depois a tela recarrega do cache local**
+   - A função `gmailListLive` busca mensagens com `labelIds=SENT` corretamente.
+   - Porém a lista final ainda é reconstruída com o cache local, e o cache pode representar a thread completa, não somente a mensagem enviada.
 
-4. **O mirror completo baixa corpo e anexos durante o lote**
-   - Isso pesa muito.
-   - Para contas com muitos emails/anexos, a chance de timeout é alta.
+## O que está confirmado
 
-5. **Espelhar 100% do Gmail não é o caminho mais estável aqui**
-   - Gmail tem paginação, labels sobrepostos, histórico que expira e limites de API.
-   - Fazer uma cópia fiel, histórica e permanente dentro desse app exige uma arquitetura de worker/fila dedicada, não apenas cron chamando uma rota web.
+- O banco tem emails enviados reais (`labels` contendo `SENT`).
+- O banco também tem threads agregadas com `INBOX` e `SENT` juntas.
+- Isso explica exatamente o que você viu: “Enviados” exibindo assuntos/conversas que parecem de entrada.
 
-## Solução que eu consigo executar com mais segurança
+## Solução proposta
 
-Trocar o modelo de “espelhar todo o Gmail” por um modelo **Gmail como fonte da verdade + cache operacional limitado**.
+Trocar a renderização de pastas por uma regra simples e robusta:
 
-Em vez de tentar copiar tudo, o app passa a funcionar assim:
+### 1. Pastas de mensagem usam mensagens, não threads agregadas
+Para estas pastas:
 
-```text
-Tela de Email
-  -> busca a lista diretamente no Gmail em tempo real
-  -> salva no banco só o necessário para uso operacional
-  -> abre mensagens sob demanda
-  -> sincroniza automaticamente apenas emails recentes/importantes
-```
+- `SENT` / Enviados
+- `DRAFT` / Rascunhos
+- `SPAM`
+- `TRASH`
 
-## O que será implementado
+A lista deve vir da tabela `emails`, filtrando mensagens que têm exatamente aquele label, e só depois agrupar por `thread_id` para exibir uma linha por conversa.
 
-### 1. Remover o mirror completo como fluxo principal
+### 2. “Enviados” deve mostrar a última mensagem enviada da conversa
+Na aba Enviados:
 
-- Parar de usar “Importar tudo / cópia fiel” como ação principal.
-- Manter ou remover visualmente esse botão para evitar falsa expectativa.
-- O app não vai mais depender de uma importação completa terminar para exibir emails.
+- O remetente precisa ser a conta conectada.
+- Os participantes exibidos devem ser os destinatários.
+- A data deve ser a data da mensagem enviada, não a data da última resposta recebida.
+- O snippet deve ser o snippet da mensagem enviada, não da última mensagem da thread.
 
-### 2. Criar listagem direta do Gmail
+### 3. Abertura da conversa continua mostrando a thread completa
+Ao clicar em uma linha de Enviados, a conversa pode continuar abrindo completa, como no Gmail.
 
-- Ao clicar em Caixa de entrada, Enviados, Spam, Lixeira etc., buscar direto no Gmail.
-- Usar paginação real do Gmail com `nextPageToken`.
-- Exibir os emails retornados imediatamente, sem esperar o banco completar.
+A diferença é: a linha da lista representa a mensagem enviada, não uma mensagem recebida.
 
-### 3. Cache local simples e seguro
+### 4. Corrigir atualização ao vivo
+Depois de clicar em “Atualizar caixa” ou mudar para “Enviados”, a tela deve usar imediatamente o resultado filtrado da pasta atual, sem voltar para uma thread agregada indevida.
 
-- Ao buscar uma página do Gmail, gravar/atualizar os emails no banco com deduplicação.
-- O banco vira cache, não “fonte absoluta”.
-- Se o cache falhar, a tela ainda pode buscar no Gmail.
+### 5. Remover resquícios antigos da sincronização completa na UI
+O componente ainda tem estados e textos antigos de sincronização completa que podem causar comportamento confuso. Vou limpar apenas o que estiver impactando a tela de emails.
 
-### 4. Abrir email sob demanda
+## Validação
 
-- A lista carrega metadados leves.
-- Corpo completo e anexos só são buscados quando o usuário abre a conversa.
-- Isso reduz drasticamente timeout e repetição.
+Depois da correção, vou verificar:
 
-### 5. Sincronização automática apenas recente
+- “Caixa de entrada” mostra mensagens/conversas recebidas.
+- “Enviados” mostra apenas mensagens com label `SENT`.
+- As primeiras linhas de “Enviados” exibem destinatários, não remetentes externos.
+- A busca e o botão “Atualizar caixa” preservam a pasta selecionada.
 
-- Cron passa a fazer uma tarefa pequena e previsível:
-  - buscar apenas emails novos/recentes;
-  - atualizar cache;
-  - nunca tentar varrer anos de histórico.
-- Se o histórico expirar, o app não quebra: volta a buscar por data recente.
+## Arquivos envolvidos
 
-### 6. Simplificar a interface
+- `src/components/email/EmailPanel.tsx`
+- `src/server/gmail-mirror.functions.ts`, se for necessário retornar as mensagens filtradas diretamente da busca ao vivo.
 
-- Trocar “Sincronizar tudo” por ações mais confiáveis:
-  - **Atualizar caixa atual**
-  - **Carregar mais antigos**
-  - **Buscar no Gmail**
-- Mostrar status real: “Buscando no Gmail”, “Cache atualizado”, “Sem mais resultados”.
-
-## Resultado esperado
-
-- A tela passa a mostrar emails atuais sem depender de mirror completo.
-- O risco de timeout cai muito.
-- Emails antigos aparecem via paginação/busca, não por uma cópia total prévia.
-- O banco continua útil para vínculo com leads, reservas, clientes, tarefas e histórico interno.
-
-## Limitação honesta
-
-Eu não recomendo prometer “espelhamento completo e fiel de todo o Gmail” dentro desta arquitetura atual. A solução confiável que consigo executar é: **cliente Gmail operacional com cache local**, não um backup integral do Gmail.
+Não vou tentar voltar ao espelhamento completo do Gmail. A correção será focada em fazer cada pasta consultar a fonte correta e parar de usar a thread agregada como verdade para “Enviados”.

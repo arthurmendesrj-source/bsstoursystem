@@ -98,6 +98,7 @@ function BookingDetailPage() {
   const [vouchers, setVouchers] = useState<Record<string, { id: string; code: string }>>({});
   const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>("");
+  const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -125,6 +126,15 @@ function BookingDetailPage() {
       if (v.quote_item_id) vMap[v.quote_item_id] = { id: v.id, code: v.code };
     });
     setVouchers(vMap);
+    // Invoice: by booking_id, fallback to quote_id
+    let invNum: string | null = null;
+    const { data: invByBooking } = await supabase.from("invoices").select("number").eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (invByBooking?.number) invNum = invByBooking.number;
+    else if (b.quote_id) {
+      const { data: invByQuote } = await supabase.from("invoices").select("number").eq("quote_id", b.quote_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (invByQuote?.number) invNum = invByQuote.number;
+    }
+    setInvoiceNumber(invNum);
     setLoading(false);
   };
 
@@ -305,9 +315,19 @@ function BookingDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold">{customerName || t("bookings")}</h1>
-            <p className="text-sm text-muted-foreground">
-              {booking.departure_date ?? "—"} · <MaskedField module="bookings" field="total_amount" value={format(Number(booking.total_amount), booking.currency as "BRL")} /> · <Badge variant="outline">{booking.status}</Badge>
-            </p>
+            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+              {invoiceNumber ? (
+                <Badge variant="outline" className="font-mono">{t("invoiceNumber")}: {invoiceNumber}</Badge>
+              ) : (
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30" title={t("noInvoiceForBooking")}>{t("invoiceNumber")}: —</Badge>
+              )}
+              <span>·</span>
+              <span>{booking.departure_date ?? "—"}</span>
+              <span>·</span>
+              <MaskedField module="bookings" field="total_amount" value={format(Number(booking.total_amount), booking.currency as "BRL")} />
+              <span>·</span>
+              <Badge variant="outline">{booking.status}</Badge>
+            </div>
           </div>
         </div>
         {allConfirmed && booking.status !== "confirmada" && (

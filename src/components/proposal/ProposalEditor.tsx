@@ -419,10 +419,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     setItems((arr) => arr.map((it) => ({ ...it, markup_pct: m })));
   };
 
-  const save = async () => {
+  const save = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     if (!quote) return;
-    if (!canEdit) { toast.error("Sem permissão para salvar"); return; }
+    if (!canEdit) {
+      if (!silent) toast.error("Sem permissão para salvar");
+      return;
+    }
     setSaving(true);
+    if (silent) setSaveStatus("saving");
     const totalsNow = computeTotals(items, bankFee);
 
     const { error: qErr } = await supabase
@@ -437,8 +442,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       })
       .eq("id", quote.id);
     if (qErr) {
-      toast.error(qErr.message);
+      if (!silent) toast.error(qErr.message);
       setSaving(false);
+      if (silent) setSaveStatus("error");
       return;
     }
 
@@ -464,10 +470,16 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     }
 
     setSaving(false);
-    toast.success(t("saved"));
-    onSaved?.();
-    load();
+    dirtyRef.current = false;
+    setLastSavedAt(new Date());
+    setSaveStatus("saved");
+    if (!silent) {
+      toast.success(t("saved"));
+      onSaved?.();
+      load();
+    }
   };
+  saveRef.current = save;
 
   const approve = async () => {
     if (!quote) return;

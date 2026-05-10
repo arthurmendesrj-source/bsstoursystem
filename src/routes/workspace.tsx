@@ -330,6 +330,83 @@ function WorkspacePage() {
     });
   };
 
+  const BOOKING_STATUSES = ["pre_reserva", "confirmada", "em_viagem", "concluida", "cancelada"];
+  const bookingStatusColor = (s: string) =>
+    s === "confirmada" ? "bg-emerald-500/10 text-emerald-700" :
+    s === "cancelada" ? "bg-red-500/10 text-red-700" :
+    s === "em_viagem" ? "bg-blue-500/10 text-blue-700" :
+    s === "concluida" ? "bg-slate-500/10 text-slate-700" :
+    "bg-amber-500/10 text-amber-700";
+
+  const updateBookingStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from("bookings").update({ status: status as "pre_reserva" }).eq("id", id);
+    if (error) toast.error(error.message); else if (lead) loadLead(lead.id);
+  };
+
+  const renderBookingsTable = (list: Booking[]) => (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("invoiceNumber")}</TableHead>
+            <TableHead>{t("customers")}</TableHead>
+            <TableHead>{t("packages")}</TableHead>
+            <TableHead>{t("departureDate")}</TableHead>
+            <TableHead>{t("price")}</TableHead>
+            <TableHead>{t("status")}</TableHead>
+            <TableHead className="text-right">Voucher</TableHead>
+            <TableHead className="text-right">{t("actions")}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {list.length === 0 ? (
+            <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{t("noBookings")}</TableCell></TableRow>
+          ) : list.map((b) => {
+            const pax = bookingPax[b.id] ?? [];
+            const cliLabel = b.customer_name ?? pax.find((p) => p.is_primary)?.full_name ?? pax[0]?.full_name ?? "—";
+            return (
+              <TableRow key={b.id} onDoubleClick={() => openBookingWindow(b)} className="cursor-pointer">
+                <TableCell>
+                  {b.invoice_number ? (
+                    <Badge variant="outline" className="font-mono">{b.invoice_number}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30" title={t("noInvoiceForBooking")}>sem invoice</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="font-medium">{cliLabel}</TableCell>
+                <TableCell>{b.package_name ?? "—"}</TableCell>
+                <TableCell>{b.departure_date ?? "—"}</TableCell>
+                <TableCell>
+                  <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
+                </TableCell>
+                <TableCell>
+                  <Select value={b.status} onValueChange={(v) => updateBookingStatus(b.id, v)}>
+                    <SelectTrigger className="h-8 w-36">
+                      <Badge variant="outline" className={bookingStatusColor(b.status)}>{b.status}</Badge>
+                    </SelectTrigger>
+                    <SelectContent>{BOOKING_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell className="text-right">
+                  {b.voucher_code ? (
+                    <Badge variant="outline" className="font-mono">{b.voucher_code}</Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button asChild size="sm" variant="ghost">
+                    <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+
   const renderBookingCard = (b: Booking, expanded: boolean) => {
     const pax = bookingPax[b.id] ?? [];
     const supps = bookingSuppliers[b.id] ?? [];

@@ -70,6 +70,8 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
   const [cityOpts, setCityOpts] = useState<ComboboxOption[]>([]);
   const [hotelOpts, setHotelOpts] = useState<ComboboxOption[]>([]);
   const [roomOpts, setRoomOpts] = useState<ComboboxOption[]>([]);
+  const [mealOpts, setMealOpts] = useState<ComboboxOption[]>(MEAL_PLANS.map((m) => ({ value: m, label: m })));
+  const [categoryOpts, setCategoryOpts] = useState<ComboboxOption[]>(CATEGORIES.map((c) => ({ value: c, label: c })));
 
   useEffect(() => {
     if (!open) return;

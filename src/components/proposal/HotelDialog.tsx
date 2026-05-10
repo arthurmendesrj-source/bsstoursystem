@@ -53,6 +53,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
   const [city, setCity] = useState("");
   const [hotel, setHotel] = useState("");
   const [room, setRoom] = useState("");
+  const [roomConfig, setRoomConfig] = useState<string>("");
   const [mealPlan, setMealPlan] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [qty, setQty] = useState<number>(1);

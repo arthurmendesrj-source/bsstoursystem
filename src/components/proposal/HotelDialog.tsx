@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ComboboxAutocomplete, type ComboboxOption } from "@/components/ComboboxAutocomplete";
@@ -70,6 +69,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
 
   const [cityOpts, setCityOpts] = useState<ComboboxOption[]>([]);
   const [hotelOpts, setHotelOpts] = useState<ComboboxOption[]>([]);
+  const [roomOpts, setRoomOpts] = useState<ComboboxOption[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -93,12 +93,19 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     }
     setErrors({});
     (async () => {
-      const [cRes, sRes] = await Promise.all([
+      const [cRes, sRes, rRes] = await Promise.all([
         supabase.from("ref_cities").select("name").order("name").limit(500),
         supabase.from("ref_services").select("name").order("name").limit(1000),
+        supabase.from("quote_items").select("notes").eq("kind", "hotel").not("notes", "is", null).limit(2000),
       ]);
       setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
       setHotelOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
+      const set = new Set<string>();
+      (rRes.data ?? []).forEach((r: { notes: string | null }) => {
+        const m = (r.notes ?? "").match(/^Sala:\s*([^\n]+)/);
+        if (m) { const t = m[1].trim(); if (t) set.add(t); }
+      });
+      setRoomOpts(Array.from(set).sort().map((v) => ({ value: v, label: v })));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.id]);
@@ -263,28 +270,40 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
 
           <div>
             <Label className="text-xs">Sala*</Label>
-            <Input value={room} onChange={(e) => setRoom(e.target.value)} className={errClass("room")} placeholder="Ex.: Standard, Deluxe..." />
+            <ComboboxAutocomplete
+              options={roomOpts}
+              value={room}
+              onChange={setRoom}
+              placeholder="Ex.: Standard, Deluxe..."
+              searchPlaceholder="Buscar sala..."
+              allowCustom
+              className={errClass("room")}
+            />
             {errors.room && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
 
           <div>
             <Label className="text-xs">Tipo</Label>
-            <Select value={mealPlan || undefined} onValueChange={(v) => setMealPlan(v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {MEAL_PLANS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={MEAL_PLANS.map((m) => ({ value: m, label: m }))}
+              value={mealPlan}
+              onChange={setMealPlan}
+              placeholder="Selecione ou digite..."
+              searchPlaceholder="Buscar tipo..."
+              allowCustom
+            />
           </div>
 
           <div>
             <Label className="text-xs">Avaliar</Label>
-            <Select value={category || undefined} onValueChange={(v) => setCategory(v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              value={category}
+              onChange={setCategory}
+              placeholder="Selecione ou digite..."
+              searchPlaceholder="Buscar categoria..."
+              allowCustom
+            />
           </div>
 
           <div>

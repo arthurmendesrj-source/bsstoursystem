@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { ComboboxAutocomplete, type ComboboxOption } from "@/components/ComboboxAutocomplete";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
@@ -48,17 +49,35 @@ const empty = (quoteId: string): FlightRow => ({
   notes: "",
 });
 
+const uniqOpts = (vals: (string | null | undefined)[]): ComboboxOption[] => {
+  const set = new Set<string>();
+  vals.forEach((v) => { const t = (v ?? "").toString().trim(); if (t) set.add(t); });
+  return Array.from(set).sort().map((v) => ({ value: v, label: v }));
+};
+
 export function FlightDialog({ open, onOpenChange, quoteId, initial, onSaved }: Props) {
   const { user } = useAuth();
   const [row, setRow] = useState<FlightRow>(empty(quoteId));
   const [errors, setErrors] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [numberOpts, setNumberOpts] = useState<ComboboxOption[]>([]);
+  const [fromOpts, setFromOpts] = useState<ComboboxOption[]>([]);
+  const [toOpts, setToOpts] = useState<ComboboxOption[]>([]);
 
   useEffect(() => {
-    if (open) {
-      setRow(initial ?? empty(quoteId));
-      setErrors({});
-    }
+    if (!open) return;
+    setRow(initial ?? empty(quoteId));
+    setErrors({});
+    (async () => {
+      const { data } = await supabase
+        .from("quote_flights")
+        .select("flight_number, from_code, to_code")
+        .limit(2000);
+      const rows = data ?? [];
+      setNumberOpts(uniqOpts(rows.map((r) => r.flight_number)));
+      setFromOpts(uniqOpts(rows.map((r) => r.from_code)));
+      setToOpts(uniqOpts(rows.map((r) => r.to_code)));
+    })();
   }, [open, initial, quoteId]);
 
   const dateObj = row.flight_date ? new Date(row.flight_date + "T00:00:00") : undefined;
@@ -131,17 +150,41 @@ export function FlightDialog({ open, onOpenChange, quoteId, initial, onSaved }: 
           </div>
           <div>
             <Label className="text-xs">Número*</Label>
-            <Input value={row.flight_number} onChange={(e) => setRow({ ...row, flight_number: e.target.value })} placeholder="Ex.: AA1234" className={errClass("flight_number")} />
+            <ComboboxAutocomplete
+              options={numberOpts}
+              value={row.flight_number}
+              onChange={(v) => setRow({ ...row, flight_number: v })}
+              placeholder="Ex.: AA1234"
+              searchPlaceholder="Buscar voo..."
+              allowCustom
+              className={errClass("flight_number")}
+            />
             {fieldErr("flight_number") && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
           <div>
             <Label className="text-xs">De*</Label>
-            <Input value={row.from_code} onChange={(e) => setRow({ ...row, from_code: e.target.value })} placeholder="GRU" className={errClass("from_code")} />
+            <ComboboxAutocomplete
+              options={fromOpts}
+              value={row.from_code}
+              onChange={(v) => setRow({ ...row, from_code: v.toUpperCase() })}
+              placeholder="GRU"
+              searchPlaceholder="Buscar origem..."
+              allowCustom
+              className={errClass("from_code")}
+            />
             {fieldErr("from_code") && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
           <div>
             <Label className="text-xs">Para*</Label>
-            <Input value={row.to_code} onChange={(e) => setRow({ ...row, to_code: e.target.value })} placeholder="JFK" className={errClass("to_code")} />
+            <ComboboxAutocomplete
+              options={toOpts}
+              value={row.to_code}
+              onChange={(v) => setRow({ ...row, to_code: v.toUpperCase() })}
+              placeholder="JFK"
+              searchPlaceholder="Buscar destino..."
+              allowCustom
+              className={errClass("to_code")}
+            />
             {fieldErr("to_code") && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
           <div>

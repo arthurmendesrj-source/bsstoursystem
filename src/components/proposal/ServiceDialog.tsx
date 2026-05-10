@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { ComboboxAutocomplete, type ComboboxOption } from "@/components/ComboboxAutocomplete";
@@ -227,12 +226,14 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
 
           <div>
             <Label className="text-xs">Tipo de guia</Label>
-            <Select value={guideType || undefined} onValueChange={(v) => setGuideType(v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {GUIDE_TYPES.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={GUIDE_TYPES.map((g) => ({ value: g, label: g }))}
+              value={guideType}
+              onChange={setGuideType}
+              placeholder="Selecione ou digite..."
+              searchPlaceholder="Buscar tipo..."
+              allowCustom
+            />
           </div>
 
           <div>

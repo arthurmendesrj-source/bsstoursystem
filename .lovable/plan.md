@@ -1,26 +1,30 @@
-## Plano
+## Objetivo
 
-1. **Exibir invoice na página detalhe da reserva**
-   - Atualizar `src/routes/bookings_.$bookingId.tsx` para buscar `invoices.number` da reserva aberta.
-   - Mostrar o número do invoice no cabeçalho da reserva, junto com data, valor e status.
-   - Corrigir também o erro de HTML atual no cabeçalho (`div`/`Badge` dentro de `p`) para evitar falha de hidratação.
+Nos diálogos de **Hotel**, **Voo** e **Serviço** dentro da Proposta, todo campo deve permitir digitar livremente E sugerir valores existentes (autocomplete + entrada livre).
 
-2. **Garantir fallback para reservas já convertidas**
-   - Se a reserva tiver `quote_id`, buscar invoice tanto por `booking_id` quanto por `quote_id`.
-   - Se existir invoice por `quote_id` mas sem `booking_id`, passar a exibir mesmo assim.
+## Mudanças
 
-3. **Criar invoice ausente para a reserva atual quando aplicável**
-   - Para reservas convertidas antes da última alteração, como a reserva aberta agora, criar automaticamente o invoice faltante ao carregar a página se não houver invoice vinculada.
-   - Usar o padrão já definido: `IN<code do lead>`; neste caso seria `INAE090526`.
-   - Vincular ao `booking_id`, `quote_id`, total, moeda e usuário criador quando disponível.
+### 1. Hotel (`HotelDialog.tsx`)
+Converter para `ComboboxAutocomplete` com `allowCustom`:
+- **Sala** (hoje só Input livre) → autocompleta com tipos de sala já usados em outras propostas (distinct de `quote_items.notes` parseando `Sala: ...` ou nova tabela `ref_room_types`).
+- **Tipo (meal plan)** (hoje Select fixo) → combobox com lista padrão + valores já usados, aceitando texto livre.
+- **Avaliar (categoria)** (hoje Select fixo) → idem, combobox com 3★/4★/5★/Boutique + custom.
 
-4. **Melhorar a conversão futura**
-   - Ajustar `ProposalEditor.tsx` e `NotificationBell.tsx` para não ignorarem erro ao inserir/atualizar invoice.
-   - Se a reserva for criada mas o invoice falhar, mostrar aviso claro em vez de parecer que tudo foi concluído.
+### 2. Serviço (`ServiceDialog.tsx`)
+- **Tipo de guia** (hoje Select fixo) → combobox com lista padrão + qualquer texto custom.
 
-## Resultado esperado
+### 3. Voo (`FlightDialog.tsx`)
+Hoje todos os campos são Inputs sem sugestão. Trocar para `ComboboxAutocomplete` carregando histórico distinto de `quote_flights`:
+- **Número do voo** → distinct `flight_number`.
+- **De / Para** (códigos IATA) → distinct `from_code` / `to_code`, sempre uppercase, aceita custom.
+- Data, partida, chegada, pax, total e notas continuam como inputs nativos (já são editáveis).
 
-- O número do invoice aparece automaticamente na reserva detalhada.
-- A reserva atual deixa de aparecer sem invoice após o carregamento.
-- Novas conversões continuam criando invoice automaticamente.
-- O cabeçalho da reserva fica estável sem erro de hidratação.
+### 4. Persistência de novos valores
+Sempre que o usuário digitar algo novo:
+- Cidade/Hotel/Serviço continuam usando `ref_cities` / `ref_services` (já existe).
+- Sala, meal plan, categoria, tipo de guia, número de voo e códigos de aeroporto: ficam apenas no `quote_items`/`quote_flights` (próximas buscas pegam pelo distinct, sem nova tabela).
+
+## Fora de escopo
+- Novas tabelas `ref_*` para meal_plan, categorias, salas, aeroportos.
+- Mudança de schema ou RLS.
+- Edição inline na lista da proposta (mantém-se via diálogo).

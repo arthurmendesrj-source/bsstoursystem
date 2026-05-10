@@ -15,8 +15,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/lib/permissions";
 
-const MEAL_PLANS = ["Room only", "Breakfast", "Half board", "Full board", "All inclusive"];
+const MEAL_PLANS = ["Room only", "Bed&Breakfast", "Half board", "Full board", "All inclusive"];
 const CATEGORIES = ["3★", "4★", "5★", "Boutique", "Other"];
+const ROOM_CONFIGS = ["Single", "Double", "Triple", "Quadruple"];
 
 export type HotelInitial = {
   id: string;

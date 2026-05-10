@@ -63,6 +63,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
 
   const [cityOpts, setCityOpts] = useState<ComboboxOption[]>([]);
   const [serviceOpts, setServiceOpts] = useState<ComboboxOption[]>([]);
+  const [guideOpts, setGuideOpts] = useState<ComboboxOption[]>(GUIDE_TYPES.map((g) => ({ value: g, label: g })));
 
   useEffect(() => {
     if (!open) return;

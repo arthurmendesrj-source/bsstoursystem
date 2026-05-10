@@ -43,10 +43,11 @@ type Props = {
   quoteId: string;
   defaultMarkupPct?: number;
   initial?: ServiceInitial | null;
+  defaultDate?: string | null;
   onSaved: () => void;
 };
 
-export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
+export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, defaultDate, onSaved }: Props) {
   const { user } = useAuth();
   const { canField } = usePermissions();
   const canEditCost = canField("quotes", "unit_cost", "edit");
@@ -67,7 +68,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
 
   useEffect(() => {
     if (!open) return;
-    setDate(initial?.item_date || format(new Date(), "yyyy-MM-dd"));
+    setDate(initial?.item_date || defaultDate || format(new Date(), "yyyy-MM-dd"));
     setCity(initial?.city ?? "");
     setService(initial?.description ?? "");
     setGuideType(initial?.guide_type ?? "");

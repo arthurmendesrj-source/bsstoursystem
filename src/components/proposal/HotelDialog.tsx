@@ -137,47 +137,10 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     return Object.keys(e).length === 0;
   };
 
-  const ensureRefCity = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (cityOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { data: existing } = await supabase
-      .from("ref_cities").select("id").eq("slug", slug).maybeSingle();
-    if (existing) return;
-    const { error } = await supabase
-      .from("ref_cities")
-      .upsert({ name: trimmed, slug }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) { console.warn("ref_cities upsert failed:", error.message); return; }
-    toast.success(`Nova cidade cadastrada: ${trimmed}`);
-  };
-
-  const ensureRefHotel = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (hotelOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { data: existing } = await supabase
-      .from("ref_services").select("id").eq("slug", slug).maybeSingle();
-    if (existing) return;
-    // Try to resolve hotel category
-    const { data: cat } = await supabase
-      .from("ref_service_categories")
-      .select("id").eq("kind", "hotel").eq("slug", "hotel").maybeSingle();
-    const { error } = await supabase
-      .from("ref_services")
-      .upsert({ name: trimmed, slug, category_id: cat?.id ?? null }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) { console.warn("ref_services upsert failed:", error.message); return; }
-    toast.success(`Novo hotel cadastrado: ${trimmed}`);
-  };
-
   const save = async () => {
     if (!user) return;
     if (!validate()) return;
     setSaving(true);
-    await Promise.all([ensureRefCity(city), ensureRefHotel(hotel)]);
     const nights = inObj && outObj ? Math.max(0, differenceInCalendarDays(outObj, inObj)) : 0;
     const totalNum = total === "" ? 0 : Number(total);
     const denom = nights > 0 ? nights : 1;

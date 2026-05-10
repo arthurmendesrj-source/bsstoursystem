@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { EmailPanel } from "@/components/email/EmailPanel";
 import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
-import { WorkspaceWindowsProvider, useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
+import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
 import { TaskWindow } from "@/components/workspace/windows/TaskWindow";
 
 type WorkspaceSearch = { lead?: string };

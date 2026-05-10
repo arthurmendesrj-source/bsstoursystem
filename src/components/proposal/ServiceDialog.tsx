@@ -107,55 +107,10 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     return Object.keys(e).length === 0;
   };
 
-  const slugify = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-  const norm = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-
-  const ensureRefService = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (serviceOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { data: existing } = await supabase
-      .from("ref_services")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (existing) return;
-    const { error } = await supabase
-      .from("ref_services")
-      .upsert({ name: trimmed, slug, category_id: null }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) {
-      console.warn("ref_services upsert failed:", error.message);
-      return;
-    }
-    toast.success(`Novo serviço cadastrado: ${trimmed}`);
-  };
-
-  const ensureRefCity = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (cityOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { error } = await supabase
-      .from("ref_cities")
-      .upsert({ name: trimmed, slug }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) {
-      console.warn("ref_cities upsert failed:", error.message);
-    }
-  };
-
   const save = async () => {
     if (!user) return;
     if (!validate()) return;
     setSaving(true);
-    await Promise.all([ensureRefService(service), ensureRefCity(city)]);
     const totalNum = total === "" ? null : Number(total);
     const unitCost = totalNum != null && pax > 0 ? +(totalNum / pax).toFixed(2) : 0;
     const unitPrice = unitCost;

@@ -232,6 +232,8 @@ Deno.serve(async (req) => {
         await admin.from("leads").update({ assigned_to: reassignTo }).eq("assigned_to", targetId);
         await admin.from("customers").update({ created_by: reassignTo }).eq("created_by", targetId);
         await admin.from("interactions").update({ created_by: reassignTo }).eq("created_by", targetId);
+        await admin.from("tasks").update({ assigned_to: reassignTo }).eq("assigned_to", targetId);
+        await admin.from("tasks").update({ created_by: reassignTo }).eq("created_by", targetId);
       } else {
         // Cleanup user-owned data (cascade delete)
         const { data: quotes } = await admin.from("quotes").select("id").eq("created_by", targetId);
@@ -247,6 +249,8 @@ Deno.serve(async (req) => {
         await admin.from("leads").delete().eq("assigned_to", targetId);
         await admin.from("customers").delete().eq("created_by", targetId);
         await admin.from("interactions").delete().eq("created_by", targetId);
+        await admin.from("tasks").delete().eq("assigned_to", targetId);
+        await admin.from("tasks").delete().eq("created_by", targetId);
       }
 
       // 3) user-scoped auxiliary

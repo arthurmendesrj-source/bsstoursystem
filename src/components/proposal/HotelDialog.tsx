@@ -15,8 +15,9 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/lib/permissions";
 
-const MEAL_PLANS = ["Room only", "Breakfast", "Half board", "Full board", "All inclusive"];
+const MEAL_PLANS = ["Room only", "Bed&Breakfast", "Half board", "Full board", "All inclusive"];
 const CATEGORIES = ["3★", "4★", "5★", "Boutique", "Other"];
+const ROOM_CONFIGS = ["Single", "Double", "Triple", "Quadruple"];
 
 export type HotelInitial = {
   id: string;
@@ -26,6 +27,7 @@ export type HotelInitial = {
   description?: string | null;
   category?: string | null;
   meal_plan?: string | null;
+  room_config?: string | null;
   rooms?: number | null;
   total?: number | null;
   notes?: string | null;
@@ -51,6 +53,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
   const [city, setCity] = useState("");
   const [hotel, setHotel] = useState("");
   const [room, setRoom] = useState("");
+  const [roomConfig, setRoomConfig] = useState<string>("");
   const [mealPlan, setMealPlan] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [qty, setQty] = useState<number>(1);
@@ -72,6 +75,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     setCity(initial?.city ?? "");
     setHotel(initial?.description ?? "");
     setMealPlan(initial?.meal_plan ?? "");
+    setRoomConfig(initial?.room_config ?? "");
     setCategory(initial?.category ?? "");
     setQty(initial?.rooms ?? 1);
     setTotal(initial?.total != null ? String(initial.total) : "");
@@ -150,6 +154,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
       rooms: qty,
       category: category || null,
       meal_plan: mealPlan || null,
+      room_config: roomConfig || null,
       unit_cost: unitCost,
       unit_price: unitCost,
       markup_pct: defaultMarkupPct,
@@ -249,14 +254,31 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
             {errors.room && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
 
+          <div className="rounded-md border p-3 space-y-2">
+            <Label className="text-xs font-semibold">Configuração</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {ROOM_CONFIGS.map((cfg) => (
+                <Button
+                  key={cfg}
+                  type="button"
+                  variant={roomConfig === cfg ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setRoomConfig(roomConfig === cfg ? "" : cfg)}
+                >
+                  {cfg}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           <div>
-            <Label className="text-xs">Tipo</Label>
+            <Label className="text-xs">Mealplan</Label>
             <ComboboxAutocomplete
               options={mealOpts}
               value={mealPlan}
               onChange={setMealPlan}
               placeholder="Selecione ou digite..."
-              searchPlaceholder="Buscar tipo..."
+              searchPlaceholder="Buscar mealplan..."
               allowCustom
             />
           </div>

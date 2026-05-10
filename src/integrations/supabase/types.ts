@@ -1844,6 +1844,7 @@ export type Database = {
           pax: number | null
           quantity: number
           quote_id: string
+          room_config: string | null
           rooms: number | null
           total: number
           unit_cost: number
@@ -1867,6 +1868,7 @@ export type Database = {
           pax?: number | null
           quantity?: number
           quote_id: string
+          room_config?: string | null
           rooms?: number | null
           total?: number
           unit_cost?: number
@@ -1890,6 +1892,7 @@ export type Database = {
           pax?: number | null
           quantity?: number
           quote_id?: string
+          room_config?: string | null
           rooms?: number | null
           total?: number
           unit_cost?: number

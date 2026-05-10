@@ -93,19 +93,29 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     }
     setErrors({});
     (async () => {
-      const [cRes, sRes, rRes] = await Promise.all([
-        supabase.from("ref_cities").select("name").order("name").limit(500),
-        supabase.from("ref_services").select("name").order("name").limit(1000),
-        supabase.from("quote_items").select("notes").eq("kind", "hotel").not("notes", "is", null).limit(2000),
-      ]);
-      setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
-      setHotelOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
-      const set = new Set<string>();
-      (rRes.data ?? []).forEach((r: { notes: string | null }) => {
+      const { data } = await supabase
+        .from("quote_items")
+        .select("city, description, notes, meal_plan, category")
+        .eq("kind", "hotel")
+        .limit(2000);
+      const cities = new Set<string>();
+      const hotels = new Set<string>();
+      const rooms = new Set<string>();
+      const meals = new Set<string>();
+      const cats = new Set<string>();
+      (data ?? []).forEach((r: { city: string | null; description: string | null; notes: string | null; meal_plan: string | null; category: string | null }) => {
+        if (r.city?.trim()) cities.add(r.city.trim());
+        if (r.description?.trim()) hotels.add(r.description.trim());
+        if (r.meal_plan?.trim()) meals.add(r.meal_plan.trim());
+        if (r.category?.trim()) cats.add(r.category.trim());
         const m = (r.notes ?? "").match(/^Sala:\s*([^\n]+)/);
-        if (m) { const t = m[1].trim(); if (t) set.add(t); }
+        if (m) { const t = m[1].trim(); if (t) rooms.add(t); }
       });
-      setRoomOpts(Array.from(set).sort().map((v) => ({ value: v, label: v })));
+      setCityOpts(Array.from(cities).sort().map((v) => ({ value: v, label: v })));
+      setHotelOpts(Array.from(hotels).sort().map((v) => ({ value: v, label: v })));
+      setRoomOpts(Array.from(rooms).sort().map((v) => ({ value: v, label: v })));
+      setMealOpts(Array.from(new Set([...MEAL_PLANS, ...meals])).map((v) => ({ value: v, label: v })));
+      setCategoryOpts(Array.from(new Set([...CATEGORIES, ...cats])).map((v) => ({ value: v, label: v })));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.id]);

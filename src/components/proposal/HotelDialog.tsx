@@ -40,14 +40,6 @@ type Props = {
   onSaved: () => void;
 };
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-
-const slugify = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
 export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
   const { user } = useAuth();
   const { canField } = usePermissions();
@@ -70,6 +62,8 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
   const [cityOpts, setCityOpts] = useState<ComboboxOption[]>([]);
   const [hotelOpts, setHotelOpts] = useState<ComboboxOption[]>([]);
   const [roomOpts, setRoomOpts] = useState<ComboboxOption[]>([]);
+  const [mealOpts, setMealOpts] = useState<ComboboxOption[]>(MEAL_PLANS.map((m) => ({ value: m, label: m })));
+  const [categoryOpts, setCategoryOpts] = useState<ComboboxOption[]>(CATEGORIES.map((c) => ({ value: c, label: c })));
 
   useEffect(() => {
     if (!open) return;
@@ -93,19 +87,29 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     }
     setErrors({});
     (async () => {
-      const [cRes, sRes, rRes] = await Promise.all([
-        supabase.from("ref_cities").select("name").order("name").limit(500),
-        supabase.from("ref_services").select("name").order("name").limit(1000),
-        supabase.from("quote_items").select("notes").eq("kind", "hotel").not("notes", "is", null).limit(2000),
-      ]);
-      setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
-      setHotelOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
-      const set = new Set<string>();
-      (rRes.data ?? []).forEach((r: { notes: string | null }) => {
+      const { data } = await supabase
+        .from("quote_items")
+        .select("city, description, notes, meal_plan, category")
+        .eq("kind", "hotel")
+        .limit(2000);
+      const cities = new Set<string>();
+      const hotels = new Set<string>();
+      const rooms = new Set<string>();
+      const meals = new Set<string>();
+      const cats = new Set<string>();
+      (data ?? []).forEach((r: { city: string | null; description: string | null; notes: string | null; meal_plan: string | null; category: string | null }) => {
+        if (r.city?.trim()) cities.add(r.city.trim());
+        if (r.description?.trim()) hotels.add(r.description.trim());
+        if (r.meal_plan?.trim()) meals.add(r.meal_plan.trim());
+        if (r.category?.trim()) cats.add(r.category.trim());
         const m = (r.notes ?? "").match(/^Sala:\s*([^\n]+)/);
-        if (m) { const t = m[1].trim(); if (t) set.add(t); }
+        if (m) { const t = m[1].trim(); if (t) rooms.add(t); }
       });
-      setRoomOpts(Array.from(set).sort().map((v) => ({ value: v, label: v })));
+      setCityOpts(Array.from(cities).sort().map((v) => ({ value: v, label: v })));
+      setHotelOpts(Array.from(hotels).sort().map((v) => ({ value: v, label: v })));
+      setRoomOpts(Array.from(rooms).sort().map((v) => ({ value: v, label: v })));
+      setMealOpts(Array.from(new Set([...MEAL_PLANS, ...meals])).map((v) => ({ value: v, label: v })));
+      setCategoryOpts(Array.from(new Set([...CATEGORIES, ...cats])).map((v) => ({ value: v, label: v })));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.id]);
@@ -125,47 +129,10 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     return Object.keys(e).length === 0;
   };
 
-  const ensureRefCity = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (cityOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { data: existing } = await supabase
-      .from("ref_cities").select("id").eq("slug", slug).maybeSingle();
-    if (existing) return;
-    const { error } = await supabase
-      .from("ref_cities")
-      .upsert({ name: trimmed, slug }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) { console.warn("ref_cities upsert failed:", error.message); return; }
-    toast.success(`Nova cidade cadastrada: ${trimmed}`);
-  };
-
-  const ensureRefHotel = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (hotelOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { data: existing } = await supabase
-      .from("ref_services").select("id").eq("slug", slug).maybeSingle();
-    if (existing) return;
-    // Try to resolve hotel category
-    const { data: cat } = await supabase
-      .from("ref_service_categories")
-      .select("id").eq("kind", "hotel").eq("slug", "hotel").maybeSingle();
-    const { error } = await supabase
-      .from("ref_services")
-      .upsert({ name: trimmed, slug, category_id: cat?.id ?? null }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) { console.warn("ref_services upsert failed:", error.message); return; }
-    toast.success(`Novo hotel cadastrado: ${trimmed}`);
-  };
-
   const save = async () => {
     if (!user) return;
     if (!validate()) return;
     setSaving(true);
-    await Promise.all([ensureRefCity(city), ensureRefHotel(hotel)]);
     const nights = inObj && outObj ? Math.max(0, differenceInCalendarDays(outObj, inObj)) : 0;
     const totalNum = total === "" ? 0 : Number(total);
     const denom = nights > 0 ? nights : 1;
@@ -285,7 +252,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
           <div>
             <Label className="text-xs">Tipo</Label>
             <ComboboxAutocomplete
-              options={MEAL_PLANS.map((m) => ({ value: m, label: m }))}
+              options={mealOpts}
               value={mealPlan}
               onChange={setMealPlan}
               placeholder="Selecione ou digite..."
@@ -297,7 +264,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
           <div>
             <Label className="text-xs">Avaliar</Label>
             <ComboboxAutocomplete
-              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              options={categoryOpts}
               value={category}
               onChange={setCategory}
               placeholder="Selecione ou digite..."

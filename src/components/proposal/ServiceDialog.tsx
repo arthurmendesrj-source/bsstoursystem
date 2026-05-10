@@ -63,6 +63,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
 
   const [cityOpts, setCityOpts] = useState<ComboboxOption[]>([]);
   const [serviceOpts, setServiceOpts] = useState<ComboboxOption[]>([]);
+  const [guideOpts, setGuideOpts] = useState<ComboboxOption[]>(GUIDE_TYPES.map((g) => ({ value: g, label: g })));
 
   useEffect(() => {
     if (!open) return;
@@ -75,12 +76,23 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     setNotes(initial?.notes ?? "");
     setErrors({});
     (async () => {
-      const [cRes, sRes] = await Promise.all([
-        supabase.from("ref_cities").select("name").order("name").limit(500),
-        supabase.from("ref_services").select("name").order("name").limit(500),
-      ]);
-      setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
-      setServiceOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
+      const { data } = await supabase
+        .from("quote_items")
+        .select("city, description, guide_type")
+        .eq("kind", "service")
+        .limit(2000);
+      const cities = new Set<string>();
+      const services = new Set<string>();
+      const guides = new Set<string>();
+      (data ?? []).forEach((r: { city: string | null; description: string | null; guide_type: string | null }) => {
+        if (r.city?.trim()) cities.add(r.city.trim());
+        if (r.description?.trim()) services.add(r.description.trim());
+        if (r.guide_type?.trim()) guides.add(r.guide_type.trim());
+      });
+      setCityOpts(Array.from(cities).sort().map((v) => ({ value: v, label: v })));
+      setServiceOpts(Array.from(services).sort().map((v) => ({ value: v, label: v })));
+      const merged = Array.from(new Set([...GUIDE_TYPES, ...guides]));
+      setGuideOpts(merged.map((v) => ({ value: v, label: v })));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.id]);
@@ -95,55 +107,10 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     return Object.keys(e).length === 0;
   };
 
-  const slugify = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-      .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
-  const norm = (s: string) =>
-    s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-
-  const ensureRefService = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (serviceOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { data: existing } = await supabase
-      .from("ref_services")
-      .select("id")
-      .eq("slug", slug)
-      .maybeSingle();
-    if (existing) return;
-    const { error } = await supabase
-      .from("ref_services")
-      .upsert({ name: trimmed, slug, category_id: null }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) {
-      console.warn("ref_services upsert failed:", error.message);
-      return;
-    }
-    toast.success(`Novo serviço cadastrado: ${trimmed}`);
-  };
-
-  const ensureRefCity = async (name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    if (cityOpts.some((o) => norm(o.label) === norm(trimmed))) return;
-    const slug = slugify(trimmed);
-    if (!slug) return;
-    const { error } = await supabase
-      .from("ref_cities")
-      .upsert({ name: trimmed, slug }, { onConflict: "slug", ignoreDuplicates: true });
-    if (error) {
-      console.warn("ref_cities upsert failed:", error.message);
-    }
-  };
-
   const save = async () => {
     if (!user) return;
     if (!validate()) return;
     setSaving(true);
-    await Promise.all([ensureRefService(service), ensureRefCity(city)]);
     const totalNum = total === "" ? null : Number(total);
     const unitCost = totalNum != null && pax > 0 ? +(totalNum / pax).toFixed(2) : 0;
     const unitPrice = unitCost;
@@ -227,7 +194,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
           <div>
             <Label className="text-xs">Tipo de guia</Label>
             <ComboboxAutocomplete
-              options={GUIDE_TYPES.map((g) => ({ value: g, label: g }))}
+              options={guideOpts}
               value={guideType}
               onChange={setGuideType}
               placeholder="Selecione ou digite..."

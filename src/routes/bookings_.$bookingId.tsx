@@ -126,6 +126,15 @@ function BookingDetailPage() {
       if (v.quote_item_id) vMap[v.quote_item_id] = { id: v.id, code: v.code };
     });
     setVouchers(vMap);
+    // Invoice: by booking_id, fallback to quote_id
+    let invNum: string | null = null;
+    const { data: invByBooking } = await supabase.from("invoices").select("number").eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (invByBooking?.number) invNum = invByBooking.number;
+    else if (b.quote_id) {
+      const { data: invByQuote } = await supabase.from("invoices").select("number").eq("quote_id", b.quote_id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (invByQuote?.number) invNum = invByQuote.number;
+    }
+    setInvoiceNumber(invNum);
     setLoading(false);
   };
 

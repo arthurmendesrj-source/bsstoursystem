@@ -93,12 +93,19 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     }
     setErrors({});
     (async () => {
-      const [cRes, sRes] = await Promise.all([
+      const [cRes, sRes, rRes] = await Promise.all([
         supabase.from("ref_cities").select("name").order("name").limit(500),
         supabase.from("ref_services").select("name").order("name").limit(1000),
+        supabase.from("quote_items").select("notes").eq("kind", "hotel").not("notes", "is", null).limit(2000),
       ]);
       setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
       setHotelOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
+      const set = new Set<string>();
+      (rRes.data ?? []).forEach((r: { notes: string | null }) => {
+        const m = (r.notes ?? "").match(/^Sala:\s*([^\n]+)/);
+        if (m) { const t = m[1].trim(); if (t) set.add(t); }
+      });
+      setRoomOpts(Array.from(set).sort().map((v) => ({ value: v, label: v })));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.id]);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil, Send, Receipt, AlertTriangle, ShieldCheck, Sparkles, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,12 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
   const [hotelDialogOpen, setHotelDialogOpen] = useState(false);
   const [editingHotel, setEditingHotel] = useState<HotelInitial | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const dirtyRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveRef = useRef<((opts?: { silent?: boolean }) => Promise<void>) | null>(null);
+  const anyChildDialogOpen = hotelDialogOpen || serviceDialogOpen || flightDialogOpen;
 
   const openEditHotel = async (id: string) => {
     const { data, error } = await supabase

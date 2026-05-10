@@ -168,17 +168,24 @@ function WorkspacePage() {
     let custMap = new Map<string, string>();
     let paxByBooking: Record<string, BookingPaxRow[]> = {};
     let suppByBooking: Record<string, BookingSupplierRow[]> = {};
+    let voucherMap = new Map<string, string>();
+    let pkgMap = new Map<string, string>();
     if (bookingIds.length) {
-      const [invRes, paxRes, suppRes, custRes] = await Promise.all([
+      const pkgIds = Array.from(new Set(baseBookings.map((b) => b.package_id).filter(Boolean) as string[]));
+      const [invRes, paxRes, suppRes, custRes, vouRes, pkgRes] = await Promise.all([
         supabase.from("invoices").select("booking_id,number,created_at").in("booking_id", bookingIds).order("created_at", { ascending: false }),
         supabase.from("booking_pax").select("id,booking_id,is_primary,customer_id,customers(full_name)").in("booking_id", bookingIds),
         supabase.from("booking_suppliers").select("id,booking_id,service_type,status,cost,currency,suppliers(name)").in("booking_id", bookingIds),
         customerIds.length ? supabase.from("customers").select("id,full_name").in("id", customerIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+        supabase.from("vouchers").select("booking_id,code").in("booking_id", bookingIds),
+        pkgIds.length ? supabase.from("packages").select("id,name").in("id", pkgIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
       ((invRes.data ?? []) as { booking_id: string; number: string | null }[]).forEach((row) => {
         if (row.booking_id && row.number && !invoiceMap.has(row.booking_id)) invoiceMap.set(row.booking_id, row.number);
       });
       ((custRes.data ?? []) as { id: string; full_name: string }[]).forEach((c) => custMap.set(c.id, c.full_name));
+      ((vouRes.data ?? []) as { booking_id: string; code: string }[]).forEach((v) => voucherMap.set(v.booking_id, v.code));
+      ((pkgRes.data ?? []) as { id: string; name: string }[]).forEach((p) => pkgMap.set(p.id, p.name));
       ((paxRes.data ?? []) as Array<{ id: string; booking_id: string; is_primary: boolean; customers: { full_name: string } | null }>).forEach((row) => {
         const list = paxByBooking[row.booking_id] ?? [];
         list.push({ id: row.id, booking_id: row.booking_id, is_primary: !!row.is_primary, full_name: row.customers?.full_name ?? "—" });
@@ -194,6 +201,8 @@ function WorkspacePage() {
       ...b,
       invoice_number: invoiceMap.get(b.id) ?? null,
       customer_name: b.customer_id ? (custMap.get(b.customer_id) ?? null) : null,
+      voucher_code: voucherMap.get(b.id) ?? null,
+      package_name: b.package_id ? (pkgMap.get(b.package_id) ?? null) : null,
     })));
     setBookingPax(paxByBooking);
     setBookingSuppliers(suppByBooking);

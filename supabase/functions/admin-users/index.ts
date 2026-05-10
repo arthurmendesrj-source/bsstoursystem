@@ -153,10 +153,19 @@ Deno.serve(async (req) => {
       });
       if (invErr || !invited.user) return json({ error: invErr?.message ?? "Falha no convite" }, 400);
 
-      if (requestedRoles.length > 0) {
-        const rows = requestedRoles.map((role) => ({ user_id: invited.user!.id, role }));
-        await admin.from("user_roles").insert(rows);
+      // Garante que o convidado já entre autorizado (e-mail confirmado)
+      try {
+        await admin.auth.admin.updateUserById(invited.user.id, {
+          email_confirm: true,
+        } as unknown as Record<string, unknown>);
+      } catch (e) {
+        console.warn("email_confirm update failed", e);
       }
+
+      // Atribui papéis solicitados, ou 'operador' como padrão
+      const rolesToInsert: AppRole[] = requestedRoles.length > 0 ? requestedRoles : ["operador"];
+      const rows = rolesToInsert.map((role) => ({ user_id: invited.user!.id, role }));
+      await admin.from("user_roles").insert(rows);
       // Garante que o e-mail do convite vire a caixa primária do usuário
       await admin
         .from("user_email_accounts")

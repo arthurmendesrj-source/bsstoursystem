@@ -98,6 +98,7 @@ function BookingDetailPage() {
   const [vouchers, setVouchers] = useState<Record<string, { id: string; code: string }>>({});
   const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>("");
+  const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {

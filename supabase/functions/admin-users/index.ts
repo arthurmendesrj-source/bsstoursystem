@@ -13,6 +13,7 @@ const corsHeaders = {
 type AppRole = "admin" | "diretor" | "gerente" | "coordenador" | "supervisor" | "operador";
 const ALLOWED_ROLES: AppRole[] = ["admin", "diretor", "gerente", "coordenador", "supervisor", "operador"];
 const PROTECTED_ROLES: AppRole[] = ["admin", "diretor"];
+const APP_URL = "https://bsstoursystem.lovable.app";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -124,7 +125,7 @@ Deno.serve(async (req) => {
           return json({ error: "Sem permissão" }, 403);
         }
       }
-      const redirectTo = req.headers.get("origin") ? `${req.headers.get("origin")}/` : undefined;
+      const redirectTo = `${APP_URL}/`;
       const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, { redirectTo });
       if (error) return json({ error: error.message }, 400);
       await audit({ action: "resend_invite", target_user_id: targetId, target_email: u.user.email });
@@ -144,9 +145,7 @@ Deno.serve(async (req) => {
         return json({ error: "Diretor não pode atribuir admin/diretor" }, 403);
       }
 
-      const redirectTo = req.headers.get("origin")
-        ? `${req.headers.get("origin")}/`
-        : undefined;
+      const redirectTo = `${APP_URL}/`;
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
         data: fullName ? { full_name: fullName } : undefined,
         redirectTo,

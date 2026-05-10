@@ -75,12 +75,23 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
     setNotes(initial?.notes ?? "");
     setErrors({});
     (async () => {
-      const [cRes, sRes] = await Promise.all([
-        supabase.from("ref_cities").select("name").order("name").limit(500),
-        supabase.from("ref_services").select("name").order("name").limit(500),
-      ]);
-      setCityOpts((cRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
-      setServiceOpts((sRes.data ?? []).map((r: { name: string }) => ({ value: r.name, label: r.name })));
+      const { data } = await supabase
+        .from("quote_items")
+        .select("city, description, guide_type")
+        .eq("kind", "service")
+        .limit(2000);
+      const cities = new Set<string>();
+      const services = new Set<string>();
+      const guides = new Set<string>();
+      (data ?? []).forEach((r: { city: string | null; description: string | null; guide_type: string | null }) => {
+        if (r.city?.trim()) cities.add(r.city.trim());
+        if (r.description?.trim()) services.add(r.description.trim());
+        if (r.guide_type?.trim()) guides.add(r.guide_type.trim());
+      });
+      setCityOpts(Array.from(cities).sort().map((v) => ({ value: v, label: v })));
+      setServiceOpts(Array.from(services).sort().map((v) => ({ value: v, label: v })));
+      const merged = Array.from(new Set([...GUIDE_TYPES, ...guides]));
+      setGuideOpts(merged.map((v) => ({ value: v, label: v })));
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initial?.id]);

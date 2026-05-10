@@ -254,14 +254,31 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
             {errors.room && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
 
+          <div className="rounded-md border p-3 space-y-2">
+            <Label className="text-xs font-semibold">Configuração</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {ROOM_CONFIGS.map((cfg) => (
+                <Button
+                  key={cfg}
+                  type="button"
+                  variant={roomConfig === cfg ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setRoomConfig(roomConfig === cfg ? "" : cfg)}
+                >
+                  {cfg}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           <div>
-            <Label className="text-xs">Tipo</Label>
+            <Label className="text-xs">Mealplan</Label>
             <ComboboxAutocomplete
               options={mealOpts}
               value={mealPlan}
               onChange={setMealPlan}
               placeholder="Selecione ou digite..."
-              searchPlaceholder="Buscar tipo..."
+              searchPlaceholder="Buscar mealplan..."
               allowCustom
             />
           </div>

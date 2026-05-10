@@ -54,9 +54,7 @@ export const Route = createFileRoute("/workspace")({
   component: () => (
     <AuthGate>
       <AppShell>
-        <WorkspaceWindowsProvider>
-          <WorkspacePage />
-        </WorkspaceWindowsProvider>
+        <WorkspacePage />
       </AppShell>
     </AuthGate>
   ),

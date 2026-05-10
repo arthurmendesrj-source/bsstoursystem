@@ -557,6 +557,16 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
 
   const hotels = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "hotel");
   const services = items.map((it, i) => ({ it, i })).filter(({ it }) => it.kind === "service");
+  const lastHotelCheckOut = hotels
+    .map(({ it }) => it.check_out || it.item_date || null)
+    .filter((d): d is string => !!d)
+    .sort()
+    .pop() ?? null;
+  const lastServiceDate = services
+    .map(({ it }) => it.item_date || null)
+    .filter((d): d is string => !!d)
+    .sort()
+    .pop() ?? null;
 
   return (
     <div className="space-y-5">
@@ -804,6 +814,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         quoteId={quoteId}
         defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
         initial={editingService}
+        defaultDate={lastServiceDate}
         onSaved={load}
       />
 
@@ -813,6 +824,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         quoteId={quoteId}
         defaultMarkupPct={Number(quote?.default_markup_pct ?? 0)}
         initial={editingHotel}
+        defaultCheckIn={lastHotelCheckOut}
         onSaved={load}
       />
 

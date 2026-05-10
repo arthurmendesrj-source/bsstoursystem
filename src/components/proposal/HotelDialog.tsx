@@ -39,10 +39,11 @@ type Props = {
   quoteId: string;
   defaultMarkupPct?: number;
   initial?: HotelInitial | null;
+  defaultCheckIn?: string | null;
   onSaved: () => void;
 };
 
-export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
+export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, defaultCheckIn, onSaved }: Props) {
   const { user } = useAuth();
   const { canField } = usePermissions();
   const canEditCost = canField("quotes", "unit_cost", "edit");
@@ -70,8 +71,9 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
 
   useEffect(() => {
     if (!open) return;
-    setCheckIn(initial?.item_date || today);
-    setCheckOut(initial?.check_out || today);
+    const fallbackIn = defaultCheckIn || today;
+    setCheckIn(initial?.item_date || fallbackIn);
+    setCheckOut(initial?.check_out || fallbackIn);
     setCity(initial?.city ?? "");
     setHotel(initial?.description ?? "");
     setMealPlan(initial?.meal_plan ?? "");

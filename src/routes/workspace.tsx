@@ -790,21 +790,8 @@ function WorkspacePage() {
                 <AccordionContent>
                   {!hasLead ? (
                     <EmptyTab text={t("selectLeadToView")} />
-                  ) : bookings.length === 0 ? (
-                    <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
                   ) : (
-                    <div className="space-y-2">
-                      {bookings.map((b) => (
-                        <div
-                          key={b.id}
-                          onDoubleClick={() => openBookingWindow(b)}
-                          title="Duplo-clique para abrir em janela"
-                          className="cursor-pointer hover:bg-muted/40 rounded-md"
-                        >
-                          {renderBookingCard(b, true)}
-                        </div>
-                      ))}
-                    </div>
+                    renderBookingsTable(bookings)
                   )}
                 </AccordionContent>
               </AccordionItem>

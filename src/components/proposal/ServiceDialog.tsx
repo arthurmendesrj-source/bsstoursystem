@@ -194,7 +194,7 @@ export function ServiceDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 
           <div>
             <Label className="text-xs">Tipo de guia</Label>
             <ComboboxAutocomplete
-              options={GUIDE_TYPES.map((g) => ({ value: g, label: g }))}
+              options={guideOpts}
               value={guideType}
               onChange={setGuideType}
               placeholder="Selecione ou digite..."

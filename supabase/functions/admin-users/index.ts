@@ -144,9 +144,7 @@ Deno.serve(async (req) => {
         return json({ error: "Diretor não pode atribuir admin/diretor" }, 403);
       }
 
-      const redirectTo = req.headers.get("origin")
-        ? `${req.headers.get("origin")}/`
-        : undefined;
+      const redirectTo = `${APP_URL}/`;
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
         data: fullName ? { full_name: fullName } : undefined,
         redirectTo,

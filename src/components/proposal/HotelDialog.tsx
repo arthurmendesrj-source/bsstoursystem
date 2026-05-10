@@ -40,14 +40,6 @@ type Props = {
   onSaved: () => void;
 };
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
-
-const slugify = (s: string) =>
-  s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim()
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
 export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, onSaved }: Props) {
   const { user } = useAuth();
   const { canField } = usePermissions();

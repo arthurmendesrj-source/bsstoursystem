@@ -622,7 +622,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             <FileText className="h-4 w-4 mr-1" /> Gerar Documento
           </Button>
           <Can module="quotes" action="edit">
-            <Button size="sm" onClick={save} disabled={saving}>
+            <Button size="sm" onClick={() => save()} disabled={saving}>
               <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
             </Button>
           </Can>

@@ -262,28 +262,40 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
 
           <div>
             <Label className="text-xs">Sala*</Label>
-            <Input value={room} onChange={(e) => setRoom(e.target.value)} className={errClass("room")} placeholder="Ex.: Standard, Deluxe..." />
+            <ComboboxAutocomplete
+              options={roomOpts}
+              value={room}
+              onChange={setRoom}
+              placeholder="Ex.: Standard, Deluxe..."
+              searchPlaceholder="Buscar sala..."
+              allowCustom
+              className={errClass("room")}
+            />
             {errors.room && <p className="text-xs text-destructive mt-1">Obrigatório</p>}
           </div>
 
           <div>
             <Label className="text-xs">Tipo</Label>
-            <Select value={mealPlan || undefined} onValueChange={(v) => setMealPlan(v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {MEAL_PLANS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={MEAL_PLANS.map((m) => ({ value: m, label: m }))}
+              value={mealPlan}
+              onChange={setMealPlan}
+              placeholder="Selecione ou digite..."
+              searchPlaceholder="Buscar tipo..."
+              allowCustom
+            />
           </div>
 
           <div>
             <Label className="text-xs">Avaliar</Label>
-            <Select value={category || undefined} onValueChange={(v) => setCategory(v)}>
-              <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
-              <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <ComboboxAutocomplete
+              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              value={category}
+              onChange={setCategory}
+              placeholder="Selecione ou digite..."
+              searchPlaceholder="Buscar categoria..."
+              allowCustom
+            />
           </div>
 
           <div>

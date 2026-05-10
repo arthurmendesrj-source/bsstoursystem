@@ -511,7 +511,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     const departure = dates[0] ?? null;
     const ret = dates[dates.length - 1] ?? departure;
 
-    const { error } = await supabase.from("bookings").insert({
+    const { data: newBooking, error } = await supabase.from("bookings").insert({
       lead_id: leadId,
       customer_id: customerId,
       quote_id: quote.id,
@@ -521,8 +521,28 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       return_date: ret,
       status: "pre_reserva",
       created_by: uid,
-    });
-    if (error) return toast.error(error.message);
+    }).select("id").single();
+    if (error || !newBooking) return toast.error(error?.message ?? "erro");
+
+    // Auto-create invoice so number shows up everywhere
+    const invoiceNumber = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
+    const { data: existingInv } = await supabase.from("invoices").select("id").eq("number", invoiceNumber).maybeSingle();
+    if (existingInv) {
+      await supabase.from("invoices").update({ booking_id: newBooking.id, quote_id: quote.id, customer_id: customerId }).eq("id", existingInv.id);
+    } else {
+      await supabase.from("invoices").insert({
+        number: invoiceNumber,
+        booking_id: newBooking.id,
+        quote_id: quote.id,
+        customer_id: customerId,
+        currency: quote.currency,
+        subtotal: quote.total_amount,
+        total: quote.total_amount,
+        status: "draft",
+        created_by: uid,
+        issued_at: new Date().toISOString(),
+      });
+    }
     toast.success(t("bookingCreated"));
     onSaved?.();
   };

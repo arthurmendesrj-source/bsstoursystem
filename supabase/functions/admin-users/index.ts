@@ -13,6 +13,7 @@ const corsHeaders = {
 type AppRole = "admin" | "diretor" | "gerente" | "coordenador" | "supervisor" | "operador";
 const ALLOWED_ROLES: AppRole[] = ["admin", "diretor", "gerente", "coordenador", "supervisor", "operador"];
 const PROTECTED_ROLES: AppRole[] = ["admin", "diretor"];
+const APP_URL = "https://bsstoursystem.lovable.app";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {

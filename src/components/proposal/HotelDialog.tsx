@@ -260,7 +260,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
           <div>
             <Label className="text-xs">Tipo</Label>
             <ComboboxAutocomplete
-              options={MEAL_PLANS.map((m) => ({ value: m, label: m }))}
+              options={mealOpts}
               value={mealPlan}
               onChange={setMealPlan}
               placeholder="Selecione ou digite..."
@@ -272,7 +272,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
           <div>
             <Label className="text-xs">Avaliar</Label>
             <ComboboxAutocomplete
-              options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+              options={categoryOpts}
               value={category}
               onChange={setCategory}
               placeholder="Selecione ou digite..."

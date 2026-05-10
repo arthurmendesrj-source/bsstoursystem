@@ -27,6 +27,7 @@ export type HotelInitial = {
   description?: string | null;
   category?: string | null;
   meal_plan?: string | null;
+  room_config?: string | null;
   rooms?: number | null;
   total?: number | null;
   notes?: string | null;

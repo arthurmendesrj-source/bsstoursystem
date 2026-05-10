@@ -313,10 +313,11 @@ function WorkspacePage() {
     } else {
       title = t("reservation");
       content = (
-        <div className="p-4 space-y-3">
-          {bookings.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
-          ) : bookings.map((b) => renderBookingCard(b, true))}
+        <div className="p-4 space-y-4">
+          {renderBookingsTable(bookings)}
+          {bookings.map((b) => (
+            <div key={`detail-${b.id}`}>{renderBookingCard(b, true)}</div>
+          ))}
         </div>
       );
     }

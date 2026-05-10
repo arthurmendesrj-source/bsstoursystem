@@ -227,12 +227,43 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       }),
     );
     setLoading(false);
+    dirtyRef.current = false;
+    setSaveStatus("idle");
   };
 
   useEffect(() => {
     load();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [quoteId]);
+
+  // Auto-save: debounce 2s after any user change
+  useEffect(() => {
+    if (loading || !quote || !canEdit) return;
+    if (!dirtyRef.current) {
+      dirtyRef.current = true;
+      return;
+    }
+    setSaveStatus("dirty");
+    if (anyChildDialogOpen) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveRef.current?.({ silent: true });
+    }, 2000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, bankFee, quote?.notes, quote?.valid_until, quote?.currency, quote?.default_markup_pct]);
+
+  // Flush pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (dirtyRef.current) {
+        saveRef.current?.({ silent: true });
+      }
+    };
+  }, []);
 
   const totals = useMemo(() => computeTotals(items, bankFee), [items, bankFee]);
   const ccy = quote?.currency ?? "USD";

@@ -75,6 +75,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
     setCity(initial?.city ?? "");
     setHotel(initial?.description ?? "");
     setMealPlan(initial?.meal_plan ?? "");
+    setRoomConfig(initial?.room_config ?? "");
     setCategory(initial?.category ?? "");
     setQty(initial?.rooms ?? 1);
     setTotal(initial?.total != null ? String(initial.total) : "");

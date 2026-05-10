@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Calendar as CalendarIcon,
@@ -31,6 +31,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { usePermissions, MaskedField } from "@/lib/permissions";
@@ -89,7 +90,7 @@ type Lead = {
 type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean; priority: "baixa" | "media" | "alta"; started_at: string | null; completed_at: string | null };
 type Interaction = { id: string; type: string; subject: string | null; content: string | null; occurred_at: string };
 type Quote = { id: string; status: string; total_amount: number; currency: string; valid_until: string | null; created_at: string };
-type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null; customer_id: string | null; invoice_number?: string | null; customer_name?: string | null };
+type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null; customer_id: string | null; package_id?: string | null; invoice_number?: string | null; customer_name?: string | null; package_name?: string | null; voucher_code?: string | null };
 type BookingPaxRow = { id: string; booking_id: string; is_primary: boolean; full_name: string };
 type BookingSupplierRow = { id: string; booking_id: string; service_type: string | null; status: string | null; cost: number | null; currency: string | null; supplier_name: string | null };
 
@@ -154,7 +155,7 @@ function WorkspacePage() {
       supabase.from("tasks").select("id,title,description,due_date,completed,priority,started_at,completed_at").eq("lead_id", id).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", id).order("occurred_at", { ascending: false }),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", id).order("created_at", { ascending: false }),
-      supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date,customer_id").eq("lead_id", id).order("created_at", { ascending: false }),
+      supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date,customer_id,package_id").eq("lead_id", id).order("created_at", { ascending: false }),
     ]);
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
@@ -167,17 +168,24 @@ function WorkspacePage() {
     let custMap = new Map<string, string>();
     let paxByBooking: Record<string, BookingPaxRow[]> = {};
     let suppByBooking: Record<string, BookingSupplierRow[]> = {};
+    let voucherMap = new Map<string, string>();
+    let pkgMap = new Map<string, string>();
     if (bookingIds.length) {
-      const [invRes, paxRes, suppRes, custRes] = await Promise.all([
+      const pkgIds = Array.from(new Set(baseBookings.map((b) => b.package_id).filter(Boolean) as string[]));
+      const [invRes, paxRes, suppRes, custRes, vouRes, pkgRes] = await Promise.all([
         supabase.from("invoices").select("booking_id,number,created_at").in("booking_id", bookingIds).order("created_at", { ascending: false }),
         supabase.from("booking_pax").select("id,booking_id,is_primary,customer_id,customers(full_name)").in("booking_id", bookingIds),
         supabase.from("booking_suppliers").select("id,booking_id,service_type,status,cost,currency,suppliers(name)").in("booking_id", bookingIds),
         customerIds.length ? supabase.from("customers").select("id,full_name").in("id", customerIds) : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+        supabase.from("vouchers").select("booking_id,code").in("booking_id", bookingIds),
+        pkgIds.length ? supabase.from("packages").select("id,name").in("id", pkgIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
       ]);
       ((invRes.data ?? []) as { booking_id: string; number: string | null }[]).forEach((row) => {
         if (row.booking_id && row.number && !invoiceMap.has(row.booking_id)) invoiceMap.set(row.booking_id, row.number);
       });
       ((custRes.data ?? []) as { id: string; full_name: string }[]).forEach((c) => custMap.set(c.id, c.full_name));
+      ((vouRes.data ?? []) as { booking_id: string; code: string }[]).forEach((v) => voucherMap.set(v.booking_id, v.code));
+      ((pkgRes.data ?? []) as { id: string; name: string }[]).forEach((p) => pkgMap.set(p.id, p.name));
       ((paxRes.data ?? []) as Array<{ id: string; booking_id: string; is_primary: boolean; customers: { full_name: string } | null }>).forEach((row) => {
         const list = paxByBooking[row.booking_id] ?? [];
         list.push({ id: row.id, booking_id: row.booking_id, is_primary: !!row.is_primary, full_name: row.customers?.full_name ?? "—" });
@@ -193,6 +201,8 @@ function WorkspacePage() {
       ...b,
       invoice_number: invoiceMap.get(b.id) ?? null,
       customer_name: b.customer_id ? (custMap.get(b.customer_id) ?? null) : null,
+      voucher_code: voucherMap.get(b.id) ?? null,
+      package_name: b.package_id ? (pkgMap.get(b.package_id) ?? null) : null,
     })));
     setBookingPax(paxByBooking);
     setBookingSuppliers(suppByBooking);
@@ -303,10 +313,11 @@ function WorkspacePage() {
     } else {
       title = t("reservation");
       content = (
-        <div className="p-4 space-y-3">
-          {bookings.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
-          ) : bookings.map((b) => renderBookingCard(b, true))}
+        <div className="p-4 space-y-4">
+          {renderBookingsTable(bookings)}
+          {bookings.map((b) => (
+            <div key={`detail-${b.id}`}>{renderBookingCard(b, true)}</div>
+          ))}
         </div>
       );
     }
@@ -318,6 +329,83 @@ function WorkspacePage() {
       defaultSize: { width: 1100, height: 720 },
     });
   };
+
+  const BOOKING_STATUSES = ["pre_reserva", "confirmada", "em_viagem", "concluida", "cancelada"];
+  const bookingStatusColor = (s: string) =>
+    s === "confirmada" ? "bg-emerald-500/10 text-emerald-700" :
+    s === "cancelada" ? "bg-red-500/10 text-red-700" :
+    s === "em_viagem" ? "bg-blue-500/10 text-blue-700" :
+    s === "concluida" ? "bg-slate-500/10 text-slate-700" :
+    "bg-amber-500/10 text-amber-700";
+
+  const updateBookingStatus = async (id: string, status: string) => {
+    const { error } = await supabase.from("bookings").update({ status: status as "pre_reserva" }).eq("id", id);
+    if (error) toast.error(error.message); else if (lead) loadLead(lead.id);
+  };
+
+  const renderBookingsTable = (list: Booking[]) => (
+    <Card>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t("invoiceNumber")}</TableHead>
+            <TableHead>{t("customers")}</TableHead>
+            <TableHead>{t("packages")}</TableHead>
+            <TableHead>{t("departureDate")}</TableHead>
+            <TableHead>{t("price")}</TableHead>
+            <TableHead>{t("status")}</TableHead>
+            <TableHead className="text-right">Voucher</TableHead>
+            <TableHead className="text-right">{t("actions")}</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {list.length === 0 ? (
+            <TableRow><TableCell colSpan={8} className="py-12 text-center text-muted-foreground">{t("noBookings")}</TableCell></TableRow>
+          ) : list.map((b) => {
+            const pax = bookingPax[b.id] ?? [];
+            const cliLabel = b.customer_name ?? pax.find((p) => p.is_primary)?.full_name ?? pax[0]?.full_name ?? "—";
+            return (
+              <TableRow key={b.id} onDoubleClick={() => openBookingWindow(b)} className="cursor-pointer">
+                <TableCell>
+                  {b.invoice_number ? (
+                    <Badge variant="outline" className="font-mono">{b.invoice_number}</Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/30" title={t("noInvoiceForBooking")}>sem invoice</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="font-medium">{cliLabel}</TableCell>
+                <TableCell>{b.package_name ?? "—"}</TableCell>
+                <TableCell>{b.departure_date ?? "—"}</TableCell>
+                <TableCell>
+                  <MaskedField module="bookings" field="total_amount" value={fmtCurrency(Number(b.total_amount), b.currency as "BRL")} />
+                </TableCell>
+                <TableCell>
+                  <Select value={b.status} onValueChange={(v) => updateBookingStatus(b.id, v)}>
+                    <SelectTrigger className="h-8 w-36">
+                      <Badge variant="outline" className={bookingStatusColor(b.status)}>{b.status}</Badge>
+                    </SelectTrigger>
+                    <SelectContent>{BOOKING_STATUSES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </TableCell>
+                <TableCell className="text-right">
+                  {b.voucher_code ? (
+                    <Badge variant="outline" className="font-mono">{b.voucher_code}</Badge>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button asChild size="sm" variant="ghost">
+                    <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Card>
+  );
 
   const renderBookingCard = (b: Booking, expanded: boolean) => {
     const pax = bookingPax[b.id] ?? [];
@@ -702,21 +790,8 @@ function WorkspacePage() {
                 <AccordionContent>
                   {!hasLead ? (
                     <EmptyTab text={t("selectLeadToView")} />
-                  ) : bookings.length === 0 ? (
-                    <div className="py-12 text-center text-muted-foreground text-sm">{t("noBookings")}</div>
                   ) : (
-                    <div className="space-y-2">
-                      {bookings.map((b) => (
-                        <div
-                          key={b.id}
-                          onDoubleClick={() => openBookingWindow(b)}
-                          title="Duplo-clique para abrir em janela"
-                          className="cursor-pointer hover:bg-muted/40 rounded-md"
-                        >
-                          {renderBookingCard(b, true)}
-                        </div>
-                      ))}
-                    </div>
+                    renderBookingsTable(bookings)
                   )}
                 </AccordionContent>
               </AccordionItem>

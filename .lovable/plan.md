@@ -1,43 +1,55 @@
 ## Objetivo
-Padronizar a comunicação do "Sistema de Reserva" nas duas janelas: a do Atendimento (`/workspace`) e a da barra de ferramentas (`/bookings`), exibindo sempre **Cliente** e **Nº de Invoice** (de `invoices.number` vinculada por `booking_id`).
 
-## 1. Janela do Atendimento (`src/routes/workspace.tsx`)
+1. **Criar invoice automaticamente** quando uma cotação (quote) é convertida em reserva, para que o número da invoice apareça na coluna "Invoice" sem ação extra.
+2. **Padronizar a janela de Reserva no Atendimento** com o mesmo layout/tabela da janela da barra de ferramentas (`/bookings`), mostrando colunas: Invoice · Cliente · Pacote/Datas · Valor · Status · Voucher.
 
-Carregar invoices junto das reservas e expandir os cards.
+---
 
-- Em `loadLead()` (≈ linha 148), adicionar busca paralela:
-  - `supabase.from("invoices").select("id,number,booking_id,status,total").in("booking_id", bookingIds)` após carregar `bookingsRes`.
-  - `supabase.from("booking_pax").select("id,booking_id,is_primary,customer_id, customers(full_name)").in("booking_id", bookingIds)`.
-  - `supabase.from("booking_suppliers").select("id,booking_id,service_type,status,cost,currency, suppliers(name)").in("booking_id", bookingIds)`.
-- Estender o tipo `Booking` para incluir `customer_id`, e novos states `bookingInvoices`, `bookingPax`, `bookingSuppliers` (mapas por `booking_id`).
-- No accordion **Reservation** (linhas 620-650) e na janela flutuante `openSection("reservation")` (linhas 264-283):
-  - Cabeçalho do card: `Cliente: <nome do customer principal> · Invoice: <invoices.number ou "—">`.
-  - Subseção colapsável "Itens da reserva" listando:
-    - Passageiros (booking_pax.customers.full_name + tag "principal").
-    - Serviços/fornecedores (booking_suppliers.service_type · supplier.name · status · custo).
-  - Manter datas, status e total.
-- `openBookingWindow(b)` (linhas 294-320): trocar título para `Reserva ${invoiceNumber ?? "—"} · ${customerName}` e adicionar as duas seções (passageiros e serviços) no corpo.
+## 1. Conversão de cotação → reserva já cria a invoice
 
-## 2. Janela da barra de ferramentas (`src/routes/bookings.tsx`)
+Hoje `bookings.tsx` e `workspace.tsx` buscam `invoices.number` por `booking_id`, mas a conversão da cotação não insere nenhum registro em `invoices` — por isso aparece sempre "sem invoice". O número visual `IN<leadCode>` existe só dentro do `ProposalEditor`.
 
-Adicionar coluna **Invoice** como primeira da tabela e garantir que sempre venha preenchida (com aviso quando faltar).
+**Arquivos a alterar (frontend, sem migration):**
 
-- Carregar invoices junto na função `load()` (linha 62):
-  - `supabase.from("invoices").select("id,number,booking_id").in("booking_id", bookingIds)` e mapear `invoice_number` em cada `Booking`.
-- Estender tipo `Booking` com `invoice_number?: string | null`.
-- `<TableHeader>` (linhas 201-211): inserir `<TableHead>Invoice</TableHead>` ANTES de `Cliente`.
-- `<TableBody>` (linha 217): nova primeira célula com `b.invoice_number` em badge `font-mono`; quando ausente, mostrar badge âmbar `"sem invoice"` + tooltip "Gere uma invoice para esta reserva".
-- Ajustar `colSpan={7}` → `colSpan={8}` no estado vazio.
-- Diálogo "Nova reserva" (linhas 149-195):
-  - Marcar **Cliente** com `*` e adicionar texto auxiliar "Cliente e nº de invoice devem ser preenchidos. A invoice pode ser gerada após salvar a reserva.".
-  - Após `INSERT bookings` bem-sucedido (linha 92-99), exibir toast extra: "Reserva criada — gere a invoice para concluir." quando `customer_id` presente mas sem invoice ainda. Não bloquear o fluxo.
-- `Link "Abrir reserva"` continua igual; cabeçalho da página `/bookings/$bookingId` fica fora do escopo desta iteração.
+- `src/components/proposal/ProposalEditor.tsx` (`convertToBooking`, ~linha 488):
+  - Após `INSERT bookings` retornar com sucesso, fazer `INSERT public.invoices` com:
+    - `number`: `IN${leadCode ?? quote.id.slice(0,8).toUpperCase()}` (mesmo cálculo já usado na UI).
+    - `booking_id`: id da reserva recém-criada (usar `.select("id").single()` no insert de bookings).
+    - `quote_id`, `customer_id`, `currency`, `subtotal = total = quote.total_amount`, `status: "draft"`, `created_by: uid`, `issued_at: new Date().toISOString()`.
+  - Tratar conflito de `number` único: se já existir invoice com mesmo number (refazendo conversão), apenas atualizar `booking_id`.
 
-## 3. i18n (`src/lib/i18n.tsx`)
+- `src/components/NotificationBell.tsx` (`convertQuote`, ~linha 108):
+  - Mesma lógica: capturar `id` do booking inserido e criar a invoice com número `IN${q.lead_id?.slice(0,8).toUpperCase() ?? q.id.slice(0,8)}` (não temos `leadCode` aqui — buscar `leads.code` antes do insert para manter padrão `IN<leadCode>`).
 
-Adicionar chaves em pt/en/es: `invoiceNumber` ("Invoice"/"Invoice"/"Factura"), `noInvoiceForBooking` ("Sem invoice — gere uma invoice para esta reserva."), `bookingItems` ("Itens da reserva"/"Booking items"/"Items de la reserva"), `passengers` ("Passageiros"/"Passengers"/"Pasajeros"), `services` ("Serviços"/"Services"/"Servicios").
+- Sem mudança de schema/RLS (a tabela `invoices` já tem RLS para `bookings.create/edit`).
+
+---
+
+## 2. Janela de Reserva do Atendimento = tabela do `/bookings`
+
+Hoje o Atendimento renderiza cards (`renderBookingCard`). Vamos substituir pela mesma tabela do `/bookings`, mantendo as queries/estados que já existem em `workspace.tsx`.
+
+**Arquivo: `src/routes/workspace.tsx`**
+
+- Criar um novo helper `renderBookingsTable(bookings: Booking[])` que renderiza:
+  - `<Table>` com `<TableHeader>` idêntico ao de `/bookings`:
+    `Invoice | Cliente | Pacote | Saída | Valor | Status | Voucher | Ações`.
+  - Linha: badge mono com `invoice_number` ou badge âmbar "sem invoice"; nome do cliente (`b.customer_name` ou primário de `bookingPax`); pacote (já carregado: adicionar `package_id`+nome via mapa `packages` se necessário, ou simplesmente "—" quando não houver — `/bookings` mostra "—"); data de saída; `MaskedField` total; `Select` de status (mesma lista `STATUSES`); badge do voucher (consultar tabela `vouchers` por `booking_id` no `loadLead`); botão "Abrir reserva" → `Link` para `/bookings/$bookingId` (mesmo destino).
+  - Estado vazio com `colSpan={8}`.
+- Usar essa tabela em **dois lugares**:
+  - Accordion "Reservation" (na coluna lateral) — substitui `bookings.map(renderBookingCard)`.
+  - Janela flutuante `openSection("reservation")` — substitui o `bookings.map(...)` no `content`.
+- Manter `openBookingWindow` para o duplo-clique no item, mas seu conteúdo passa a ser também a tabela filtrada por aquela reserva (uma linha) + lista de passageiros/serviços abaixo.
+- Carregar `vouchers` e `packages` no `loadLead` em paralelo, para alimentar as colunas Voucher e Pacote.
+
+---
+
+## i18n
+
+Reaproveitar chaves já existentes (`invoiceNumber`, `customers`, `packages`, `departureDate`, `price`, `status`, `actions`, `noData`, `openBooking`, `generateVoucher`, `noInvoiceForBooking`). Sem novas chaves.
 
 ## Fora de escopo
-- Geração automática de invoice no insert de reserva (usuário escolheu "não bloquear, só exibir aviso").
-- Mudança nas RLS / migrations (todas as tabelas necessárias já existem com RLS).
-- Edição da rota `bookings_.$bookingId.tsx`.
+
+- Geração/edição da invoice criada (continua "draft"); o usuário ajusta depois pela janela de Invoice.
+- Migrations / mudanças de RLS.
+- Mudanças no `/bookings` toolbar — ele já está como o usuário pediu.

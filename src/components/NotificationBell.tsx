@@ -116,15 +116,34 @@ export function NotificationBell() {
       const { data: userRes } = await supabase.auth.getUser();
       const uid = userRes.user?.id;
       if (!uid) return;
-      const { error } = await supabase.from("bookings").insert({
+      const { data: newBooking, error } = await supabase.from("bookings").insert({
         lead_id: q.lead_id, customer_id: q.customer_id, quote_id: q.id,
         total_amount: q.total_amount, currency: q.currency as "BRL",
         departure_date: quoteForm.departure || null,
         return_date: quoteForm.ret || quoteForm.departure || null,
         status: "pre_reserva", created_by: uid,
-      });
-      if (error) toast.error(error.message);
-      else { toast.success(t("bookingCreated")); setQuoteDialog(null); load(); }
+      }).select("id").single();
+      if (error || !newBooking) { toast.error(error?.message ?? "erro"); return; }
+
+      // Auto-create invoice
+      let invoiceNumber = `IN${q.id.slice(0, 8).toUpperCase()}`;
+      if (q.lead_id) {
+        const { data: lead } = await supabase.from("leads").select("code").eq("id", q.lead_id).maybeSingle();
+        if (lead?.code) invoiceNumber = `IN${lead.code}`;
+      }
+      const { data: existingInv } = await supabase.from("invoices").select("id").eq("number", invoiceNumber).maybeSingle();
+      if (existingInv) {
+        await supabase.from("invoices").update({ booking_id: newBooking.id, quote_id: q.id, customer_id: q.customer_id }).eq("id", existingInv.id);
+      } else {
+        await supabase.from("invoices").insert({
+          number: invoiceNumber, booking_id: newBooking.id, quote_id: q.id, customer_id: q.customer_id,
+          currency: q.currency as "BRL", subtotal: q.total_amount, total: q.total_amount,
+          status: "draft", created_by: uid, issued_at: new Date().toISOString(),
+        });
+      }
+      toast.success(t("bookingCreated"));
+      setQuoteDialog(null);
+      load();
     } finally {
       setBusyId(null);
     }

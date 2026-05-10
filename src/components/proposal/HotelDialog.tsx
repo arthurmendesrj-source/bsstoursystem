@@ -69,6 +69,7 @@ export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0,
 
   const [cityOpts, setCityOpts] = useState<ComboboxOption[]>([]);
   const [hotelOpts, setHotelOpts] = useState<ComboboxOption[]>([]);
+  const [roomOpts, setRoomOpts] = useState<ComboboxOption[]>([]);
 
   useEffect(() => {
     if (!open) return;

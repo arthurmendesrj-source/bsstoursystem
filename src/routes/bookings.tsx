@@ -55,10 +55,12 @@ function BookingsPage() {
   const [customers, setCustomers] = useState<{ id: string; full_name: string }[]>([]);
   const [pkgs, setPkgs] = useState<{ id: string; name: string; base_price: number; base_currency: string }[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const emptyForm = {
     customer_id: "", package_id: "", total_amount: "", currency: "BRL",
     departure_date: "", return_date: "", status: "pre_reserva",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
 
   const load = async () => {
     let bookingsQ = supabase.from("bookings").select("*").order("created_at", { ascending: false });

@@ -166,6 +166,8 @@ function BookingDetailPage() {
         proof_text: merged.proof_text,
         proof_reference: merged.proof_reference,
         proof_email_id: merged.proof_email_id ?? null,
+        supplier_id: merged.supplier_id ?? null,
+        supplier_name: merged.supplier_name ?? null,
         confirmed_at: merged.status === "confirmado" ? new Date().toISOString() : null,
         confirmed_by: merged.status === "confirmado" ? user?.id ?? null : null,
       } as never, { onConflict: "booking_id,quote_item_id" })

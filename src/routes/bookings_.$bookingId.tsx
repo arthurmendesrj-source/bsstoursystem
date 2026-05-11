@@ -130,6 +130,8 @@ function BookingDetailPage() {
       if (v.quote_item_id) vMap[v.quote_item_id] = { id: v.id, code: v.code };
     });
     setVouchers(vMap);
+    const { data: sup } = await supabase.from("suppliers").select("id,name").order("name");
+    setSuppliers((sup ?? []) as { id: string; name: string }[]);
     // Invoice: by booking_id, fallback to quote_id
     let invNum: string | null = null;
     const { data: invByBooking } = await supabase.from("invoices").select("number").eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();

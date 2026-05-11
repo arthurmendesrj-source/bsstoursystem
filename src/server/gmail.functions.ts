@@ -206,7 +206,7 @@ export const gmailSync = createServerFn({ method: "POST" })
 
 // ---------------- analyze a local (db-only / seed) email with AI ----------------
 export const emailAnalyzeLocal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth, requireGmailAccount])
+  .middleware([requireSupabaseAuth])
   .inputValidator((data: { email_id: string }) => data)
   .handler(async ({ data, context }) => {
     const { supabase } = context;

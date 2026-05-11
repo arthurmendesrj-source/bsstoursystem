@@ -19,6 +19,7 @@ import {
   PageBreak,
 } from "https://esm.sh/docx@8.5.0";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { IATA_COUNTRY, formatCountryList } from "./iata-countries.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -426,6 +427,22 @@ Deno.serve(async (req) => {
       description: String(r.description ?? "").replace(/^\[(HOTEL|SERVICE)\]\s*/, ""),
     }));
 
+    // Load flights early — used for the active-dates filter, the destination
+    // title, and the consolidated schedule below.
+    const { data: flightsRaw } = await admin
+      .from("quote_flights")
+      .select("flight_date, departure_time, arrival_time, from_code, to_code, flight_number")
+      .eq("quote_id", quoteId)
+      .order("flight_date", { ascending: true });
+    const flights = (flightsRaw ?? []) as Array<{
+      flight_date: string | null;
+      departure_time: string | null;
+      arrival_time: string | null;
+      from_code: string | null;
+      to_code: string | null;
+      flight_number: string | null;
+    }>;
+
     let lead: any = null;
     if (quote.lead_id) {
       const { data } = await admin.from("leads").select("*").eq("id", quote.lead_id).maybeSingle();
@@ -447,11 +464,63 @@ Deno.serve(async (req) => {
     const total = subtotal + bankFee;
     const ccy: string = quote.currency ?? "USD";
 
+    // === Active dates: only days that have at least one quoted item ===
+    const activeDates = new Set<string>();
+    for (const it of items) {
+      if (it.item_date) activeDates.add(String(it.item_date));
+      if (it.kind === "hotel" && it.check_out) activeDates.add(String(it.check_out));
+    }
+    for (const f of flights) {
+      if (f.flight_date) activeDates.add(String(f.flight_date));
+    }
+    const activeDatesSorted = Array.from(activeDates).sort();
+
+    // Per-date brief sent to the AI so it cannot invent activities.
+    const dayBriefs = activeDatesSorted.map((date) => {
+      const dayItems: Array<{ kind: string; description: string; city?: string | null }> = [];
+      for (const it of items) {
+        if (it.kind === "hotel") {
+          if (it.item_date === date) dayItems.push({ kind: "hotel_check_in", description: it.description, city: it.city });
+          if (it.check_out === date) dayItems.push({ kind: "hotel_check_out", description: it.description, city: it.city });
+        } else if (it.item_date === date) {
+          dayItems.push({ kind: "service", description: it.description, city: it.city });
+        }
+      }
+      for (const f of flights) {
+        if (f.flight_date === date) {
+          dayItems.push({
+            kind: "flight",
+            description: `${f.flight_number ?? ""} ${f.from_code ?? ""} → ${f.to_code ?? ""}`.trim(),
+          });
+        }
+      }
+      return { date, items: dayItems };
+    });
+
+    // === Program title from flight destination countries (excluding origin) ===
+    const originCode = flights[0]?.from_code ?? null;
+    const originCountry = originCode ? IATA_COUNTRY[originCode] : undefined;
+    const destinationCountries: string[] = [];
+    for (const f of flights) {
+      if (!f.to_code) continue;
+      const country = IATA_COUNTRY[f.to_code];
+      if (!country) {
+        console.log(`[generate-proposal-doc] unknown IATA code: ${f.to_code}`);
+        continue;
+      }
+      if (country === originCountry) continue;
+      if (!destinationCountries.includes(country)) destinationCountries.push(country);
+    }
+    const programTitleFromFlights = formatCountryList(destinationCountries);
+
     // Ask AI for narrative content
     const langName = { pt: "Portuguese", en: "English", es: "Spanish", ru: "Russian" }[lang];
     const userBrief = {
       destination: lead?.destination ?? null,
       pax: items[0]?.pax ?? null,
+      program_title: programTitleFromFlights || null,
+      active_dates: activeDatesSorted,
+      day_briefs: dayBriefs,
       items: items.map((it: any) => ({
         kind: it.kind,
         description: it.description,
@@ -473,19 +542,28 @@ Deno.serve(async (req) => {
 
 Always reply by calling the tool 'build_proposal_content'. Tone: ${tone}. Language: ${langName}.
 
-For EACH day, provide:
-- A vivid descriptive narrative (experience, atmosphere, gastronomy, cultural context).
-- 'schedule': hour-by-hour planned activities (suggested times like 09:00, 12:30, etc.).
-- 'transfers': all logistical movements (e.g. "Airport GIG → Hotel Copacabana, ~45min by private car").
-- 'meals_included': breakfast/lunch/dinner included that day.
-- 'highlights': 2-4 bullet points of the day's highlights.
-- 'tips': 2-4 practical local tips (dress code, money, crowd timing, photo spots).
+**STRICT SCOPE — only quoted items**:
+- The user message includes 'active_dates' (the only dates with quoted items) and 'day_briefs' (what was sold on each date).
+- Generate entries in 'days' ONLY for dates listed in 'active_dates'. NEVER invent free days, rest days, leisure days, or filler activities for any other date.
+- For each generated day, the 'schedule', 'transfers', 'meals_included', 'highlights' and 'tips' MUST reference only the items present in day_briefs[date]. Do not add extra tours, sightseeing, museums, restaurants or meals that were not quoted.
+- Days that contain only a hotel check-in or check-out (no service, no flight) must have a SHORT narrative focused on arrival/departure logistics, with at most 1-2 schedule lines (check-in / rest / check-out) — never invent tours.
+- 'day_number' is the sequential index within active_dates (1, 2, 3...), not a calendar offset.
 
-Provide a 'practical_info' block covering: best time to visit, weather expected for the dates, currency, language, plug type, tipping culture, required documents (passport validity, visa, vaccines if applicable), what to pack, health & safety guidance, and generic emergency contacts (e.g. 190 police BR, 192 ambulance BR, embassy hint).
+For days WITH quoted services or flights, provide:
+- A vivid descriptive narrative (experience, atmosphere, gastronomy, cultural context) tied to those quoted items.
+- 'schedule': hour-by-hour times for the quoted items only.
+- 'transfers': only the logistical movements implied by the quoted flights/hotels.
+- 'meals_included': only meals included by the quoted hotel meal plan or quoted services.
+- 'highlights': 2-4 bullet points tied to the quoted items.
+- 'tips': 2-4 practical local tips relevant to those activities.
+
+Provide a 'practical_info' block covering: best time to visit, weather expected for the dates, currency, language, plug type, tipping culture, required documents (passport validity, visa, vaccines if applicable), what to pack, health & safety guidance, and generic emergency contacts.
 
 Provide a 'trip_management' block covering: how the client will be received at the airport, check-in/check-out policy, transfers overview, guide language, 24/7 local coordinator support details, standard cancellation policy, and standard payment terms.
 
 Inclusions/exclusions must reflect what was quoted (hotels with meal plan, transfers, tours) plus standard exclusions (international flights unless quoted, visas, tips, personal expenses, optional tours).
+
+If 'program_title' is provided in the user brief, use it VERBATIM as the document 'title'. Otherwise build a short title from the destination.
 
 NEVER mention internal costs, markup, or supplier names. Speak as the operator delivering the trip.
 
@@ -549,6 +627,14 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       } catch (e) {
         console.error("parse content failed", e);
       }
+    }
+
+    // Override title with the country-derived program name when available
+    if (programTitleFromFlights) content.title = programTitleFromFlights;
+
+    // Defensive filter: drop any AI-invented days outside the quoted dates
+    if (Array.isArray(content.days) && activeDates.size > 0) {
+      content.days = content.days.filter((d: any) => !d?.date || activeDates.has(String(d.date)));
     }
 
     // Build .docx
@@ -637,12 +723,7 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
 
     // Cronograma consolidado (datas + horários)
     if (isExecutive && includeSchedule) {
-      // Build flat schedule from items + flights
-      const { data: flightsRaw } = await admin
-        .from("quote_flights")
-        .select("flight_date, departure_time, arrival_time, from_code, to_code, flight_number")
-        .eq("quote_id", quoteId)
-        .order("flight_date", { ascending: true });
+      // Build flat schedule from items + flights (flights loaded earlier)
 
       type SchedRow = {
         date: string;
@@ -707,16 +788,17 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
           });
         }
       }
-      for (const f of flightsRaw ?? []) {
+      for (const f of flights) {
+        if (!f.flight_date) continue;
         const dep = String(f.departure_time ?? "").slice(0, 5);
         sched.push({
           date: String(f.flight_date),
           time: dep || "—",
           sortKey: 1, // flights before ground services
-          activity: `Voo ${f.flight_number ?? ""} ${f.from_code} → ${f.to_code}${
+          activity: `Voo ${f.flight_number ?? ""} ${f.from_code ?? ""} → ${f.to_code ?? ""}${
             f.arrival_time ? ` (chegada ${String(f.arrival_time).slice(0, 5)})` : ""
           }`.trim(),
-          place: f.from_code,
+          place: f.from_code ?? "—",
         });
       }
       sched.sort((a, b) => {

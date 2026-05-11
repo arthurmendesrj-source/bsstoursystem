@@ -1126,16 +1126,21 @@ function ItemTable({
                     />
                   </td>
                   <td className="p-2 text-right font-medium tabular-nums">{sub.toFixed(2)}</td>
-                  {!readOnly && (
+                  {(!readOnly || (showNotes && quoteId)) && (
                     <td className="p-2 text-right whitespace-nowrap">
-                      {onEdit && !it.id.startsWith("new-") && (
+                      {showNotes && quoteId && !it.id.startsWith("new-") && (
+                        <ItemNoteButton quoteId={quoteId} targetKind="item" targetId={it.id} />
+                      )}
+                      {!readOnly && onEdit && !it.id.startsWith("new-") && (
                         <Button size="icon" variant="ghost" onClick={() => onEdit(it.id)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" onClick={() => onRemove(i)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {!readOnly && (
+                        <Button size="icon" variant="ghost" onClick={() => onRemove(i)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </td>
                   )}
                 </tr>

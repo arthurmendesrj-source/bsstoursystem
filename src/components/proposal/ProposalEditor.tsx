@@ -822,6 +822,8 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onAdd={canEdit ? () => { setEditingService(null); setServiceDialogOpen(true); } : undefined}
         addLabel={t("addService")}
         icon={<Wrench className="h-4 w-4" />}
+        showNotes={mode === "invoice"}
+        quoteId={quoteId}
       />
 
       <div className="rounded-md border">

@@ -804,6 +804,8 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onAdd={canEdit ? () => { setEditingHotel(null); setHotelDialogOpen(true); } : undefined}
         addLabel={t("addHotel")}
         icon={<Hotel className="h-4 w-4" />}
+        showNotes={mode === "invoice"}
+        quoteId={quoteId}
       />
 
       <ItemTable

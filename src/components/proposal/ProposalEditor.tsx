@@ -653,6 +653,14 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             <FileText className="h-4 w-4 mr-1" /> Gerar Documento
           </Button>
           <Can module="quotes" action="edit">
+            <span className="text-xs text-muted-foreground self-center min-w-[110px]">
+              {saveStatus === "saving" && "Salvando…"}
+              {saveStatus === "dirty" && "Alterações não salvas"}
+              {saveStatus === "saved" && lastSavedAt && (
+                <span className="text-emerald-600">Salvo • {format(lastSavedAt, "HH:mm")}</span>
+              )}
+              {saveStatus === "error" && <span className="text-destructive">Erro ao salvar</span>}
+            </span>
             <Button size="sm" onClick={() => save()} disabled={saving}>
               <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
             </Button>

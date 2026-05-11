@@ -19,6 +19,7 @@ import {
   PageBreak,
 } from "https://esm.sh/docx@8.5.0";
 import { PDFDocument, StandardFonts, rgb } from "https://esm.sh/pdf-lib@1.17.1";
+import { IATA_COUNTRY, formatCountryList } from "./iata-countries.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -426,6 +427,22 @@ Deno.serve(async (req) => {
       description: String(r.description ?? "").replace(/^\[(HOTEL|SERVICE)\]\s*/, ""),
     }));
 
+    // Load flights early — used for the active-dates filter, the destination
+    // title, and the consolidated schedule below.
+    const { data: flightsRaw } = await admin
+      .from("quote_flights")
+      .select("flight_date, departure_time, arrival_time, from_code, to_code, flight_number")
+      .eq("quote_id", quoteId)
+      .order("flight_date", { ascending: true });
+    const flights = (flightsRaw ?? []) as Array<{
+      flight_date: string | null;
+      departure_time: string | null;
+      arrival_time: string | null;
+      from_code: string | null;
+      to_code: string | null;
+      flight_number: string | null;
+    }>;
+
     let lead: any = null;
     if (quote.lead_id) {
       const { data } = await admin.from("leads").select("*").eq("id", quote.lead_id).maybeSingle();
@@ -447,11 +464,63 @@ Deno.serve(async (req) => {
     const total = subtotal + bankFee;
     const ccy: string = quote.currency ?? "USD";
 
+    // === Active dates: only days that have at least one quoted item ===
+    const activeDates = new Set<string>();
+    for (const it of items) {
+      if (it.item_date) activeDates.add(String(it.item_date));
+      if (it.kind === "hotel" && it.check_out) activeDates.add(String(it.check_out));
+    }
+    for (const f of flights) {
+      if (f.flight_date) activeDates.add(String(f.flight_date));
+    }
+    const activeDatesSorted = Array.from(activeDates).sort();
+
+    // Per-date brief sent to the AI so it cannot invent activities.
+    const dayBriefs = activeDatesSorted.map((date) => {
+      const dayItems: Array<{ kind: string; description: string; city?: string | null }> = [];
+      for (const it of items) {
+        if (it.kind === "hotel") {
+          if (it.item_date === date) dayItems.push({ kind: "hotel_check_in", description: it.description, city: it.city });
+          if (it.check_out === date) dayItems.push({ kind: "hotel_check_out", description: it.description, city: it.city });
+        } else if (it.item_date === date) {
+          dayItems.push({ kind: "service", description: it.description, city: it.city });
+        }
+      }
+      for (const f of flights) {
+        if (f.flight_date === date) {
+          dayItems.push({
+            kind: "flight",
+            description: `${f.flight_number ?? ""} ${f.from_code ?? ""} → ${f.to_code ?? ""}`.trim(),
+          });
+        }
+      }
+      return { date, items: dayItems };
+    });
+
+    // === Program title from flight destination countries (excluding origin) ===
+    const originCode = flights[0]?.from_code ?? null;
+    const originCountry = originCode ? IATA_COUNTRY[originCode] : undefined;
+    const destinationCountries: string[] = [];
+    for (const f of flights) {
+      if (!f.to_code) continue;
+      const country = IATA_COUNTRY[f.to_code];
+      if (!country) {
+        console.log(`[generate-proposal-doc] unknown IATA code: ${f.to_code}`);
+        continue;
+      }
+      if (country === originCountry) continue;
+      if (!destinationCountries.includes(country)) destinationCountries.push(country);
+    }
+    const programTitleFromFlights = formatCountryList(destinationCountries);
+
     // Ask AI for narrative content
     const langName = { pt: "Portuguese", en: "English", es: "Spanish", ru: "Russian" }[lang];
     const userBrief = {
       destination: lead?.destination ?? null,
       pax: items[0]?.pax ?? null,
+      program_title: programTitleFromFlights || null,
+      active_dates: activeDatesSorted,
+      day_briefs: dayBriefs,
       items: items.map((it: any) => ({
         kind: it.kind,
         description: it.description,

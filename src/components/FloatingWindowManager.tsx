@@ -37,6 +37,7 @@ export type FloatingWindowManagerHandle = {
   openOrFocus: (opts: FloatingWindowOpenOpts) => void;
   close: (id: string) => void;
   hasOpen: (id: string) => boolean;
+  minimizeAll: () => void;
 };
 
 function readLastRect(sizeKey: string, def: FloatingWindowSize): WinRect {

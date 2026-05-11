@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth";
 import { useViewAs } from "@/lib/viewAs";
 import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
+import { notifyTaskAssigned } from "@/lib/tasks.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 

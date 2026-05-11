@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/button";
 import { NotificationBell } from "@/components/NotificationBell";
 import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();

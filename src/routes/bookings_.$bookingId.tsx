@@ -102,7 +102,7 @@ function BookingDetailPage() {
   const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>("");
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
-  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 

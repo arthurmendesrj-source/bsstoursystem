@@ -22,6 +22,7 @@ import {
 } from "@/lib/proposal-totals";
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocumentDialog } from "./GenerateDocumentDialog";
+import { QuoteSpreadsheetButton } from "./QuoteSpreadsheetButton";
 import { GenerateInvoiceDialog } from "@/components/booking/GenerateInvoiceDialog";
 import { ItemNoteButton } from "@/components/booking/ItemNoteButton";
 import { AiProgramAssistantDialog } from "./AiProgramAssistantDialog";

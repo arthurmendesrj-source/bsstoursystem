@@ -1,73 +1,46 @@
 ## Objetivo
 
-1. **Manter o lead em foco**: ao navegar pela barra lateral com um lead aberto em `/workspace`, abrir o conteúdo dentro do próprio painel central — sem trocar de rota nem perder o lead.
-2. **Planilha de Cotação**: na tela Proposta (dentro do atendimento), substituir o botão atual por um único botão "Planilha de Cotação" com duas ações: **Baixar** e **Upload** (substitui itens da proposta atual).
+Fazer com que todas as janelas flutuantes abertas via duplo-clique (e-mail, atividades, propostas, fatura, reservas, tarefas, etc.) **nunca sumam sozinhas** ao usar a barra de ferramentas (sidebar) do Workspace. Elas devem ser **minimizadas automaticamente** para o rodapé e permanecerem lá até o usuário clicar manualmente no `X`.
 
----
+## Comportamento atual
 
-### 1. Barra lateral "lead-aware" no Workspace
+- O `WorkspaceWindowsProvider` já vive no `__root.tsx`, então as janelas tecnicamente sobrevivem à navegação.
+- Porém, ao clicar em um item da sidebar com um lead ativo, o Workspace renderiza um `iframe` da ferramenta (Reservas, Pacotes, etc.) que cobre visualmente as janelas abertas, dando a sensação de que “sumiram”.
+- Não existe hoje uma forma do usuário recuperar essas janelas a não ser fechando o iframe.
 
-`src/components/AppShell.tsx`
-- Detectar se a rota atual é `/workspace` e se há `?lead=<id>` no search.
-- Quando houver lead ativo, interceptar os cliques nos itens da barra (Reservas, Pacotes, Email, Clientes, Fornecedores, Itinerários, Funil, Atividades, Bíblia, Inbox-IA, etc.) e, em vez de `<Link to="...">`, disparar uma navegação para `/workspace` mantendo `?lead=<id>` e adicionando um novo parâmetro `tool=<chave>` (ex.: `bookings`, `packages`, `email`, `customers`, `suppliers`, `itineraries`, `funnel`, `biblia`, `inbox-ia`, `dashboard`).
-- Itens de Configurações/Permissões/Usuários continuam navegando normalmente (não fazem sentido embutidos).
-- O destaque de "ativo" passa a considerar `tool` em vez do `path` quando o lead está ativo.
+## Mudanças propostas
 
-`src/routes/workspace.tsx`
-- Estender `WorkspaceSearch` para `{ lead?: string; tool?: string }`.
-- Adicionar uma nova seção "Ferramenta" no painel central que, quando `tool` está setado, renderiza o componente embutido correspondente, escopado ao lead quando faz sentido:
-  - `bookings` → lista de reservas filtrada por `lead_id`
-  - `packages` → lista de pacotes (read-only, para consulta)
-  - `email` → `<EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader />` (já existe)
-  - `customers` → ficha do cliente vinculado ao lead
-  - `suppliers`, `itineraries`, `funnel`, `biblia`, `inbox-ia`, `dashboard` → versão embutida em iframe-less, reusando os componentes principais já existentes nessas rotas (refatorando para um componente exportável quando necessário).
-- Header do painel mostra um botão "Voltar para atendimento" que limpa `tool` e volta para a aba padrão (Email/Atividades/Proposta etc.).
-- Sem lead ativo, `tool` é ignorado.
+### 1. `FloatingWindowManager.tsx`
+- Expor uma nova ação `minimizeAll()` no `FloatingWindowManagerHandle`.
+- `minimizeAll()` percorre todas as janelas em estado `normal` ou `max` e altera para `min`, preservando posição/tamanho. Janelas já minimizadas permanecem como estão.
+- Garantir que a barra de minimizadas no rodapé (`fixed bottom-2 right-2 z-50`) **sempre** fique acima de qualquer iframe/painel — manter z-50 e adicionar `pointer-events-auto` no container.
 
-**Fora de escopo desta etapa**: encapsular telas extremamente complexas (Gerencial, Permissões, Settings) — essas continuam navegando para fora.
+### 2. `WorkspaceWindowsProvider.tsx`
+- Adicionar `minimizeAllWindows()` ao contexto, chamando `ref.current?.minimizeAll()`.
+- Fallback no-op para componentes fora do provider.
 
----
+### 3. `AppShell.tsx` (sidebar)
+- No handler de clique dos itens da sidebar (incluindo o caminho que monta `wrappedSearch` para “Manter dentro do Workspace”), antes de `navigate(...)`, chamar `minimizeAllWindows()`.
+- Aplicar também aos itens que **trocam de rota** (Gerencial, Configurações, Permissões, etc.) — assim o usuário recupera as janelas ao voltar.
+- Não chamar `closeWindow` em lugar nenhum por causa de navegação.
 
-### 2. Botão "Planilha de Cotação" (Proposta)
+### 4. Workspace `ToolPanel` (`workspace.tsx`)
+- Ao trocar `tool` ou ao clicar “Voltar para atendimento”, **não** fechar janelas; apenas minimizar (`minimizeAllWindows()`) por consistência visual.
+- Ajustar o container do iframe para `relative z-0` para garantir que nunca cubra a barra de minimizadas (z-50) nem janelas restauradas (z-40+).
 
-`src/components/proposal/ProposalEditor.tsx`
-- Remover o botão atual de download de planilha (caso exista) ou substituí-lo.
-- Adicionar um único botão **"Planilha de Cotação"** com ícone de planilha, abrindo um `DropdownMenu` com:
-  - **Baixar** → gera e baixa `.xlsx` no cliente (sem edge function).
-  - **Upload** → abre input `<input type="file" accept=".xlsx">`; ao selecionar, parseia e substitui itens da proposta atual.
+### 5. Garantia de persistência
+- Revisar `workspace.tsx` para confirmar que nenhum `useEffect` de mudança de `lead` ou `tool` chama `win.closeWindow(...)` automaticamente. Se houver, remover.
+- Janelas continuam a ser fechadas **apenas** pelo botão `X` no título ou na pílula minimizada.
 
-`src/components/proposal/QuoteSpreadsheetButton.tsx` (novo)
-- Encapsula UI (dropdown), geração e parse usando **`xlsx`** (SheetJS) — biblioteca já leve, client-side.
-- Estrutura do arquivo:
-  - Aba **"Lead"** (somente leitura, instruções no topo):
-    - Cliente, Código do lead, Lead ID, Customer ID, Quote ID, Moeda, Markup padrão %, Datas (início/fim), Observações.
-  - Aba **"Itens"** (editável) com colunas:
-    - `kind` (`hotel`/`service`), `description`, `city`, `check_in`, `check_out`, `item_date`, `quantity`, `unit_cost`, `markup_pct`.
-    - Linhas pré-preenchidas com os itens existentes da proposta.
-  - Aba **"Instruções"** com regras: não renomear colunas, não alterar Quote ID na aba Lead, etc.
-- Nome do arquivo: `cotacao_<lead_code>_<quote_id_curto>.xlsx`.
+## Fora de escopo
 
-**Upload (substituir itens)**:
-- Lê a aba "Itens", valida `kind` e numéricos.
-- Confirma com diálogo: "Isso substituirá todos os itens da proposta. Continuar?".
-- Em uma transação lógica:
-  1. `delete from quote_items where quote_id = :id`
-  2. `insert` em `quote_items` com os novos itens (recalculando `unit_price` e `total` via `lib/proposal-totals.ts`).
-- Recarrega o editor (`onSaved` / `load()`).
-- Validação cruzada: o `Quote ID` da aba Lead deve bater com o `quoteId` atual; se não bater, bloqueia.
+- Não mudar o conteúdo das janelas, nem o `xlsx`/Planilha de Cotação.
+- Não alterar o comportamento de duplo-clique em si — só o que acontece com janelas já abertas durante a navegação.
+- Sem mudanças de schema/banco.
 
-**Sem mudanças de schema** — usa tabelas e RLS existentes (`quote_items`).
+## Arquivos afetados
 
----
-
-### Arquivos
-
-- **Editar**: `src/components/AppShell.tsx`, `src/routes/workspace.tsx`, `src/components/proposal/ProposalEditor.tsx`
-- **Criar**: `src/components/proposal/QuoteSpreadsheetButton.tsx`
-- **Dependência**: adicionar `xlsx` (`bun add xlsx`)
-
-### Fora de escopo
-
-- Não mexer em invoice, vouchers, geração de PDF.
-- Não embutir Gerencial / Permissões / Settings no Workspace.
-- Sem migrações de banco.
+- `src/components/FloatingWindowManager.tsx` (editar)
+- `src/components/workspace/WorkspaceWindowsProvider.tsx` (editar)
+- `src/components/AppShell.tsx` (editar)
+- `src/routes/workspace.tsx` (editar — `ToolPanel` + verificação de closes acidentais)

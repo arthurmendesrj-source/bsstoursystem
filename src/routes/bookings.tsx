@@ -95,7 +95,7 @@ function BookingsPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const { error } = await supabase.from("bookings").insert({
+    const payload = {
       customer_id: form.customer_id || null,
       package_id: form.package_id || null,
       total_amount: Number(form.total_amount || 0),
@@ -103,15 +103,32 @@ function BookingsPage() {
       departure_date: form.departure_date || null,
       return_date: form.return_date || null,
       status: form.status as "pre_reserva",
-      created_by: user.id,
-    });
+    };
+    const { error } = editingId
+      ? await supabase.from("bookings").update(payload).eq("id", editingId)
+      : await supabase.from("bookings").insert({ ...payload, created_by: user.id });
     if (error) toast.error(error.message);
     else {
       toast.success(t("saved"));
       setOpen(false);
-      setForm({ customer_id: "", package_id: "", total_amount: "", currency: "BRL", departure_date: "", return_date: "", status: "pre_reserva" });
+      setEditingId(null);
+      setForm(emptyForm);
       load();
     }
+  };
+
+  const openEdit = (b: Booking) => {
+    setEditingId(b.id);
+    setForm({
+      customer_id: b.customer_id ?? "",
+      package_id: b.package_id ?? "",
+      total_amount: String(b.total_amount ?? ""),
+      currency: b.currency ?? "BRL",
+      departure_date: b.departure_date ?? "",
+      return_date: b.return_date ?? "",
+      status: b.status ?? "pre_reserva",
+    });
+    setOpen(true);
   };
 
   const updateStatus = async (id: string, status: string) => {

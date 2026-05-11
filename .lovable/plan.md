@@ -1,53 +1,106 @@
 ## Objetivo
 
-1. **Auto-save** no editor de proposta: grava automaticamente 2s após qualquer alteração, com indicador discreto "Salvando…/Salvo" no cabeçalho (sem toasts repetidos).
-2. **Janela flutuante persistente**: a janela de proposta (e demais janelas flutuantes) continua aberta ao navegar entre telas (`/leads`, `/bookings`, etc.), não só dentro de `/workspace`.
+Ajustar a edge function `generate-proposal-doc` para:
+
+1. **Não inventar atividades em dias livres**: o roteiro/cronograma deve mencionar apenas datas em que existem itens preenchidos (hotel check-in/out, serviço com data, ou voo). Dias intermediários sem itens são totalmente omitidos.
+2. **Nome do programa baseado em países-destino dos voos**, excluindo o país de origem (ex.: "Argentina & Chile").
 
 ---
 
-## 1. Janela flutuante global
+## 1. Restringir o roteiro aos itens preenchidos
 
-**Mover** `WorkspaceWindowsProvider` de `src/routes/workspace.tsx` para `src/routes/__root.tsx`, dentro de `RootComponent` (logo abaixo de `PermissionsProvider`, envolvendo `<Outlet />`).
+Em `supabase/functions/generate-proposal-doc/index.ts`:
 
-Resultado: o `FloatingWindowManager` é montado uma única vez no app inteiro; abrir uma proposta no `/workspace` mantém a janela visível ao navegar para `/leads` ou qualquer outra rota.
+### Pré-cálculo (antes da chamada à IA)
 
-Nada muda na API do hook `useWorkspaceWindows()` — `workspace.tsx` continua usando como hoje, mas sem montar o provider localmente.
+- Carregar `quote_flights` antes do prompt (hoje só são carregados depois, dentro do bloco de cronograma). Mover esse fetch para junto do `quote_items`.
+- Construir `activeDates: Set<string>` reunindo:
+  - `item_date` e `check_out` de cada hotel,
+  - `item_date` de cada serviço,
+  - `flight_date` de cada voo.
+- Construir `dayBriefs: { date, items: [{ kind, description, city, time? }] }[]` agrupando todos os itens por data para passar à IA.
 
-## 2. Auto-save no `ProposalEditor`
+### Prompt da IA
 
-Em `src/components/proposal/ProposalEditor.tsx`:
+- Adicionar ao `userBrief`:
+  - `active_dates`: array ordenado das datas com itens.
+  - `day_briefs`: array agrupado por data (kind + description + city).
+- Reforçar no system prompt:
+  - "Generate days ONLY for the dates listed in `active_dates`. Do NOT invent free days, rest days, or filler activities for any other date."
+  - "Each generated day's `schedule`, `transfers`, `meals_included`, `highlights` and `tips` must reference ONLY the items provided in `day_briefs[date]`. Do not add extra tours, sightseeing or meals that were not quoted."
+  - "Hotel-only days (apenas check-in ou check-out, sem serviço/voo) devem ter narrativa curta focada em chegada/saída — sem horário de tour."
+- Atualizar a instrução do tool `build_proposal_content`: campo `days[].day_number` agora corresponde à posição cronológica dentro de `active_dates` (1, 2, 3...), não ao "dia da viagem" calendário absoluto.
 
-- Novo estado `saveStatus: "idle" | "dirty" | "saving" | "saved" | "error"` e `lastSavedAt: Date | null`.
-- Novo flag `dirtyRef` (useRef) para distinguir mudanças do usuário das vindas do `load()` inicial.
-- `useEffect` que observa `[items, bankFee, quote?.notes, quote?.valid_until, quote?.currency, quote?.default_markup_pct]`:
-  - Ignora a primeira execução pós-`load()`.
-  - Marca `saveStatus = "dirty"` e agenda `setTimeout(2000)` chamando uma versão silenciosa de `save()`.
-  - Limpa o timer anterior em cada mudança (debounce).
-- Refatorar `save()` para aceitar `{ silent?: boolean }`:
-  - Quando `silent`, não dispara `toast.success` nem `load()` (apenas atualiza ids de itens novos retornados pelo insert).
-  - Em erro silencioso, define `saveStatus = "error"` (mantém toast só nos erros).
-  - O botão "Salvar" manual continua funcionando como hoje (com toast).
-- Pausar auto-save enquanto `saving === true` ou enquanto algum dialog filho (`hotelDialogOpen`, `serviceDialogOpen`, `flightDialogOpen`) estiver aberto, para evitar conflito com gravações próprias desses diálogos.
-- Disparar um auto-save imediato (flush) ao desmontar o componente, se `saveStatus === "dirty"`.
+### Pós-processamento defensivo
 
-### Indicador no cabeçalho
+Após receber `content.days` da IA, filtrar:
+```ts
+content.days = (content.days ?? []).filter(d => activeDates.has(String(d.date)));
+```
+Garante a omissão mesmo se a IA escorregar.
 
-No header do editor (mesma linha do botão "Salvar"), adicionar um pequeno texto:
+### Cronograma consolidado
 
-- `dirty` → "Alterações não salvas" (cinza)
-- `saving` → "Salvando…" (com ícone girando)
-- `saved` → "Salvo • HH:mm" (verde discreto)
-- `error` → "Erro ao salvar" (vermelho)
+O bloco de cronograma já é montado a partir de itens reais (`items + flightsRaw`), então naturalmente ignora dias sem dados. Não precisa mudar.
+
+## 2. Título do programa pelos países-destino dos voos
+
+### Mapeamento IATA → país
+
+Adicionar arquivo `supabase/functions/generate-proposal-doc/iata-countries.ts` com um dicionário compacto dos códigos IATA mais relevantes para a operação atual (Brasil + América do Sul + principais hubs internacionais que aparecem nas propostas). Estrutura:
+
+```ts
+export const IATA_COUNTRY: Record<string, string> = {
+  GIG: "Brasil", GRU: "Brasil", CGH: "Brasil", BSB: "Brasil", SSA: "Brasil",
+  EZE: "Argentina", AEP: "Argentina", BRC: "Argentina",
+  SCL: "Chile", IPC: "Chile",
+  LIM: "Peru", CUZ: "Peru",
+  MVD: "Uruguai", PUJ: "República Dominicana",
+  MIA: "EUA", JFK: "EUA", LAX: "EUA",
+  LIS: "Portugal", MAD: "Espanha", CDG: "França", FCO: "Itália", LHR: "Reino Unido",
+  // ... lista inicial de ~80 códigos cobrindo destinos comuns
+};
+```
+
+Códigos não mapeados são ignorados (não derrubam o título; caem no fallback abaixo).
+
+### Cálculo do título
+
+Após carregar voos, antes do prompt:
+
+```ts
+const originCode = flightsRaw[0]?.from_code;
+const originCountry = originCode ? IATA_COUNTRY[originCode] : undefined;
+const destinationCountries = Array.from(new Set(
+  (flightsRaw ?? [])
+    .map(f => IATA_COUNTRY[f.to_code])
+    .filter((c): c is string => !!c && c !== originCountry)
+));
+```
+
+Formatação:
+- 0 países → fallback (lead.destination ou título atual da IA).
+- 1 país → `"Brasil"`.
+- 2 países → `"Argentina & Chile"`.
+- 3+ → `"Argentina, Chile & Peru"` (vírgula nos primeiros, `&` antes do último).
+
+Passar ao IA como `program_title` no `userBrief` E sobrescrever o `content.title` pós-resposta com esse valor quando houver pelo menos um país-destino. Assim o nome aparece na capa, no `safeTitle` do arquivo e no registro `quote_documents.title`.
+
+### Casos de borda
+
+- Sem voos → mantém comportamento atual (`lead.destination` ou título da IA).
+- Voo único cujo destino é o mesmo país de origem (voo doméstico) → título cai no fallback.
+- Códigos IATA desconhecidos → contribuir com um TODO interno (log) para enriquecer o dicionário no futuro.
 
 ## 3. Detalhes técnicos
 
-- O `load()` atual já é chamado em `useEffect([quoteId])`. Após o load, resetar `dirtyRef = false` para o `useEffect` de auto-save não disparar.
-- O auto-save NÃO precisa salvar enquanto `loading === true`.
-- Os diálogos `HotelDialog`/`ServiceDialog`/`FlightDialog` continuam fazendo seu próprio insert/update — eles não dependem do auto-save.
-- Permissão: se `!canEdit`, auto-save fica desligado (mesmo guard já presente em `save()`).
+- Re-ordenar o fetch de `quote_flights` para ANTES da chamada à IA; o bloco que monta o cronograma reaproveita o mesmo `flightsRaw` (remove o fetch duplicado).
+- Tipar `flightsRaw` localmente para evitar `any` no novo código.
+- Não há mudança de schema de banco.
+- Não há mudança no frontend (o título exibido vem do retorno da função).
 
 ## Fora do escopo
 
-- Versionamento/histórico de alterações.
-- Conflict resolution multi-usuário (último a salvar vence, como hoje).
-- Persistência da janela após F5/reload (apenas durante navegação SPA).
+- Tradução do título para os 4 idiomas (mantém em PT por enquanto).
+- Mapeamento IATA completo (parte de outro turno se aparecerem códigos novos).
+- Geocoding de cidades para inferir país sem voos (não solicitado).

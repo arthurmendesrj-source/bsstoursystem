@@ -368,12 +368,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       const { data: hits } = await supabase
         .from("emails")
         .select("thread_id")
-        .in("owner_email", authorizedEmails!)
+        .in("owner_email", currentOwners)
         .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
         .limit(500);
       threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
     }
-    let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
+    let q = supabase.from("email_threads").select("*").in("owner_email", currentOwners)
       .order("last_message_at", { ascending: false }).limit(pageSize);
     q = q.contains("labels", [activeLabel]);
     if (safe) {
@@ -390,7 +390,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     setLastPageFull(rows.length >= pageSize);
     if (isSearching) setThreads(rows);
     else setThreads((prev) => mergeUnique(rows, prev));
-  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize, mergeUnique]);
+  }, [activeLabel, search, hasMailbox, currentOwners, pageSize, mergeUnique]);
 
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);

@@ -45,11 +45,12 @@ import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
 import { TaskWindow } from "@/components/workspace/windows/TaskWindow";
 
-type WorkspaceSearch = { lead?: string };
+type WorkspaceSearch = { lead?: string; tool?: string };
 
 export const Route = createFileRoute("/workspace")({
   validateSearch: (search: Record<string, unknown>): WorkspaceSearch => ({
     lead: typeof search.lead === "string" ? search.lead : undefined,
+    tool: typeof search.tool === "string" ? search.tool : undefined,
   }),
   component: () => (
     <AuthGate>

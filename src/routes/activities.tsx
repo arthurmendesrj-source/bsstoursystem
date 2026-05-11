@@ -22,6 +22,7 @@ import { useAuth } from "@/lib/auth";
 import { useViewAs } from "@/lib/viewAs";
 import { useSubordinates } from "@/lib/hierarchy";
 import { supabase } from "@/integrations/supabase/client";
+import { notifyTaskAssigned } from "@/lib/tasks.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -61,10 +62,17 @@ function ActivitiesPage() {
   const { viewAs } = useViewAs();
   const targetUserId = viewAs?.user_id ?? null;
   const { subordinates } = useSubordinates();
+  const subordinateIds = useMemo(() => new Set(subordinates.map((s) => s.user_id)), [subordinates]);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [leadsMap, setLeadsMap] = useState<Record<string, LeadLite>>({});
+  const [allUsers, setAllUsers] = useState<{ user_id: string; full_name: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const canEdit = (task: Task) =>
+    isAdmin
+    || (!!user && task.assigned_to === user.id)
+    || (!!task.assigned_to && subordinateIds.has(task.assigned_to));
 
   // filters
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress" | "done">("open");
@@ -117,6 +125,15 @@ function ActivitiesPage() {
   };
 
   useEffect(() => { loadData(); }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // load all users for the "Atribuir a" select (open to everyone)
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .order("full_name", { ascending: true })
+      .then(({ data }) => setAllUsers((data ?? []) as { user_id: string; full_name: string | null }[]));
+  }, []);
 
   // link-to-lead dialog
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -250,7 +267,8 @@ function ActivitiesPage() {
     if (!user || !form.title.trim()) return;
     const category = form.lead_id ? "negocio" : form.category;
     const source = form.lead_id ? "lead" : "manual";
-    const { error } = await supabase.from("tasks").insert({
+    const assignedTo = form.assigned_to || targetUserId || user.id;
+    const { data: inserted, error } = await supabase.from("tasks").insert({
       title: form.title.slice(0, 200),
       description: form.description || null,
       due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
@@ -259,9 +277,13 @@ function ActivitiesPage() {
       source,
       lead_id: form.lead_id || null,
       created_by: user.id,
-      assigned_to: form.assigned_to || targetUserId || user.id,
-    });
+      assigned_to: assignedTo,
+    }).select("id").maybeSingle();
     if (error) { toast.error(error.message); return; }
+    // Notifica destinatário se for outra pessoa (falha silenciosa)
+    if (inserted?.id && assignedTo && assignedTo !== user.id) {
+      notifyTaskAssigned({ data: { taskId: inserted.id } }).catch(() => undefined);
+    }
     // Auto-link emails by lead's email
     if (form.lead_id) {
       const { data: leadRow } = await supabase
@@ -354,18 +376,22 @@ function ActivitiesPage() {
                   </Select>
                 </div>
               </div>
-              {subordinates.length > 0 && (
-                <div>
-                  <Label>Responsável</Label>
-                  <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="self">Eu mesmo</SelectItem>
-                      {subordinates.map((s) => <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div>
+                <Label>Atribuir a</Label>
+                <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Eu mesmo</SelectItem>
+                    {allUsers
+                      .filter((u) => u.user_id !== user?.id)
+                      .map((u) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.full_name || u.user_id.slice(0, 8)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                 <Button type="submit">{t("save")}</Button>
@@ -543,18 +569,21 @@ function ActivitiesPage() {
                       <TableCell className="text-sm">{fmtTime(task.time_spent_minutes)}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          {!canEdit(task) && (
+                            <Badge variant="outline" className="text-[10px] mr-1">somente leitura</Badge>
+                          )}
                           {!task.completed && (
-                            <Button size="icon" variant="ghost" onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
+                            <Button size="icon" variant="ghost" disabled={!canEdit(task)} onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
                               {inProgress ? <Pause className="h-4 w-4 text-amber-600" /> : <Play className="h-4 w-4" />}
                             </Button>
                           )}
-                          <Button size="icon" variant="ghost" onClick={() => openLinkDialog([task.id])} title={t("linkToLead")}>
+                          <Button size="icon" variant="ghost" disabled={!canEdit(task)} onClick={() => openLinkDialog([task.id])} title={t("linkToLead")}>
                             <Link2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => removeTask(task)} title={t("delete")}>
+                          <Button size="icon" variant="ghost" disabled={!isAdmin && task.created_by !== user?.id} onClick={() => removeTask(task)} title={t("delete")}>
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => toggleComplete(task)} title={t("bulkComplete")}>
+                          <Button size="icon" variant="ghost" disabled={!canEdit(task)} onClick={() => toggleComplete(task)} title={t("bulkComplete")}>
                             {task.completed
                               ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                               : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary" />}

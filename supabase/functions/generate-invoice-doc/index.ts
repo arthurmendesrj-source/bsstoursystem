@@ -256,6 +256,7 @@ Deno.serve(async (req) => {
       : ["xlsx"];
     const bankInfo: string = body.bank_info ?? "";
     const beneficiary: string = body.beneficiary ?? "";
+    const version: "client" | "admin" = body.version === "admin" ? "admin" : "client";
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "booking_id required" }), {

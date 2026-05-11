@@ -313,7 +313,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
     const OUTBOUND = new Set(["SENT", "DRAFT", "TRASH", "SPAM"]);
     if (OUTBOUND.has(activeLabel)) {
-      const owners = authorizedEmails!;
+      const owners = currentOwners;
+      if (owners.length === 0) { setThreads([]); return; }
       let q = supabase
         .from("emails")
         .select("id, thread_id, subject, snippet, from_email, from_name, to_emails, internal_date, is_starred, is_unread, is_important, has_attachments, labels, body_text, owner_email")

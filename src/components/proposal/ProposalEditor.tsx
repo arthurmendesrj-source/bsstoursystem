@@ -658,9 +658,38 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               <FileText className="h-4 w-4 mr-1" /> Gerar Invoice
             </Button>
           ) : (
-            <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-              <FileText className="h-4 w-4 mr-1" /> Gerar Documento
-            </Button>
+            <>
+              <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
+                <FileText className="h-4 w-4 mr-1" /> Gerar Documento
+              </Button>
+              <QuoteSpreadsheetButton
+                lead={{
+                  leadId,
+                  leadCode: leadCode ?? null,
+                  customerId: customerId ?? null,
+                }}
+                quote={{
+                  quoteId,
+                  currency: quote.currency,
+                  defaultMarkupPct: Number(quote.default_markup_pct ?? 0),
+                  notes: quote.notes,
+                  validUntil: quote.valid_until,
+                }}
+                items={items.map((it) => ({
+                  kind: it.kind,
+                  description: (it.description ?? "").replace(/^\[(HOTEL|SERVICE)\]\s*/i, ""),
+                  city: (it as { city?: string | null }).city ?? null,
+                  check_in: it.kind === "hotel" ? it.item_date ?? null : null,
+                  check_out: it.kind === "hotel" ? it.check_out ?? null : null,
+                  item_date: it.kind === "service" ? it.item_date ?? null : null,
+                  quantity: Number(it.quantity) || 0,
+                  unit_cost: Number(it.unit_cost) || 0,
+                  markup_pct: Number(it.markup_pct) || 0,
+                }))}
+                disabled={!canEdit}
+                onUploaded={() => { void load(); onSaved?.(); }}
+              />
+            </>
           )}
           <Can module="quotes" action="edit">
             <span className="text-xs text-muted-foreground self-center min-w-[110px]">

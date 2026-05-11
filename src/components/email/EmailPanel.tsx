@@ -151,52 +151,87 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   useEffect(() => { try { localStorage.setItem(LS_COLLAPSED, collapsed ? "1" : "0"); } catch {} }, [collapsed]);
 
 
+  const LS_SELECTED_ACCOUNT = "email.selectedAccount";
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
-  const [newAccountEmail, setNewAccountEmail] = useState("");
-  const [addingAccount, setAddingAccount] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(() => {
+    try { return localStorage.getItem(LS_SELECTED_ACCOUNT); } catch { return null; }
+  });
+  const [connecting, setConnecting] = useState(false);
 
   const loadAccounts = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
     if (!uid) { setAuthorizedEmails([]); return; }
-    const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
-    setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
+    // Load OAuth-connected accounts (source of truth) — falls back to user_email_accounts.
+    const { data: tokens } = await supabase
+      .from("user_gmail_tokens")
+      .select("email_address")
+      .eq("user_id", uid);
+    let emails = ((tokens ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
+    if (emails.length === 0) {
+      const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
+      emails = ((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
+    }
+    setAuthorizedEmails(emails);
+    setSelectedAccount((prev) => {
+      const next = prev && emails.includes(prev) ? prev : (emails[0] ?? null);
+      try { if (next) localStorage.setItem(LS_SELECTED_ACCOUNT, next); else localStorage.removeItem(LS_SELECTED_ACCOUNT); } catch {}
+      return next;
+    });
   }, []);
 
   useEffect(() => { void loadAccounts(); }, [loadAccounts]);
 
-  const addEmailAccount = useCallback(async () => {
-    const email = newAccountEmail.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Informe um endereço de email válido.");
-      return;
-    }
-    setAddingAccount(true);
+  const pickAccount = useCallback((email: string) => {
+    setSelectedAccount(email);
+    try { localStorage.setItem(LS_SELECTED_ACCOUNT, email); } catch {}
+  }, []);
+
+  const startGoogleConnect = useCallback(async () => {
+    setConnecting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user?.id;
-      if (!uid) { toast.error("Sessão expirada."); return; }
-      const isFirst = (authorizedEmails?.length ?? 0) === 0;
-      const { error } = await supabase
-        .from("user_email_accounts")
-        .insert({ user_id: uid, email_address: email, is_primary: isFirst });
-      if (error) {
-        if ((error as { code?: string }).code === "23505") {
-          toast.error("Esta conta já está vinculada.");
-        } else {
-          toast.error(error.message || "Falha ao vincular conta.");
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { toast.error("Sessão expirada — faça login novamente."); return; }
+      const url = `/api/public/google/oauth/start?token=${encodeURIComponent(token)}`;
+      const popup = window.open(url, "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
+      if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups para este site."); return; }
+      const onMessage = (ev: MessageEvent) => {
+        const msg = ev.data as { type?: string; ok?: boolean; message?: string } | undefined;
+        if (!msg || msg.type !== "gmail-oauth") return;
+        window.removeEventListener("message", onMessage);
+        if (msg.ok) { toast.success(msg.message || "Conta conectada"); void loadAccounts(); }
+        else toast.error(msg.message || "Falha ao conectar");
+        setConnecting(false);
+      };
+      window.addEventListener("message", onMessage);
+      // Safety timeout in case popup is closed without message
+      const interval = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(interval);
+          window.removeEventListener("message", onMessage);
+          setConnecting(false);
+          void loadAccounts();
         }
-        return;
-      }
-      toast.success(`Conta ${email} vinculada.`);
-      setNewAccountEmail("");
-      setAddAccountOpen(false);
-      await loadAccounts();
-    } finally {
-      setAddingAccount(false);
+      }, 800);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao iniciar OAuth");
+      setConnecting(false);
     }
-  }, [newAccountEmail, authorizedEmails, loadAccounts]);
+  }, [loadAccounts]);
+
+  const disconnectAccount = useCallback(async (email: string) => {
+    if (!email) return;
+    if (!confirm(`Desconectar a conta ${email}? Os tokens serão removidos.`)) return;
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) return;
+    const { error } = await supabase.from("user_gmail_tokens").delete()
+      .eq("user_id", uid).eq("email_address", email.toLowerCase());
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Conta ${email} desconectada`);
+    await loadAccounts();
+  }, [loadAccounts]);
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
 

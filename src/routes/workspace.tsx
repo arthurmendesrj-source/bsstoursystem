@@ -1128,3 +1128,47 @@ function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Ta
     </div>
   );
 }
+
+const TOOL_ROUTES: Record<string, string> = {
+  "dashboard": "/dashboard",
+  "funnel": "/funnel",
+  "packages": "/packages",
+  "inbox-ia": "/inbox-ia",
+  "inbox-ia-email": "/inbox-ia/email",
+  "email": "/email",
+  "activities": "/activities",
+  "alerts": "/alerts",
+  "customers": "/customers",
+  "suppliers": "/suppliers",
+  "bookings": "/bookings",
+  "biblia": "/biblia",
+  "itineraries": "/itineraries",
+};
+
+function ToolPanel({ tool, onClose }: { tool: string; onClose: () => void }) {
+  const route = TOOL_ROUTES[tool];
+  if (!route) {
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        Ferramenta desconhecida.
+        <div className="mt-3"><Button size="sm" variant="outline" onClick={onClose}>Voltar para atendimento</Button></div>
+      </div>
+    );
+  }
+  const sep = route.includes("?") ? "&" : "?";
+  const src = `${route}${sep}embed=1`;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold capitalize">{tool.replace("-", " ")}</div>
+        <Button size="sm" variant="outline" onClick={onClose}>Voltar para atendimento</Button>
+      </div>
+      <iframe
+        src={src}
+        title={tool}
+        className="w-full rounded-md border bg-background"
+        style={{ height: "calc(100vh - 240px)", minHeight: 500 }}
+      />
+    </div>
+  );
+}

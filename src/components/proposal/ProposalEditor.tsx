@@ -652,10 +652,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="default" size="sm" onClick={() => setAiAssistOpen(true)} className="bg-gradient-to-r from-primary to-primary/80">
             <Sparkles className="h-4 w-4 mr-1" /> Assistente IA
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-            <FileText className="h-4 w-4 mr-1" /> Gerar Documento
-          </Button>
-          <Can module="quotes" action="edit">
+          {mode === "invoice" ? (
+            <Button variant="outline" size="sm" onClick={() => setInvoiceGenOpen(true)}>
+              <FileText className="h-4 w-4 mr-1" /> Gerar Invoice
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
+              <FileText className="h-4 w-4 mr-1" /> Gerar Documento
+            </Button>
+          )}
             <span className="text-xs text-muted-foreground self-center min-w-[110px]">
               {saveStatus === "saving" && "Salvando…"}
               {saveStatus === "dirty" && "Alterações não salvas"}

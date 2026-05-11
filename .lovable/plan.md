@@ -1,69 +1,44 @@
-## Contexto
+## Problema identificado
 
-Hoje o app usa **um único conector Gmail no nível do workspace** (a chave `GOOGLE_MAIL_API_KEY`), autorizado em `booking@adatours.com`. Toda chamada em `src/server/gmail-mirror.server.ts` usa esse mesmo token, então qualquer usuário que clica em "Sincronizar" acaba puxando os emails de `booking@adatours.com` — foi o que aconteceu com `boscobssteste2@gmail.com`.
+Após conectar várias contas Gmail, a Caixa de Entrada e Enviados estão **misturando emails de todas as contas autorizadas**, em vez de mostrar apenas os da conta selecionada no seletor.
 
-Como o app precisa suportar **várias contas Gmail reais e diferentes**, a única solução correta é implementar **OAuth Google próprio, por usuário**. O conector Lovable não consegue fazer isso por design.
+Causa raiz em `src/components/email/EmailPanel.tsx`:
+- Todas as queries usam `.in("owner_email", authorizedEmails)` (todas as contas) em vez de filtrar pela conta ativa (`selectedAccount`).
+- Isto afeta: lista de pastas (`email_labels`), threads da Caixa de Entrada (`email_threads`), mensagens de SENT/DRAFT/TRASH/SPAM (`emails`), busca, e estado do espelhamento (`email_sync_state`).
+- O filtro de "remetente igual ao dono" em SENT também usa todas as contas, então emails enviados pela conta A aparecem listados quando a conta B está selecionada.
 
----
+Adicionalmente, as tabelas `emails` e `email_threads` têm chaves únicas globais (`gmail_id`, `id`) sem incluir `owner_email`. Em teoria os IDs do Gmail são por‑caixa, mas se duas contas espelhadas trocarem mensagens entre si pode haver colisão de upsert. A correção blindando isto evita "vazamento" futuro entre contas.
 
-## Plano
+## Plano de correção
 
-### 1. Credenciais Google Cloud (você faz uma vez)
-1. Em https://console.cloud.google.com/ criar (ou reutilizar) um projeto
-2. Ativar a **Gmail API**
-3. Configurar **OAuth consent screen** (External, modo Production)
-4. Criar **OAuth 2.0 Client ID** do tipo *Web application* com Authorized redirect URIs:
-   - `https://bsstoursystem.lovable.app/api/public/google/oauth/callback`
-   - `https://id-preview--e04e61e2-142f-4f0a-97f1-8cfe086322f3.lovable.app/api/public/google/oauth/callback`
-5. Escopos: `openid`, `email`, `profile`, `https://www.googleapis.com/auth/gmail.readonly`, `gmail.modify`, `gmail.send`
+**Frontend — `src/components/email/EmailPanel.tsx`**
+1. Criar um helper `currentOwners()` que devolve `[selectedAccount]` quando há conta selecionada, e `authorizedEmails` apenas como fallback (quando `selectedAccount` é `null`).
+2. Substituir todos os `.in("owner_email", authorizedEmails!)` pelas chamadas a `currentOwners()` em:
+   - `loadFolders` (pastas/labels)
+   - `loadThreads` (INBOX e ramo OUTBOUND para SENT/DRAFT/TRASH/SPAM)
+   - busca por `thread_id` (`threadIdHits`)
+   - estado do mirror (`email_sync_state`)
+3. No ramo OUTBOUND, restringir o filtro `from_email.ilike` à conta selecionada (remetente = dono da caixa), garantindo que SENT mostra apenas o que foi enviado por essa conta.
+4. Quando o utilizador troca de conta no seletor, recarregar pastas e threads (já há efeitos em `activeLabel` e `selectedAccount` — confirmar dependência de `selectedAccount` nos `useCallback`/`useEffect` e adicioná‑la onde faltar para forçar refresh).
+5. Em `LeadEmailMini` (segunda metade do ficheiro) já lê `selectedAccount` do `localStorage`; manter, mas garantir que as queries diretas a `emails`/`email_threads` por `thread_id` não voltam a juntar contas (filtrar `owner_email = selectedAccount` quando aplicável).
 
-Depois eu peço como secrets: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_STATE_SECRET` (para assinar o `state`).
+**Backend — migração SQL**
+6. Substituir o índice único global por composto, para isolar contas:
+   - `emails`: drop `emails_gmail_id_key` → `UNIQUE (owner_email, gmail_id)`.
+   - `email_threads`: tornar a PK composta `(owner_email, id)` (ou manter PK em `id` e adicionar `UNIQUE (owner_email, id)` + ajustar upserts em `rebuildThread`/`startFullMirror` para `onConflict: "owner_email,id"`).
+7. Atualizar `gmail-mirror.server.ts`:
+   - `rebuildThread`: filtrar `select ... from emails` também por `owner_email`.
+   - Upserts de `email_threads` usar `onConflict: "owner_email,id"`.
 
-### 2. Banco (migration)
-- Tabela `user_gmail_tokens`:
-  - `user_id uuid` (FK lógica para auth.users)
-  - `email_address text` (lowercase)
-  - `access_token text`, `refresh_token text`, `expires_at timestamptz`, `scope text`
-  - `created_at`, `updated_at`
-  - Unique `(user_id, email_address)`
-- RLS:
-  - Usuário só vê/edita os próprios tokens (campos sensíveis ficam acessíveis apenas via service role no backend)
-  - Admin vê todos
-- View pública `user_gmail_accounts_public` (sem tokens) com `email_address`, `connected_at` para a UI listar contas conectadas.
+**Validação**
+8. Conectar duas contas, alternar no seletor e confirmar:
+   - Caixa de Entrada mostra só os emails recebidos pela conta ativa.
+   - Enviados mostra só os emails enviados pela conta ativa.
+   - Trocar de conta troca o conjunto integralmente, sem mistura.
+9. Confirmar que `email_sync_state` no rodapé reflete o progresso da conta ativa.
 
-### 3. Rotas OAuth (server routes em `src/routes/api/public/google/oauth/`)
-- `start.ts` (GET): exige usuário logado (lê access token do header), gera `state` HMAC com `user_id` + `nonce`, redireciona para `https://accounts.google.com/o/oauth2/v2/auth` com `access_type=offline&prompt=consent` para sempre vir refresh_token.
-- `callback.ts` (GET): valida `state`, troca `code` por tokens em `https://oauth2.googleapis.com/token`, busca o `email` em `https://openidconnect.googleapis.com/v1/userinfo`, salva em `user_gmail_tokens` (upsert por `user_id+email_address`) e em `user_email_accounts`. Fecha o popup com `postMessage`.
+## Notas técnicas
 
-### 4. Refator do mirror (`src/server/gmail-mirror.server.ts`)
-- Trocar `gw(path)` (que usa o gateway Lovable) por `gmailFetch(userId, emailAddress, path)` que:
-  - Carrega tokens do `user_gmail_tokens`
-  - Se `expires_at` venceu, faz refresh via `oauth2.googleapis.com/token` e atualiza a linha
-  - Chama `https://gmail.googleapis.com/gmail/v1{path}` com `Authorization: Bearer access_token`
-- Todas as funções (`listAndPersistLabels`, sync de mensagens, threads, history) passam a receber `(supabase, userId, emailAddress)`.
-- O `owner_email` continua vindo do `profile.emailAddress` do Gmail — agora coerente com a conta escolhida.
-- Server functions chamadoras (em `src/server/gmail.functions.ts`) passam a exigir `emailAddress` selecionado pelo usuário.
-
-### 5. UI (`src/components/email/EmailPanel.tsx` e correlatos)
-- Novo botão **"Conectar conta Google"** abre popup `/api/public/google/oauth/start` (com header `Authorization`).
-- Lista as contas conectadas do usuário (de `user_gmail_accounts_public`) num seletor.
-- Botão **"Sincronizar"** e leitura de mensagens passam a usar a conta selecionada.
-- Botão **"Desconectar conta"** (remove de `user_gmail_tokens` e opcionalmente revoga em `https://oauth2.googleapis.com/revoke`).
-
-### 6. Conector Lovable atual
-- O conector Gmail (`GOOGLE_MAIL_API_KEY`) **deixa de ser usado** para sincronização de caixa.
-- Pode permanecer apenas para envios automáticos do sistema (ex.: vouchers a partir de `booking@adatours.com`) — confirmar com você se quer manter ou remover.
-
----
-
-## Detalhes técnicos
-- Substituímos o gateway `connector-gateway.lovable.dev/google_mail/gmail/v1` por chamadas diretas a `gmail.googleapis.com/gmail/v1` com tokens por usuário — necessário porque o gateway não suporta credenciais por end-user.
-- Refresh: `POST oauth2.googleapis.com/token` com `grant_type=refresh_token&refresh_token=...&client_id=...&client_secret=...`. Margem de 60s antes do `expires_at`.
-- `state` assinado com `crypto.createHmac('sha256', GOOGLE_OAUTH_STATE_SECRET)` para evitar CSRF, com validade de 10 min.
-- Rotas em `/api/public/*` ignoram auth do site publicado, então o `start` exige `Authorization: Bearer` do usuário; o `callback` valida via `state`.
-- Mantemos a tabela `user_email_accounts` e a chave composta `(owner_email, id)` em `email_labels` que já criamos.
-
----
-
-## Próximo passo
-Se aprovar este plano, eu começo pela migration (`user_gmail_tokens` + view) e em seguida peço os 3 secrets do Google. Depois implemento as rotas OAuth, o helper `gmailFetch`, refatoro o mirror e atualizo a UI para múltiplas contas.
+- Não altera o esquema lógico das tabelas além das chaves únicas; nenhum dado é movido.
+- A migração de índice único é segura porque `(owner_email, gmail_id)` é mais permissiva do que `(gmail_id)`; nenhuma linha existente viola o novo índice.
+- Mantém compatibilidade com `LeadEmailMini` (que já passa `emailAddress` ao backend).

@@ -234,6 +234,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   }, [loadAccounts]);
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
+  // When an account is selected, scope all queries to it; otherwise use all authorized.
+  const currentOwners = useMemo<string[]>(
+    () => (selectedAccount ? [selectedAccount] : (authorizedEmails ?? [])),
+    [selectedAccount, authorizedEmails],
+  );
 
   // Live mirror state (driven by background cron / realtime)
   type MirrorState = {

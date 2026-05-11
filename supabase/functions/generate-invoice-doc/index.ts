@@ -366,8 +366,26 @@ Deno.serve(async (req) => {
     const tplBuf = await tplBlob.arrayBuffer();
 
     const ts = Date.now();
-    const baseName = (invoiceNumber || `invoice-${bookingId.slice(0, 8)}`).replace(/[^A-Za-z0-9_-]/g, "_");
+    const suffix = version === "admin" ? "_admin" : "_client";
+    const baseName = ((invoiceNumber || `invoice-${bookingId.slice(0, 8)}`) + suffix).replace(/[^A-Za-z0-9_-]/g, "_");
     const result: Record<string, string> = { file_name: baseName };
+
+    const enrichedBank = version === "admin" && allNotesBlock
+      ? `${bankInfo}\n\n${allNotesBlock}`
+      : bankInfo;
+
+    // Append notes per item to description for admin (PDF will show; XLSX will show in Hotel name cell)
+    const enrichItems = (arr: Item[]) =>
+      version === "admin"
+        ? arr.map((it) => {
+            const n = fmtNotes(it.id);
+            return n
+              ? { ...it, description: `${it.description ?? ""}\n— Notas:\n${n}` }
+              : it;
+          })
+        : arr;
+    const hotelsOut = enrichItems(hotels);
+    const servicesOut = enrichItems(services);
 
     if (formats.includes("xlsx")) {
       const xlsxBytes = await buildXlsx({

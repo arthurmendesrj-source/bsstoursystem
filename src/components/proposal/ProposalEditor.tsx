@@ -99,6 +99,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [bankFee, setBankFee] = useState(0);
   const [dictating, setDictating] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
+  const [invoiceGenOpen, setInvoiceGenOpen] = useState(false);
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
   const [docsRefresh, setDocsRefresh] = useState(0);
   const [flights, setFlights] = useState<FlightRow[]>([]);

@@ -37,6 +37,7 @@ export type FloatingWindowManagerHandle = {
   openOrFocus: (opts: FloatingWindowOpenOpts) => void;
   close: (id: string) => void;
   hasOpen: (id: string) => boolean;
+  minimizeAll: () => void;
 };
 
 function readLastRect(sizeKey: string, def: FloatingWindowSize): WinRect {
@@ -104,6 +105,9 @@ export const FloatingWindowManager = forwardRef<FloatingWindowManagerHandle>(fun
   useImperativeHandle(ref, () => ({
     hasOpen: (id) => windows.some((w) => w.id === id),
     close,
+    minimizeAll: () => {
+      setWindows((prev) => prev.map((w) => (w.state === "min" ? w : { ...w, state: "min" })));
+    },
     openOrFocus: ({ id, title, content, sizeKey, defaultSize, icon }) => {
       const key = sizeKey ?? "default";
       const def = defaultSize ?? { width: 900, height: 600 };

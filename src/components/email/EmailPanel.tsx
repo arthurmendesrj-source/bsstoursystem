@@ -474,14 +474,15 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     if (append) setLoadingMore(true); else setRefreshing(true);
     let liveOk = false;
     try {
-      await listLabelsFn({ data: undefined as never });
+      await listLabelsFn({ data: { emailAddress: selectedAccount ?? undefined } as never });
       const r = await listLiveFn({
         data: {
           labelId: activeLabel,
           pageToken: append ? (nextPageToken ?? undefined) : undefined,
           maxResults: PAGE_SIZE,
           q: search.trim() || undefined,
-        },
+          emailAddress: selectedAccount ?? undefined,
+        } as never,
       });
       setNextPageToken(r.nextPageToken);
       liveOk = true;

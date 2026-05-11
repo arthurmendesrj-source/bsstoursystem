@@ -47,6 +47,32 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const isEmbed = search?.embed === "1" || search?.embed === 1;
+  const activeLeadId = path === "/workspace" && typeof search?.lead === "string" ? (search.lead as string) : null;
+
+  const wrapTo = (to: string) => {
+    if (!activeLeadId) return { to } as const;
+    // Map sidebar route -> tool key inside Workspace
+    const toolMap: Record<string, string> = {
+      "/dashboard": "dashboard",
+      "/funnel": "funnel",
+      "/packages": "packages",
+      "/inbox-ia": "inbox-ia",
+      "/inbox-ia/email": "inbox-ia-email",
+      "/email": "email",
+      "/activities": "activities",
+      "/alerts": "alerts",
+      "/customers": "customers",
+      "/suppliers": "suppliers",
+      "/bookings": "bookings",
+      "/biblia": "biblia",
+      "/itineraries": "itineraries",
+    };
+    const tool = toolMap[to];
+    if (!tool) return { to } as const;
+    return { to: "/workspace", search: { lead: activeLeadId, tool } } as const;
+  };
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;

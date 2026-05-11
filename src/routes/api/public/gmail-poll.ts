@@ -1,11 +1,10 @@
-// Cron-driven Gmail mirror tick (replaces legacy logic).
-// 1) If a wipe is queued/in progress for an owner → run ONE small batch.
-// 2) Else if a full mirror is in progress → run one full-sync tick.
-// 3) Else → run an incremental sync.
-// All work is small and idempotent so it never times out.
+// Cron-driven Gmail mirror tick — iterates over every connected Gmail
+// account in `user_gmail_tokens` and runs an incremental sync inside the
+// per-user OAuth context.
 import { createFileRoute } from "@tanstack/react-router";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { runIncrementalSync, runWipeBatch } from "@/server/gmail-mirror.server";
+import { runWithGmailAccount } from "@/server/gmail-auth.server";
 
 export const Route = createFileRoute("/api/public/gmail-poll")({
   server: {
@@ -14,29 +13,33 @@ export const Route = createFileRoute("/api/public/gmail-poll")({
       POST: async () => {
         const results: Record<string, unknown> = {};
         try {
-          const { data: states } = await supabaseAdmin
-            .from("email_sync_state")
-            .select("owner_email, wipe_status, full_sync_in_progress, last_incremental_sync_at, last_full_sync_at");
-          const rows = (states ?? []) as Array<{
-            owner_email: string; wipe_status: string | null;
-            full_sync_in_progress: boolean | null; last_incremental_sync_at: string | null;
-            last_full_sync_at: string | null;
-          }>;
-          for (const r of rows) {
-            const owner = r.owner_email;
+          const { data: tokenRows } = await supabaseAdmin
+            .from("user_gmail_tokens")
+            .select("user_id, email_address");
+          const tokens = (tokenRows ?? []) as Array<{ user_id: string; email_address: string }>;
+          for (const t of tokens) {
+            const owner = t.email_address.toLowerCase();
             try {
-              if (r.wipe_status === "wiping") {
-                results[owner] = { type: "wipe", ...(await runWipeBatch(supabaseAdmin as any, owner)) };
-              } else {
-                // Apenas sincronização incremental (leve). Sem mirror histórico.
-                const idleMs = r.last_incremental_sync_at
-                  ? Date.now() - new Date(r.last_incremental_sync_at).getTime() : Infinity;
+              const { data: state } = await supabaseAdmin
+                .from("email_sync_state")
+                .select("wipe_status, last_incremental_sync_at")
+                .eq("owner_email", owner)
+                .maybeSingle();
+              const wipe = (state as { wipe_status?: string | null } | null)?.wipe_status ?? null;
+              const lastInc = (state as { last_incremental_sync_at?: string | null } | null)?.last_incremental_sync_at ?? null;
+
+              await runWithGmailAccount({ userId: t.user_id, emailAddress: owner }, async () => {
+                if (wipe === "wiping") {
+                  results[owner] = { type: "wipe", ...(await runWipeBatch(supabaseAdmin as any, owner)) };
+                  return;
+                }
+                const idleMs = lastInc ? Date.now() - new Date(lastInc).getTime() : Infinity;
                 if (idleMs > 60_000) {
                   results[owner] = { type: "inc", ...(await runIncrementalSync(supabaseAdmin as any, owner)) };
                 } else {
                   results[owner] = { type: "skip" };
                 }
-              }
+              });
             } catch (e) {
               results[owner] = { error: e instanceof Error ? e.message : String(e) };
             }

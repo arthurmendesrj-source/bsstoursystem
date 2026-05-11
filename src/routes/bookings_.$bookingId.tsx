@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProofAssociateDialog, type ProofPick } from "@/components/ProofAssociateDialog";
 import { VoucherDialog } from "@/components/booking/VoucherDialog";
+import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";

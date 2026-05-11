@@ -451,11 +451,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   }, [loadFolders, activeLabel, mergeUnique]);
 
   const incRef = useRef(incSyncFn); incRef.current = incSyncFn;
+  const accRef = useRef<string | null>(selectedAccount); accRef.current = selectedAccount;
   useEffect(() => {
     if (mode !== "full" || !hasMailbox) return;
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
-      try { await incRef.current({ data: undefined as never }); } catch { /* silent */ }
+      const acc = accRef.current;
+      if (!acc) return;
+      try { await incRef.current({ data: { emailAddress: acc } as never }); } catch { /* silent */ }
     };
     const timer = setInterval(tick, 15_000);
     void tick();

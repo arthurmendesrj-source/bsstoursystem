@@ -547,7 +547,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
 
   const fetchThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
-    const r = await getThreadFn({ data: { threadId } });
+    const r = await getThreadFn({ data: { threadId, emailAddress: selectedAccount ?? undefined } as never });
     return r.messages as ThreadMessage[];
   };
 

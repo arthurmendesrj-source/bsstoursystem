@@ -256,6 +256,7 @@ Deno.serve(async (req) => {
       : ["xlsx"];
     const bankInfo: string = body.bank_info ?? "";
     const beneficiary: string = body.beneficiary ?? "";
+    const version: "client" | "admin" = body.version === "admin" ? "admin" : "client";
 
     if (!bookingId) {
       return new Response(JSON.stringify({ error: "booking_id required" }), {
@@ -306,6 +307,32 @@ Deno.serve(async (req) => {
     const services = items.filter((i) => i.kind !== "hotel");
     const total = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
 
+    // Load notes when admin version
+    type Note = { target_kind: string; target_id: string; category: string; note: string };
+    let notes: Note[] = [];
+    if (version === "admin" && booking.quote_id) {
+      const { data: ns } = await userClient
+        .from("quote_item_notes")
+        .select("target_kind,target_id,category,note")
+        .eq("quote_id", booking.quote_id)
+        .order("created_at", { ascending: true });
+      notes = (ns ?? []) as Note[];
+    }
+    const notesByTarget = new Map<string, Note[]>();
+    for (const n of notes) {
+      const arr = notesByTarget.get(n.target_id) ?? [];
+      arr.push(n);
+      notesByTarget.set(n.target_id, arr);
+    }
+    const fmtNotes = (id: string) =>
+      (notesByTarget.get(id) ?? [])
+        .map((n) => `[${n.category.toUpperCase()}] ${n.note}`)
+        .join("\n");
+    const allNotesBlock = notes.length > 0
+      ? "INTERNAL NOTES (administrativo):\n" +
+        notes.map((n) => `• [${n.category.toUpperCase()}] ${n.note}`).join("\n")
+      : "";
+
     let invoiceNumber = "";
     const { data: invByBooking } = await userClient
       .from("invoices")
@@ -339,17 +366,35 @@ Deno.serve(async (req) => {
     const tplBuf = await tplBlob.arrayBuffer();
 
     const ts = Date.now();
-    const baseName = (invoiceNumber || `invoice-${bookingId.slice(0, 8)}`).replace(/[^A-Za-z0-9_-]/g, "_");
+    const suffix = version === "admin" ? "_admin" : "_client";
+    const baseName = ((invoiceNumber || `invoice-${bookingId.slice(0, 8)}`) + suffix).replace(/[^A-Za-z0-9_-]/g, "_");
     const result: Record<string, string> = { file_name: baseName };
+
+    const enrichedBank = version === "admin" && allNotesBlock
+      ? `${bankInfo}\n\n${allNotesBlock}`
+      : bankInfo;
+
+    // Append notes per item to description for admin (PDF will show; XLSX will show in Hotel name cell)
+    const enrichItems = (arr: Item[]) =>
+      version === "admin"
+        ? arr.map((it) => {
+            const n = fmtNotes(it.id);
+            return n
+              ? { ...it, description: `${it.description ?? ""}\n— Notas:\n${n}` }
+              : it;
+          })
+        : arr;
+    const hotelsOut = enrichItems(hotels);
+    const servicesOut = enrichItems(services);
 
     if (formats.includes("xlsx")) {
       const xlsxBytes = await buildXlsx({
         templateBuf: tplBuf,
         invoiceNumber,
         customerName,
-        hotels,
-        services,
-        bankInfo,
+        hotels: hotelsOut,
+        services: servicesOut,
+        bankInfo: enrichedBank,
         beneficiary,
         total,
       });
@@ -369,9 +414,9 @@ Deno.serve(async (req) => {
       const pdfBytes = buildPdf({
         invoiceNumber,
         customerName,
-        hotels,
-        services,
-        bankInfo,
+        hotels: hotelsOut,
+        services: servicesOut,
+        bankInfo: enrichedBank,
         beneficiary,
         total,
       });

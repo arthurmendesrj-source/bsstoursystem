@@ -1832,6 +1832,42 @@ export type Database = {
           },
         ]
       }
+      quote_item_notes: {
+        Row: {
+          author_id: string
+          category: Database["public"]["Enums"]["note_category"]
+          created_at: string
+          id: string
+          note: string
+          quote_id: string
+          target_id: string
+          target_kind: Database["public"]["Enums"]["note_target_kind"]
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          category: Database["public"]["Enums"]["note_category"]
+          created_at?: string
+          id?: string
+          note: string
+          quote_id: string
+          target_id: string
+          target_kind: Database["public"]["Enums"]["note_target_kind"]
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          category?: Database["public"]["Enums"]["note_category"]
+          created_at?: string
+          id?: string
+          note?: string
+          quote_id?: string
+          target_id?: string
+          target_kind?: Database["public"]["Enums"]["note_target_kind"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       quote_items: {
         Row: {
           category: string | null
@@ -3119,6 +3155,8 @@ export type Database = {
         | "proposta"
         | "fechado"
         | "perdido"
+      note_category: "operacional" | "financeiro" | "comercial"
+      note_target_kind: "item" | "flight"
       notification_channel: "push" | "in_app" | "email" | "whatsapp"
       notification_event_type:
         | "lead_assigned"
@@ -3306,6 +3344,8 @@ export const Constants = {
         "fechado",
         "perdido",
       ],
+      note_category: ["operacional", "financeiro", "comercial"],
+      note_target_kind: ["item", "flight"],
       notification_channel: ["push", "in_app", "email", "whatsapp"],
       notification_event_type: [
         "lead_assigned",

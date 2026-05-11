@@ -22,6 +22,8 @@ import {
 } from "@/lib/proposal-totals";
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocumentDialog } from "./GenerateDocumentDialog";
+import { GenerateInvoiceDialog } from "@/components/booking/GenerateInvoiceDialog";
+import { ItemNoteButton } from "@/components/booking/ItemNoteButton";
 import { AiProgramAssistantDialog } from "./AiProgramAssistantDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";
@@ -97,6 +99,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [bankFee, setBankFee] = useState(0);
   const [dictating, setDictating] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
+  const [invoiceGenOpen, setInvoiceGenOpen] = useState(false);
   const [aiAssistOpen, setAiAssistOpen] = useState(false);
   const [docsRefresh, setDocsRefresh] = useState(0);
   const [flights, setFlights] = useState<FlightRow[]>([]);
@@ -649,9 +652,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
           <Button variant="default" size="sm" onClick={() => setAiAssistOpen(true)} className="bg-gradient-to-r from-primary to-primary/80">
             <Sparkles className="h-4 w-4 mr-1" /> Assistente IA
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
-            <FileText className="h-4 w-4 mr-1" /> Gerar Documento
-          </Button>
+          {mode === "invoice" ? (
+            <Button variant="outline" size="sm" onClick={() => setInvoiceGenOpen(true)}>
+              <FileText className="h-4 w-4 mr-1" /> Gerar Invoice
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
+              <FileText className="h-4 w-4 mr-1" /> Gerar Documento
+            </Button>
+          )}
           <Can module="quotes" action="edit">
             <span className="text-xs text-muted-foreground self-center min-w-[110px]">
               {saveStatus === "saving" && "Salvando…"}
@@ -709,6 +718,12 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         open={genOpen}
         onOpenChange={setGenOpen}
         onGenerated={() => setDocsRefresh((n) => n + 1)}
+      />
+
+      <GenerateInvoiceDialog
+        quoteId={quoteId}
+        open={invoiceGenOpen}
+        onOpenChange={setInvoiceGenOpen}
       />
 
       <AiProgramAssistantDialog
@@ -789,6 +804,8 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onAdd={canEdit ? () => { setEditingHotel(null); setHotelDialogOpen(true); } : undefined}
         addLabel={t("addHotel")}
         icon={<Hotel className="h-4 w-4" />}
+        showNotes={mode === "invoice"}
+        quoteId={quoteId}
       />
 
       <ItemTable
@@ -805,6 +822,8 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onAdd={canEdit ? () => { setEditingService(null); setServiceDialogOpen(true); } : undefined}
         addLabel={t("addService")}
         icon={<Wrench className="h-4 w-4" />}
+        showNotes={mode === "invoice"}
+        quoteId={quoteId}
       />
 
       <div className="rounded-md border">
@@ -842,6 +861,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
                     <td className="px-3 py-2 text-right">{f.pax}</td>
                     <td className="px-3 py-2 text-right">{f.total != null ? fmt(Number(f.total), ccy) : "—"}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {mode === "invoice" && f.id && (
+                        <ItemNoteButton quoteId={quoteId} targetKind="flight" targetId={f.id} />
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => { setEditingFlight(f); setFlightDialogOpen(true); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -960,6 +982,8 @@ function ItemTable({
   onAdd,
   addLabel,
   icon,
+  showNotes,
+  quoteId,
 }: {
   title: string;
   kind: ProposalItemKind;
@@ -972,6 +996,8 @@ function ItemTable({
   onAdd?: () => void;
   addLabel?: string;
   icon?: React.ReactNode;
+  showNotes?: boolean;
+  quoteId?: string;
 }) {
   const { t } = useI18n();
   const { canField } = usePermissions();
@@ -1103,16 +1129,21 @@ function ItemTable({
                     />
                   </td>
                   <td className="p-2 text-right font-medium tabular-nums">{sub.toFixed(2)}</td>
-                  {!readOnly && (
+                  {(!readOnly || (showNotes && quoteId)) && (
                     <td className="p-2 text-right whitespace-nowrap">
-                      {onEdit && !it.id.startsWith("new-") && (
+                      {showNotes && quoteId && !it.id.startsWith("new-") && (
+                        <ItemNoteButton quoteId={quoteId} targetKind="item" targetId={it.id} />
+                      )}
+                      {!readOnly && onEdit && !it.id.startsWith("new-") && (
                         <Button size="icon" variant="ghost" onClick={() => onEdit(it.id)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       )}
-                      <Button size="icon" variant="ghost" onClick={() => onRemove(i)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {!readOnly && (
+                        <Button size="icon" variant="ghost" onClick={() => onRemove(i)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
                     </td>
                   )}
                 </tr>

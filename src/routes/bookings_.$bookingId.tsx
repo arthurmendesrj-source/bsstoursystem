@@ -103,6 +103,7 @@ function BookingDetailPage() {
   const [customerName, setCustomerName] = useState<string>("");
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   const load = async () => {
     setLoading(true);

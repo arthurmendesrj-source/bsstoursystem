@@ -178,10 +178,10 @@ function BookingsPage() {
           <p className="text-muted-foreground">{rows.length}</p>
         </div>
         <Can module="bookings" action="create">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button></DialogTrigger>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setForm(emptyForm); } }}>
+          <DialogTrigger asChild><Button onClick={() => { setEditingId(null); setForm(emptyForm); }}><Plus className="mr-2 h-4 w-4" />{t("new")}</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>{t("new")} {t("bookings")}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? `${t("edit") || "Editar"} ${t("bookings")}` : `${t("new")} ${t("bookings")}`}</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
               <div>
                 <Label>{t("customers")} *</Label>

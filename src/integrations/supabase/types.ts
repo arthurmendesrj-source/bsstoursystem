@@ -222,6 +222,8 @@ export type Database = {
           proof_type: string | null
           quote_item_id: string
           status: string
+          supplier_id: string | null
+          supplier_name: string | null
           updated_at: string
         }
         Insert: {
@@ -238,6 +240,8 @@ export type Database = {
           proof_type?: string | null
           quote_item_id: string
           status?: string
+          supplier_id?: string | null
+          supplier_name?: string | null
           updated_at?: string
         }
         Update: {
@@ -254,6 +258,8 @@ export type Database = {
           proof_type?: string | null
           quote_item_id?: string
           status?: string
+          supplier_id?: string | null
+          supplier_name?: string | null
           updated_at?: string
         }
         Relationships: []

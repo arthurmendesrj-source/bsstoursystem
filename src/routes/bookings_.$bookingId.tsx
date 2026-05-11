@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ProofAssociateDialog, type ProofPick } from "@/components/ProofAssociateDialog";
 import { VoucherDialog } from "@/components/booking/VoucherDialog";
+import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useCurrency } from "@/lib/currency";
@@ -84,6 +85,8 @@ type Confirmation = {
   proof_text: string | null;
   proof_reference: string | null;
   proof_email_id?: string | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
 };
 
 function BookingDetailPage() {
@@ -100,6 +103,7 @@ function BookingDetailPage() {
   const [customerName, setCustomerName] = useState<string>("");
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -126,6 +130,8 @@ function BookingDetailPage() {
       if (v.quote_item_id) vMap[v.quote_item_id] = { id: v.id, code: v.code };
     });
     setVouchers(vMap);
+    const { data: sup } = await supabase.from("suppliers").select("id,name").order("name");
+    setSuppliers((sup ?? []) as { id: string; name: string }[]);
     // Invoice: by booking_id, fallback to quote_id
     let invNum: string | null = null;
     const { data: invByBooking } = await supabase.from("invoices").select("number").eq("booking_id", bookingId).order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -160,6 +166,8 @@ function BookingDetailPage() {
         proof_text: merged.proof_text,
         proof_reference: merged.proof_reference,
         proof_email_id: merged.proof_email_id ?? null,
+        supplier_id: merged.supplier_id ?? null,
+        supplier_name: merged.supplier_name ?? null,
         confirmed_at: merged.status === "confirmado" ? new Date().toISOString() : null,
         confirmed_by: merged.status === "confirmado" ? user?.id ?? null : null,
       } as never, { onConflict: "booking_id,quote_item_id" })
@@ -482,10 +490,31 @@ function BookingDetailPage() {
                   </div>
                 </div>
 
+                <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase tracking-wide">Fornecedor</Label>
+                  <ComboboxAutocomplete
+                    options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                    value={c?.supplier_id ?? (c?.supplier_name ?? "")}
+                    allowCustom
+                    placeholder="Selecione ou digite o fornecedor…"
+                    searchPlaceholder="Buscar fornecedor…"
+                    emptyMessage="Nenhum fornecedor cadastrado."
+                    onChange={(v) => {
+                      const match = suppliers.find((s) => s.id === v);
+                      const patch: Partial<Confirmation> = match
+                        ? { supplier_id: match.id, supplier_name: match.name }
+                        : { supplier_id: null, supplier_name: v ? (v.trim() || null) : null };
+                      updateLocal(item.id, patch);
+                      persist(item.id, patch);
+                    }}
+                  />
+                </div>
+
                 <div>
                   <Label className="text-xs">{t("notes")}</Label>
                   <Textarea rows={2} value={item.notes ?? ""} onChange={(e) => updateItemLocal(item.id, { notes: e.target.value })} onBlur={(e) => persistItem(item.id, { notes: e.target.value })} />
                 </div>
+
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>

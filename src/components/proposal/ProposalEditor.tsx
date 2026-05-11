@@ -861,6 +861,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
                     <td className="px-3 py-2 text-right">{f.pax}</td>
                     <td className="px-3 py-2 text-right">{f.total != null ? fmt(Number(f.total), ccy) : "—"}</td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {mode === "invoice" && f.id && (
+                        <ItemNoteButton quoteId={quoteId} targetKind="flight" targetId={f.id} />
+                      )}
                       <Button size="icon" variant="ghost" onClick={() => { setEditingFlight(f); setFlightDialogOpen(true); }}>
                         <Pencil className="h-4 w-4" />
                       </Button>

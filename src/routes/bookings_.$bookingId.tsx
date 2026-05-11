@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Paperclip, Download, RotateCcw, Link2, Mail, Ticket, Plus, Trash2, FileText } from "lucide-react";
+import { GenerateInvoiceDialog } from "@/components/booking/GenerateInvoiceDialog";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,7 @@ function BookingDetailPage() {
   const [openVoucherId, setOpenVoucherId] = useState<string | null>(null);
   const [customerName, setCustomerName] = useState<string>("");
   const [invoiceNumber, setInvoiceNumber] = useState<string | null>(null);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([]);
 
@@ -338,13 +340,19 @@ function BookingDetailPage() {
             </div>
           </div>
         </div>
-        {allConfirmed && booking.status !== "confirmada" && (
-          <Button onClick={markBookingConfirmed}><CheckCircle2 className="mr-2 h-4 w-4" />{t("markBookingConfirmed")}</Button>
-        )}
-        {booking.status === "confirmada" && (
-          <Button variant="outline" onClick={reopenBooking}><RotateCcw className="mr-2 h-4 w-4" />{t("reopenBooking")}</Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setInvoiceDialogOpen(true)}>
+            <FileText className="mr-2 h-4 w-4" />Gerar Invoice
+          </Button>
+          {allConfirmed && booking.status !== "confirmada" && (
+            <Button onClick={markBookingConfirmed}><CheckCircle2 className="mr-2 h-4 w-4" />{t("markBookingConfirmed")}</Button>
+          )}
+          {booking.status === "confirmada" && (
+            <Button variant="outline" onClick={reopenBooking}><RotateCcw className="mr-2 h-4 w-4" />{t("reopenBooking")}</Button>
+          )}
+        </div>
       </div>
+      <GenerateInvoiceDialog bookingId={bookingId} open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen} />
 
       {items.length > 0 && (
         <Card className="p-4 space-y-2">

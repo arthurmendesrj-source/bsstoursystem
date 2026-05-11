@@ -200,6 +200,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Link
                   key={it.to}
                   to={it.to}
+                  onClick={() => minimizeAllWindows()}
                   className={cn(
                     "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
                     active

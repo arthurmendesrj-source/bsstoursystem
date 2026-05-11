@@ -136,6 +136,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
     );
 
+  if (isEmbed) {
+    return (
+      <div className="h-screen w-full overflow-auto bg-background p-4 md:p-6">{children}</div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-full bg-background">
       <aside

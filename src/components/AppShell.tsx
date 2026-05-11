@@ -47,6 +47,32 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const isEmbed = search?.embed === "1" || search?.embed === 1;
+  const activeLeadId = path === "/workspace" && typeof search?.lead === "string" ? (search.lead as string) : null;
+
+  const wrapTo = (to: string) => {
+    if (!activeLeadId) return { to } as const;
+    // Map sidebar route -> tool key inside Workspace
+    const toolMap: Record<string, string> = {
+      "/dashboard": "dashboard",
+      "/funnel": "funnel",
+      "/packages": "packages",
+      "/inbox-ia": "inbox-ia",
+      "/inbox-ia/email": "inbox-ia-email",
+      "/email": "email",
+      "/activities": "activities",
+      "/alerts": "alerts",
+      "/customers": "customers",
+      "/suppliers": "suppliers",
+      "/bookings": "bookings",
+      "/biblia": "biblia",
+      "/itineraries": "itineraries",
+    };
+    const tool = toolMap[to];
+    if (!tool) return { to } as const;
+    return { to: "/workspace", search: { lead: activeLeadId, tool } } as const;
+  };
 
   const [collapsed, setCollapsed] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
@@ -109,6 +135,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
         : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
     );
+
+  if (isEmbed) {
+    return (
+      <div className="h-screen w-full overflow-auto bg-background p-4 md:p-6">{children}</div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-background">
@@ -180,10 +212,26 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
 
           {items.map((it) => {
-            const active = path === it.to || path.startsWith(it.to + "/");
+            const wrapped = wrapTo(it.to);
+            const wrappedSearch = "search" in wrapped ? wrapped.search : null;
+            const active = wrappedSearch
+              ? path === "/workspace" && search?.tool === wrappedSearch.tool
+              : path === it.to || path.startsWith(it.to + "/");
             const Icon = it.icon;
+            const handleClick = (e: React.MouseEvent) => {
+              if (wrappedSearch) {
+                e.preventDefault();
+                navigate({ to: "/workspace", search: wrappedSearch });
+              }
+            };
             return (
-              <Link key={it.to} to={it.to} className={itemClass(active)} title={collapsed ? it.label : undefined}>
+              <Link
+                key={it.to}
+                to={it.to}
+                onClick={handleClick}
+                className={itemClass(active)}
+                title={collapsed ? it.label : undefined}
+              >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{it.label}</span>}
               </Link>

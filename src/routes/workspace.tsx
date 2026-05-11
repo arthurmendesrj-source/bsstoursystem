@@ -45,11 +45,12 @@ import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
 import { TaskWindow } from "@/components/workspace/windows/TaskWindow";
 
-type WorkspaceSearch = { lead?: string };
+type WorkspaceSearch = { lead?: string; tool?: string };
 
 export const Route = createFileRoute("/workspace")({
   validateSearch: (search: Record<string, unknown>): WorkspaceSearch => ({
     lead: typeof search.lead === "string" ? search.lead : undefined,
+    tool: typeof search.tool === "string" ? search.tool : undefined,
   }),
   component: () => (
     <AuthGate>
@@ -106,7 +107,7 @@ function WorkspacePage() {
   const { user } = useAuth();
   const { format: fmtCurrency } = useCurrency();
   const navigate = useNavigate({ from: "/workspace" });
-  const { lead: leadId } = Route.useSearch();
+  const { lead: leadId, tool } = Route.useSearch();
 
   const [leadOptions, setLeadOptions] = useState<LeadOption[]>([]);
   const [lead, setLead] = useState<Lead | null>(null);
@@ -714,6 +715,9 @@ function WorkspacePage() {
         {/* MAIN */}
         <Card className="min-h-[600px] ml-2">
           <CardContent className="p-4">
+            {tool && hasLead && lead ? (
+              <ToolPanel tool={tool} onClose={() => navigate({ search: { lead: lead.id } })} />
+            ) : (
             <Accordion type="multiple" defaultValue={["email"]} className="w-full">
               <AccordionItem value="email">
                 <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("email"); }} title="Duplo-clique para abrir em janela">
@@ -794,6 +798,7 @@ function WorkspacePage() {
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+            )}
           </CardContent>
         </Card>
         </ResizablePanel>
@@ -1120,6 +1125,50 @@ function ActivitiesTab({ leadId, tasks, onChanged }: { leadId: string; tasks: Ta
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+const TOOL_ROUTES: Record<string, string> = {
+  "dashboard": "/dashboard",
+  "funnel": "/funnel",
+  "packages": "/packages",
+  "inbox-ia": "/inbox-ia",
+  "inbox-ia-email": "/inbox-ia/email",
+  "email": "/email",
+  "activities": "/activities",
+  "alerts": "/alerts",
+  "customers": "/customers",
+  "suppliers": "/suppliers",
+  "bookings": "/bookings",
+  "biblia": "/biblia",
+  "itineraries": "/itineraries",
+};
+
+function ToolPanel({ tool, onClose }: { tool: string; onClose: () => void }) {
+  const route = TOOL_ROUTES[tool];
+  if (!route) {
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        Ferramenta desconhecida.
+        <div className="mt-3"><Button size="sm" variant="outline" onClick={onClose}>Voltar para atendimento</Button></div>
+      </div>
+    );
+  }
+  const sep = route.includes("?") ? "&" : "?";
+  const src = `${route}${sep}embed=1`;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-semibold capitalize">{tool.replace("-", " ")}</div>
+        <Button size="sm" variant="outline" onClick={onClose}>Voltar para atendimento</Button>
+      </div>
+      <iframe
+        src={src}
+        title={tool}
+        className="w-full rounded-md border bg-background"
+        style={{ height: "calc(100vh - 240px)", minHeight: 500 }}
+      />
     </div>
   );
 }

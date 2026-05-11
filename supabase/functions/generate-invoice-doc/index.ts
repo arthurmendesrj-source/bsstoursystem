@@ -392,9 +392,9 @@ Deno.serve(async (req) => {
         templateBuf: tplBuf,
         invoiceNumber,
         customerName,
-        hotels,
-        services,
-        bankInfo,
+        hotels: hotelsOut,
+        services: servicesOut,
+        bankInfo: enrichedBank,
         beneficiary,
         total,
       });
@@ -414,9 +414,9 @@ Deno.serve(async (req) => {
       const pdfBytes = buildPdf({
         invoiceNumber,
         customerName,
-        hotels,
-        services,
-        bankInfo,
+        hotels: hotelsOut,
+        services: servicesOut,
+        bankInfo: enrichedBank,
         beneficiary,
         total,
       });

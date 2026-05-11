@@ -55,7 +55,7 @@ function parseFrom(value: string | undefined): { name: string; email: string } {
 
 // ---------------- list ----------------
 export const gmailList = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { q?: string; maxResults?: number; pageToken?: string }) => data)
   .handler(async ({ data }) => {
     const params = new URLSearchParams();
@@ -68,7 +68,7 @@ export const gmailList = createServerFn({ method: "POST" })
 
 // ---------------- get full message ----------------
 export const gmailGet = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     const res = await gw(`/users/me/messages/${encodeURIComponent(data.id)}?format=full`);
@@ -100,7 +100,7 @@ export const gmailGet = createServerFn({ method: "POST" })
 
 // ---------------- modify (read/unread/archive/trash) ----------------
 export const gmailModify = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { id: string; addLabelIds?: string[]; removeLabelIds?: string[]; trash?: boolean; untrash?: boolean }) => data)
   .handler(async ({ data }) => {
     if (data.trash) {
@@ -143,7 +143,7 @@ function buildRfc2822({
 }
 
 export const gmailSend = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { to: string; subject: string; body: string; threadId?: string; inReplyTo?: string; references?: string; cc?: string }) => data)
   .handler(async ({ data }) => {
     const raw = toBase64Url(buildRfc2822(data));
@@ -154,7 +154,7 @@ export const gmailSend = createServerFn({ method: "POST" })
 
 // ---------------- sync to db ----------------
 export const gmailSync = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { q?: string; maxResults?: number }) => data)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -206,7 +206,7 @@ export const gmailSync = createServerFn({ method: "POST" })
 
 // ---------------- analyze a local (db-only / seed) email with AI ----------------
 export const emailAnalyzeLocal = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { email_id: string }) => data)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -293,7 +293,7 @@ export const emailAnalyzeLocal = createServerFn({ method: "POST" })
 
 // ---------------- analyze with AI (returns suggestion only) ----------------
 export const emailAnalyze = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { gmail_id: string }) => data)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -390,7 +390,7 @@ export const emailAnalyze = createServerFn({ method: "POST" })
 
 // ---------------- translate email body with AI ----------------
 export const emailTranslate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { gmail_id: string; target_language: string }) => data)
   .handler(async ({ data }) => {
     const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;

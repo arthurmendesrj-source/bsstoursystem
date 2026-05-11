@@ -789,15 +789,16 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
         }
       }
       for (const f of flights) {
+        if (!f.flight_date) continue;
         const dep = String(f.departure_time ?? "").slice(0, 5);
         sched.push({
           date: String(f.flight_date),
           time: dep || "—",
           sortKey: 1, // flights before ground services
-          activity: `Voo ${f.flight_number ?? ""} ${f.from_code} → ${f.to_code}${
+          activity: `Voo ${f.flight_number ?? ""} ${f.from_code ?? ""} → ${f.to_code ?? ""}${
             f.arrival_time ? ` (chegada ${String(f.arrival_time).slice(0, 5)})` : ""
           }`.trim(),
-          place: f.from_code,
+          place: f.from_code ?? "—",
         });
       }
       sched.sort((a, b) => {

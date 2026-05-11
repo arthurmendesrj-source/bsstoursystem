@@ -107,7 +107,7 @@ function WorkspacePage() {
   const { user } = useAuth();
   const { format: fmtCurrency } = useCurrency();
   const navigate = useNavigate({ from: "/workspace" });
-  const { lead: leadId } = Route.useSearch();
+  const { lead: leadId, tool } = Route.useSearch();
 
   const [leadOptions, setLeadOptions] = useState<LeadOption[]>([]);
   const [lead, setLead] = useState<Lead | null>(null);

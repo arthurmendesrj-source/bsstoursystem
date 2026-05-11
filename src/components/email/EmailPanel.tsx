@@ -856,7 +856,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
         {Sidebar}
         <div className={cn("min-w-0 border-r", inlineReader ? "flex-1" : "flex-1 max-w-[560px]")}>{ThreadList}</div>
 
-        {AddAccountDialog}
+        
 
         {/* Janelas flutuantes das conversas */}
         <ThreadWindowManager

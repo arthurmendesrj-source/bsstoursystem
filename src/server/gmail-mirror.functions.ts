@@ -1,6 +1,7 @@
 // Thin createServerFn wrappers around shared helpers in gmail-mirror.server.ts.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireGmailAccount, runWithGmailAccount } from "@/server/gmail-auth.server";
 import {
   gw, findHeader, parseFrom, extractBody, extractAttachments, type GmailPart,
   listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe,
@@ -8,7 +9,7 @@ import {
 
 // ---------------- LABELS ----------------
 export const gmailListLabels = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const r = await listAndPersistLabels(supabase);
@@ -21,7 +22,7 @@ export const gmailListLabels = createServerFn({ method: "POST" })
 // imediatamente. Não baixa corpo nem anexos — isso é feito sob demanda em
 // gmailGetThread quando o usuário abre a conversa.
 export const gmailListLive = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { labelId: string; pageToken?: string; maxResults?: number; q?: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -119,7 +120,7 @@ export const gmailListLive = createServerFn({ method: "POST" })
 
 // ---------------- START FULL MIRROR ----------------
 export const gmailStartFullMirror = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const r = await startFullMirror(supabase);
@@ -131,7 +132,7 @@ export const gmailStartFullMirror = createServerFn({ method: "POST" })
 // current label/month and empty-streak counter. Preserves total counters and
 // last_full_sync_at for audit purposes.
 export const gmailCancelFullMirror = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
@@ -151,7 +152,7 @@ export const gmailCancelFullMirror = createServerFn({ method: "POST" })
 // Cancels the in-flight sync, zeroes the totals, then re-initializes the
 // queue from scratch via startFullMirror — equivalent to a fresh start.
 export const gmailResetFullMirror = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
@@ -192,7 +193,7 @@ async function wipeOwnerStorage(supabase: any, owner: string) {
 // Just ENQUEUES the wipe — the cron drains it in small batches.
 // Returns immediately so the UI never times out.
 export const gmailWipeAndRestart = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { confirm: string }) => {
     if (!d || d.confirm !== "ESVAZIAR") {
       throw new Error('Confirmação inválida. Digite "ESVAZIAR" para prosseguir.');
@@ -211,7 +212,7 @@ export const gmailWipeAndRestart = createServerFn({ method: "POST" })
 // Kept for manual UI invocation; the cron drives this same logic in the
 // background via /api/public/gmail-cron-tick.
 export const gmailFullSync = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d?: { restart?: boolean; windowDays?: number }) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -249,7 +250,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
 
 // ---------------- INCREMENTAL SYNC ----------------
 export const gmailIncrementalSync = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
@@ -260,7 +261,7 @@ export const gmailIncrementalSync = createServerFn({ method: "POST" })
 
 // ---------------- GET THREAD (full) ----------------
 export const gmailGetThread = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { threadId: string }) => d)
   .handler(async ({ data }) => {
     const t = (await gw(`/users/me/threads/${encodeURIComponent(data.threadId)}?format=full`)) as {
@@ -293,7 +294,7 @@ export const gmailGetThread = createServerFn({ method: "POST" })
 // ---------------- GET ATTACHMENT ----------------
 const ATTACHMENT_BUCKET = "email-attachments";
 export const gmailGetAttachment = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { messageId: string; attachmentId: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase } = context;

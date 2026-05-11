@@ -1,34 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_mail/gmail/v1";
-
-function authHeaders() {
-  const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-  const GOOGLE_MAIL_API_KEY = process.env.GOOGLE_MAIL_API_KEY_1 ?? process.env.GOOGLE_MAIL_API_KEY;
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!GOOGLE_MAIL_API_KEY) throw new Error("GOOGLE_MAIL_API_KEY is not configured");
-  return {
-    Authorization: `Bearer ${LOVABLE_API_KEY}`,
-    "X-Connection-Api-Key": GOOGLE_MAIL_API_KEY,
-    "Content-Type": "application/json",
-  };
-}
+import { gmailFetch, requireGmailAccount } from "@/server/gmail-auth.server";
 
 async function gw(path: string, init?: RequestInit) {
-  const res = await fetch(`${GATEWAY_URL}${path}`, {
-    ...init,
-    headers: { ...authHeaders(), ...(init?.headers as Record<string, string> | undefined) },
-  });
-  const text = await res.text();
-  let data: unknown = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  if (!res.ok) {
-    throw new Error(`Gmail API ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return data as any;
+  return gmailFetch(path, init);
 }
+
 
 function decodeB64Url(s: string) {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -78,7 +55,7 @@ function parseFrom(value: string | undefined): { name: string; email: string } {
 
 // ---------------- list ----------------
 export const gmailList = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { q?: string; maxResults?: number; pageToken?: string }) => data)
   .handler(async ({ data }) => {
     const params = new URLSearchParams();
@@ -91,7 +68,7 @@ export const gmailList = createServerFn({ method: "POST" })
 
 // ---------------- get full message ----------------
 export const gmailGet = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { id: string }) => data)
   .handler(async ({ data }) => {
     const res = await gw(`/users/me/messages/${encodeURIComponent(data.id)}?format=full`);
@@ -123,7 +100,7 @@ export const gmailGet = createServerFn({ method: "POST" })
 
 // ---------------- modify (read/unread/archive/trash) ----------------
 export const gmailModify = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { id: string; addLabelIds?: string[]; removeLabelIds?: string[]; trash?: boolean; untrash?: boolean }) => data)
   .handler(async ({ data }) => {
     if (data.trash) {
@@ -166,7 +143,7 @@ function buildRfc2822({
 }
 
 export const gmailSend = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { to: string; subject: string; body: string; threadId?: string; inReplyTo?: string; references?: string; cc?: string }) => data)
   .handler(async ({ data }) => {
     const raw = toBase64Url(buildRfc2822(data));
@@ -177,7 +154,7 @@ export const gmailSend = createServerFn({ method: "POST" })
 
 // ---------------- sync to db ----------------
 export const gmailSync = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { q?: string; maxResults?: number }) => data)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -316,7 +293,7 @@ export const emailAnalyzeLocal = createServerFn({ method: "POST" })
 
 // ---------------- analyze with AI (returns suggestion only) ----------------
 export const emailAnalyze = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { gmail_id: string }) => data)
   .handler(async ({ data, context }) => {
     const { supabase } = context;
@@ -413,7 +390,7 @@ export const emailAnalyze = createServerFn({ method: "POST" })
 
 // ---------------- translate email body with AI ----------------
 export const emailTranslate = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { gmail_id: string; target_language: string }) => data)
   .handler(async ({ data }) => {
     const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;

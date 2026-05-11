@@ -1,50 +1,18 @@
 // Server-only Gmail mirror helpers. Used by both protected server fns
 // (with the user-scoped supabase client) and the public cron route
 // (with supabaseAdmin). No middleware here — caller passes the client.
+//
+// All Gmail API calls now go through `gmailFetch` which uses per-user OAuth
+// tokens stored in `user_gmail_tokens`. The active account is selected via
+// AsyncLocalStorage (see gmail-auth.server.ts) — callers must wrap calls in
+// `runWithGmailAccount({ userId, emailAddress }, ...)`.
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/google_mail/gmail/v1";
-
-function authHeaders() {
-  const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-  const GOOGLE_MAIL_API_KEY = process.env.GOOGLE_MAIL_API_KEY_1 ?? process.env.GOOGLE_MAIL_API_KEY;
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-  if (!GOOGLE_MAIL_API_KEY) throw new Error("GOOGLE_MAIL_API_KEY is not configured");
-  return {
-    Authorization: `Bearer ${LOVABLE_API_KEY}`,
-    "X-Connection-Api-Key": GOOGLE_MAIL_API_KEY,
-    "Content-Type": "application/json",
-  };
-}
+import { gmailFetch } from "@/server/gmail-auth.server";
 
 export async function gw(path: string, init?: RequestInit) {
-  const maxAttempts = 4;
-  let lastErr: unknown = null;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    let res: Response;
-    try {
-      res = await fetch(`${GATEWAY_URL}${path}`, {
-        ...init,
-        headers: { ...authHeaders(), ...(init?.headers as Record<string, string> | undefined) },
-      });
-    } catch (e) {
-      lastErr = e;
-      if (attempt < maxAttempts) { await new Promise((r) => setTimeout(r, 400 * attempt)); continue; }
-      throw e;
-    }
-    const text = await res.text();
-    let data: unknown = null;
-    try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-    if (res.ok) return data as any;
-    if ((res.status === 502 || res.status === 503 || res.status === 504 || res.status === 429) && attempt < maxAttempts) {
-      await new Promise((r) => setTimeout(r, 500 * attempt));
-      lastErr = new Error(`Gmail API ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
-      continue;
-    }
-    throw new Error(`Gmail API ${res.status}: ${typeof data === "string" ? data : JSON.stringify(data)}`);
-  }
-  throw lastErr instanceof Error ? lastErr : new Error("Gmail API: unknown error");
+  return gmailFetch(path, init);
 }
+
 
 function decodeB64Url(s: string) {
   const b64 = s.replace(/-/g, "+").replace(/_/g, "/");
@@ -222,35 +190,6 @@ export async function rebuildThread(supabase: SupabaseClient, owner: string, thr
 export async function listAndPersistLabels(supabase: SupabaseClient): Promise<{ owner: string; labels: Array<{ id: string; type: string; name: string }> }> {
   const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
   const owner = profile.emailAddress.toLowerCase();
-
-  // Garante que o usuário autenticado esteja vinculado a esta conta antes de
-  // qualquer upsert protegido por RLS (evita erro de "row-level security").
-  try {
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (uid) {
-      const { data: existing } = await supabase
-        .from("user_email_accounts")
-        .select("id")
-        .eq("user_id", uid)
-        .eq("email_address", owner)
-        .maybeSingle();
-      if (!existing) {
-        const { data: anyAcc } = await supabase
-          .from("user_email_accounts")
-          .select("id")
-          .eq("user_id", uid)
-          .limit(1);
-        await supabase.from("user_email_accounts").insert({
-          user_id: uid,
-          email_address: owner,
-          is_primary: !anyAcc || anyAcc.length === 0,
-        });
-      }
-    }
-  } catch (e) {
-    console.error("auto-link user_email_accounts failed", e);
-  }
 
   const list = (await gw(`/users/me/labels`)) as { labels: Array<{ id: string; name: string; type: string; messageListVisibility?: string; labelListVisibility?: string }> };
   const details = await Promise.all(

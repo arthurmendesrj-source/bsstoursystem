@@ -376,18 +376,22 @@ function ActivitiesPage() {
                   </Select>
                 </div>
               </div>
-              {subordinates.length > 0 && (
-                <div>
-                  <Label>Responsável</Label>
-                  <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="self">Eu mesmo</SelectItem>
-                      {subordinates.map((s) => <SelectItem key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div>
+                <Label>Atribuir a</Label>
+                <Select value={form.assigned_to || "self"} onValueChange={(v) => setForm({ ...form, assigned_to: v === "self" ? "" : v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Eu mesmo</SelectItem>
+                    {allUsers
+                      .filter((u) => u.user_id !== user?.id)
+                      .map((u) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.full_name || u.user_id.slice(0, 8)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <DialogFooter>
                 <Button type="button" variant="ghost" onClick={() => setDialogOpen(false)}>{t("cancel")}</Button>
                 <Button type="submit">{t("save")}</Button>

@@ -22,6 +22,8 @@ import {
 } from "@/lib/proposal-totals";
 import { DictateItemsPanel, type DictatedItem } from "./DictateItemsPanel";
 import { GenerateDocumentDialog } from "./GenerateDocumentDialog";
+import { GenerateInvoiceDialog } from "@/components/booking/GenerateInvoiceDialog";
+import { ItemNoteButton } from "@/components/booking/ItemNoteButton";
 import { AiProgramAssistantDialog } from "./AiProgramAssistantDialog";
 import { ProposalDocumentsList } from "./ProposalDocumentsList";
 import { FlightDialog, type FlightRow } from "./FlightDialog";

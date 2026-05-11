@@ -62,10 +62,17 @@ function ActivitiesPage() {
   const { viewAs } = useViewAs();
   const targetUserId = viewAs?.user_id ?? null;
   const { subordinates } = useSubordinates();
+  const subordinateIds = useMemo(() => new Set(subordinates.map((s) => s.user_id)), [subordinates]);
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [leadsMap, setLeadsMap] = useState<Record<string, LeadLite>>({});
+  const [allUsers, setAllUsers] = useState<{ user_id: string; full_name: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const canEdit = (task: Task) =>
+    isAdmin
+    || (!!user && task.assigned_to === user.id)
+    || (!!task.assigned_to && subordinateIds.has(task.assigned_to));
 
   // filters
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "in_progress" | "done">("open");

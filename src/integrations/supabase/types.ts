@@ -2767,6 +2767,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_gmail_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          email_address: string
+          expires_at: string
+          id: string
+          refresh_token: string
+          scope: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          email_address: string
+          expires_at: string
+          id?: string
+          refresh_token: string
+          scope?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          email_address?: string
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          scope?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_module_permissions: {
         Row: {
           can_approve: boolean | null
@@ -2945,6 +2981,27 @@ export type Database = {
       }
     }
     Views: {
+      user_gmail_accounts_public: {
+        Row: {
+          connected_at: string | null
+          email_address: string | null
+          last_refresh_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          connected_at?: string | null
+          email_address?: string | null
+          last_refresh_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          connected_at?: string | null
+          email_address?: string | null
+          last_refresh_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       v_supplier_rates_duplicates: {
         Row: {
           category: string | null

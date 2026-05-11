@@ -191,35 +191,6 @@ export async function listAndPersistLabels(supabase: SupabaseClient): Promise<{ 
   const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
   const owner = profile.emailAddress.toLowerCase();
 
-  // Garante que o usuário autenticado esteja vinculado a esta conta antes de
-  // qualquer upsert protegido por RLS (evita erro de "row-level security").
-  try {
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (uid) {
-      const { data: existing } = await supabase
-        .from("user_email_accounts")
-        .select("id")
-        .eq("user_id", uid)
-        .eq("email_address", owner)
-        .maybeSingle();
-      if (!existing) {
-        const { data: anyAcc } = await supabase
-          .from("user_email_accounts")
-          .select("id")
-          .eq("user_id", uid)
-          .limit(1);
-        await supabase.from("user_email_accounts").insert({
-          user_id: uid,
-          email_address: owner,
-          is_primary: !anyAcc || anyAcc.length === 0,
-        });
-      }
-    }
-  } catch (e) {
-    console.error("auto-link user_email_accounts failed", e);
-  }
-
   const list = (await gw(`/users/me/labels`)) as { labels: Array<{ id: string; name: string; type: string; messageListVisibility?: string; labelListVisibility?: string }> };
   const details = await Promise.all(
     list.labels.map(async (l) => {

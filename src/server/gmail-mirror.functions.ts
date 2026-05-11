@@ -1,7 +1,7 @@
 // Thin createServerFn wrappers around shared helpers in gmail-mirror.server.ts.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireGmailAccount, runWithGmailAccount } from "@/server/gmail-auth.server";
+import { requireGmailAccount } from "@/server/gmail-auth-middleware";
 import {
   gw, findHeader, parseFrom, extractBody, extractAttachments, type GmailPart,
   listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe,

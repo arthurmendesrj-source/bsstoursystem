@@ -490,10 +490,31 @@ function BookingDetailPage() {
                   </div>
                 </div>
 
+                <div className="rounded-md border bg-muted/30 p-3 space-y-1.5">
+                  <Label className="text-xs font-semibold uppercase tracking-wide">Fornecedor</Label>
+                  <ComboboxAutocomplete
+                    options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                    value={c?.supplier_id ?? (c?.supplier_name ?? "")}
+                    allowCustom
+                    placeholder="Selecione ou digite o fornecedor…"
+                    searchPlaceholder="Buscar fornecedor…"
+                    emptyMessage="Nenhum fornecedor cadastrado."
+                    onChange={(v) => {
+                      const match = suppliers.find((s) => s.id === v);
+                      const patch: Partial<Confirmation> = match
+                        ? { supplier_id: match.id, supplier_name: match.name }
+                        : { supplier_id: null, supplier_name: v ? (v.trim() || null) : null };
+                      updateLocal(item.id, patch);
+                      persist(item.id, patch);
+                    }}
+                  />
+                </div>
+
                 <div>
                   <Label className="text-xs">{t("notes")}</Label>
                   <Textarea rows={2} value={item.notes ?? ""} onChange={(e) => updateItemLocal(item.id, { notes: e.target.value })} onBlur={(e) => persistItem(item.id, { notes: e.target.value })} />
                 </div>
+
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>

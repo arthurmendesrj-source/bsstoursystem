@@ -535,7 +535,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     void (async () => {
       try {
         const r = await listLiveFn({
-          data: { labelId: activeLabel, maxResults: PAGE_SIZE, q: search.trim() || undefined },
+          data: { labelId: activeLabel, maxResults: PAGE_SIZE, q: search.trim() || undefined, emailAddress: selectedAccount ?? undefined } as never,
         });
         setNextPageToken((tok) => tok ?? r.nextPageToken);
         await loadFolders();

@@ -234,6 +234,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   }, [loadAccounts]);
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
+  // When an account is selected, scope all queries to it; otherwise use all authorized.
+  const currentOwners = useMemo<string[]>(
+    () => (selectedAccount ? [selectedAccount] : (authorizedEmails ?? [])),
+    [selectedAccount, authorizedEmails],
+  );
 
   // Live mirror state (driven by background cron / realtime)
   type MirrorState = {
@@ -251,7 +256,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
   useEffect(() => {
     if (!hasMailbox) { setMirror(null); return; }
-    const owners = authorizedEmails!;
+    const owners = currentOwners;
+    if (owners.length === 0) { setMirror(null); return; }
     let cancelled = false;
     const load = async () => {
       const { data } = await supabase
@@ -281,13 +287,13 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       .subscribe();
     const poll = setInterval(load, 20_000);
     return () => { cancelled = true; supabase.removeChannel(channel); clearInterval(poll); };
-  }, [hasMailbox, authorizedEmails]);
+  }, [hasMailbox, currentOwners]);
 
   const loadFolders = useCallback(async () => {
     if (!hasMailbox) { setFolders([]); return; }
-    const { data } = await supabase.from("email_labels").select("*").in("owner_email", authorizedEmails!).order("name");
+    const { data } = await supabase.from("email_labels").select("*").in("owner_email", currentOwners).order("name");
     setFolders((data ?? []) as Folder[]);
-  }, [hasMailbox, authorizedEmails]);
+  }, [hasMailbox, currentOwners]);
 
   const mergeUnique = useCallback((incoming: ThreadRow[], existing: ThreadRow[]): ThreadRow[] => {
     const map = new Map<string, ThreadRow>();
@@ -307,7 +313,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
     const OUTBOUND = new Set(["SENT", "DRAFT", "TRASH", "SPAM"]);
     if (OUTBOUND.has(activeLabel)) {
-      const owners = authorizedEmails!;
+      const owners = currentOwners;
+      if (owners.length === 0) { setThreads([]); return; }
       let q = supabase
         .from("emails")
         .select("id, thread_id, subject, snippet, from_email, from_name, to_emails, internal_date, is_starred, is_unread, is_important, has_attachments, labels, body_text, owner_email")
@@ -361,12 +368,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       const { data: hits } = await supabase
         .from("emails")
         .select("thread_id")
-        .in("owner_email", authorizedEmails!)
+        .in("owner_email", currentOwners)
         .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
         .limit(500);
       threadIdHits = Array.from(new Set(((hits ?? []) as Array<{ thread_id: string | null }>).map((h) => h.thread_id).filter((x): x is string => !!x)));
     }
-    let q = supabase.from("email_threads").select("*").in("owner_email", authorizedEmails!)
+    let q = supabase.from("email_threads").select("*").in("owner_email", currentOwners)
       .order("last_message_at", { ascending: false }).limit(pageSize);
     q = q.contains("labels", [activeLabel]);
     if (safe) {
@@ -383,7 +390,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     setLastPageFull(rows.length >= pageSize);
     if (isSearching) setThreads(rows);
     else setThreads((prev) => mergeUnique(rows, prev));
-  }, [activeLabel, search, hasMailbox, authorizedEmails, pageSize, mergeUnique]);
+  }, [activeLabel, search, hasMailbox, currentOwners, pageSize, mergeUnique]);
 
 
   useEffect(() => { void loadFolders(); }, [loadFolders]);

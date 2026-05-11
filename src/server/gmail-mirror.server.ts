@@ -144,7 +144,7 @@ export async function fetchAndStoreMessage(supabase: SupabaseClient, owner: stri
   };
 
   const { data: upserted, error } = await supabase
-    .from("emails").upsert(row, { onConflict: "gmail_id" }).select("id").single();
+    .from("emails").upsert(row, { onConflict: "owner_email,gmail_id" }).select("id").single();
   if (error) throw new Error(`emails upsert: ${error.message}`);
 
   if (hasAttachments && upserted?.id) {
@@ -169,9 +169,10 @@ export async function rebuildThread(supabase: SupabaseClient, owner: string, thr
   const { data: msgs } = await supabase
     .from("emails")
     .select("from_email, from_name, to_emails, subject, snippet, internal_date, labels, is_unread, is_starred, is_important, has_attachments")
+    .eq("owner_email", owner)
     .eq("thread_id", threadId).order("internal_date", { ascending: true });
   if (!msgs || msgs.length === 0) {
-    await supabase.from("email_threads").delete().eq("id", threadId);
+    await supabase.from("email_threads").delete().eq("owner_email", owner).eq("id", threadId);
     return;
   }
   const participants = Array.from(new Set(msgs.flatMap((m: any) => [m.from_name || m.from_email, ...(m.to_emails ?? [])]).filter(Boolean)));
@@ -183,7 +184,7 @@ export async function rebuildThread(supabase: SupabaseClient, owner: string, thr
     is_unread: msgs.some((m: any) => m.is_unread), is_starred: msgs.some((m: any) => m.is_starred),
     is_important: msgs.some((m: any) => m.is_important), has_attachments: msgs.some((m: any) => m.has_attachments),
     labels: allLabels, updated_at: new Date().toISOString(),
-  }, { onConflict: "id" });
+  }, { onConflict: "owner_email,id" });
 }
 
 // ---------------- LABELS ----------------

@@ -569,18 +569,21 @@ function ActivitiesPage() {
                       <TableCell className="text-sm">{fmtTime(task.time_spent_minutes)}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
+                          {!canEdit(task) && (
+                            <Badge variant="outline" className="text-[10px] mr-1">somente leitura</Badge>
+                          )}
                           {!task.completed && (
-                            <Button size="icon" variant="ghost" onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
+                            <Button size="icon" variant="ghost" disabled={!canEdit(task)} onClick={() => toggleStarted(task)} title={inProgress ? t("pauseTask") : t("startTask")}>
                               {inProgress ? <Pause className="h-4 w-4 text-amber-600" /> : <Play className="h-4 w-4" />}
                             </Button>
                           )}
-                          <Button size="icon" variant="ghost" onClick={() => openLinkDialog([task.id])} title={t("linkToLead")}>
+                          <Button size="icon" variant="ghost" disabled={!canEdit(task)} onClick={() => openLinkDialog([task.id])} title={t("linkToLead")}>
                             <Link2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => removeTask(task)} title={t("delete")}>
+                          <Button size="icon" variant="ghost" disabled={!isAdmin && task.created_by !== user?.id} onClick={() => removeTask(task)} title={t("delete")}>
                             <Trash2 className="h-4 w-4 text-muted-foreground" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => toggleComplete(task)} title={t("bulkComplete")}>
+                          <Button size="icon" variant="ghost" disabled={!canEdit(task)} onClick={() => toggleComplete(task)} title={t("bulkComplete")}>
                             {task.completed
                               ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
                               : <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/40 hover:border-primary" />}

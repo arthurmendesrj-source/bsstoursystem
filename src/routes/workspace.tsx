@@ -715,6 +715,9 @@ function WorkspacePage() {
         {/* MAIN */}
         <Card className="min-h-[600px] ml-2">
           <CardContent className="p-4">
+            {tool && hasLead && lead ? (
+              <ToolPanel tool={tool} onClose={() => navigate({ search: { lead: lead.id } })} />
+            ) : (
             <Accordion type="multiple" defaultValue={["email"]} className="w-full">
               <AccordionItem value="email">
                 <AccordionTrigger className="text-sm font-semibold" onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); openSection("email"); }} title="Duplo-clique para abrir em janela">

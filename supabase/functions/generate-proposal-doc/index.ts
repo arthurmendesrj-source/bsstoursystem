@@ -542,19 +542,28 @@ Deno.serve(async (req) => {
 
 Always reply by calling the tool 'build_proposal_content'. Tone: ${tone}. Language: ${langName}.
 
-For EACH day, provide:
-- A vivid descriptive narrative (experience, atmosphere, gastronomy, cultural context).
-- 'schedule': hour-by-hour planned activities (suggested times like 09:00, 12:30, etc.).
-- 'transfers': all logistical movements (e.g. "Airport GIG → Hotel Copacabana, ~45min by private car").
-- 'meals_included': breakfast/lunch/dinner included that day.
-- 'highlights': 2-4 bullet points of the day's highlights.
-- 'tips': 2-4 practical local tips (dress code, money, crowd timing, photo spots).
+**STRICT SCOPE — only quoted items**:
+- The user message includes 'active_dates' (the only dates with quoted items) and 'day_briefs' (what was sold on each date).
+- Generate entries in 'days' ONLY for dates listed in 'active_dates'. NEVER invent free days, rest days, leisure days, or filler activities for any other date.
+- For each generated day, the 'schedule', 'transfers', 'meals_included', 'highlights' and 'tips' MUST reference only the items present in day_briefs[date]. Do not add extra tours, sightseeing, museums, restaurants or meals that were not quoted.
+- Days that contain only a hotel check-in or check-out (no service, no flight) must have a SHORT narrative focused on arrival/departure logistics, with at most 1-2 schedule lines (check-in / rest / check-out) — never invent tours.
+- 'day_number' is the sequential index within active_dates (1, 2, 3...), not a calendar offset.
 
-Provide a 'practical_info' block covering: best time to visit, weather expected for the dates, currency, language, plug type, tipping culture, required documents (passport validity, visa, vaccines if applicable), what to pack, health & safety guidance, and generic emergency contacts (e.g. 190 police BR, 192 ambulance BR, embassy hint).
+For days WITH quoted services or flights, provide:
+- A vivid descriptive narrative (experience, atmosphere, gastronomy, cultural context) tied to those quoted items.
+- 'schedule': hour-by-hour times for the quoted items only.
+- 'transfers': only the logistical movements implied by the quoted flights/hotels.
+- 'meals_included': only meals included by the quoted hotel meal plan or quoted services.
+- 'highlights': 2-4 bullet points tied to the quoted items.
+- 'tips': 2-4 practical local tips relevant to those activities.
+
+Provide a 'practical_info' block covering: best time to visit, weather expected for the dates, currency, language, plug type, tipping culture, required documents (passport validity, visa, vaccines if applicable), what to pack, health & safety guidance, and generic emergency contacts.
 
 Provide a 'trip_management' block covering: how the client will be received at the airport, check-in/check-out policy, transfers overview, guide language, 24/7 local coordinator support details, standard cancellation policy, and standard payment terms.
 
 Inclusions/exclusions must reflect what was quoted (hotels with meal plan, transfers, tours) plus standard exclusions (international flights unless quoted, visas, tips, personal expenses, optional tours).
+
+If 'program_title' is provided in the user brief, use it VERBATIM as the document 'title'. Otherwise build a short title from the destination.
 
 NEVER mention internal costs, markup, or supplier names. Speak as the operator delivering the trip.
 

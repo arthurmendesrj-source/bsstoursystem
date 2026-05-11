@@ -339,13 +339,19 @@ function BookingDetailPage() {
             </div>
           </div>
         </div>
-        {allConfirmed && booking.status !== "confirmada" && (
-          <Button onClick={markBookingConfirmed}><CheckCircle2 className="mr-2 h-4 w-4" />{t("markBookingConfirmed")}</Button>
-        )}
-        {booking.status === "confirmada" && (
-          <Button variant="outline" onClick={reopenBooking}><RotateCcw className="mr-2 h-4 w-4" />{t("reopenBooking")}</Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setInvoiceDialogOpen(true)}>
+            <FileText className="mr-2 h-4 w-4" />Gerar Invoice
+          </Button>
+          {allConfirmed && booking.status !== "confirmada" && (
+            <Button onClick={markBookingConfirmed}><CheckCircle2 className="mr-2 h-4 w-4" />{t("markBookingConfirmed")}</Button>
+          )}
+          {booking.status === "confirmada" && (
+            <Button variant="outline" onClick={reopenBooking}><RotateCcw className="mr-2 h-4 w-4" />{t("reopenBooking")}</Button>
+          )}
+        </div>
       </div>
+      <GenerateInvoiceDialog bookingId={bookingId} open={invoiceDialogOpen} onOpenChange={setInvoiceDialogOpen} />
 
       {items.length > 0 && (
         <Card className="p-4 space-y-2">

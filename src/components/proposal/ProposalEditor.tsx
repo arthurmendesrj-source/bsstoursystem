@@ -720,6 +720,12 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
         onGenerated={() => setDocsRefresh((n) => n + 1)}
       />
 
+      <GenerateInvoiceDialog
+        quoteId={quoteId}
+        open={invoiceGenOpen}
+        onOpenChange={setInvoiceGenOpen}
+      />
+
       <AiProgramAssistantDialog
         leadId={leadId}
         quoteId={quoteId}

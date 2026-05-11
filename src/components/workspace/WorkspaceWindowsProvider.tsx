@@ -4,6 +4,7 @@ import { FloatingWindowManager, type FloatingWindowManagerHandle, type FloatingW
 type Ctx = {
   openWindow: (opts: FloatingWindowOpenOpts) => void;
   closeWindow: (id: string) => void;
+  minimizeAllWindows: () => void;
 };
 
 const WorkspaceWindowsContext = createContext<Ctx | null>(null);
@@ -11,8 +12,7 @@ const WorkspaceWindowsContext = createContext<Ctx | null>(null);
 export function useWorkspaceWindows(): Ctx {
   const ctx = useContext(WorkspaceWindowsContext);
   if (!ctx) {
-    // Safe no-op fallback so child components don't crash outside provider
-    return { openWindow: () => {}, closeWindow: () => {} };
+    return { openWindow: () => {}, closeWindow: () => {}, minimizeAllWindows: () => {} };
   }
   return ctx;
 }
@@ -22,6 +22,7 @@ export function WorkspaceWindowsProvider({ children }: { children: ReactNode }) 
   const value: Ctx = {
     openWindow: (opts) => ref.current?.openOrFocus(opts),
     closeWindow: (id) => ref.current?.close(id),
+    minimizeAllWindows: () => ref.current?.minimizeAll(),
   };
   return (
     <WorkspaceWindowsContext.Provider value={value}>

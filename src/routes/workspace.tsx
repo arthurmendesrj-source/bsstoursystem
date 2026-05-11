@@ -1158,7 +1158,7 @@ function ToolPanel({ tool, onClose }: { tool: string; onClose: () => void }) {
   const sep = route.includes("?") ? "&" : "?";
   const src = `${route}${sep}embed=1`;
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 relative z-0">
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold capitalize">{tool.replace("-", " ")}</div>
         <Button size="sm" variant="outline" onClick={onClose}>Voltar para atendimento</Button>

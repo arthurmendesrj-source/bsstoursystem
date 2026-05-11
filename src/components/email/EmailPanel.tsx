@@ -256,7 +256,8 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
   useEffect(() => {
     if (!hasMailbox) { setMirror(null); return; }
-    const owners = authorizedEmails!;
+    const owners = currentOwners;
+    if (owners.length === 0) { setMirror(null); return; }
     let cancelled = false;
     const load = async () => {
       const { data } = await supabase
@@ -286,13 +287,13 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       .subscribe();
     const poll = setInterval(load, 20_000);
     return () => { cancelled = true; supabase.removeChannel(channel); clearInterval(poll); };
-  }, [hasMailbox, authorizedEmails]);
+  }, [hasMailbox, currentOwners]);
 
   const loadFolders = useCallback(async () => {
     if (!hasMailbox) { setFolders([]); return; }
-    const { data } = await supabase.from("email_labels").select("*").in("owner_email", authorizedEmails!).order("name");
+    const { data } = await supabase.from("email_labels").select("*").in("owner_email", currentOwners).order("name");
     setFolders((data ?? []) as Folder[]);
-  }, [hasMailbox, authorizedEmails]);
+  }, [hasMailbox, currentOwners]);
 
   const mergeUnique = useCallback((incoming: ThreadRow[], existing: ThreadRow[]): ThreadRow[] => {
     const map = new Map<string, ThreadRow>();

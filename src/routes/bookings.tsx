@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Ticket } from "lucide-react";
+import { Pencil, Plus, Ticket } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";

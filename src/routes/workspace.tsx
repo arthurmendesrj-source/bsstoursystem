@@ -798,6 +798,7 @@ function WorkspacePage() {
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+            )}
           </CardContent>
         </Card>
         </ResizablePanel>

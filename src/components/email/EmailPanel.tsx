@@ -704,10 +704,29 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
-                  <Mail className="h-3.5 w-3.5 mr-2" />
-                  <span className="flex-1">Adicionar conta de email…</span>
+              <DropdownMenuContent align="end" className="w-72">
+                {(authorizedEmails ?? []).length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Conta ativa</div>
+                    {(authorizedEmails ?? []).map((em) => (
+                      <DropdownMenuItem key={em} onClick={() => pickAccount(em)} className="flex items-center gap-2">
+                        <Check className={cn("h-3.5 w-3.5", em === selectedAccount ? "opacity-100" : "opacity-0")} />
+                        <span className="flex-1 truncate">{em}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); void disconnectAccount(em); }}
+                          className="opacity-60 hover:opacity-100"
+                          title="Desconectar"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={() => void startGoogleConnect()} disabled={connecting}>
+                  {connecting ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
+                  <span className="flex-1">Conectar conta Google…</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

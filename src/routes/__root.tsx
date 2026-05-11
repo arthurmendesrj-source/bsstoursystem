@@ -10,6 +10,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { PermissionFieldHighlighter } from "@/components/PermissionFieldHighlighter";
 import { GlobalButtonTooltips } from "@/components/GlobalButtonTooltips";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { WorkspaceWindowsProvider } from "@/components/workspace/WorkspaceWindowsProvider";
 
 function NotFoundComponent() {
   return (
@@ -75,10 +76,12 @@ function RootComponent() {
           <ViewAsProvider>
             <PermissionsProvider>
               <TooltipProvider delayDuration={400}>
-                <Outlet />
-                <PermissionFieldHighlighter />
-                <GlobalButtonTooltips />
-                <Toaster />
+                <WorkspaceWindowsProvider>
+                  <Outlet />
+                  <PermissionFieldHighlighter />
+                  <GlobalButtonTooltips />
+                  <Toaster />
+                </WorkspaceWindowsProvider>
               </TooltipProvider>
             </PermissionsProvider>
           </ViewAsProvider>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Hotel, Wrench, Save, CheckCircle2, FileCheck, Mic, FileText, CalendarCheck, Plane, Pencil, Send, Receipt, AlertTriangle, ShieldCheck, Sparkles, RotateCcw } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -106,6 +106,12 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
   const [editingFlight, setEditingFlight] = useState<FlightRow | null>(null);
   const [hotelDialogOpen, setHotelDialogOpen] = useState(false);
   const [editingHotel, setEditingHotel] = useState<HotelInitial | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "dirty" | "saving" | "saved" | "error">("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  const dirtyRef = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveRef = useRef<((opts?: { silent?: boolean }) => Promise<void>) | null>(null);
+  const anyChildDialogOpen = hotelDialogOpen || serviceDialogOpen || flightDialogOpen;
 
   const openEditHotel = async (id: string) => {
     const { data, error } = await supabase
@@ -221,12 +227,43 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       }),
     );
     setLoading(false);
+    dirtyRef.current = false;
+    setSaveStatus("idle");
   };
 
   useEffect(() => {
     load();
     /* eslint-disable-next-line react-hooks/exhaustive-deps */
   }, [quoteId]);
+
+  // Auto-save: debounce 2s after any user change
+  useEffect(() => {
+    if (loading || !quote || !canEdit) return;
+    if (!dirtyRef.current) {
+      dirtyRef.current = true;
+      return;
+    }
+    setSaveStatus("dirty");
+    if (anyChildDialogOpen) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      saveRef.current?.({ silent: true });
+    }, 2000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, bankFee, quote?.notes, quote?.valid_until, quote?.currency, quote?.default_markup_pct]);
+
+  // Flush pending save on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      if (dirtyRef.current) {
+        saveRef.current?.({ silent: true });
+      }
+    };
+  }, []);
 
   const totals = useMemo(() => computeTotals(items, bankFee), [items, bankFee]);
   const ccy = quote?.currency ?? "USD";
@@ -413,10 +450,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     setItems((arr) => arr.map((it) => ({ ...it, markup_pct: m })));
   };
 
-  const save = async () => {
+  const save = async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent === true;
     if (!quote) return;
-    if (!canEdit) { toast.error("Sem permissão para salvar"); return; }
+    if (!canEdit) {
+      if (!silent) toast.error("Sem permissão para salvar");
+      return;
+    }
     setSaving(true);
+    if (silent) setSaveStatus("saving");
     const totalsNow = computeTotals(items, bankFee);
 
     const { error: qErr } = await supabase
@@ -431,8 +473,9 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       })
       .eq("id", quote.id);
     if (qErr) {
-      toast.error(qErr.message);
+      if (!silent) toast.error(qErr.message);
       setSaving(false);
+      if (silent) setSaveStatus("error");
       return;
     }
 
@@ -458,10 +501,16 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     }
 
     setSaving(false);
-    toast.success(t("saved"));
-    onSaved?.();
-    load();
+    dirtyRef.current = false;
+    setLastSavedAt(new Date());
+    setSaveStatus("saved");
+    if (!silent) {
+      toast.success(t("saved"));
+      onSaved?.();
+      load();
+    }
   };
+  saveRef.current = save;
 
   const approve = async () => {
     if (!quote) return;
@@ -604,7 +653,15 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
             <FileText className="h-4 w-4 mr-1" /> Gerar Documento
           </Button>
           <Can module="quotes" action="edit">
-            <Button size="sm" onClick={save} disabled={saving}>
+            <span className="text-xs text-muted-foreground self-center min-w-[110px]">
+              {saveStatus === "saving" && "Salvando…"}
+              {saveStatus === "dirty" && "Alterações não salvas"}
+              {saveStatus === "saved" && lastSavedAt && (
+                <span className="text-emerald-600">Salvo • {format(lastSavedAt, "HH:mm")}</span>
+              )}
+              {saveStatus === "error" && <span className="text-destructive">Erro ao salvar</span>}
+            </span>
+            <Button size="sm" onClick={() => save()} disabled={saving}>
               <Save className="h-4 w-4 mr-1" /> {saving ? t("loading") : t("save")}
             </Button>
           </Can>

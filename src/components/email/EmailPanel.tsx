@@ -1071,7 +1071,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
 
   const onDownloadAttachment = async (msgId: string, att: { attachment_id: string; filename: string; mime_type: string }) => {
     try {
-      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id } });
+      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id, emailAddress: selectedAccount } as never });
       const b64 = r.dataB64Url.replace(/-/g, "+").replace(/_/g, "/");
       const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
       const bin = atob(b64 + pad);

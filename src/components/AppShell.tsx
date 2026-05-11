@@ -242,7 +242,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
           {showManagerial && !viewAs && (
-            <Link to="/gerencial" className={itemClass(path === "/gerencial" || path.startsWith("/gerencial/"))} title={collapsed ? "Gerencial" : undefined}>
+            <Link to="/gerencial" onClick={() => minimizeAllWindows()} className={itemClass(path === "/gerencial" || path.startsWith("/gerencial/"))} title={collapsed ? "Gerencial" : undefined}>
               <BarChart3 className="h-4 w-4 shrink-0" />
               {!collapsed && <span className="truncate">Gerencial</span>}
             </Link>
@@ -254,23 +254,24 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {t("admin")}
                 </div>
               )}
-              <Link to="/users" className={itemClass(path.startsWith("/users"))} title={collapsed ? t("users") : undefined}>
+              <Link to="/users" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/users"))} title={collapsed ? t("users") : undefined}>
                 <Shield className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{t("users")}</span>}
               </Link>
-              <Link to="/security-audit" className={itemClass(path.startsWith("/security-audit"))} title={collapsed ? t("secAuditTitle") : undefined}>
+              <Link to="/security-audit" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/security-audit"))} title={collapsed ? t("secAuditTitle") : undefined}>
                 <ShieldAlert className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{t("secAuditTitle")}</span>}
               </Link>
             </>
           )}
-          <Link to="/permissions-audit" className={itemClass(path === "/permissions-audit")} title={collapsed ? "Minhas permissões" : undefined}>
+          <Link to="/permissions-audit" onClick={() => minimizeAllWindows()} className={itemClass(path === "/permissions-audit")} title={collapsed ? "Minhas permissões" : undefined}>
             <Shield className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">Minhas permissões</span>}
           </Link>
           {!collapsed && (
             <Link
               to="/permissions-audit/financial"
+              onClick={() => minimizeAllWindows()}
               className={cn(
                 "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
                 path.startsWith("/permissions-audit/financial")
@@ -281,7 +282,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               Campos financeiros
             </Link>
           )}
-          <Link to="/settings" className={itemClass(path === "/settings")} title={collapsed ? t("settings") : undefined}>
+          <Link to="/settings" onClick={() => minimizeAllWindows()} className={itemClass(path === "/settings")} title={collapsed ? t("settings") : undefined}>
             <Settings className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t("settings")}</span>}
           </Link>
@@ -289,6 +290,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <>
               <Link
                 to="/settings/templates"
+                onClick={() => minimizeAllWindows()}
                 className={cn(
                   "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
                   path.startsWith("/settings/templates")
@@ -301,6 +303,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {isAdmin && (
                 <Link
                   to="/settings/sla"
+                  onClick={() => minimizeAllWindows()}
                   className={cn(
                     "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
                     path.startsWith("/settings/sla")
@@ -314,6 +317,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               {isAdmin && (
                 <Link
                   to="/settings/permissions"
+                  onClick={() => minimizeAllWindows()}
                   className={cn(
                     "flex items-center gap-3 rounded-md pl-9 pr-3 py-1.5 text-sm transition-colors",
                     path.startsWith("/settings/permissions")

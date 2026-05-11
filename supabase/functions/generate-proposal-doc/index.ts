@@ -723,12 +723,7 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
 
     // Cronograma consolidado (datas + horários)
     if (isExecutive && includeSchedule) {
-      // Build flat schedule from items + flights
-      const { data: flightsRaw } = await admin
-        .from("quote_flights")
-        .select("flight_date, departure_time, arrival_time, from_code, to_code, flight_number")
-        .eq("quote_id", quoteId)
-        .order("flight_date", { ascending: true });
+      // Build flat schedule from items + flights (flights loaded earlier)
 
       type SchedRow = {
         date: string;
@@ -793,7 +788,7 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
           });
         }
       }
-      for (const f of flightsRaw ?? []) {
+      for (const f of flights) {
         const dep = String(f.departure_time ?? "").slice(0, 5);
         sched.push({
           date: String(f.flight_date),

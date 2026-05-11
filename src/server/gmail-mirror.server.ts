@@ -144,7 +144,7 @@ export async function fetchAndStoreMessage(supabase: SupabaseClient, owner: stri
   };
 
   const { data: upserted, error } = await supabase
-    .from("emails").upsert(row, { onConflict: "gmail_id" }).select("id").single();
+    .from("emails").upsert(row, { onConflict: "owner_email,gmail_id" }).select("id").single();
   if (error) throw new Error(`emails upsert: ${error.message}`);
 
   if (hasAttachments && upserted?.id) {

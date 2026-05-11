@@ -59,6 +59,8 @@ import { Route as ApiPublicGmailLeadRouteImport } from './routes/api/public/gmai
 import { Route as ApiPublicGmailDealRouteImport } from './routes/api/public/gmail/deal'
 import { Route as ApiPublicGmailContactRouteImport } from './routes/api/public/gmail/contact'
 import { Route as ApiPublicGmailActivityRouteImport } from './routes/api/public/gmail/activity'
+import { Route as ApiPublicGoogleOauthStartRouteImport } from './routes/api/public/google/oauth/start'
+import { Route as ApiPublicGoogleOauthCallbackRouteImport } from './routes/api/public/google/oauth/callback'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -314,6 +316,18 @@ const ApiPublicGmailActivityRoute = ApiPublicGmailActivityRouteImport.update({
   path: '/api/public/gmail/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGoogleOauthStartRoute =
+  ApiPublicGoogleOauthStartRouteImport.update({
+    id: '/api/public/google/oauth/start',
+    path: '/api/public/google/oauth/start',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicGoogleOauthCallbackRoute =
+  ApiPublicGoogleOauthCallbackRouteImport.update({
+    id: '/api/public/google/oauth/callback',
+    path: '/api/public/google/oauth/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -366,6 +380,8 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
+  '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -418,6 +434,8 @@ export interface FileRoutesByTo {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
+  '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -471,6 +489,8 @@ export interface FileRoutesById {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
+  '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -525,6 +545,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/google/oauth/callback'
+    | '/api/public/google/oauth/start'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -577,6 +599,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/google/oauth/callback'
+    | '/api/public/google/oauth/start'
   id:
     | '__root__'
     | '/'
@@ -629,6 +653,8 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/google/oauth/callback'
+    | '/api/public/google/oauth/start'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -668,6 +694,8 @@ export interface RootRouteChildren {
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
+  ApiPublicGoogleOauthCallbackRoute: typeof ApiPublicGoogleOauthCallbackRoute
+  ApiPublicGoogleOauthStartRoute: typeof ApiPublicGoogleOauthStartRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1022,6 +1050,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGmailActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/google/oauth/start': {
+      id: '/api/public/google/oauth/start'
+      path: '/api/public/google/oauth/start'
+      fullPath: '/api/public/google/oauth/start'
+      preLoaderRoute: typeof ApiPublicGoogleOauthStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/google/oauth/callback': {
+      id: '/api/public/google/oauth/callback'
+      path: '/api/public/google/oauth/callback'
+      fullPath: '/api/public/google/oauth/callback'
+      preLoaderRoute: typeof ApiPublicGoogleOauthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1146,6 +1188,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,
+  ApiPublicGoogleOauthCallbackRoute: ApiPublicGoogleOauthCallbackRoute,
+  ApiPublicGoogleOauthStartRoute: ApiPublicGoogleOauthStartRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

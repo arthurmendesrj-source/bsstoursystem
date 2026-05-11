@@ -267,7 +267,8 @@ function ActivitiesPage() {
     if (!user || !form.title.trim()) return;
     const category = form.lead_id ? "negocio" : form.category;
     const source = form.lead_id ? "lead" : "manual";
-    const { error } = await supabase.from("tasks").insert({
+    const assignedTo = form.assigned_to || targetUserId || user.id;
+    const { data: inserted, error } = await supabase.from("tasks").insert({
       title: form.title.slice(0, 200),
       description: form.description || null,
       due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
@@ -276,9 +277,13 @@ function ActivitiesPage() {
       source,
       lead_id: form.lead_id || null,
       created_by: user.id,
-      assigned_to: form.assigned_to || targetUserId || user.id,
-    });
+      assigned_to: assignedTo,
+    }).select("id").maybeSingle();
     if (error) { toast.error(error.message); return; }
+    // Notifica destinatário se for outra pessoa (falha silenciosa)
+    if (inserted?.id && assignedTo && assignedTo !== user.id) {
+      notifyTaskAssigned({ data: { taskId: inserted.id } }).catch(() => undefined);
+    }
     // Auto-link emails by lead's email
     if (form.lead_id) {
       const { data: leadRow } = await supabase

@@ -979,6 +979,8 @@ function ItemTable({
   onAdd,
   addLabel,
   icon,
+  showNotes,
+  quoteId,
 }: {
   title: string;
   kind: ProposalItemKind;
@@ -991,6 +993,8 @@ function ItemTable({
   onAdd?: () => void;
   addLabel?: string;
   icon?: React.ReactNode;
+  showNotes?: boolean;
+  quoteId?: string;
 }) {
   const { t } = useI18n();
   const { canField } = usePermissions();

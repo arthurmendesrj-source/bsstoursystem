@@ -307,6 +307,32 @@ Deno.serve(async (req) => {
     const services = items.filter((i) => i.kind !== "hotel");
     const total = items.reduce((sum, i) => sum + (Number(i.total) || 0), 0);
 
+    // Load notes when admin version
+    type Note = { target_kind: string; target_id: string; category: string; note: string };
+    let notes: Note[] = [];
+    if (version === "admin" && booking.quote_id) {
+      const { data: ns } = await userClient
+        .from("quote_item_notes")
+        .select("target_kind,target_id,category,note")
+        .eq("quote_id", booking.quote_id)
+        .order("created_at", { ascending: true });
+      notes = (ns ?? []) as Note[];
+    }
+    const notesByTarget = new Map<string, Note[]>();
+    for (const n of notes) {
+      const arr = notesByTarget.get(n.target_id) ?? [];
+      arr.push(n);
+      notesByTarget.set(n.target_id, arr);
+    }
+    const fmtNotes = (id: string) =>
+      (notesByTarget.get(id) ?? [])
+        .map((n) => `[${n.category.toUpperCase()}] ${n.note}`)
+        .join("\n");
+    const allNotesBlock = notes.length > 0
+      ? "INTERNAL NOTES (administrativo):\n" +
+        notes.map((n) => `• [${n.category.toUpperCase()}] ${n.note}`).join("\n")
+      : "";
+
     let invoiceNumber = "";
     const { data: invByBooking } = await userClient
       .from("invoices")

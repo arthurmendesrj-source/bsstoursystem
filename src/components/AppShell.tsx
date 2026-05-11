@@ -221,6 +221,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               : path === it.to || path.startsWith(it.to + "/");
             const Icon = it.icon;
             const handleClick = (e: React.MouseEvent) => {
+              minimizeAllWindows();
               if (wrappedSearch) {
                 e.preventDefault();
                 navigate({ to: "/workspace", search: wrappedSearch });

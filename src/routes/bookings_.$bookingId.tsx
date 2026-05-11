@@ -85,6 +85,8 @@ type Confirmation = {
   proof_text: string | null;
   proof_reference: string | null;
   proof_email_id?: string | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
 };
 
 function BookingDetailPage() {

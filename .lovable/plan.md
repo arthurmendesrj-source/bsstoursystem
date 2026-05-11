@@ -1,42 +1,23 @@
-## Mudanças (revisão do plano)
+## Adicionar botão Editar na lista de Reservas
 
-Mantém tudo do plano anterior e adiciona suporte a notas no documento gerado, com duas versões.
+### Objetivo
+Permitir editar uma reserva direto da tela `/bookings` (cliente, pacote, datas, valor, moeda, status) sem precisar abrir o detalhe.
 
-### 1. Remover "Gerar Invoice" da tela de Reservas
-- `src/routes/bookings_.$bookingId.tsx`: remover botão **Gerar Invoice**, estado `invoiceDialogOpen`, render de `<GenerateInvoiceDialog/>` e o import.
+### Mudanças
 
-### 2. Mover "Gerar Invoice" para a Invoice em Atendimento
-- `src/components/proposal/ProposalEditor.tsx`:
-  - Em `mode === "invoice"`: esconder o botão **Gerar Documento**.
-  - Em `mode === "invoice"`: novo botão **Gerar Invoice** abrindo `GenerateInvoiceDialog`.
-  - Resolver `bookingId` a partir de `bookings.quote_id = quoteId` (mais recente). Sem booking ⇒ botão desabilitado com tooltip "sem reserva vinculada".
-
-### 3. Anotação por item (Operacional / Financeiro / Comercial)
-- Migração — nova tabela `quote_item_notes`:
-  - `quote_id` (FK quotes), `target_kind` enum (`item`|`flight`), `target_id` uuid, `category` enum `note_category` (`operacional`|`financeiro`|`comercial`), `note` text, `author_id` uuid, timestamps.
-  - RLS: SELECT/INSERT para autenticado; UPDATE/DELETE só do `author_id` (ou admin via has_role).
-- Novo `src/components/booking/ItemNoteButton.tsx`: ícone `StickyNote` (com badge de contagem), Popover com lista de notas existentes + form (Select de categoria + Textarea + Salvar).
-- `ProposalEditor.tsx`: renderizar `ItemNoteButton` ao lado dos botões de lápis/lixeira nas tabelas de itens (linha ~1106) e de voos (linha ~844), quando `mode === "invoice"` e o item já existe (não `new-…`).
-
-### 4. **NOVO**: Versão financeira do documento (com/sem notas)
-- `GenerateInvoiceDialog.tsx`:
-  - Adicionar **seletor "Versão"**: 
-    - **Cliente** (sem notas) — default.
-    - **Setor Administrativo** (com notas) — inclui um bloco/coluna de notas no doc.
-  - Enviar `version: "client" | "admin"` para a edge function.
-- `supabase/functions/generate-invoice-doc/index.ts`:
-  - Aceitar `version` no body. Se `version === "admin"`:
-    - Carregar `quote_item_notes` do `quote_id` agrupadas por `target_id`.
-    - **XLSX**: para cada linha de item/voo, anexar nas células livres da direita (coluna J em diante) a lista de notas no formato `[Categoria] texto · autor`. Adicionar também ao final da planilha (após totals, antes do bloco bancário) uma seção **"Internal Notes"** listando todas as notas com referência ao item.
-    - **PDF**: adicionar coluna "Notes" nas tabelas de hotéis e serviços com as notas concatenadas; ao final, antes do bloco bancário, seção **"Internal Notes"** com lista completa.
-  - Se `version === "client"`: comportamento atual (sem notas).
-  - Naming do arquivo: sufixo `_admin` ou `_client` no `file_name` para diferenciar downloads.
-
-### Arquivos
-- editar: `src/routes/bookings_.$bookingId.tsx`, `src/components/proposal/ProposalEditor.tsx`, `src/components/booking/GenerateInvoiceDialog.tsx`, `supabase/functions/generate-invoice-doc/index.ts`
-- criar: `src/components/booking/ItemNoteButton.tsx`
-- migração: tabela `quote_item_notes` + enums + RLS
+**`src/routes/bookings.tsx`**
+- Adicionar botão **Editar** (ícone `Pencil`) na coluna **Ações** de cada linha, ao lado do "Abrir reserva". Visível apenas com permissão `bookings.edit`.
+- Reutilizar o mesmo `<Dialog>` do "Novo", transformando-o em modo dual (criar/editar):
+  - Estado `editingId: string | null` além do `form` existente.
+  - Ao clicar em editar: preencher `form` com os dados da reserva e abrir o dialog. Título muda para "Editar Reserva".
+  - `submit`: se `editingId` → `update().eq('id', editingId)`; senão → `insert` (comportamento atual).
+  - Ao fechar/limpar: resetar `editingId` para `null`.
+- Campos editáveis no form (já existem): cliente, pacote, data ida/volta, valor, moeda, status.
 
 ### Fora do escopo
-- Sem mudar o gerador de proposta (`GenerateDocumentDialog`).
-- Notas não são editáveis em massa — só pelo botão por item.
+- Não mexer em `/bookings/$bookingId` (detalhe).
+- Não mexer em vouchers, invoice, itens da proposta.
+- Sem mudanças de schema/RLS — `bookings` já tem update policy.
+
+### Arquivos
+- Editar: `src/routes/bookings.tsx`

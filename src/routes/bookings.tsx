@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Ticket } from "lucide-react";
+import { Pencil, Plus, Ticket } from "lucide-react";
 import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
@@ -55,10 +55,12 @@ function BookingsPage() {
   const [customers, setCustomers] = useState<{ id: string; full_name: string }[]>([]);
   const [pkgs, setPkgs] = useState<{ id: string; name: string; base_price: number; base_currency: string }[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const emptyForm = {
     customer_id: "", package_id: "", total_amount: "", currency: "BRL",
     departure_date: "", return_date: "", status: "pre_reserva",
-  });
+  };
+  const [form, setForm] = useState(emptyForm);
 
   const load = async () => {
     let bookingsQ = supabase.from("bookings").select("*").order("created_at", { ascending: false });
@@ -93,7 +95,7 @@ function BookingsPage() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    const { error } = await supabase.from("bookings").insert({
+    const payload = {
       customer_id: form.customer_id || null,
       package_id: form.package_id || null,
       total_amount: Number(form.total_amount || 0),
@@ -101,15 +103,32 @@ function BookingsPage() {
       departure_date: form.departure_date || null,
       return_date: form.return_date || null,
       status: form.status as "pre_reserva",
-      created_by: user.id,
-    });
+    };
+    const { error } = editingId
+      ? await supabase.from("bookings").update(payload).eq("id", editingId)
+      : await supabase.from("bookings").insert({ ...payload, created_by: user.id });
     if (error) toast.error(error.message);
     else {
       toast.success(t("saved"));
       setOpen(false);
-      setForm({ customer_id: "", package_id: "", total_amount: "", currency: "BRL", departure_date: "", return_date: "", status: "pre_reserva" });
+      setEditingId(null);
+      setForm(emptyForm);
       load();
     }
+  };
+
+  const openEdit = (b: Booking) => {
+    setEditingId(b.id);
+    setForm({
+      customer_id: b.customer_id ?? "",
+      package_id: b.package_id ?? "",
+      total_amount: String(b.total_amount ?? ""),
+      currency: b.currency ?? "BRL",
+      departure_date: b.departure_date ?? "",
+      return_date: b.return_date ?? "",
+      status: b.status ?? "pre_reserva",
+    });
+    setOpen(true);
   };
 
   const updateStatus = async (id: string, status: string) => {
@@ -159,10 +178,10 @@ function BookingsPage() {
           <p className="text-muted-foreground">{rows.length}</p>
         </div>
         <Can module="bookings" action="create">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild><Button><Plus className="mr-2 h-4 w-4" />{t("new")}</Button></DialogTrigger>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditingId(null); setForm(emptyForm); } }}>
+          <DialogTrigger asChild><Button onClick={() => { setEditingId(null); setForm(emptyForm); }}><Plus className="mr-2 h-4 w-4" />{t("new")}</Button></DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>{t("new")} {t("bookings")}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? `${t("edit") || "Editar"} ${t("bookings")}` : `${t("new")} ${t("bookings")}`}</DialogTitle></DialogHeader>
             <form onSubmit={submit} className="space-y-3">
               <div>
                 <Label>{t("customers")} *</Label>
@@ -262,9 +281,16 @@ function BookingsPage() {
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
-                  </Button>
+                  <div className="flex justify-end gap-1">
+                    {can("bookings", "edit") && (
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(b)} title={t("edit") || "Editar"}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

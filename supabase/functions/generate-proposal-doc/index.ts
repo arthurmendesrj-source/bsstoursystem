@@ -629,6 +629,14 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       }
     }
 
+    // Override title with the country-derived program name when available
+    if (programTitleFromFlights) content.title = programTitleFromFlights;
+
+    // Defensive filter: drop any AI-invented days outside the quoted dates
+    if (Array.isArray(content.days) && activeDates.size > 0) {
+      content.days = content.days.filter((d: any) => !d?.date || activeDates.has(String(d.date)));
+    }
+
     // Build .docx
     const children: any[] = [];
 

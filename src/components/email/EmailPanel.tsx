@@ -1038,7 +1038,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
   useEffect(() => { void loadRows(); }, [loadRows]);
 
   const fetchMessages = async (threadId: string): Promise<ThreadMessage[]> => {
-    const r = await getThreadFn({ data: { threadId } });
+    const r = await getThreadFn({ data: { threadId, emailAddress: selectedAccount } as never });
     return r.messages as ThreadMessage[];
   };
 

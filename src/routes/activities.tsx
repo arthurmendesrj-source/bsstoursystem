@@ -126,6 +126,15 @@ function ActivitiesPage() {
 
   useEffect(() => { loadData(); }, [targetUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // load all users for the "Atribuir a" select (open to everyone)
+  useEffect(() => {
+    supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .order("full_name", { ascending: true })
+      .then(({ data }) => setAllUsers((data ?? []) as { user_id: string; full_name: string | null }[]));
+  }, []);
+
   // link-to-lead dialog
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkTargetIds, setLinkTargetIds] = useState<string[]>([]);

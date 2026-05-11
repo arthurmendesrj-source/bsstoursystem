@@ -47,6 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useI18n();
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();
+  const { minimizeAllWindows } = useWorkspaceWindows();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
   const isEmbed = search?.embed === "1" || search?.embed === 1;

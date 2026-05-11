@@ -618,7 +618,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     if (!composeTo.trim()) { toast.error("Destinatário?"); return; }
     setSending(true);
     try {
-      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined } });
+      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined, emailAddress: selectedAccount ?? undefined } as never });
       toast.success("Enviado"); setComposeOpen(null);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSending(false); }

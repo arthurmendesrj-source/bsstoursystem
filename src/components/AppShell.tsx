@@ -206,10 +206,26 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
 
           {items.map((it) => {
-            const active = path === it.to || path.startsWith(it.to + "/");
+            const wrapped = wrapTo(it.to);
+            const active =
+              wrapped.to === "/workspace" && "search" in wrapped
+                ? path === "/workspace" && search?.tool === wrapped.search.tool
+                : path === it.to || path.startsWith(it.to + "/");
             const Icon = it.icon;
+            const handleClick = (e: React.MouseEvent) => {
+              if (wrapped.to === "/workspace" && "search" in wrapped) {
+                e.preventDefault();
+                navigate({ to: "/workspace", search: wrapped.search });
+              }
+            };
             return (
-              <Link key={it.to} to={it.to} className={itemClass(active)} title={collapsed ? it.label : undefined}>
+              <Link
+                key={it.to}
+                to={it.to}
+                onClick={handleClick}
+                className={itemClass(active)}
+                title={collapsed ? it.label : undefined}
+              >
                 <Icon className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{it.label}</span>}
               </Link>

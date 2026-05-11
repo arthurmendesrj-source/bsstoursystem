@@ -184,7 +184,7 @@ export async function gmailFetch(path: string, init?: RequestInit): Promise<any>
 
 export const requireGmailAccount = createMiddleware({ type: "function" }).server(
   async ({ next, data, context }) => {
-    const ctx = context as { userId?: string };
+    const ctx = (context ?? {}) as unknown as { userId?: string };
     const userId = ctx.userId;
     if (!userId) {
       throw new Response("Unauthorized", { status: 401 });

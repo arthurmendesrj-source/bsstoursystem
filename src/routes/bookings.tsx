@@ -281,9 +281,16 @@ function BookingsPage() {
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button asChild size="sm" variant="ghost">
-                    <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
-                  </Button>
+                  <div className="flex justify-end gap-1">
+                    {can("bookings", "edit") && (
+                      <Button size="sm" variant="ghost" onClick={() => openEdit(b)} title={t("edit") || "Editar"}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to="/bookings/$bookingId" params={{ bookingId: b.id }}>{t("openBooking")}</Link>
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}

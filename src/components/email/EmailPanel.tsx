@@ -151,52 +151,87 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   useEffect(() => { try { localStorage.setItem(LS_COLLAPSED, collapsed ? "1" : "0"); } catch {} }, [collapsed]);
 
 
+  const LS_SELECTED_ACCOUNT = "email.selectedAccount";
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
-  const [newAccountEmail, setNewAccountEmail] = useState("");
-  const [addingAccount, setAddingAccount] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(() => {
+    try { return localStorage.getItem(LS_SELECTED_ACCOUNT); } catch { return null; }
+  });
+  const [connecting, setConnecting] = useState(false);
 
   const loadAccounts = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
     if (!uid) { setAuthorizedEmails([]); return; }
-    const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
-    setAuthorizedEmails(((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase()));
+    // Load OAuth-connected accounts (source of truth) — falls back to user_email_accounts.
+    const { data: tokens } = await supabase
+      .from("user_gmail_tokens")
+      .select("email_address")
+      .eq("user_id", uid);
+    let emails = ((tokens ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
+    if (emails.length === 0) {
+      const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
+      emails = ((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
+    }
+    setAuthorizedEmails(emails);
+    setSelectedAccount((prev) => {
+      const next = prev && emails.includes(prev) ? prev : (emails[0] ?? null);
+      try { if (next) localStorage.setItem(LS_SELECTED_ACCOUNT, next); else localStorage.removeItem(LS_SELECTED_ACCOUNT); } catch {}
+      return next;
+    });
   }, []);
 
   useEffect(() => { void loadAccounts(); }, [loadAccounts]);
 
-  const addEmailAccount = useCallback(async () => {
-    const email = newAccountEmail.trim().toLowerCase();
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      toast.error("Informe um endereço de email válido.");
-      return;
-    }
-    setAddingAccount(true);
+  const pickAccount = useCallback((email: string) => {
+    setSelectedAccount(email);
+    try { localStorage.setItem(LS_SELECTED_ACCOUNT, email); } catch {}
+  }, []);
+
+  const startGoogleConnect = useCallback(async () => {
+    setConnecting(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const uid = userData.user?.id;
-      if (!uid) { toast.error("Sessão expirada."); return; }
-      const isFirst = (authorizedEmails?.length ?? 0) === 0;
-      const { error } = await supabase
-        .from("user_email_accounts")
-        .insert({ user_id: uid, email_address: email, is_primary: isFirst });
-      if (error) {
-        if ((error as { code?: string }).code === "23505") {
-          toast.error("Esta conta já está vinculada.");
-        } else {
-          toast.error(error.message || "Falha ao vincular conta.");
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) { toast.error("Sessão expirada — faça login novamente."); return; }
+      const url = `/api/public/google/oauth/start?token=${encodeURIComponent(token)}`;
+      const popup = window.open(url, "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
+      if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups para este site."); return; }
+      const onMessage = (ev: MessageEvent) => {
+        const msg = ev.data as { type?: string; ok?: boolean; message?: string } | undefined;
+        if (!msg || msg.type !== "gmail-oauth") return;
+        window.removeEventListener("message", onMessage);
+        if (msg.ok) { toast.success(msg.message || "Conta conectada"); void loadAccounts(); }
+        else toast.error(msg.message || "Falha ao conectar");
+        setConnecting(false);
+      };
+      window.addEventListener("message", onMessage);
+      // Safety timeout in case popup is closed without message
+      const interval = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(interval);
+          window.removeEventListener("message", onMessage);
+          setConnecting(false);
+          void loadAccounts();
         }
-        return;
-      }
-      toast.success(`Conta ${email} vinculada.`);
-      setNewAccountEmail("");
-      setAddAccountOpen(false);
-      await loadAccounts();
-    } finally {
-      setAddingAccount(false);
+      }, 800);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao iniciar OAuth");
+      setConnecting(false);
     }
-  }, [newAccountEmail, authorizedEmails, loadAccounts]);
+  }, [loadAccounts]);
+
+  const disconnectAccount = useCallback(async (email: string) => {
+    if (!email) return;
+    if (!confirm(`Desconectar a conta ${email}? Os tokens serão removidos.`)) return;
+    const { data: userData } = await supabase.auth.getUser();
+    const uid = userData.user?.id;
+    if (!uid) return;
+    const { error } = await supabase.from("user_gmail_tokens").delete()
+      .eq("user_id", uid).eq("email_address", email.toLowerCase());
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Conta ${email} desconectada`);
+    await loadAccounts();
+  }, [loadAccounts]);
 
   const hasMailbox = (authorizedEmails?.length ?? 0) > 0;
 
@@ -416,11 +451,14 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   }, [loadFolders, activeLabel, mergeUnique]);
 
   const incRef = useRef(incSyncFn); incRef.current = incSyncFn;
+  const accRef = useRef<string | null>(selectedAccount); accRef.current = selectedAccount;
   useEffect(() => {
     if (mode !== "full" || !hasMailbox) return;
     const tick = async () => {
       if (document.visibilityState !== "visible") return;
-      try { await incRef.current({ data: undefined as never }); } catch { /* silent */ }
+      const acc = accRef.current;
+      if (!acc) return;
+      try { await incRef.current({ data: { emailAddress: acc } as never }); } catch { /* silent */ }
     };
     const timer = setInterval(tick, 15_000);
     void tick();
@@ -436,14 +474,15 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     if (append) setLoadingMore(true); else setRefreshing(true);
     let liveOk = false;
     try {
-      await listLabelsFn({ data: undefined as never });
+      await listLabelsFn({ data: { emailAddress: selectedAccount ?? undefined } as never });
       const r = await listLiveFn({
         data: {
           labelId: activeLabel,
           pageToken: append ? (nextPageToken ?? undefined) : undefined,
           maxResults: PAGE_SIZE,
           q: search.trim() || undefined,
-        },
+          emailAddress: selectedAccount ?? undefined,
+        } as never,
       });
       setNextPageToken(r.nextPageToken);
       liveOk = true;
@@ -496,7 +535,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     void (async () => {
       try {
         const r = await listLiveFn({
-          data: { labelId: activeLabel, maxResults: PAGE_SIZE, q: search.trim() || undefined },
+          data: { labelId: activeLabel, maxResults: PAGE_SIZE, q: search.trim() || undefined, emailAddress: selectedAccount ?? undefined } as never,
         });
         setNextPageToken((tok) => tok ?? r.nextPageToken);
         await loadFolders();
@@ -508,7 +547,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
 
   const fetchThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
-    const r = await getThreadFn({ data: { threadId } });
+    const r = await getThreadFn({ data: { threadId, emailAddress: selectedAccount ?? undefined } as never });
     return r.messages as ThreadMessage[];
   };
 
@@ -533,7 +572,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
   const downloadAttachment = async (msgId: string, att: { attachment_id: string; filename: string; mime_type: string }) => {
     try {
-      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id } });
+      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id, emailAddress: selectedAccount ?? undefined } as never });
       const b64 = r.dataB64Url.replace(/-/g, "+").replace(/_/g, "/");
       const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
       const bin = atob(b64 + pad);
@@ -579,7 +618,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     if (!composeTo.trim()) { toast.error("Destinatário?"); return; }
     setSending(true);
     try {
-      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined } });
+      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined, emailAddress: selectedAccount ?? undefined } as never });
       toast.success("Enviado"); setComposeOpen(null);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSending(false); }
@@ -596,36 +635,11 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   if (authorizedEmails === null) {
     return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
   }
-  const AddAccountDialog = (
-    <Dialog open={addAccountOpen} onOpenChange={(o) => { setAddAccountOpen(o); if (!o) setNewAccountEmail(""); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Vincular conta de email</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="new-email-account">Endereço Gmail</Label>
-          <Input
-            id="new-email-account"
-            type="email"
-            autoFocus
-            placeholder="voce@gmail.com"
-            value={newAccountEmail}
-            onChange={(e) => setNewAccountEmail(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") void addEmailAccount(); }}
-          />
-          <p className="text-xs text-muted-foreground">
-            A conta será vinculada ao seu usuário. A sincronização usa a integração Gmail já configurada.
-          </p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setAddAccountOpen(false)} disabled={addingAccount}>Cancelar</Button>
-          <Button onClick={() => void addEmailAccount()} disabled={addingAccount}>
-            {addingAccount && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Vincular
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+  const ConnectButton = ({ size = "default" }: { size?: "default" | "sm" }) => (
+    <Button onClick={() => void startGoogleConnect()} disabled={connecting} size={size}>
+      {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+      {connecting ? "Conectando…" : "Conectar conta Google"}
+    </Button>
   );
 
   if (!hasMailbox) {
@@ -633,13 +647,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center bg-background", className)}>
         <div className="max-w-md text-center px-6 py-10 rounded-lg border bg-card">
           <Mail className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold mb-2">Nenhuma conta de email vinculada</h2>
-          <p className="text-sm text-muted-foreground mb-4">Vincule uma conta Gmail para começar a sincronizar.</p>
-          <Button onClick={() => setAddAccountOpen(true)}>
-            <Mail className="h-4 w-4 mr-2" /> Adicionar conta de email
-          </Button>
+          <h2 className="text-lg font-semibold mb-2">Nenhuma conta Google conectada</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Conecte sua conta Google para sincronizar e enviar emails. Você pode conectar várias contas e alternar entre elas.
+          </p>
+          <ConnectButton />
         </div>
-        {AddAccountDialog}
       </div>
     );
   }
@@ -695,10 +708,29 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
                   <ChevronDown className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => setAddAccountOpen(true)}>
-                  <Mail className="h-3.5 w-3.5 mr-2" />
-                  <span className="flex-1">Adicionar conta de email…</span>
+              <DropdownMenuContent align="end" className="w-72">
+                {(authorizedEmails ?? []).length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Conta ativa</div>
+                    {(authorizedEmails ?? []).map((em) => (
+                      <DropdownMenuItem key={em} onClick={() => pickAccount(em)} className="flex items-center gap-2">
+                        <Check className={cn("h-3.5 w-3.5", em === selectedAccount ? "opacity-100" : "opacity-0")} />
+                        <span className="flex-1 truncate">{em}</span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); void disconnectAccount(em); }}
+                          className="opacity-60 hover:opacity-100"
+                          title="Desconectar"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem onClick={() => void startGoogleConnect()} disabled={connecting}>
+                  {connecting ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
+                  <span className="flex-1">Conectar conta Google…</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -828,7 +860,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
         {Sidebar}
         <div className={cn("min-w-0 border-r", inlineReader ? "flex-1" : "flex-1 max-w-[560px]")}>{ThreadList}</div>
 
-        {AddAccountDialog}
+        
 
         {/* Janelas flutuantes das conversas */}
         <ThreadWindowManager
@@ -971,6 +1003,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
   };
   const [rows, setRows] = useState<Row[]>([]);
   const windowsRef = useRef<ThreadWindowManagerHandle>(null);
+  const selectedAccount = (() => { try { return localStorage.getItem("email.selectedAccount") || undefined; } catch { return undefined; } })();
 
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);
@@ -1005,7 +1038,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
   useEffect(() => { void loadRows(); }, [loadRows]);
 
   const fetchMessages = async (threadId: string): Promise<ThreadMessage[]> => {
-    const r = await getThreadFn({ data: { threadId } });
+    const r = await getThreadFn({ data: { threadId, emailAddress: selectedAccount } as never });
     return r.messages as ThreadMessage[];
   };
 
@@ -1038,7 +1071,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
 
   const onDownloadAttachment = async (msgId: string, att: { attachment_id: string; filename: string; mime_type: string }) => {
     try {
-      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id } });
+      const r = await getAttachmentFn({ data: { messageId: msgId, attachmentId: att.attachment_id, emailAddress: selectedAccount } as never });
       const b64 = r.dataB64Url.replace(/-/g, "+").replace(/_/g, "/");
       const pad = b64.length % 4 === 0 ? "" : "=".repeat(4 - (b64.length % 4));
       const bin = atob(b64 + pad);
@@ -1066,7 +1099,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
     if (!composeTo.trim()) { toast.error("Destinatário?"); return; }
     setSending(true);
     try {
-      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined } });
+      await sendFn({ data: { to: composeTo, subject: composeSubject, body: composeBody, threadId: composeOpen.mode === "reply" ? composeOpen.msg.id : undefined, emailAddress: selectedAccount } as never });
       toast.success("Enviado"); setComposeOpen(null);
     } catch (e) { toast.error(e instanceof Error ? e.message : "Erro"); }
     finally { setSending(false); }

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Loader2, FileText, FileType2, FileCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, FileText, FileType2, FileCheck, Users, Building2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -25,25 +25,61 @@ const DEFAULT_BENEFICIARY = `Beneficiary: VIPDELUXETRAVEL LLC
 Beneficiary Address : 200 S. PARK RD. SUITE 301. HOLLYWOOD. FL 33021`;
 
 type Format = "xlsx" | "pdf" | "both";
+type Version = "client" | "admin";
 
 type Props = {
-  bookingId: string;
+  bookingId?: string;
+  quoteId?: string;
   open: boolean;
   onOpenChange: (o: boolean) => void;
 };
 
-export function GenerateInvoiceDialog({ bookingId, open, onOpenChange }: Props) {
+export function GenerateInvoiceDialog({ bookingId, quoteId, open, onOpenChange }: Props) {
   const [format, setFormat] = useState<Format>("xlsx");
+  const [version, setVersion] = useState<Version>("client");
   const [bankInfo, setBankInfo] = useState(DEFAULT_BANK_INFO);
   const [beneficiary, setBeneficiary] = useState(DEFAULT_BENEFICIARY);
   const [busy, setBusy] = useState(false);
+  const [resolvedBookingId, setResolvedBookingId] = useState<string | null>(bookingId ?? null);
+  const [resolving, setResolving] = useState(false);
+
+  useEffect(() => {
+    if (bookingId) { setResolvedBookingId(bookingId); return; }
+    if (!open || !quoteId) return;
+    let cancel = false;
+    (async () => {
+      setResolving(true);
+      const { data } = await supabase
+        .from("bookings")
+        .select("id")
+        .eq("quote_id", quoteId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!cancel) {
+        setResolvedBookingId(data?.id ?? null);
+        setResolving(false);
+      }
+    })();
+    return () => { cancel = true; };
+  }, [bookingId, quoteId, open]);
 
   const generate = async () => {
+    if (!resolvedBookingId) {
+      toast.error("Sem reserva vinculada a este invoice");
+      return;
+    }
     setBusy(true);
     try {
       const formats = format === "both" ? ["xlsx", "pdf"] : [format];
       const { data, error } = await supabase.functions.invoke("generate-invoice-doc", {
-        body: { booking_id: bookingId, formats, bank_info: bankInfo, beneficiary },
+        body: {
+          booking_id: resolvedBookingId,
+          formats,
+          bank_info: bankInfo,
+          beneficiary,
+          version,
+        },
       });
       if (error) {
         toast.error(error.message);
@@ -79,6 +115,36 @@ export function GenerateInvoiceDialog({ bookingId, open, onOpenChange }: Props) 
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {!bookingId && (
+            <div className="text-xs text-muted-foreground">
+              {resolving
+                ? "Buscando reserva vinculada…"
+                : resolvedBookingId
+                  ? `Reserva: ${resolvedBookingId.slice(0, 8)}`
+                  : "Sem reserva vinculada — não é possível gerar."}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label className="text-xs">Versão</Label>
+            <RadioGroup
+              value={version}
+              onValueChange={(v) => setVersion(v as Version)}
+              className="grid grid-cols-2 gap-2"
+            >
+              <label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/40">
+                <RadioGroupItem value="client" id="ver-c" />
+                <Users className="h-4 w-4" />
+                <span className="text-sm font-medium">Cliente (sem notas)</span>
+              </label>
+              <label className="flex items-center gap-2 rounded-md border p-2 cursor-pointer hover:bg-muted/40">
+                <RadioGroupItem value="admin" id="ver-a" />
+                <Building2 className="h-4 w-4" />
+                <span className="text-sm font-medium">Administrativo (com notas)</span>
+              </label>
+            </RadioGroup>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-xs">Formato</Label>
             <RadioGroup
@@ -134,7 +200,7 @@ export function GenerateInvoiceDialog({ bookingId, open, onOpenChange }: Props) 
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancelar
           </Button>
-          <Button onClick={generate} disabled={busy}>
+          <Button onClick={generate} disabled={busy || !resolvedBookingId}>
             {busy ? (
               <>
                 <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Gerando…

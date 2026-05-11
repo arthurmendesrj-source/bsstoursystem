@@ -1003,6 +1003,7 @@ function LeadEmailMini({ leadId, className }: { leadId: string; className?: stri
   };
   const [rows, setRows] = useState<Row[]>([]);
   const windowsRef = useRef<ThreadWindowManagerHandle>(null);
+  const selectedAccount = (() => { try { return localStorage.getItem("email.selectedAccount") || undefined; } catch { return undefined; } })();
 
   const getThreadFn = useServerFn(gmailGetThread);
   const getAttachmentFn = useServerFn(gmailGetAttachment);

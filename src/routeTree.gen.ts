@@ -51,6 +51,7 @@ import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
 import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
@@ -274,6 +275,12 @@ const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   path: '/api/assistant/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWhatsappWebhookRoute =
+  ApiPublicWhatsappWebhookRouteImport.update({
+    id: '/api/public/whatsapp/webhook',
+    path: '/api/public/whatsapp/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
   id: '/api/public/hooks/task-due',
   path: '/api/public/hooks/task-due',
@@ -380,6 +387,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
   '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
@@ -434,6 +442,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
   '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
@@ -489,6 +498,7 @@ export interface FileRoutesById {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
   '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
@@ -545,6 +555,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/whatsapp/webhook'
     | '/api/public/google/oauth/callback'
     | '/api/public/google/oauth/start'
   fileRoutesByTo: FileRoutesByTo
@@ -599,6 +610,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/whatsapp/webhook'
     | '/api/public/google/oauth/callback'
     | '/api/public/google/oauth/start'
   id:
@@ -653,6 +665,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/whatsapp/webhook'
     | '/api/public/google/oauth/callback'
     | '/api/public/google/oauth/start'
   fileRoutesById: FileRoutesById
@@ -694,6 +707,7 @@ export interface RootRouteChildren {
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
+  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicGoogleOauthCallbackRoute: typeof ApiPublicGoogleOauthCallbackRoute
   ApiPublicGoogleOauthStartRoute: typeof ApiPublicGoogleOauthStartRoute
 }
@@ -994,6 +1008,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAssistantChatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/whatsapp/webhook': {
+      id: '/api/public/whatsapp/webhook'
+      path: '/api/public/whatsapp/webhook'
+      fullPath: '/api/public/whatsapp/webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/task-due': {
       id: '/api/public/hooks/task-due'
       path: '/api/public/hooks/task-due'
@@ -1188,6 +1209,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,
+  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicGoogleOauthCallbackRoute: ApiPublicGoogleOauthCallbackRoute,
   ApiPublicGoogleOauthStartRoute: ApiPublicGoogleOauthStartRoute,
 }

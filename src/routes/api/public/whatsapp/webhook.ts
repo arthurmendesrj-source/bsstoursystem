@@ -110,7 +110,7 @@ async function processIncoming(value: MetaWebhookValue) {
       }
       await supabaseAdmin
         .from("whatsapp_messages")
-        .update(update)
+        .update(update as never)
         .eq("account_id", account.id)
         .eq("wa_message_id", s.id);
     }

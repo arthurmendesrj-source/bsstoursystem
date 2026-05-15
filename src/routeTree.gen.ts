@@ -36,6 +36,7 @@ import { Route as SuppliersReferencesRouteImport } from './routes/suppliers.refe
 import { Route as SuppliersRatesValidationRouteImport } from './routes/suppliers.rates-validation'
 import { Route as SuppliersRatesSearchRouteImport } from './routes/suppliers.rates-search'
 import { Route as SuppliersRatesImportRouteImport } from './routes/suppliers.rates-import'
+import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
@@ -198,6 +199,11 @@ const SuppliersRatesImportRoute = SuppliersRatesImportRouteImport.update({
   id: '/rates-import',
   path: '/rates-import',
   getParentRoute: () => SuppliersRoute,
+} as any)
+const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const SettingsTemplatesRoute = SettingsTemplatesRouteImport.update({
   id: '/templates',
@@ -372,6 +378,7 @@ export interface FileRoutesByFullPath {
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
@@ -427,6 +434,7 @@ export interface FileRoutesByTo {
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
@@ -483,6 +491,7 @@ export interface FileRoutesById {
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
@@ -540,6 +549,7 @@ export interface FileRouteTypes {
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
+    | '/settings/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
@@ -595,6 +605,7 @@ export interface FileRouteTypes {
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
+    | '/settings/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
@@ -650,6 +661,7 @@ export interface FileRouteTypes {
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
+    | '/settings/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
@@ -903,6 +915,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersRatesImportRouteImport
       parentRoute: typeof SuppliersRoute
     }
+    '/settings/whatsapp': {
+      id: '/settings/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/settings/whatsapp'
+      preLoaderRoute: typeof SettingsWhatsappRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/templates': {
       id: '/settings/templates'
       path: '/templates'
@@ -1142,12 +1161,14 @@ interface SettingsRouteChildren {
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
+  SettingsWhatsappRoute: typeof SettingsWhatsappRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,
+  SettingsWhatsappRoute: SettingsWhatsappRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(

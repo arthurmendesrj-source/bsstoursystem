@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkspaceRouteImport } from './routes/workspace'
+import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -36,6 +37,7 @@ import { Route as SuppliersReferencesRouteImport } from './routes/suppliers.refe
 import { Route as SuppliersRatesValidationRouteImport } from './routes/suppliers.rates-validation'
 import { Route as SuppliersRatesSearchRouteImport } from './routes/suppliers.rates-search'
 import { Route as SuppliersRatesImportRouteImport } from './routes/suppliers.rates-import'
+import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
 import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
@@ -51,6 +53,7 @@ import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
 import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
+import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
@@ -65,6 +68,11 @@ import { Route as ApiPublicGoogleOauthCallbackRouteImport } from './routes/api/p
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
   path: '/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WhatsappRoute = WhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UsersRoute = UsersRouteImport.update({
@@ -198,6 +206,11 @@ const SuppliersRatesImportRoute = SuppliersRatesImportRouteImport.update({
   path: '/rates-import',
   getParentRoute: () => SuppliersRoute,
 } as any)
+const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
+  getParentRoute: () => SettingsRoute,
+} as any)
 const SettingsTemplatesRoute = SettingsTemplatesRouteImport.update({
   id: '/templates',
   path: '/templates',
@@ -274,6 +287,12 @@ const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   path: '/api/assistant/chat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicWhatsappWebhookRoute =
+  ApiPublicWhatsappWebhookRouteImport.update({
+    id: '/api/public/whatsapp/webhook',
+    path: '/api/public/whatsapp/webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTaskDueRoute = ApiPublicHooksTaskDueRouteImport.update({
   id: '/api/public/hooks/task-due',
   path: '/api/public/hooks/task-due',
@@ -352,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
+  '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
@@ -365,6 +385,7 @@ export interface FileRoutesByFullPath {
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
@@ -380,6 +401,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
   '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
@@ -406,6 +428,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
+  '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
@@ -419,6 +442,7 @@ export interface FileRoutesByTo {
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
@@ -434,6 +458,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
   '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
@@ -461,6 +486,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
+  '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
@@ -474,6 +500,7 @@ export interface FileRoutesById {
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
+  '/settings/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
@@ -489,6 +516,7 @@ export interface FileRoutesById {
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
+  '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
   '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
   '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
@@ -517,6 +545,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/whatsapp'
     | '/workspace'
     | '/alerts/debug'
     | '/alerts/history'
@@ -530,6 +559,7 @@ export interface FileRouteTypes {
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
+    | '/settings/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
@@ -545,6 +575,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/whatsapp/webhook'
     | '/api/public/google/oauth/callback'
     | '/api/public/google/oauth/start'
   fileRoutesByTo: FileRoutesByTo
@@ -571,6 +602,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/whatsapp'
     | '/workspace'
     | '/alerts/debug'
     | '/alerts/history'
@@ -584,6 +616,7 @@ export interface FileRouteTypes {
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
+    | '/settings/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
@@ -599,6 +632,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/whatsapp/webhook'
     | '/api/public/google/oauth/callback'
     | '/api/public/google/oauth/start'
   id:
@@ -625,6 +659,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/whatsapp'
     | '/workspace'
     | '/alerts/debug'
     | '/alerts/history'
@@ -638,6 +673,7 @@ export interface FileRouteTypes {
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
+    | '/settings/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
@@ -653,6 +689,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
+    | '/api/public/whatsapp/webhook'
     | '/api/public/google/oauth/callback'
     | '/api/public/google/oauth/start'
   fileRoutesById: FileRoutesById
@@ -680,6 +717,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRouteWithChildren
   SuppliersRoute: typeof SuppliersRouteWithChildren
   UsersRoute: typeof UsersRoute
+  WhatsappRoute: typeof WhatsappRoute
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   InboxIaEmailRoute: typeof InboxIaEmailRoute
@@ -694,6 +732,7 @@ export interface RootRouteChildren {
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
+  ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
   ApiPublicGoogleOauthCallbackRoute: typeof ApiPublicGoogleOauthCallbackRoute
   ApiPublicGoogleOauthStartRoute: typeof ApiPublicGoogleOauthStartRoute
 }
@@ -705,6 +744,13 @@ declare module '@tanstack/react-router' {
       path: '/workspace'
       fullPath: '/workspace'
       preLoaderRoute: typeof WorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/whatsapp': {
+      id: '/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof WhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/users': {
@@ -889,6 +935,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersRatesImportRouteImport
       parentRoute: typeof SuppliersRoute
     }
+    '/settings/whatsapp': {
+      id: '/settings/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/settings/whatsapp'
+      preLoaderRoute: typeof SettingsWhatsappRouteImport
+      parentRoute: typeof SettingsRoute
+    }
     '/settings/templates': {
       id: '/settings/templates'
       path: '/templates'
@@ -992,6 +1045,13 @@ declare module '@tanstack/react-router' {
       path: '/api/assistant/chat'
       fullPath: '/api/assistant/chat'
       preLoaderRoute: typeof ApiAssistantChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/whatsapp/webhook': {
+      id: '/api/public/whatsapp/webhook'
+      path: '/api/public/whatsapp/webhook'
+      fullPath: '/api/public/whatsapp/webhook'
+      preLoaderRoute: typeof ApiPublicWhatsappWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/task-due': {
@@ -1121,12 +1181,14 @@ interface SettingsRouteChildren {
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
+  SettingsWhatsappRoute: typeof SettingsWhatsappRoute
 }
 
 const SettingsRouteChildren: SettingsRouteChildren = {
   SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,
+  SettingsWhatsappRoute: SettingsWhatsappRoute,
 }
 
 const SettingsRouteWithChildren = SettingsRoute._addFileChildren(
@@ -1174,6 +1236,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRouteWithChildren,
   SuppliersRoute: SuppliersRouteWithChildren,
   UsersRoute: UsersRoute,
+  WhatsappRoute: WhatsappRoute,
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   InboxIaEmailRoute: InboxIaEmailRoute,
@@ -1188,6 +1251,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,
+  ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
   ApiPublicGoogleOauthCallbackRoute: ApiPublicGoogleOauthCallbackRoute,
   ApiPublicGoogleOauthStartRoute: ApiPublicGoogleOauthStartRoute,
 }

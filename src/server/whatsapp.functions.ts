@@ -349,7 +349,7 @@ export const syncWhatsappTemplates = createServerFn({ method: "POST" })
       language: t.language,
       category: t.category ?? null,
       status: t.status ?? null,
-      components: t.components ?? null,
+      components: (t.components ?? null) as never,
       synced_at: new Date().toISOString(),
     }));
     if (rows.length > 0) {

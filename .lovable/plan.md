@@ -1,44 +1,110 @@
-## Problema identificado
+# Integração WhatsApp — Meta Cloud API (multi-número por vendedor)
 
-Após conectar várias contas Gmail, a Caixa de Entrada e Enviados estão **misturando emails de todas as contas autorizadas**, em vez de mostrar apenas os da conta selecionada no seletor.
+## Visão geral
 
-Causa raiz em `src/components/email/EmailPanel.tsx`:
-- Todas as queries usam `.in("owner_email", authorizedEmails)` (todas as contas) em vez de filtrar pela conta ativa (`selectedAccount`).
-- Isto afeta: lista de pastas (`email_labels`), threads da Caixa de Entrada (`email_threads`), mensagens de SENT/DRAFT/TRASH/SPAM (`emails`), busca, e estado do espelhamento (`email_sync_state`).
-- O filtro de "remetente igual ao dono" em SENT também usa todas as contas, então emails enviados pela conta A aparecem listados quando a conta B está selecionada.
+Cada vendedor conecta seu próprio número WhatsApp Business à plataforma. As credenciais (Phone Number ID, WABA ID, access token de longa duração) ficam armazenadas por usuário. O CRM envia e recebe mensagens via API oficial da Meta, com inbox bidirecional integrado ao módulo de leads/clientes.
 
-Adicionalmente, as tabelas `emails` e `email_threads` têm chaves únicas globais (`gmail_id`, `id`) sem incluir `owner_email`. Em teoria os IDs do Gmail são por‑caixa, mas se duas contas espelhadas trocarem mensagens entre si pode haver colisão de upsert. A correção blindando isto evita "vazamento" futuro entre contas.
+> **Importante:** A Meta Cloud API exige que cada vendedor:
+> 1. Tenha (ou crie) um **WhatsApp Business Account (WABA)** dentro do Meta Business Manager
+> 2. Cadastre o número de telefone no WABA (não pode estar ativo no app WhatsApp comum)
+> 3. Crie um **App** no Meta for Developers e gere um **System User Token** (longa duração)
+> 4. Aprove **templates HSM** para mensagens iniciadas pela empresa (fora da janela de 24h)
+>
+> Esse onboarding é manual — vamos guiar o vendedor com instruções dentro da tela de configuração.
 
-## Plano de correção
+## Arquitetura
 
-**Frontend — `src/components/email/EmailPanel.tsx`**
-1. Criar um helper `currentOwners()` que devolve `[selectedAccount]` quando há conta selecionada, e `authorizedEmails` apenas como fallback (quando `selectedAccount` é `null`).
-2. Substituir todos os `.in("owner_email", authorizedEmails!)` pelas chamadas a `currentOwners()` em:
-   - `loadFolders` (pastas/labels)
-   - `loadThreads` (INBOX e ramo OUTBOUND para SENT/DRAFT/TRASH/SPAM)
-   - busca por `thread_id` (`threadIdHits`)
-   - estado do mirror (`email_sync_state`)
-3. No ramo OUTBOUND, restringir o filtro `from_email.ilike` à conta selecionada (remetente = dono da caixa), garantindo que SENT mostra apenas o que foi enviado por essa conta.
-4. Quando o utilizador troca de conta no seletor, recarregar pastas e threads (já há efeitos em `activeLabel` e `selectedAccount` — confirmar dependência de `selectedAccount` nos `useCallback`/`useEffect` e adicioná‑la onde faltar para forçar refresh).
-5. Em `LeadEmailMini` (segunda metade do ficheiro) já lê `selectedAccount` do `localStorage`; manter, mas garantir que as queries diretas a `emails`/`email_threads` por `thread_id` não voltam a juntar contas (filtrar `owner_email = selectedAccount` quando aplicável).
+```text
+┌─────────────────┐    envio     ┌──────────────────────┐
+│  CRM (lead/inbox)├─────────────►│  serverFn /whatsapp  │
+└─────────────────┘              │  send-message        │
+        ▲                         └──────────┬───────────┘
+        │ realtime                            │ POST graph.facebook.com
+        │                                     ▼
+┌─────────────────┐ webhook  ┌─────────────────────────┐
+│ tabela messages ◄──────────┤ /api/public/whatsapp/   │
+│ tabela accounts │          │ webhook (Meta callback) │
+└─────────────────┘          └─────────────────────────┘
+```
 
-**Backend — migração SQL**
-6. Substituir o índice único global por composto, para isolar contas:
-   - `emails`: drop `emails_gmail_id_key` → `UNIQUE (owner_email, gmail_id)`.
-   - `email_threads`: tornar a PK composta `(owner_email, id)` (ou manter PK em `id` e adicionar `UNIQUE (owner_email, id)` + ajustar upserts em `rebuildThread`/`startFullMirror` para `onConflict: "owner_email,id"`).
-7. Atualizar `gmail-mirror.server.ts`:
-   - `rebuildThread`: filtrar `select ... from emails` também por `owner_email`.
-   - Upserts de `email_threads` usar `onConflict: "owner_email,id"`.
+## Banco de dados (migrações)
 
-**Validação**
-8. Conectar duas contas, alternar no seletor e confirmar:
-   - Caixa de Entrada mostra só os emails recebidos pela conta ativa.
-   - Enviados mostra só os emails enviados pela conta ativa.
-   - Trocar de conta troca o conjunto integralmente, sem mistura.
-9. Confirmar que `email_sync_state` no rodapé reflete o progresso da conta ativa.
+**`whatsapp_accounts`** — uma linha por número conectado
+- user_id, phone_number_id, waba_id, display_phone, access_token (criptografado), webhook_verify_token, status, connected_at
+- RLS: cada vendedor vê só os seus; admin vê todos
 
-## Notas técnicas
+**`whatsapp_conversations`** — agrupamento por contato
+- account_id, contact_phone, contact_name, lead_id (nullable), customer_id (nullable), last_message_at, unread_count, window_expires_at (janela 24h)
 
-- Não altera o esquema lógico das tabelas além das chaves únicas; nenhum dado é movido.
-- A migração de índice único é segura porque `(owner_email, gmail_id)` é mais permissiva do que `(gmail_id)`; nenhuma linha existente viola o novo índice.
-- Mantém compatibilidade com `LeadEmailMini` (que já passa `emailAddress` ao backend).
+**`whatsapp_messages`** — todas as mensagens enviadas/recebidas
+- conversation_id, direction (in/out), wa_message_id, type (text/image/document/audio/template), body, media_url, media_storage_path, status (sent/delivered/read/failed), error_code, sent_at
+- Realtime habilitado para inbox ao vivo
+
+**`whatsapp_templates`** — cache de templates aprovados pela Meta por WABA
+- account_id, name, language, category, status, components (jsonb)
+
+**Storage bucket `whatsapp-media`** (privado) — anexos enviados/recebidos
+
+## Backend (TanStack server functions + rota pública)
+
+1. **`/api/public/whatsapp/webhook`** (rota pública, sem auth):
+   - GET → verificação de webhook da Meta (hub.challenge)
+   - POST → recebe mensagens, status updates, valida assinatura `X-Hub-Signature-256` com app secret
+   - Identifica conta pelo `phone_number_id`, faz upsert de conversation + message, tenta vincular a lead/cliente por telefone, baixa mídia para o storage
+   - Dispara realtime para o frontend
+
+2. **`whatsapp.functions.ts`** (server functions autenticados):
+   - `sendTextMessage({ accountId, to, body })`
+   - `sendMediaMessage({ accountId, to, mediaType, fileOrUrl, caption })`
+   - `sendTemplate({ accountId, to, templateName, language, variables })` — usado quando janela 24h expirou
+   - `listTemplates({ accountId })` — sincroniza com `/message_templates` da Meta
+   - `markAsRead({ messageId })`
+
+3. **`whatsapp-onboarding.functions.ts`**:
+   - `connectAccount({ phoneNumberId, wabaId, accessToken, appSecret })` — valida o token chamando `/{phone_number_id}` e salva
+   - `disconnectAccount({ accountId })`
+
+## Frontend
+
+1. **Tela `/settings/whatsapp`** — tutorial passo-a-passo + formulário para colar Phone Number ID, WABA ID, token e App Secret. Mostra a URL de webhook + verify token para o vendedor copiar no painel da Meta.
+
+2. **Módulo `/whatsapp`** (inbox geral):
+   - Sidebar de conversas (filtra pela conta selecionada do vendedor logado)
+   - Painel de mensagens com upload de anexo, seletor de template (se janela > 24h)
+   - Realtime via Supabase channel
+   - Reaproveita padrão multi-account do `EmailPanel`
+
+3. **`LeadWhatsAppMini`** dentro da página do lead — mostra histórico de WhatsApp daquele contato (similar ao `LeadEmailMini`).
+
+4. **Integração com notificações automáticas** — adicionar `whatsapp` como canal nos hooks existentes (`lead-events`, `task-due`, `sla-escalations`) usando o template HSM aprovado.
+
+## Secrets necessários
+
+- `META_APP_SECRET` — para validar assinatura do webhook (um por app Meta; se cada vendedor tiver app próprio, guardar por conta)
+- `WHATSAPP_TOKEN_ENCRYPTION_KEY` — chave para criptografar tokens dos vendedores no DB
+
+Vou pedir esses secrets no momento da implementação.
+
+## Custos e limites
+
+- Meta cobra por **conversa de 24h** (não por mensagem): grátis até 1.000/mês por WABA, depois ~US$ 0.005–0.08 dependendo do país e categoria (utility/marketing/auth/service)
+- Templates HSM precisam de aprovação (~minutos a horas)
+- Mídia: até 16MB para imagens/áudio, 100MB para documentos
+
+## Detalhes técnicos
+
+- **Janela de 24h**: após 24h sem resposta do cliente, só pode enviar template aprovado. Calculamos `window_expires_at = last_inbound_at + 24h` e bloqueamos UI de texto livre quando expirado.
+- **Webhook URL**: `https://bsstoursystem.lovable.app/api/public/whatsapp/webhook` (URL pública estável)
+- **Vinculação lead/cliente**: ao receber mensagem, normaliza telefone (E.164) e procura em `leads.phone` / `customers.phone` para auto-vincular conversation
+- **Token longo prazo**: System User Token não expira; armazenamos criptografado com AES-GCM usando `WHATSAPP_TOKEN_ENCRYPTION_KEY`
+- **Rate limits Meta**: 80 msg/s por número por padrão, escala automaticamente conforme qualidade
+
+## Etapas de implementação
+
+1. Migração DB (4 tabelas + bucket + RLS + realtime)
+2. Pedir secrets `META_APP_SECRET` e `WHATSAPP_TOKEN_ENCRYPTION_KEY`
+3. Webhook público + validação de assinatura
+4. Server functions de envio (texto, mídia, template)
+5. Tela de onboarding em `/settings/whatsapp`
+6. Inbox `/whatsapp` com realtime
+7. Mini-painel no lead + integração com notificações automáticas

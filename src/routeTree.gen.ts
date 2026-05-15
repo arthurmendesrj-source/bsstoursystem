@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkspaceRouteImport } from './routes/workspace'
+import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
 import { Route as SettingsRouteImport } from './routes/settings'
@@ -67,6 +68,11 @@ import { Route as ApiPublicGoogleOauthCallbackRouteImport } from './routes/api/p
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
   path: '/workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WhatsappRoute = WhatsappRouteImport.update({
+  id: '/whatsapp',
+  path: '/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UsersRoute = UsersRouteImport.update({
@@ -365,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
+  '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
@@ -421,6 +428,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
+  '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
@@ -478,6 +486,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRouteWithChildren
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
+  '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
@@ -536,6 +545,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/whatsapp'
     | '/workspace'
     | '/alerts/debug'
     | '/alerts/history'
@@ -592,6 +602,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/whatsapp'
     | '/workspace'
     | '/alerts/debug'
     | '/alerts/history'
@@ -648,6 +659,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/suppliers'
     | '/users'
+    | '/whatsapp'
     | '/workspace'
     | '/alerts/debug'
     | '/alerts/history'
@@ -705,6 +717,7 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRouteWithChildren
   SuppliersRoute: typeof SuppliersRouteWithChildren
   UsersRoute: typeof UsersRoute
+  WhatsappRoute: typeof WhatsappRoute
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   InboxIaEmailRoute: typeof InboxIaEmailRoute
@@ -731,6 +744,13 @@ declare module '@tanstack/react-router' {
       path: '/workspace'
       fullPath: '/workspace'
       preLoaderRoute: typeof WorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/whatsapp': {
+      id: '/whatsapp'
+      path: '/whatsapp'
+      fullPath: '/whatsapp'
+      preLoaderRoute: typeof WhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/users': {
@@ -1216,6 +1236,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRouteWithChildren,
   SuppliersRoute: SuppliersRouteWithChildren,
   UsersRoute: UsersRoute,
+  WhatsappRoute: WhatsappRoute,
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   InboxIaEmailRoute: InboxIaEmailRoute,

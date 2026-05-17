@@ -198,7 +198,8 @@ function BookingDetailPage() {
       if (p.file) {
         if (p.file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
         const ext = p.file.name.split(".").pop() || "bin";
-        storagePath = `${bookingId}/${item.id}/${Date.now()}.${ext}`;
+        if (!tenant) { toast.error("Empresa não selecionada"); return; }
+        storagePath = tenantPath(tenant.id, bookingId!, item.id, `${Date.now()}.${ext}`);
         const { error } = await supabase.storage.from("booking-proofs").upload(storagePath, p.file, { upsert: true });
         if (error) { toast.error(error.message); return; }
       }

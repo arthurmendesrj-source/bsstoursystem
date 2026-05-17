@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { useTenant } from "@/lib/tenant";
-import { tenantPath } from "@/lib/tenantStorage";
+import { uploadTenantFile } from "@/lib/tenantStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -301,12 +301,19 @@ function ItinerariesPage() {
     try {
       const ext = file.name.split(".").pop()!.toLowerCase();
       const fmt = ext === "doc" ? "doc" : ext === "pdf" ? "pdf" : "docx";
-      if (!tenant) throw new Error("Empresa não selecionada");
-      const path = tenantPath(tenant.id, user.id, `${crypto.randomUUID()}-${file.name}`);
-      const { error: upErr } = await supabase.storage
-        .from("itineraries")
-        .upload(path, file, { contentType: file.type || undefined });
-      if (upErr) throw upErr;
+      const res = await uploadTenantFile({
+        bucket: "itineraries",
+        tenantId: tenant?.id ?? "",
+        path: `${user.id}/${crypto.randomUUID()}-${file.name}`,
+        file,
+        contentType: file.type || undefined,
+      });
+      if (!res.ok) {
+        updateJob(jobId, { status: "failed", error: res.error });
+        toast.error(res.error);
+        return;
+      }
+      const path = res.path;
 
       const baseTitle = file.name.replace(/\.[^.]+$/, "");
       const { data: ins, error: insErr } = await supabase

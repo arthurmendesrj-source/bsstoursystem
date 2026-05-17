@@ -2126,7 +2126,7 @@ export type Database = {
           is_public: boolean
           is_quote: boolean | null
           name: string
-          price_cents: number
+          price_cents: number | null
           sort_order: number
           stripe_extra_user_price_id: string | null
           stripe_price_id: string | null
@@ -2148,7 +2148,7 @@ export type Database = {
           is_public?: boolean
           is_quote?: boolean | null
           name: string
-          price_cents?: number
+          price_cents?: number | null
           sort_order?: number
           stripe_extra_user_price_id?: string | null
           stripe_price_id?: string | null
@@ -2170,7 +2170,7 @@ export type Database = {
           is_public?: boolean
           is_quote?: boolean | null
           name?: string
-          price_cents?: number
+          price_cents?: number | null
           sort_order?: number
           stripe_extra_user_price_id?: string | null
           stripe_price_id?: string | null

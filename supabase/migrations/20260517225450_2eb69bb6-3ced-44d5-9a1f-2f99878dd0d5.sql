@@ -1,0 +1,1 @@
+ALTER TABLE public.plans ALTER COLUMN price_cents DROP NOT NULL;

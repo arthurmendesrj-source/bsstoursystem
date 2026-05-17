@@ -207,24 +207,24 @@ const SuppliersRatesImportRoute = SuppliersRatesImportRouteImport.update({
   getParentRoute: () => SuppliersRoute,
 } as any)
 const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
-  id: '/whatsapp',
-  path: '/whatsapp',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/whatsapp',
+  path: '/settings/whatsapp',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsTemplatesRoute = SettingsTemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/templates',
+  path: '/settings/templates',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsSlaRoute = SettingsSlaRouteImport.update({
-  id: '/sla',
-  path: '/sla',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/sla',
+  path: '/settings/sla',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
-  id: '/permissions',
-  path: '/permissions',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/permissions',
+  path: '/settings/permissions',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PermissionsAuditFinancialRoute =
   PermissionsAuditFinancialRouteImport.update({
@@ -720,6 +720,10 @@ export interface RootRouteChildren {
   WorkspaceRoute: typeof WorkspaceRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   InboxIaEmailRoute: typeof InboxIaEmailRoute
+  SettingsPermissionsRoute: typeof SettingsPermissionsRoute
+  SettingsSlaRoute: typeof SettingsSlaRoute
+  SettingsTemplatesRoute: typeof SettingsTemplatesRoute
+  SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
@@ -937,31 +941,31 @@ declare module '@tanstack/react-router' {
     }
     '/settings/whatsapp': {
       id: '/settings/whatsapp'
-      path: '/whatsapp'
+      path: '/settings/whatsapp'
       fullPath: '/settings/whatsapp'
       preLoaderRoute: typeof SettingsWhatsappRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/templates': {
       id: '/settings/templates'
-      path: '/templates'
+      path: '/settings/templates'
       fullPath: '/settings/templates'
       preLoaderRoute: typeof SettingsTemplatesRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/sla': {
       id: '/settings/sla'
-      path: '/sla'
+      path: '/settings/sla'
       fullPath: '/settings/sla'
       preLoaderRoute: typeof SettingsSlaRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/permissions': {
       id: '/settings/permissions'
-      path: '/permissions'
+      path: '/settings/permissions'
       fullPath: '/settings/permissions'
       preLoaderRoute: typeof SettingsPermissionsRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/permissions-audit/financial': {
       id: '/permissions-audit/financial'
@@ -1221,6 +1225,10 @@ const rootRouteChildren: RootRouteChildren = {
   WorkspaceRoute: WorkspaceRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   InboxIaEmailRoute: InboxIaEmailRoute,
+  SettingsPermissionsRoute: SettingsPermissionsRoute,
+  SettingsSlaRoute: SettingsSlaRoute,
+  SettingsTemplatesRoute: SettingsTemplatesRoute,
+  SettingsWhatsappRoute: SettingsWhatsappRoute,
   SettingsIndexRoute: SettingsIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
@@ -1240,12 +1248,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

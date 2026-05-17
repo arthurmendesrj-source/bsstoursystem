@@ -78,7 +78,7 @@ async function generateImageTool(prompt: string, userId: string, conversationId:
   if (!dataUrl) throw new Error("Sem imagem na resposta");
   const base64 = dataUrl.split(",")[1];
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const path = `${userId}/${Date.now()}.png`;
+  const path = tenantPath(tenantId, userId, `${Date.now()}.png`);
   await supabaseAdmin.storage.from("ai-images").upload(path, bytes, { contentType: "image/png" });
   await supabaseAdmin.from("ai_generated_images").insert({
     user_id: userId,

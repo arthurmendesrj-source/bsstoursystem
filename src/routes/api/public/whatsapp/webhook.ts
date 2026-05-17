@@ -73,13 +73,14 @@ async function ensureConversation(accountId: string, contactPhone: string, conta
 async function downloadAndStoreMedia(
   mediaId: string,
   token: string,
+  tenantId: string,
   accountId: string,
 ): Promise<{ path: string; mime: string } | null> {
   try {
     const meta = await fetchMediaUrl(mediaId, token);
     const { buf, mime } = await downloadMedia(meta.url, token);
     const ext = (meta.mime_type ?? mime).split("/")[1]?.split(";")[0] ?? "bin";
-    const path = `${accountId}/${mediaId}.${ext}`;
+    const path = `${tenantId}/${accountId}/${mediaId}.${ext}`;
     await supabaseAdmin.storage.from("whatsapp-media").upload(path, buf, {
       contentType: meta.mime_type ?? mime,
       upsert: true,

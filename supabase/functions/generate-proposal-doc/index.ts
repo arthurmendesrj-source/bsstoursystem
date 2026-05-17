@@ -1092,7 +1092,14 @@ If an "Operator briefing" is provided in the user message, treat it as the HIGHE
       .slice(0, 60) || "proposal";
     const docPrefix = docType === "tour_program" ? "programa-turistico" : docType === "combined" ? "proposta-completa" : "proposta-executiva";
     const fileName = `${docPrefix}_${safeTitle}_${Date.now()}.docx`;
-    const path = `${userId}/${quoteId}/${fileName}`;
+    const { data: quoteRow } = await admin.from("quotes").select("tenant_id").eq("id", quoteId).maybeSingle();
+    const tenantId = (quoteRow as any)?.tenant_id;
+    if (!tenantId) {
+      return new Response(JSON.stringify({ error: "quote_without_tenant" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const path = `${tenantId}/${userId}/${quoteId}/${fileName}`;
 
     const { error: upErr } = await admin.storage
       .from("proposal-docs")

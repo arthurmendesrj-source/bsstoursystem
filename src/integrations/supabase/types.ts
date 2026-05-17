@@ -4250,6 +4250,10 @@ export type Database = {
       }
       slugify: { Args: { _t: string }; Returns: string }
       slugify_text: { Args: { input: string }; Returns: string }
+      storage_path_allowed_for_user: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
       unaccent: { Args: { "": string }; Returns: string }
       user_has_email_account: {
         Args: { _email: string; _user_id: string }

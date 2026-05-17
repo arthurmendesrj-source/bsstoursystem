@@ -398,7 +398,7 @@ Deno.serve(async (req) => {
         beneficiary,
         total,
       });
-      const path = `${bookingId}/${ts}-${baseName}.xlsx`;
+      const path = `${(booking as any).tenant_id}/${bookingId}/${ts}-${baseName}.xlsx`;
       const { error: upErr } = await admin.storage
         .from("invoice-docs")
         .upload(path, xlsxBytes, {

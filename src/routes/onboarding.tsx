@@ -57,7 +57,7 @@ function OnboardingPage() {
     try {
       const { data: tenant, error: te } = await supabase
         .from("tenants")
-        .insert({ name: name.trim(), slug: slug.trim(), created_by: user.id, status: "trialing" })
+        .insert([{ name: name.trim(), slug: slug.trim(), created_by: user.id, status: "active" as const }])
         .select("id, slug")
         .single();
       if (te) throw te;

@@ -17,7 +17,7 @@ type Row = {
   id: string;
   slug: string;
   name: string;
-  status: "active" | "trialing" | "past_due" | "suspended" | "canceled";
+  status: "active" | "suspended" | "canceled";
   created_at: string;
 };
 

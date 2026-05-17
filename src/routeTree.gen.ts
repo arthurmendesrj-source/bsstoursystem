@@ -18,6 +18,7 @@ import { Route as SecurityAuditRouteImport } from './routes/security-audit'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PermissionsAuditRouteImport } from './routes/permissions-audit'
 import { Route as PackagesRouteImport } from './routes/packages'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadsRouteImport } from './routes/leads'
@@ -30,11 +31,13 @@ import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BookingsRouteImport } from './routes/bookings'
+import { Route as BillingRouteImport } from './routes/billing'
 import { Route as BibliaRouteImport } from './routes/biblia'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TTenantSlugRouteImport } from './routes/t.$tenantSlug'
 import { Route as SuppliersReferencesRouteImport } from './routes/suppliers.references'
 import { Route as SuppliersRatesValidationRouteImport } from './routes/suppliers.rates-validation'
 import { Route as SuppliersRatesSearchRouteImport } from './routes/suppliers.rates-search'
@@ -52,6 +55,8 @@ import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
 import { Route as AlertsPreferencesRouteImport } from './routes/alerts.preferences'
 import { Route as AlertsHistoryRouteImport } from './routes/alerts.history'
 import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
+import { Route as AdminTenantsRouteImport } from './routes/admin.tenants'
+import { Route as AdminPlansRouteImport } from './routes/admin.plans'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
 import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
@@ -110,6 +115,11 @@ const PermissionsAuditRoute = PermissionsAuditRouteImport.update({
 const PackagesRoute = PackagesRouteImport.update({
   id: '/packages',
   path: '/packages',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketingRoute = MarketingRouteImport.update({
@@ -172,6 +182,11 @@ const BookingsRoute = BookingsRouteImport.update({
   path: '/bookings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BillingRoute = BillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BibliaRoute = BibliaRouteImport.update({
   id: '/biblia',
   path: '/biblia',
@@ -195,6 +210,11 @@ const ActivitiesRoute = ActivitiesRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TTenantSlugRoute = TTenantSlugRouteImport.update({
+  id: '/t/$tenantSlug',
+  path: '/t/$tenantSlug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuppliersReferencesRoute = SuppliersReferencesRouteImport.update({
@@ -284,6 +304,16 @@ const AlertsDebugRoute = AlertsDebugRouteImport.update({
   path: '/debug',
   getParentRoute: () => AlertsRoute,
 } as any)
+const AdminTenantsRoute = AdminTenantsRouteImport.update({
+  id: '/admin/tenants',
+  path: '/admin/tenants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPlansRoute = AdminPlansRouteImport.update({
+  id: '/admin/plans',
+  path: '/admin/plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const UsersUserIdPermissionsRoute = UsersUserIdPermissionsRouteImport.update({
   id: '/users_/$userId/permissions',
   path: '/users/$userId/permissions',
@@ -366,6 +396,7 @@ export interface FileRoutesByFullPath {
   '/alerts': typeof AlertsRouteWithChildren
   '/assistant': typeof AssistantRoute
   '/biblia': typeof BibliaRoute
+  '/billing': typeof BillingRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -378,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
+  '/onboarding': typeof OnboardingRoute
   '/packages': typeof PackagesRoute
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -387,6 +419,8 @@ export interface FileRoutesByFullPath {
   '/users': typeof UsersRoute
   '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
+  '/admin/plans': typeof AdminPlansRoute
+  '/admin/tenants': typeof AdminTenantsRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
@@ -404,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
@@ -425,6 +460,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof AlertsRouteWithChildren
   '/assistant': typeof AssistantRoute
   '/biblia': typeof BibliaRoute
+  '/billing': typeof BillingRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -437,6 +473,7 @@ export interface FileRoutesByTo {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
+  '/onboarding': typeof OnboardingRoute
   '/packages': typeof PackagesRoute
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -446,6 +483,8 @@ export interface FileRoutesByTo {
   '/users': typeof UsersRoute
   '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
+  '/admin/plans': typeof AdminPlansRoute
+  '/admin/tenants': typeof AdminTenantsRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
@@ -463,6 +502,7 @@ export interface FileRoutesByTo {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
@@ -485,6 +525,7 @@ export interface FileRoutesById {
   '/alerts': typeof AlertsRouteWithChildren
   '/assistant': typeof AssistantRoute
   '/biblia': typeof BibliaRoute
+  '/billing': typeof BillingRoute
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
@@ -497,6 +538,7 @@ export interface FileRoutesById {
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
+  '/onboarding': typeof OnboardingRoute
   '/packages': typeof PackagesRoute
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -506,6 +548,8 @@ export interface FileRoutesById {
   '/users': typeof UsersRoute
   '/whatsapp': typeof WhatsappRoute
   '/workspace': typeof WorkspaceRoute
+  '/admin/plans': typeof AdminPlansRoute
+  '/admin/tenants': typeof AdminTenantsRoute
   '/alerts/debug': typeof AlertsDebugRoute
   '/alerts/history': typeof AlertsHistoryRoute
   '/alerts/preferences': typeof AlertsPreferencesRoute
@@ -523,6 +567,7 @@ export interface FileRoutesById {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
+  '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
@@ -546,6 +591,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assistant'
     | '/biblia'
+    | '/billing'
     | '/bookings'
     | '/customers'
     | '/dashboard'
@@ -558,6 +604,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/login'
     | '/marketing'
+    | '/onboarding'
     | '/packages'
     | '/permissions-audit'
     | '/reset-password'
@@ -567,6 +614,8 @@ export interface FileRouteTypes {
     | '/users'
     | '/whatsapp'
     | '/workspace'
+    | '/admin/plans'
+    | '/admin/tenants'
     | '/alerts/debug'
     | '/alerts/history'
     | '/alerts/preferences'
@@ -584,6 +633,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/t/$tenantSlug'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
@@ -605,6 +655,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assistant'
     | '/biblia'
+    | '/billing'
     | '/bookings'
     | '/customers'
     | '/dashboard'
@@ -617,6 +668,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/login'
     | '/marketing'
+    | '/onboarding'
     | '/packages'
     | '/permissions-audit'
     | '/reset-password'
@@ -626,6 +678,8 @@ export interface FileRouteTypes {
     | '/users'
     | '/whatsapp'
     | '/workspace'
+    | '/admin/plans'
+    | '/admin/tenants'
     | '/alerts/debug'
     | '/alerts/history'
     | '/alerts/preferences'
@@ -643,6 +697,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/t/$tenantSlug'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
@@ -664,6 +719,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/assistant'
     | '/biblia'
+    | '/billing'
     | '/bookings'
     | '/customers'
     | '/dashboard'
@@ -676,6 +732,7 @@ export interface FileRouteTypes {
     | '/leads'
     | '/login'
     | '/marketing'
+    | '/onboarding'
     | '/packages'
     | '/permissions-audit'
     | '/reset-password'
@@ -685,6 +742,8 @@ export interface FileRouteTypes {
     | '/users'
     | '/whatsapp'
     | '/workspace'
+    | '/admin/plans'
+    | '/admin/tenants'
     | '/alerts/debug'
     | '/alerts/history'
     | '/alerts/preferences'
@@ -702,6 +761,7 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
+    | '/t/$tenantSlug'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users_/$userId/permissions'
@@ -724,6 +784,7 @@ export interface RootRouteChildren {
   AlertsRoute: typeof AlertsRouteWithChildren
   AssistantRoute: typeof AssistantRoute
   BibliaRoute: typeof BibliaRoute
+  BillingRoute: typeof BillingRoute
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
@@ -736,6 +797,7 @@ export interface RootRouteChildren {
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
   MarketingRoute: typeof MarketingRoute
+  OnboardingRoute: typeof OnboardingRoute
   PackagesRoute: typeof PackagesRoute
   PermissionsAuditRoute: typeof PermissionsAuditRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -745,12 +807,15 @@ export interface RootRouteChildren {
   UsersRoute: typeof UsersRoute
   WhatsappRoute: typeof WhatsappRoute
   WorkspaceRoute: typeof WorkspaceRoute
+  AdminPlansRoute: typeof AdminPlansRoute
+  AdminTenantsRoute: typeof AdminTenantsRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   InboxIaEmailRoute: typeof InboxIaEmailRoute
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
+  TTenantSlugRoute: typeof TTenantSlugRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
@@ -830,6 +895,13 @@ declare module '@tanstack/react-router' {
       path: '/packages'
       fullPath: '/packages'
       preLoaderRoute: typeof PackagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/marketing': {
@@ -916,6 +988,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/billing': {
+      id: '/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof BillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/biblia': {
       id: '/biblia'
       path: '/biblia'
@@ -949,6 +1028,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/t/$tenantSlug': {
+      id: '/t/$tenantSlug'
+      path: '/t/$tenantSlug'
+      fullPath: '/t/$tenantSlug'
+      preLoaderRoute: typeof TTenantSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/suppliers/references': {
@@ -1069,6 +1155,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/alerts/debug'
       preLoaderRoute: typeof AlertsDebugRouteImport
       parentRoute: typeof AlertsRoute
+    }
+    '/admin/tenants': {
+      id: '/admin/tenants'
+      path: '/admin/tenants'
+      fullPath: '/admin/tenants'
+      preLoaderRoute: typeof AdminTenantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/plans': {
+      id: '/admin/plans'
+      path: '/admin/plans'
+      fullPath: '/admin/plans'
+      preLoaderRoute: typeof AdminPlansRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/users_/$userId/permissions': {
       id: '/users_/$userId/permissions'
@@ -1245,6 +1345,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlertsRoute: AlertsRouteWithChildren,
   AssistantRoute: AssistantRoute,
   BibliaRoute: BibliaRoute,
+  BillingRoute: BillingRoute,
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
@@ -1257,6 +1358,7 @@ const rootRouteChildren: RootRouteChildren = {
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,
   MarketingRoute: MarketingRoute,
+  OnboardingRoute: OnboardingRoute,
   PackagesRoute: PackagesRoute,
   PermissionsAuditRoute: PermissionsAuditRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
@@ -1266,12 +1368,15 @@ const rootRouteChildren: RootRouteChildren = {
   UsersRoute: UsersRoute,
   WhatsappRoute: WhatsappRoute,
   WorkspaceRoute: WorkspaceRoute,
+  AdminPlansRoute: AdminPlansRoute,
+  AdminTenantsRoute: AdminTenantsRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   InboxIaEmailRoute: InboxIaEmailRoute,
   SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
+  TTenantSlugRoute: TTenantSlugRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,

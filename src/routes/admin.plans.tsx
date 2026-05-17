@@ -65,7 +65,8 @@ function AdminPlansPage() {
   };
 
   const toggle = async (p: Plan, field: "is_active" | "is_public") => {
-    const { error } = await supabase.from("plans").update({ [field]: !p[field] }).eq("id", p.id);
+    const patch = { [field]: !p[field] } as { is_active?: boolean; is_public?: boolean };
+    const { error } = await supabase.from("plans").update(patch).eq("id", p.id);
     if (error) toast.error(error.message);
     else load();
   };

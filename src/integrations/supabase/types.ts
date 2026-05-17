@@ -1997,20 +1997,140 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_addons: {
+        Row: {
+          category: string | null
+          code: string
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          id: string
+          interval: string | null
+          is_active: boolean | null
+          metadata: Json | null
+          name: string
+          price_cents: number
+          sort_order: number | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          interval?: string | null
+          is_active?: boolean | null
+          metadata?: Json | null
+          name: string
+          price_cents: number
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          interval?: string | null
+          is_active?: boolean | null
+          metadata?: Json | null
+          name?: string
+          price_cents?: number
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      plan_one_time: {
+        Row: {
+          category: string | null
+          code: string
+          created_at: string | null
+          currency: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_quote: boolean | null
+          name: string
+          payment_split: Json | null
+          price_cents: number | null
+          price_max_cents: number | null
+          price_min_cents: number | null
+          sort_order: number | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          code: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_quote?: boolean | null
+          name: string
+          payment_split?: Json | null
+          price_cents?: number | null
+          price_max_cents?: number | null
+          price_min_cents?: number | null
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          code?: string
+          created_at?: string | null
+          currency?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_quote?: boolean | null
+          name?: string
+          payment_split?: Json | null
+          price_cents?: number | null
+          price_max_cents?: number | null
+          price_min_cents?: number | null
+          sort_order?: number | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       plans: {
         Row: {
           code: string
           created_at: string
           currency: string
           description: string | null
+          extra_user_cents: number | null
           features: Json
           id: string
+          included_users: number | null
           interval: Database["public"]["Enums"]["billing_interval"]
           is_active: boolean
           is_public: boolean
+          is_quote: boolean | null
           name: string
           price_cents: number
           sort_order: number
+          stripe_extra_user_price_id: string | null
+          stripe_price_id: string | null
+          stripe_product_id: string | null
           trial_days: number
           updated_at: string
         }
@@ -2019,14 +2139,20 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          extra_user_cents?: number | null
           features?: Json
           id?: string
+          included_users?: number | null
           interval?: Database["public"]["Enums"]["billing_interval"]
           is_active?: boolean
           is_public?: boolean
+          is_quote?: boolean | null
           name: string
           price_cents?: number
           sort_order?: number
+          stripe_extra_user_price_id?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           trial_days?: number
           updated_at?: string
         }
@@ -2035,14 +2161,20 @@ export type Database = {
           created_at?: string
           currency?: string
           description?: string | null
+          extra_user_cents?: number | null
           features?: Json
           id?: string
+          included_users?: number | null
           interval?: Database["public"]["Enums"]["billing_interval"]
           is_active?: boolean
           is_public?: boolean
+          is_quote?: boolean | null
           name?: string
           price_cents?: number
           sort_order?: number
+          stripe_extra_user_price_id?: string | null
+          stripe_price_id?: string | null
+          stripe_product_id?: string | null
           trial_days?: number
           updated_at?: string
         }
@@ -2795,6 +2927,48 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subscription_addons: {
+        Row: {
+          added_at: string | null
+          addon_id: string | null
+          id: string
+          quantity: number | null
+          stripe_subscription_item_id: string | null
+          subscription_id: string | null
+        }
+        Insert: {
+          added_at?: string | null
+          addon_id?: string | null
+          id?: string
+          quantity?: number | null
+          stripe_subscription_item_id?: string | null
+          subscription_id?: string | null
+        }
+        Update: {
+          added_at?: string | null
+          addon_id?: string | null
+          id?: string
+          quantity?: number | null
+          stripe_subscription_item_id?: string | null
+          subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_addons_addon_id_fkey"
+            columns: ["addon_id"]
+            isOneToOne: false
+            referencedRelation: "plan_addons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_addons_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {

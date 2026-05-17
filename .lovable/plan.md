@@ -1,191 +1,163 @@
-# Plano: Multi-tenant (SaaS por empresa) + Módulo de Cobrança
+## Decisões confirmadas
+1. **Enterprise**: produto sem price (sob proposta).
+2. **Usuário extra**: price recorrente separado no Stripe, cobrado via `quantity` no checkout.
+3. **IA excedente / créditos**: cobrança manual fora do Stripe — não criar metered.
+4. **Banco de horas adicional (R$ 180/h)**: não aplicar agora.
+5. **Migração Completa (faixa)**: não criar no Stripe — proposta manual.
 
-## Visão geral
+## 1. Migrations (schema)
 
-Transformar o app atual num SaaS multi-tenant:
-- **Um único banco**, com isolamento por `tenant_id` em todas as tabelas + **RLS** no Postgres.
-- **Acesso por path agora** (`/t/{slug}/...`) e estrutura pronta para subdomínio depois (`empresa.seuapp.com`).
-- **Super-admin global** (você) com acesso a tudo; demais dados migrados para um tenant `default`.
-- **Módulo de cobrança**: tabelas de planos / assinaturas / status agora; integração com gateway (Stripe) depois.
-- Bloqueio de acesso ao app quando assinatura não estiver `active` (mostra tela de cobrança).
-
----
-
-## 1. Modelo de dados (migração SQL)
-
-### 1.1 Novas tabelas
-
-- **`tenants`** — empresa assinante
-  - `slug` (único, usado na URL), `name`, `status` (`active` / `suspended` / `canceled`), `created_by`
-- **`tenant_members`** — vínculo usuário ↔ tenant
-  - `tenant_id`, `user_id`, `role_in_tenant` (`owner` / `admin` / `member`), `is_active`
-- **`tenant_domains`** (preparação futura para subdomínio)
-  - `tenant_id`, `host`, `is_primary`
-- **`plans`** — planos de assinatura
-  - `code`, `name`, `price_cents`, `currency`, `interval` (`month` / `year`), `features` (jsonb), `is_active`
-- **`subscriptions`** — assinatura por tenant
-  - `tenant_id` (único), `plan_id`, `status` (`trialing` / `active` / `past_due` / `canceled`), `current_period_end`, `trial_end`, `gateway`, `gateway_customer_id`, `gateway_subscription_id`
-- **`invoices`** — histórico de cobranças
-  - `tenant_id`, `subscription_id`, `amount_cents`, `currency`, `status`, `due_date`, `paid_at`, `gateway_invoice_id`
-- **`super_admins`** — quem é super-admin global do SaaS
-  - `user_id` (único)
-
-### 1.2 Adicionar `tenant_id` nas tabelas de negócio existentes
-
-Adicionar coluna `tenant_id uuid` (nullable inicialmente para a migração) em todas as tabelas de domínio do CRM: `leads`, `customers`, `suppliers`, `bookings`, `proposals`, `activities`, `emails`, `tasks`, `notifications`, `whatsapp_*`, `proposal_*`, `booking_*`, `supplier_*`, `user_email_accounts`, `user_module_permissions`, `user_field_permissions`, etc.
-
-> Vou levantar a lista exata varrendo o schema antes da migração; nenhuma tabela de negócio fica de fora.
-
-### 1.3 Backfill (migrar dados atuais)
-
-1. Criar tenant `default` (slug `default`).
-2. Atribuir `tenant_id = default` em todas as linhas existentes de todas as tabelas de negócio.
-3. Para cada usuário existente: criar `tenant_members` ligando ao tenant `default` (role `member`; admins atuais viram `owner`).
-4. Tornar `tenant_id` `NOT NULL` após backfill.
-5. Marcar o usuário admin atual como `super_admin`.
-6. Criar `subscription` `active` para o tenant `default` no plano "Free interno" para não bloquear acesso.
-
-### 1.4 Funções e RLS
-
-- Função `public.current_tenant_id()` (security definer) — lê o tenant da sessão (via JWT claim `tenant_id` setado no login no tenant, ou via fallback consultando `tenant_members`).
-- Função `public.is_super_admin(uuid)` — checa `super_admins`.
-- Função `public.is_tenant_member(uuid, uuid)` — checa membership.
-- **Políticas RLS** em TODAS as tabelas com `tenant_id`:
-  - `SELECT/INSERT/UPDATE/DELETE USING (tenant_id = public.current_tenant_id() OR public.is_super_admin(auth.uid()))`
-  - Para `INSERT`, `WITH CHECK` força `tenant_id = current_tenant_id()`.
-- RLS em `tenants`, `tenant_members`, `subscriptions`, `invoices`, `plans` com regras específicas (membros leem seu tenant; super-admin vê tudo; `plans` é leitura pública para autenticados).
-
-### 1.5 Trigger de proteção
-
-Trigger `BEFORE INSERT` em todas as tabelas tenant-scoped que injeta `tenant_id = current_tenant_id()` quando NULL, evitando bugs de aplicação.
-
----
-
-## 2. Frontend — roteamento por tenant
-
-### 2.1 Estrutura de rotas
-
-Reorganizar todas as rotas autenticadas do app sob um layout `/t/$tenantSlug`:
-
-```text
-src/routes/
-  _authenticated.tsx              -> gate de login (já existe lógica)
-  t.$tenantSlug.tsx               -> layout do tenant (resolve slug -> tenantId, valida membership, valida subscription, fornece TenantContext)
-  t.$tenantSlug.dashboard.tsx
-  t.$tenantSlug.leads.tsx
-  t.$tenantSlug.customers.tsx
-  ... (todas as rotas atuais movidas para baixo de t.$tenantSlug.*)
-  billing.tsx                     -> tela de cobrança (acessível mesmo com subscription past_due)
-  admin.tenants.tsx               -> super-admin: lista de tenants
-  admin.tenants.$tenantId.tsx     -> super-admin: detalhe/edição
-  onboarding.tsx                  -> primeira criação de tenant
+### 1.1 Estender `plans`
+```sql
+ALTER TABLE public.plans
+  ADD COLUMN IF NOT EXISTS stripe_product_id text,
+  ADD COLUMN IF NOT EXISTS stripe_price_id   text,
+  ADD COLUMN IF NOT EXISTS included_users    int DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS extra_user_cents  int DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS stripe_extra_user_price_id text,
+  ADD COLUMN IF NOT EXISTS description       text,
+  ADD COLUMN IF NOT EXISTS features          jsonb DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS is_quote          boolean DEFAULT false;
 ```
 
-> Como o app já tem MUITAS rotas (settings, alerts, suppliers, bookings, etc.), o ajuste prático será: manter os arquivos com seus nomes, mas o **layout `t.$tenantSlug.tsx`** carrega o contexto do tenant e o `AppShell` já existente passa a usar `useTenant()` para montar links com prefixo `/t/{slug}/...`.
+### 1.2 `plan_addons` (recorrentes)
+WhatsApp, IA Starter, IA Pro, BI, Banco 10h.
+```sql
+CREATE TABLE public.plan_addons (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code text UNIQUE NOT NULL,
+  name text NOT NULL,
+  description text,
+  price_cents int NOT NULL,
+  currency text DEFAULT 'BRL',
+  interval text DEFAULT 'month',
+  category text,                 -- 'integration' | 'ai' | 'bi' | 'support'
+  metadata jsonb DEFAULT '{}',   -- ex: { credits: 1000 }
+  stripe_product_id text,
+  stripe_price_id text,
+  is_active boolean DEFAULT true,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.plan_addons ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "addons readable" ON public.plan_addons FOR SELECT USING (true);
+CREATE POLICY "addons admin write" ON public.plan_addons FOR ALL
+  USING (public.is_super_admin(auth.uid()))
+  WITH CHECK (public.is_super_admin(auth.uid()));
+```
 
-### 2.2 Resolução do tenant
+### 1.3 `plan_one_time` (cobranças únicas)
+Setup Essencial/Completo, Setup WhatsApp, Migração Básica. (Migração Completa fica `is_quote=true` sem price.)
+```sql
+CREATE TABLE public.plan_one_time (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  code text UNIQUE NOT NULL,
+  name text NOT NULL,
+  description text,
+  price_cents int,
+  price_min_cents int,
+  price_max_cents int,
+  currency text DEFAULT 'BRL',
+  category text,                 -- 'setup' | 'migration' | 'integration_setup'
+  payment_split jsonb DEFAULT '{"upfront_pct":50,"on_delivery_pct":50}',
+  stripe_product_id text,
+  stripe_price_id text,
+  is_active boolean DEFAULT true,
+  is_quote boolean DEFAULT false,
+  sort_order int DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.plan_one_time ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "one_time readable" ON public.plan_one_time FOR SELECT USING (true);
+CREATE POLICY "one_time admin write" ON public.plan_one_time FOR ALL
+  USING (public.is_super_admin(auth.uid()))
+  WITH CHECK (public.is_super_admin(auth.uid()));
+```
 
-- Layout `t.$tenantSlug.tsx`:
-  1. `beforeLoad` valida sessão (já existente).
-  2. `loader` chama server fn `resolveTenant({ slug })` que retorna `{ tenantId, role, subscriptionStatus, planFeatures }`.
-  3. Se usuário não é membro → 403 "Você não tem acesso a esta empresa".
-  4. Se `subscriptionStatus` ∈ {`past_due`, `canceled`} → redireciona para `/billing` (com `tenantId` no contexto).
-  5. Provê `TenantContext` para toda a subárvore.
+### 1.4 `subscription_addons` (suporte a múltiplos itens por assinatura)
+```sql
+CREATE TABLE public.subscription_addons (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id uuid REFERENCES public.subscriptions(id) ON DELETE CASCADE,
+  addon_id uuid REFERENCES public.plan_addons(id),
+  quantity int DEFAULT 1,
+  stripe_subscription_item_id text,
+  added_at timestamptz DEFAULT now()
+);
+ALTER TABLE public.subscription_addons ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "sub addons by tenant" ON public.subscription_addons FOR SELECT
+  USING (EXISTS (
+    SELECT 1 FROM public.subscriptions s
+    WHERE s.id = subscription_id AND public.is_tenant_member(s.tenant_id, auth.uid())
+  ));
+```
 
-### 2.3 AppShell
+## 2. Seed de dados (via `supabase--insert` após migration)
 
-- Sidebar lê `useTenant()` e gera todos os `<Link>` com `params={{ tenantSlug }}`.
-- Mostra nome da empresa no topo e seletor "Trocar empresa" se o usuário pertence a mais de um tenant.
-- Item "Cobrança" visível apenas para `owner`/`admin` do tenant.
-- Item "Admin do SaaS" visível apenas para super-admin (lista de tenants, assinaturas, etc.).
+**`plans`** — desativa `free`/`pro` antigos e insere:
+- `essencial` — R$ 1.490, 5 usuários, extra R$ 79.
+- `profissional` — R$ 2.990, 12 usuários, extra R$ 99, gmail incluso, **destaque/recomendado**.
+- `enterprise` — `is_quote=true`, `price_cents=null`.
 
-### 2.4 Server functions
+**`plan_addons`**:
+- `whatsapp` R$ 250 (integration)
+- `ia_starter` R$ 490 (ai, metadata `{credits:1000}`)
+- `ia_pro` R$ 990 (ai, metadata `{credits:3000}`)
+- `bi` R$ 390 (bi)
+- `horas_10` R$ 1.500 (support, metadata `{hours:10}`)
 
-- Todas as server fns existentes (`*.functions.ts`) passam a:
-  - Ler `tenantId` do contexto (via header `x-tenant-id` enviado pelo client ou via claim na sessão).
-  - Validar membership via `is_tenant_member`.
-  - RLS é o backstop, mas a validação explícita melhora mensagens de erro.
-- Adicionar middleware `requireTenantMember` que estende `requireSupabaseAuth`.
+**`plan_one_time`**:
+- `setup_essencial` R$ 3.500
+- `setup_completo` R$ 6.500
+- `setup_whatsapp` R$ 1.500
+- `migracao_basica` R$ 2.500
+- `migracao_completa` `is_quote=true`, price_min 6.000 / price_max 12.000
+
+## 3. Ativar Stripe nativo
+`payments--enable_stripe_payments` → cria ambiente test.
+Stripe Tax = **sem automação** (BR).
+
+## 4. Espelhar no Stripe (`batch_create_product`)
+
+Recorrentes:
+- Essencial + price R$ 1.490/mês BRL + price extra R$ 79/mês (quantity).
+- Profissional + price R$ 2.990/mês + extra R$ 99/mês.
+- Enterprise: produto **sem price**.
+- WhatsApp R$ 250/mês.
+- IA Starter R$ 490/mês.
+- IA Pro R$ 990/mês.
+- BI R$ 390/mês.
+- Banco 10h R$ 1.500/mês.
+
+One-time:
+- Setup Essencial R$ 3.500.
+- Setup Completo R$ 6.500.
+- Setup WhatsApp R$ 1.500.
+- Migração Básica R$ 2.500.
+- Migração Completa: produto **sem price**.
+
+Persistir `stripe_product_id`/`stripe_price_id` (e `stripe_extra_user_price_id` em planos) via UPDATE.
+
+## 5. UI `/billing` (apresentação dos planos e presets Boa/Melhor/Ideal)
+- 3 cards de plano com features e CTA "Assinar". Enterprise → "Falar com vendas".
+- Seção de add-ons com toggles.
+- Seção de serviços únicos (Setup / Migração) — cards com "Contratar".
+- 3 presets pré-configurados (Boa / Melhor / Ideal) que selecionam plano + add-ons + setup + migração e abrem checkout.
+
+## 6. Admin `/admin/plans` — expandir
+- Aba **Planos** (campos extras).
+- Aba **Add-ons** (CRUD).
+- Aba **Serviços únicos** (CRUD).
+- Botão "Sincronizar com Stripe" por linha.
+
+## 7. Fora desta fase
+- `/api/billing/checkout` real (monta line_items com plano + extras + addons + one-time selecionados).
+- `/api/billing/portal` (Customer Portal).
+- Substituir `src/routes/api/public/billing.webhook.ts` para validar assinatura Stripe e mapear eventos → `subscriptions` + `subscription_addons` + `billing_invoices`.
+- Lógica 50/50 para Setup/Migração (estratégia sugerida: 1ª invoice no checkout = 50%, 2ª invoice manual no go-live).
 
 ---
 
-## 3. Onboarding
-
-Fluxo `/onboarding` (acessível após login quando usuário não tem nenhum tenant):
-1. Nome da empresa + slug desejado (validação de unicidade e formato `[a-z0-9-]`).
-2. Escolha do plano (lista de `plans`, com possibilidade de "Trial 14 dias").
-3. Cria `tenants` + `tenant_members` (role `owner`) + `subscriptions` com status `trialing` (ou `active` para plano free).
-4. **Cobrança fica pendente** — gateway será conectado depois; por ora a assinatura é criada localmente.
-5. Redireciona para `/t/{slug}/dashboard`.
-
----
-
-## 4. Módulo de cobrança (sem gateway ainda)
-
-### 4.1 Telas
-
-- **`/billing`** (escopo do tenant atual): mostra plano atual, status, próximo vencimento, lista de invoices, botão "Alterar plano".
-- **`/admin/tenants`** (super-admin): lista de tenants, status de cada assinatura, permite suspender/reativar manualmente.
-- **`/admin/plans`** (super-admin): CRUD de planos.
-
-### 4.2 Lógica
-
-- Server fns para listar plano, mudar plano, listar invoices, marcar invoice como paga (manual por super-admin enquanto não há gateway).
-- Hook `useSubscriptionGate()` no layout de tenant que redireciona para `/billing` quando status não permite uso.
-- Estrutura pronta para receber webhooks do gateway depois (campos `gateway`, `gateway_customer_id`, `gateway_subscription_id`, `gateway_invoice_id` já existem).
-
-### 4.3 Preparação para gateway futuro (Stripe)
-
-- Server route `src/routes/api/public/billing/webhook.ts` criado como **stub** que valida assinatura HMAC e roteia eventos `invoice.paid`, `subscription.updated`, etc. Implementação real do gateway fica para uma próxima iteração.
-
----
-
-## 5. Subdomínio futuro (preparação, não implementação agora)
-
-- Tabela `tenant_domains` já criada.
-- Helper `resolveTenantFromHost(host)` no server stub: lê host, consulta `tenant_domains`. Não está ligado às rotas ainda — quando você quiser ligar subdomínios, basta:
-  1. Configurar DNS wildcard + custom domain no Lovable.
-  2. Trocar o `loader` de `t.$tenantSlug.tsx` por resolução via host.
-  3. Roteamento por path continua funcionando como fallback.
-
----
-
-## 6. Detalhes técnicos
-
-- **Claim de tenant na sessão**: o backend não consegue setar JWT custom claims sem hook no Supabase Auth. Solução pragmática: client envia `x-tenant-id` em todo server-fn call (via `attachSupabaseAuth` estendido), e `current_tenant_id()` lê de uma GUC setada por uma server fn de "switch tenant" + validação por `tenant_members`. Alternativa mais simples: passar `tenantId` explícito em cada server fn e validar membership.
-- **Realtime**: canais Supabase passam a filtrar por `tenant_id` no client.
-- **Storage**: prefixar paths com `tenant_id/...` em todos os buckets (`proposal-docs`, `booking-proofs`, etc.) e adicionar policies de storage por tenant.
-- **i18n / config.toml / Lovable Cloud**: nada muda.
-
----
-
-## 7. Ordem de execução (proposta)
-
-1. **Migração SQL** (tenants, members, plans, subscriptions, invoices, super_admins, `tenant_id` em todas as tabelas, backfill, RLS, triggers).
-2. **TenantContext + layout `t.$tenantSlug.tsx`** + `AppShell` adaptado.
-3. **Atualizar todas as server fns** para validar membership + propagar `tenant_id`.
-4. **Onboarding** (`/onboarding`).
-5. **Módulo de cobrança** (telas billing + admin de tenants/planos, sem gateway).
-6. **Storage** scoping por tenant.
-7. **Stub de webhook** para gateway futuro.
-
----
-
-## 8. Fora de escopo (agora)
-
-- Integração real com Stripe / Mercado Pago / Pagar.me.
-- Subdomínio por empresa (estrutura pronta, mas não ligada).
-- Suporte a múltiplos tenants por usuário com troca rápida (vou criar a base, mas a UX refinada de "trocar empresa" pode ser melhorada depois).
-- Migração granular de permissões existentes (`user_module_permissions` / `user_field_permissions`) — vão ganhar `tenant_id` mas a UI de gestão continua igual.
-- Faturamento por uso / métricas / cobrança variável.
-
----
-
-## Pergunta antes de implementar
-
-Esse plano é grande (toca em quase todo o schema e em todas as rotas). Confirma:
-1. **Slug do tenant default** para a migração: `default` está OK, ou prefere outro (`bsstour`, `principal`)?
-2. **Plano inicial** para o tenant default: crio um plano `interno` invisível (acesso ilimitado, sem cobrança) — OK?
-3. **Trial padrão** nos novos cadastros: 14 dias soa bem, ou prefere outro número (7 / 30 / sem trial)?
-
-Se confirmar esses 3 pontos, sigo executando na ordem do item 7.
+Pronto para implementar nesta ordem: **migration → seed → enable Stripe → batch_create_product → UPDATE com ids → UI planos**. Posso começar pela migration?

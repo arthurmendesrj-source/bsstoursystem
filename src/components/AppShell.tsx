@@ -26,6 +26,8 @@ import {
   BarChart3,
   LayoutGrid,
   Sparkles,
+  Wallet,
+  Megaphone,
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { GlobalSearchTrigger } from "@/components/GlobalSearch";
@@ -45,6 +47,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { isAdmin, hasRole } = useEffectiveAuth();
   const { viewAs, exitViewAs } = useViewAs();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
+  const showFinanceiro = isAdmin || hasRole("diretor") || hasRole("financeiro");
+  const showMarketing = isAdmin || hasRole("diretor") || hasRole("gerente");
   const { t, lang, setLang } = useI18n();
   const { currency, setCurrency } = useCurrency();
   const navigate = useNavigate();
@@ -119,6 +123,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     { to: "/whatsapp", label: "WhatsApp", icon: MessageSquare },
     { to: "/activities", label: t("activities"), icon: ListChecks },
     { to: "/alerts", label: t("alertsMenu"), icon: Bell },
+    ...(showFinanceiro ? [{ to: "/financeiro", label: "Financeiro", icon: Wallet }] : []),
+    ...(showMarketing ? [{ to: "/marketing", label: "Marketing", icon: Megaphone }] : []),
     { to: "/customers", label: t("customers"), icon: Users },
     { to: "/suppliers", label: t("suppliers"), icon: Building2 },
     { to: "/bookings", label: t("bookings"), icon: CalendarRange },

@@ -261,7 +261,7 @@ export const Route = createFileRoute("/api/assistant/chat")({
                     if (name === "web_search") {
                       result = { result: await webSearch(args.query || "") };
                     } else if (name === "generate_image") {
-                      const url = await generateImageTool(args.prompt, userId, conversationId);
+                      const url = await generateImageTool(args.prompt, userId, conversationId, tenantId);
                       result = { url, note: "Imagem gerada e salva. Mostre ao usuário usando markdown: ![imagem](url)" };
                       send({ type: "image", url, prompt: args.prompt });
                     } else if (PROPOSE_TOOLS.has(name)) {

@@ -160,15 +160,20 @@ export async function fetchAndStoreMessage(supabase: SupabaseClient, owner: stri
   if (hasAttachments && upserted?.id) {
     const atts = extractAttachments(m.payload);
     if (atts.length) {
+      const tenantId = await resolveOwnerTenantId(supabase, owner);
       await supabase.from("email_attachments").delete().eq("email_id", upserted.id);
       const inserted = atts.map((a) => ({ ...a, email_id: upserted.id, storage_path: null as string | null }));
       await supabase.from("email_attachments").insert(inserted);
-      for (const a of atts) {
-        const path = await downloadAttachmentToStorage(supabase, owner, m.id, upserted.id, a);
-        if (path) {
-          await supabase.from("email_attachments")
-            .update({ storage_path: path }).eq("email_id", upserted.id).eq("attachment_id", a.attachment_id);
+      if (tenantId) {
+        for (const a of atts) {
+          const path = await downloadAttachmentToStorage(supabase, tenantId, owner, m.id, upserted.id, a);
+          if (path) {
+            await supabase.from("email_attachments")
+              .update({ storage_path: path }).eq("email_id", upserted.id).eq("attachment_id", a.attachment_id);
+          }
         }
+      } else {
+        console.warn("[gmail-mirror] skipping attachment download — no tenant for owner", owner);
       }
     }
   }

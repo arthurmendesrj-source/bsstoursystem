@@ -1,29 +1,50 @@
-## Problema
+## Objetivo
+Adicionar dois novos módulos na barra lateral principal: **Financeiro** e **Marketing**, com criação básica (páginas placeholder) e **acesso restrito** já no primeiro release.
 
-A página `/settings/whatsapp` (e demais subpáginas de settings) quebra com:
+## Escopo
 
-> Invariant failed: Expected to find a match below the root match in SPA mode.
+### 1. Novas rotas
+- `src/routes/financeiro.tsx` → `/financeiro`
+  - Página básica com título, descrição e cards placeholder (Contas a Pagar, Contas a Receber, Fluxo de Caixa).
+  - `head()` com title/description próprios.
+- `src/routes/marketing.tsx` → `/marketing`
+  - Página básica com título, descrição e cards placeholder (Campanhas, Leads por Canal, Automações).
+  - `head()` com title/description próprios.
 
-A causa é o arquivo `src/routes/settings.index.tsx` com `createFileRoute("/settings/")`. Na convenção plana do TanStack Router, o sufixo `.index` declara que existe um pai chamado `settings` com layout próprio. Como não existe `settings.tsx` renderizando `<Outlet />`, as rotas filhas (`settings.whatsapp`, `settings.templates`, `settings.sla`, `settings.permissions`) ficam órfãs sob um pai virtual sem ponto de montagem — daí o invariant.
+Ambas usam `AppShell`, tokens semânticos do design system, sem cores hardcoded.
 
-Além disso, cada subpágina de settings já encapsula seu próprio `<AuthGate><AppShell>...</AppShell></AuthGate>`, então não há motivo para um layout compartilhado.
+### 2. Restrição de acesso (versão inicial, baseada em role)
+Reaproveitando o padrão já existente no projeto (`useEffectiveAuth` + `isAdmin` / `hasRole`), sem criar tabela nova:
 
-## Plano
+- **Financeiro**: visível e acessível apenas para `admin`, `diretor` e `financeiro` (se existir esse role; caso contrário, apenas admin/diretor).
+- **Marketing**: visível e acessível apenas para `admin`, `diretor` e `gerente`.
 
-Tornar todas as rotas de settings irmãs planas sob a raiz, sem pai compartilhado.
+Implementação:
+- No componente da rota, se o usuário não tem o role permitido, renderizar um bloco "Acesso negado" (mesmo padrão usado em outras telas restritas).
+- Na sidebar (`AppShell.tsx`), só renderizar o item se o usuário tiver o role permitido (igual ao tratamento atual de "Gerencial" e do bloco admin).
 
-1. Renomear `src/routes/settings.index.tsx` → `src/routes/settings.tsx`.
-2. Dentro dele, trocar `createFileRoute("/settings/")` por `createFileRoute("/settings")`.
-3. Renomear os filhos para usar o sufixo `_` (opt-out de nesting):
-   - `settings.whatsapp.tsx` → `settings_.whatsapp.tsx`
-   - `settings.templates.tsx` → `settings_.templates.tsx`
-   - `settings.sla.tsx` → `settings_.sla.tsx`
-   - `settings.permissions.tsx` → `settings_.permissions.tsx`
-4. Em cada arquivo renomeado, manter o `createFileRoute("/settings/whatsapp")` etc. (o caminho de URL não muda; só o filename muda para evitar o agrupamento sob `settings`).
-5. Deixar o Vite plugin regenerar `src/routeTree.gen.ts` — nenhum link/import precisa mudar porque as URLs permanecem `/settings`, `/settings/whatsapp`, etc.
+Hook futuro: quando o sistema de "acesso por módulos" (`has_module_permission`) for criado, basta trocar a checagem por role pela checagem por permissão de módulo — a estrutura fica preparada.
+
+### 3. Sidebar (`src/components/AppShell.tsx`)
+- Importar ícones `Wallet` e `Megaphone` do `lucide-react`.
+- Adicionar dois itens condicionais logo após "Alertas":
+  - "Financeiro" → `/financeiro` (gate por role)
+  - "Marketing" → `/marketing` (gate por role)
+- Funciona em modo expandido e colapsado (com tooltip).
+
+### 4. Fora de escopo (agora)
+- Nenhuma tabela, RLS, integração financeira (gateways, conciliação) ou ferramentas de marketing (envio de campanhas, tracking).
+- Não criar ainda o sistema genérico de "acesso por módulo" — só deixar o ponto pronto para receber.
+- Sem entradas no `i18n` por enquanto (labels fixos "Financeiro" / "Marketing").
 
 ## Verificação
+- Usuário sem o role permitido **não vê** o item na sidebar e recebe "Acesso negado" se acessar a URL diretamente.
+- Usuário com role permitido vê os itens e abre as páginas placeholder normalmente.
+- Sidebar funciona expandida e colapsada.
 
-- Navegar para `/settings/whatsapp` — deve renderizar a tela de configuração sem invariant.
-- Navegar para `/settings`, `/settings/templates`, `/settings/sla`, `/settings/permissions` — todas devem abrir normalmente.
-- Confirmar no console que o erro `Expected to find a match below the root match` sumiu.
+## Pergunta antes de implementar
+Confirma os roles para cada módulo?
+- **Financeiro** → admin + diretor (+ "financeiro" se existir esse role no projeto)
+- **Marketing** → admin + diretor + gerente
+
+Se quiser outra combinação (por exemplo, "Marketing também para operacional"), me diga que ajusto antes de codar.

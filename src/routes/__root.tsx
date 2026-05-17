@@ -2,6 +2,7 @@ import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/r
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
+import { TenantProvider } from "@/lib/tenant";
 import { ViewAsProvider } from "@/lib/viewAs";
 import { PermissionsProvider } from "@/lib/permissions";
 import { I18nProvider } from "@/lib/i18n";
@@ -73,18 +74,20 @@ function RootComponent() {
     <I18nProvider>
       <CurrencyProvider>
         <AuthProvider>
-          <ViewAsProvider>
-            <PermissionsProvider>
-              <TooltipProvider delayDuration={400}>
-                <WorkspaceWindowsProvider>
-                  <Outlet />
-                  <PermissionFieldHighlighter />
-                  <GlobalButtonTooltips />
-                  <Toaster />
-                </WorkspaceWindowsProvider>
-              </TooltipProvider>
-            </PermissionsProvider>
-          </ViewAsProvider>
+          <TenantProvider>
+            <ViewAsProvider>
+              <PermissionsProvider>
+                <TooltipProvider delayDuration={400}>
+                  <WorkspaceWindowsProvider>
+                    <Outlet />
+                    <PermissionFieldHighlighter />
+                    <GlobalButtonTooltips />
+                    <Toaster />
+                  </WorkspaceWindowsProvider>
+                </TooltipProvider>
+              </PermissionsProvider>
+            </ViewAsProvider>
+          </TenantProvider>
         </AuthProvider>
       </CurrencyProvider>
     </I18nProvider>

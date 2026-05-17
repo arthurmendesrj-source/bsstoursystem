@@ -17,7 +17,7 @@ import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { useTenant } from "@/lib/tenant";
-import { tenantPath } from "@/lib/tenantStorage";
+import { uploadTenantFile } from "@/lib/tenantStorage";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

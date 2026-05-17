@@ -134,7 +134,7 @@ function OnboardingPage() {
                         <div className="text-xs text-muted-foreground">{p.trial_days} dias de teste</div>
                       </div>
                       <div className="font-semibold">
-                        {p.currency} {(p.price_cents / 100).toFixed(2)}
+                        {p.price_cents == null ? "Sob proposta" : `${p.currency} ${(p.price_cents / 100).toFixed(2)}`}
                       </div>
                     </div>
                   </button>

@@ -110,45 +110,51 @@ function BillingPage() {
   const [extraUsers, setExtraUsers] = useState(0);
 
   useEffect(() => {
-    setLoading(true);
-    const tasks: Promise<unknown>[] = [
-      supabase
-        .from("plans")
-        .select("id, code, name, price_cents, currency, interval, trial_days, included_users, extra_user_cents, description, features, is_quote")
-        .eq("is_active", true)
-        .eq("is_public", true)
-        .order("sort_order")
-        .then(({ data }) => setPlans((data ?? []).map((p: any) => ({ ...p, features: p.features ?? [] })) as Plan[])),
-      supabase
-        .from("plan_addons")
-        .select("id, code, name, description, price_cents, currency, category")
-        .eq("is_active", true)
-        .order("sort_order")
-        .then(({ data }) => setAddons((data ?? []) as Addon[])),
-      supabase
-        .from("plan_one_time")
-        .select("id, code, name, description, price_cents, price_min_cents, price_max_cents, currency, category, is_quote")
-        .eq("is_active", true)
-        .order("sort_order")
-        .then(({ data }) => setOneTimes((data ?? []) as OneTime[])),
-    ];
-    if (tenant) {
-      tasks.push(
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const [pRes, aRes, oRes] = await Promise.all([
         supabase
-          .from("subscriptions")
-          .select("id, status, trial_end, current_period_end, plans:plan_id (name, code, price_cents, currency, interval)")
-          .eq("tenant_id", tenant.id)
-          .maybeSingle()
-          .then(({ data }) => setSub(data as any)),
+          .from("plans")
+          .select("id, code, name, price_cents, currency, interval, trial_days, included_users, extra_user_cents, description, features, is_quote")
+          .eq("is_active", true)
+          .eq("is_public", true)
+          .order("sort_order"),
         supabase
-          .from("billing_invoices")
-          .select("id, amount_cents, currency, status, due_date, paid_at, hosted_invoice_url, created_at")
-          .eq("tenant_id", tenant.id)
-          .order("created_at", { ascending: false })
-          .then(({ data }) => setInvoices((data ?? []) as Invoice[])),
-      );
-    }
-    Promise.all(tasks).finally(() => setLoading(false));
+          .from("plan_addons")
+          .select("id, code, name, description, price_cents, currency, category")
+          .eq("is_active", true)
+          .order("sort_order"),
+        supabase
+          .from("plan_one_time")
+          .select("id, code, name, description, price_cents, price_min_cents, price_max_cents, currency, category, is_quote")
+          .eq("is_active", true)
+          .order("sort_order"),
+      ]);
+      if (cancelled) return;
+      setPlans(((pRes.data ?? []) as any[]).map((p) => ({ ...p, features: p.features ?? [] })) as Plan[]);
+      setAddons((aRes.data ?? []) as Addon[]);
+      setOneTimes((oRes.data ?? []) as OneTime[]);
+      if (tenant) {
+        const [sRes, iRes] = await Promise.all([
+          supabase
+            .from("subscriptions")
+            .select("id, status, trial_end, current_period_end, plans:plan_id (name, code, price_cents, currency, interval)")
+            .eq("tenant_id", tenant.id)
+            .maybeSingle(),
+          supabase
+            .from("billing_invoices")
+            .select("id, amount_cents, currency, status, due_date, paid_at, hosted_invoice_url, created_at")
+            .eq("tenant_id", tenant.id)
+            .order("created_at", { ascending: false }),
+        ]);
+        if (cancelled) return;
+        setSub(sRes.data as any);
+        setInvoices((iRes.data ?? []) as Invoice[]);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
   }, [tenant]);
 
   const planByCode = useMemo(() => Object.fromEntries(plans.map((p) => [p.code, p])), [plans]);

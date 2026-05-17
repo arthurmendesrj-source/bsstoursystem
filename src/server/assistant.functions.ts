@@ -188,11 +188,16 @@ export const rejectAction = createServerFn({ method: "POST" })
 // ===== Image generation =====
 export const generateAssistantImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { prompt: string; conversation_id?: string }) =>
-    z.object({ prompt: z.string().min(1).max(2000), conversation_id: z.string().uuid().optional() }).parse(d),
+  .inputValidator((d: { prompt: string; conversation_id?: string; tenant_id?: string }) =>
+    z.object({
+      prompt: z.string().min(1).max(2000),
+      conversation_id: z.string().uuid().optional(),
+      tenant_id: z.string().uuid().optional(),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    const tenantId = await resolveUserTenantId(userId, data.tenant_id);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
 

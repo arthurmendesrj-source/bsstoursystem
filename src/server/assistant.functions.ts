@@ -220,7 +220,7 @@ export const generateAssistantImage = createServerFn({ method: "POST" })
 
     const base64 = dataUrl.split(",")[1];
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const path = `${userId}/${Date.now()}.png`;
+    const path = tenantPath(tenantId, userId, `${Date.now()}.png`);
     const { error: upErr } = await supabaseAdmin.storage.from("ai-images").upload(path, bytes, {
       contentType: "image/png",
       upsert: false,

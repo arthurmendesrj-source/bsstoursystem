@@ -95,6 +95,7 @@ function formatType(t: string | null) {
 
 function ItinerariesPage() {
   const { user, isAdmin, hasRole } = useAuth();
+  const { tenant } = useTenant();
   const canManage = isAdmin || hasRole("operacional");
   const [rows, setRows] = useState<Itinerary[]>([]);
   const [loading, setLoading] = useState(true);

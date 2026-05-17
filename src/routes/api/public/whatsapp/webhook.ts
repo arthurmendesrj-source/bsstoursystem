@@ -73,13 +73,14 @@ async function ensureConversation(accountId: string, contactPhone: string, conta
 async function downloadAndStoreMedia(
   mediaId: string,
   token: string,
+  tenantId: string,
   accountId: string,
 ): Promise<{ path: string; mime: string } | null> {
   try {
     const meta = await fetchMediaUrl(mediaId, token);
     const { buf, mime } = await downloadMedia(meta.url, token);
     const ext = (meta.mime_type ?? mime).split("/")[1]?.split(";")[0] ?? "bin";
-    const path = `${accountId}/${mediaId}.${ext}`;
+    const path = `${tenantId}/${accountId}/${mediaId}.${ext}`;
     await supabaseAdmin.storage.from("whatsapp-media").upload(path, buf, {
       contentType: meta.mime_type ?? mime,
       upsert: true,
@@ -132,22 +133,22 @@ async function processIncoming(value: MetaWebhookValue) {
         body = m.text?.body ?? null;
       } else if (m.type === "image" && m.image?.id) {
         body = m.image.caption ?? null;
-        const stored = await downloadAndStoreMedia(m.image.id, token, account.id);
+        const stored = await downloadAndStoreMedia(m.image.id, token, account.tenant_id, account.id);
         mediaPath = stored?.path ?? null;
         mediaMime = stored?.mime ?? m.image.mime_type ?? null;
       } else if (m.type === "document" && m.document?.id) {
         body = m.document.caption ?? null;
         mediaFilename = m.document.filename ?? null;
-        const stored = await downloadAndStoreMedia(m.document.id, token, account.id);
+        const stored = await downloadAndStoreMedia(m.document.id, token, account.tenant_id, account.id);
         mediaPath = stored?.path ?? null;
         mediaMime = stored?.mime ?? m.document.mime_type ?? null;
       } else if (m.type === "audio" && m.audio?.id) {
-        const stored = await downloadAndStoreMedia(m.audio.id, token, account.id);
+        const stored = await downloadAndStoreMedia(m.audio.id, token, account.tenant_id, account.id);
         mediaPath = stored?.path ?? null;
         mediaMime = stored?.mime ?? m.audio.mime_type ?? null;
       } else if (m.type === "video" && m.video?.id) {
         body = m.video.caption ?? null;
-        const stored = await downloadAndStoreMedia(m.video.id, token, account.id);
+        const stored = await downloadAndStoreMedia(m.video.id, token, account.tenant_id, account.id);
         mediaPath = stored?.path ?? null;
         mediaMime = stored?.mime ?? m.video.mime_type ?? null;
       }

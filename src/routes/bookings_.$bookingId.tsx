@@ -16,6 +16,8 @@ import { VoucherDialog } from "@/components/booking/VoucherDialog";
 import { ComboboxAutocomplete } from "@/components/ComboboxAutocomplete";
 import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
+import { useTenant } from "@/lib/tenant";
+import { tenantPath } from "@/lib/tenantStorage";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -93,6 +95,7 @@ function BookingDetailPage() {
   const { bookingId } = Route.useParams();
   const { t } = useI18n();
   const { user } = useAuth();
+  const { tenant } = useTenant();
   const { format } = useCurrency();
   const navigate = useNavigate();
   const [booking, setBooking] = useState<Booking | null>(null);
@@ -195,7 +198,8 @@ function BookingDetailPage() {
       if (p.file) {
         if (p.file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
         const ext = p.file.name.split(".").pop() || "bin";
-        storagePath = `${bookingId}/${item.id}/${Date.now()}.${ext}`;
+        if (!tenant) { toast.error("Empresa não selecionada"); return; }
+        storagePath = tenantPath(tenant.id, bookingId!, item.id, `${Date.now()}.${ext}`);
         const { error } = await supabase.storage.from("booking-proofs").upload(storagePath, p.file, { upsert: true });
         if (error) { toast.error(error.message); return; }
       }
@@ -213,7 +217,8 @@ function BookingDetailPage() {
   const onUpload = async (item: QuoteItem, file: File) => {
     if (file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
     const ext = file.name.split(".").pop() || "bin";
-    const path = `${bookingId}/${item.id}/${Date.now()}.${ext}`;
+    if (!tenant) { toast.error("Empresa não selecionada"); return; }
+    const path = tenantPath(tenant.id, bookingId!, item.id, `${Date.now()}.${ext}`);
     const { error } = await supabase.storage.from("booking-proofs").upload(path, file, { upsert: true });
     if (error) { toast.error(error.message); return; }
     await persist(item.id, { proof_storage_path: path });

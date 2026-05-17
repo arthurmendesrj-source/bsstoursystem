@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { ASSISTANT_SYSTEM_PROMPT } from "@/server/assistant.prompt";
 import { ASSISTANT_TOOLS, executeReadTool } from "@/server/assistant.tools";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolveUserTenantId } from "@/server/tenant.server";
+import { tenantPath } from "@/lib/tenantStorage";
 import type { Database } from "@/integrations/supabase/types";
 
 type ChatMsg = {
@@ -58,7 +60,7 @@ async function webSearch(query: string): Promise<string> {
   }
 }
 
-async function generateImageTool(prompt: string, userId: string, conversationId: string): Promise<string> {
+async function generateImageTool(prompt: string, userId: string, conversationId: string, tenantId: string): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
   const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -76,7 +78,7 @@ async function generateImageTool(prompt: string, userId: string, conversationId:
   if (!dataUrl) throw new Error("Sem imagem na resposta");
   const base64 = dataUrl.split(",")[1];
   const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const path = `${userId}/${Date.now()}.png`;
+  const path = tenantPath(tenantId, userId, `${Date.now()}.png`);
   await supabaseAdmin.storage.from("ai-images").upload(path, bytes, { contentType: "image/png" });
   await supabaseAdmin.from("ai_generated_images").insert({
     user_id: userId,
@@ -105,6 +107,8 @@ export const Route = createFileRoute("/api/assistant/chat")({
         const conversationId: string = body.conversationId;
         const userMessage: string = body.message;
         if (!conversationId || !userMessage) return new Response("missing fields", { status: 400 });
+
+        const tenantId = await resolveUserTenantId(userId, body.tenantId);
 
         // Verify conversation belongs to user
         const { data: conv } = await supabase
@@ -257,7 +261,7 @@ export const Route = createFileRoute("/api/assistant/chat")({
                     if (name === "web_search") {
                       result = { result: await webSearch(args.query || "") };
                     } else if (name === "generate_image") {
-                      const url = await generateImageTool(args.prompt, userId, conversationId);
+                      const url = await generateImageTool(args.prompt, userId, conversationId, tenantId);
                       result = { url, note: "Imagem gerada e salva. Mostre ao usuário usando markdown: ![imagem](url)" };
                       send({ type: "image", url, prompt: args.prompt });
                     } else if (PROPOSE_TOOLS.has(name)) {

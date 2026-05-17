@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolveUserTenantId } from "@/server/tenant.server";
+import { tenantPath } from "@/lib/tenantStorage";
 
 // ===== Conversations =====
 export const listConversations = createServerFn({ method: "GET" })
@@ -186,11 +188,16 @@ export const rejectAction = createServerFn({ method: "POST" })
 // ===== Image generation =====
 export const generateAssistantImage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { prompt: string; conversation_id?: string }) =>
-    z.object({ prompt: z.string().min(1).max(2000), conversation_id: z.string().uuid().optional() }).parse(d),
+  .inputValidator((d: { prompt: string; conversation_id?: string; tenant_id?: string }) =>
+    z.object({
+      prompt: z.string().min(1).max(2000),
+      conversation_id: z.string().uuid().optional(),
+      tenant_id: z.string().uuid().optional(),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    const tenantId = await resolveUserTenantId(userId, data.tenant_id);
     const apiKey = process.env.LOVABLE_API_KEY;
     if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
 
@@ -213,7 +220,7 @@ export const generateAssistantImage = createServerFn({ method: "POST" })
 
     const base64 = dataUrl.split(",")[1];
     const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const path = `${userId}/${Date.now()}.png`;
+    const path = tenantPath(tenantId, userId, `${Date.now()}.png`);
     const { error: upErr } = await supabaseAdmin.storage.from("ai-images").upload(path, bytes, {
       contentType: "image/png",
       upsert: false,

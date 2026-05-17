@@ -35,6 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
+import { useTenant } from "@/lib/tenant";
+import { tenantPath } from "@/lib/tenantStorage";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -93,6 +95,7 @@ function formatType(t: string | null) {
 
 function ItinerariesPage() {
   const { user, isAdmin, hasRole } = useAuth();
+  const { tenant } = useTenant();
   const canManage = isAdmin || hasRole("operacional");
   const [rows, setRows] = useState<Itinerary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,7 +301,8 @@ function ItinerariesPage() {
     try {
       const ext = file.name.split(".").pop()!.toLowerCase();
       const fmt = ext === "doc" ? "doc" : ext === "pdf" ? "pdf" : "docx";
-      const path = `${user.id}/${crypto.randomUUID()}-${file.name}`;
+      if (!tenant) throw new Error("Empresa não selecionada");
+      const path = tenantPath(tenant.id, user.id, `${crypto.randomUUID()}-${file.name}`);
       const { error: upErr } = await supabase.storage
         .from("itineraries")
         .upload(path, file, { contentType: file.type || undefined });

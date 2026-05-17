@@ -196,12 +196,17 @@ function BookingDetailPage() {
     } else {
       let storagePath: string | null = null;
       if (p.file) {
-        if (p.file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
         const ext = p.file.name.split(".").pop() || "bin";
-        if (!tenant) { toast.error("Empresa não selecionada"); return; }
-        storagePath = tenantPath(tenant.id, bookingId!, item.id, `${Date.now()}.${ext}`);
-        const { error } = await supabase.storage.from("booking-proofs").upload(storagePath, p.file, { upsert: true });
-        if (error) { toast.error(error.message); return; }
+        const res = await uploadTenantFile({
+          bucket: "booking-proofs",
+          tenantId: tenant?.id ?? "",
+          path: `${bookingId!}/${item.id}/${Date.now()}.${ext}`,
+          file: p.file,
+          upsert: true,
+          maxBytes: 10 * 1024 * 1024,
+        });
+        if (!res.ok) { toast.error(res.error); return; }
+        storagePath = res.path;
       }
       await persist(item.id, {
         proof_type: "whatsapp",
@@ -215,13 +220,17 @@ function BookingDetailPage() {
 
 
   const onUpload = async (item: QuoteItem, file: File) => {
-    if (file.size > 10 * 1024 * 1024) { toast.error("Max 10 MB"); return; }
     const ext = file.name.split(".").pop() || "bin";
-    if (!tenant) { toast.error("Empresa não selecionada"); return; }
-    const path = tenantPath(tenant.id, bookingId!, item.id, `${Date.now()}.${ext}`);
-    const { error } = await supabase.storage.from("booking-proofs").upload(path, file, { upsert: true });
-    if (error) { toast.error(error.message); return; }
-    await persist(item.id, { proof_storage_path: path });
+    const res = await uploadTenantFile({
+      bucket: "booking-proofs",
+      tenantId: tenant?.id ?? "",
+      path: `${bookingId!}/${item.id}/${Date.now()}.${ext}`,
+      file,
+      upsert: true,
+      maxBytes: 10 * 1024 * 1024,
+    });
+    if (!res.ok) { toast.error(res.error); return; }
+    await persist(item.id, { proof_storage_path: res.path });
     toast.success(t("saved"));
   };
 

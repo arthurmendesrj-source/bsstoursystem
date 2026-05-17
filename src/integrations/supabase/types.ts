@@ -2751,6 +2751,51 @@ export type Database = {
           },
         ]
       }
+      storage_access_log: {
+        Row: {
+          action: string
+          bucket: string
+          content_type: string | null
+          created_at: string
+          error_message: string | null
+          file_size_bytes: number | null
+          id: string
+          object_path: string
+          status: string
+          tenant_id: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          bucket: string
+          content_type?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          object_path: string
+          status?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          bucket?: string
+          content_type?: string | null
+          created_at?: string
+          error_message?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          object_path?: string
+          status?: string
+          tenant_id?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscriptions: {
         Row: {
           cancel_at_period_end: boolean

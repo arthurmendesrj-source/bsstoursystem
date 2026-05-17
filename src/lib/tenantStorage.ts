@@ -147,9 +147,53 @@ export function friendlyStorageError(
 }
 
 /**
+ * Fire-and-forget audit log entry. Never throws — logging must not break
+ * the user's upload/download flow.
+ */
+async function logStorageAccess(entry: {
+  bucket: string;
+  objectPath: string;
+  action: "upload" | "download" | "delete" | "signed_url";
+  status?: "success" | "denied" | "error";
+  errorMessage?: string | null;
+  fileSizeBytes?: number | null;
+  contentType?: string | null;
+  tenantId?: string | null;
+}) {
+  try {
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) return;
+    const ua =
+      typeof navigator !== "undefined" ? navigator.userAgent ?? null : null;
+    await supabase.from("storage_access_log").insert({
+      user_id: uid,
+      tenant_id: entry.tenantId ?? null,
+      bucket: entry.bucket,
+      object_path: entry.objectPath,
+      action: entry.action,
+      status: entry.status ?? "success",
+      error_message: entry.errorMessage ?? null,
+      file_size_bytes: entry.fileSizeBytes ?? null,
+      content_type: entry.contentType ?? null,
+      user_agent: ua,
+    });
+  } catch {
+    // swallow — auditing must never block storage operations
+  }
+}
+
+/** Extract the tenant UUID (first path segment) from a storage object path. */
+function tenantIdFromPath(objectPath: string): string | null {
+  const first = (objectPath ?? "").split("/")[0] ?? "";
+  return isUuid(first) ? first : null;
+}
+
+/**
  * Upload a file to a tenant-scoped bucket. The path is automatically
  * prefixed with the tenant id. Returns the Supabase upload result plus a
- * pre-computed friendly error message when something fails.
+ * pre-computed friendly error message when something fails. Every attempt
+ * is recorded in `storage_access_log`.
  */
 export async function uploadTenantFile(opts: {
   bucket: TenantScopedBucket;
@@ -168,14 +212,37 @@ export async function uploadTenantFile(opts: {
     file: opts.file,
     maxBytes: opts.maxBytes,
   });
-  if (validation) return { ok: false, error: validation };
+  if (validation) {
+    await logStorageAccess({
+      bucket: opts.bucket,
+      objectPath: opts.path,
+      action: "upload",
+      status: "denied",
+      errorMessage: validation,
+      tenantId: isUuid(opts.tenantId) ? opts.tenantId : null,
+    });
+    return { ok: false, error: validation };
+  }
 
   let fullPath: string;
   try {
     fullPath = tenantPath(opts.tenantId, opts.path);
   } catch (e) {
-    return { ok: false, error: friendlyStorageError(e, { bucket: opts.bucket }), raw: e };
+    const msg = friendlyStorageError(e, { bucket: opts.bucket });
+    await logStorageAccess({
+      bucket: opts.bucket,
+      objectPath: opts.path,
+      action: "upload",
+      status: "error",
+      errorMessage: msg,
+      tenantId: opts.tenantId,
+    });
+    return { ok: false, error: msg, raw: e };
   }
+
+  const size = (opts.file as File).size ?? null;
+  const contentType =
+    opts.contentType ?? ((opts.file as File).type || null) ?? null;
 
   const { error } = await supabase.storage
     .from(opts.bucket)
@@ -185,11 +252,80 @@ export async function uploadTenantFile(opts: {
     });
 
   if (error) {
-    return {
-      ok: false,
-      error: friendlyStorageError(error, { bucket: opts.bucket }),
-      raw: error,
-    };
+    const friendly = friendlyStorageError(error, { bucket: opts.bucket });
+    const status =
+      String((error as { statusCode?: string | number }).statusCode ?? "") ===
+        "403" ||
+      /row-level security|not authorized|unauthorized|permission denied/i.test(
+        (error as { message?: string }).message ?? "",
+      )
+        ? "denied"
+        : "error";
+    await logStorageAccess({
+      bucket: opts.bucket,
+      objectPath: fullPath,
+      action: "upload",
+      status,
+      errorMessage: friendly,
+      fileSizeBytes: size,
+      contentType,
+      tenantId: opts.tenantId,
+    });
+    return { ok: false, error: friendly, raw: error };
   }
+
+  await logStorageAccess({
+    bucket: opts.bucket,
+    objectPath: fullPath,
+    action: "upload",
+    status: "success",
+    fileSizeBytes: size,
+    contentType,
+    tenantId: opts.tenantId,
+  });
   return { ok: true, path: fullPath };
 }
+
+/**
+ * Create a signed download URL for a tenant-scoped object and record the
+ * access in `storage_access_log`. Returns a friendly error message when the
+ * URL could not be generated.
+ */
+export async function downloadTenantFile(opts: {
+  bucket: TenantScopedBucket;
+  path: string;
+  expiresIn?: number;
+}): Promise<
+  | { ok: true; signedUrl: string }
+  | { ok: false; error: string; raw?: unknown }
+> {
+  const tenantId = tenantIdFromPath(opts.path);
+  const { data, error } = await supabase.storage
+    .from(opts.bucket)
+    .createSignedUrl(opts.path, opts.expiresIn ?? 3600);
+
+  if (error || !data?.signedUrl) {
+    const friendly = friendlyStorageError(error ?? new Error("no url"), {
+      bucket: opts.bucket,
+    });
+    await logStorageAccess({
+      bucket: opts.bucket,
+      objectPath: opts.path,
+      action: "signed_url",
+      status: "denied",
+      errorMessage: friendly,
+      tenantId,
+    });
+    return { ok: false, error: friendly, raw: error };
+  }
+
+  await logStorageAccess({
+    bucket: opts.bucket,
+    objectPath: opts.path,
+    action: "download",
+    status: "success",
+    tenantId,
+  });
+  return { ok: true, signedUrl: data.signedUrl };
+}
+

@@ -3,6 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import { ASSISTANT_SYSTEM_PROMPT } from "@/server/assistant.prompt";
 import { ASSISTANT_TOOLS, executeReadTool } from "@/server/assistant.tools";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { resolveUserTenantId } from "@/server/tenant.server";
+import { tenantPath } from "@/lib/tenantStorage";
 import type { Database } from "@/integrations/supabase/types";
 
 type ChatMsg = {

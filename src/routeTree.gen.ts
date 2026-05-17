@@ -13,6 +13,7 @@ import { Route as WorkspaceRouteImport } from './routes/workspace'
 import { Route as WhatsappRouteImport } from './routes/whatsapp'
 import { Route as UsersRouteImport } from './routes/users'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SecurityAuditRouteImport } from './routes/security-audit'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PermissionsAuditRouteImport } from './routes/permissions-audit'
@@ -32,15 +33,14 @@ import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as SettingsIndexRouteImport } from './routes/settings.index'
 import { Route as SuppliersReferencesRouteImport } from './routes/suppliers.references'
 import { Route as SuppliersRatesValidationRouteImport } from './routes/suppliers.rates-validation'
 import { Route as SuppliersRatesSearchRouteImport } from './routes/suppliers.rates-search'
 import { Route as SuppliersRatesImportRouteImport } from './routes/suppliers.rates-import'
-import { Route as SettingsWhatsappRouteImport } from './routes/settings.whatsapp'
-import { Route as SettingsTemplatesRouteImport } from './routes/settings.templates'
-import { Route as SettingsSlaRouteImport } from './routes/settings.sla'
-import { Route as SettingsPermissionsRouteImport } from './routes/settings.permissions'
+import { Route as SettingsWhatsappRouteImport } from './routes/settings_.whatsapp'
+import { Route as SettingsTemplatesRouteImport } from './routes/settings_.templates'
+import { Route as SettingsSlaRouteImport } from './routes/settings_.sla'
+import { Route as SettingsPermissionsRouteImport } from './routes/settings_.permissions'
 import { Route as PermissionsAuditFinancialRouteImport } from './routes/permissions-audit.financial'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as InboxIaEmailRouteImport } from './routes/inbox-ia_.email'
@@ -83,6 +83,11 @@ const UsersRoute = UsersRouteImport.update({
 const SuppliersRoute = SuppliersRouteImport.update({
   id: '/suppliers',
   path: '/suppliers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SecurityAuditRoute = SecurityAuditRouteImport.update({
@@ -180,11 +185,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/settings/',
-  path: '/settings/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SuppliersReferencesRoute = SuppliersReferencesRouteImport.update({
   id: '/references',
   path: '/references',
@@ -207,22 +207,22 @@ const SuppliersRatesImportRoute = SuppliersRatesImportRouteImport.update({
   getParentRoute: () => SuppliersRoute,
 } as any)
 const SettingsWhatsappRoute = SettingsWhatsappRouteImport.update({
-  id: '/settings/whatsapp',
+  id: '/settings_/whatsapp',
   path: '/settings/whatsapp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsTemplatesRoute = SettingsTemplatesRouteImport.update({
-  id: '/settings/templates',
+  id: '/settings_/templates',
   path: '/settings/templates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsSlaRoute = SettingsSlaRouteImport.update({
-  id: '/settings/sla',
+  id: '/settings_/sla',
   path: '/settings/sla',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
-  id: '/settings/permissions',
+  id: '/settings_/permissions',
   path: '/settings/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
@@ -368,6 +368,7 @@ export interface FileRoutesByFullPath {
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
+  '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
   '/whatsapp': typeof WhatsappRoute
@@ -389,7 +390,6 @@ export interface FileRoutesByFullPath {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
-  '/settings/': typeof SettingsIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
@@ -425,6 +425,7 @@ export interface FileRoutesByTo {
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
+  '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
   '/whatsapp': typeof WhatsappRoute
@@ -446,7 +447,6 @@ export interface FileRoutesByTo {
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
-  '/settings': typeof SettingsIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
@@ -483,6 +483,7 @@ export interface FileRoutesById {
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
   '/security-audit': typeof SecurityAuditRoute
+  '/settings': typeof SettingsRoute
   '/suppliers': typeof SuppliersRouteWithChildren
   '/users': typeof UsersRoute
   '/whatsapp': typeof WhatsappRoute
@@ -496,15 +497,14 @@ export interface FileRoutesById {
   '/inbox-ia_/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
-  '/settings/permissions': typeof SettingsPermissionsRoute
-  '/settings/sla': typeof SettingsSlaRoute
-  '/settings/templates': typeof SettingsTemplatesRoute
-  '/settings/whatsapp': typeof SettingsWhatsappRoute
+  '/settings_/permissions': typeof SettingsPermissionsRoute
+  '/settings_/sla': typeof SettingsSlaRoute
+  '/settings_/templates': typeof SettingsTemplatesRoute
+  '/settings_/whatsapp': typeof SettingsWhatsappRoute
   '/suppliers/rates-import': typeof SuppliersRatesImportRoute
   '/suppliers/rates-search': typeof SuppliersRatesSearchRoute
   '/suppliers/rates-validation': typeof SuppliersRatesValidationRoute
   '/suppliers/references': typeof SuppliersReferencesRoute
-  '/settings/': typeof SettingsIndexRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
@@ -542,6 +542,7 @@ export interface FileRouteTypes {
     | '/permissions-audit'
     | '/reset-password'
     | '/security-audit'
+    | '/settings'
     | '/suppliers'
     | '/users'
     | '/whatsapp'
@@ -563,7 +564,6 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
-    | '/settings/'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
@@ -599,6 +599,7 @@ export interface FileRouteTypes {
     | '/permissions-audit'
     | '/reset-password'
     | '/security-audit'
+    | '/settings'
     | '/suppliers'
     | '/users'
     | '/whatsapp'
@@ -620,7 +621,6 @@ export interface FileRouteTypes {
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
-    | '/settings'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
@@ -656,6 +656,7 @@ export interface FileRouteTypes {
     | '/permissions-audit'
     | '/reset-password'
     | '/security-audit'
+    | '/settings'
     | '/suppliers'
     | '/users'
     | '/whatsapp'
@@ -669,15 +670,14 @@ export interface FileRouteTypes {
     | '/inbox-ia_/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
-    | '/settings/permissions'
-    | '/settings/sla'
-    | '/settings/templates'
-    | '/settings/whatsapp'
+    | '/settings_/permissions'
+    | '/settings_/sla'
+    | '/settings_/templates'
+    | '/settings_/whatsapp'
     | '/suppliers/rates-import'
     | '/suppliers/rates-search'
     | '/suppliers/rates-validation'
     | '/suppliers/references'
-    | '/settings/'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users_/$userId/permissions'
@@ -714,6 +714,7 @@ export interface RootRouteChildren {
   PermissionsAuditRoute: typeof PermissionsAuditRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
   SecurityAuditRoute: typeof SecurityAuditRoute
+  SettingsRoute: typeof SettingsRoute
   SuppliersRoute: typeof SuppliersRouteWithChildren
   UsersRoute: typeof UsersRoute
   WhatsappRoute: typeof WhatsappRoute
@@ -724,7 +725,6 @@ export interface RootRouteChildren {
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
-  SettingsIndexRoute: typeof SettingsIndexRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
@@ -769,6 +769,13 @@ declare module '@tanstack/react-router' {
       path: '/suppliers'
       fullPath: '/suppliers'
       preLoaderRoute: typeof SuppliersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/security-audit': {
@@ -904,13 +911,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/': {
-      id: '/settings/'
-      path: '/settings'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/suppliers/references': {
       id: '/suppliers/references'
       path: '/references'
@@ -939,29 +939,29 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersRatesImportRouteImport
       parentRoute: typeof SuppliersRoute
     }
-    '/settings/whatsapp': {
-      id: '/settings/whatsapp'
+    '/settings_/whatsapp': {
+      id: '/settings_/whatsapp'
       path: '/settings/whatsapp'
       fullPath: '/settings/whatsapp'
       preLoaderRoute: typeof SettingsWhatsappRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/templates': {
-      id: '/settings/templates'
+    '/settings_/templates': {
+      id: '/settings_/templates'
       path: '/settings/templates'
       fullPath: '/settings/templates'
       preLoaderRoute: typeof SettingsTemplatesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/sla': {
-      id: '/settings/sla'
+    '/settings_/sla': {
+      id: '/settings_/sla'
       path: '/settings/sla'
       fullPath: '/settings/sla'
       preLoaderRoute: typeof SettingsSlaRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings/permissions': {
-      id: '/settings/permissions'
+    '/settings_/permissions': {
+      id: '/settings_/permissions'
       path: '/settings/permissions'
       fullPath: '/settings/permissions'
       preLoaderRoute: typeof SettingsPermissionsRouteImport
@@ -1219,6 +1219,7 @@ const rootRouteChildren: RootRouteChildren = {
   PermissionsAuditRoute: PermissionsAuditRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,
   SecurityAuditRoute: SecurityAuditRoute,
+  SettingsRoute: SettingsRoute,
   SuppliersRoute: SuppliersRouteWithChildren,
   UsersRoute: UsersRoute,
   WhatsappRoute: WhatsappRoute,
@@ -1229,7 +1230,6 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
-  SettingsIndexRoute: SettingsIndexRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,

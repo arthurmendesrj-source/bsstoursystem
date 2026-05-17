@@ -69,6 +69,7 @@ import { Route as ApiPublicGmailLeadRouteImport } from './routes/api/public/gmai
 import { Route as ApiPublicGmailDealRouteImport } from './routes/api/public/gmail/deal'
 import { Route as ApiPublicGmailContactRouteImport } from './routes/api/public/gmail/contact'
 import { Route as ApiPublicGmailActivityRouteImport } from './routes/api/public/gmail/activity'
+import { Route as ApiPublicBillingWebhookRouteImport } from './routes/api/public/billing.webhook'
 import { Route as ApiPublicGoogleOauthStartRouteImport } from './routes/api/public/google/oauth/start'
 import { Route as ApiPublicGoogleOauthCallbackRouteImport } from './routes/api/public/google/oauth/callback'
 
@@ -377,6 +378,11 @@ const ApiPublicGmailActivityRoute = ApiPublicGmailActivityRouteImport.update({
   path: '/api/public/gmail/activity',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBillingWebhookRoute = ApiPublicBillingWebhookRouteImport.update({
+  id: '/api/public/billing/webhook',
+  path: '/api/public/billing/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicGoogleOauthStartRoute =
   ApiPublicGoogleOauthStartRouteImport.update({
     id: '/api/public/google/oauth/start',
@@ -442,6 +448,7 @@ export interface FileRoutesByFullPath {
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
   '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
   '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
@@ -506,6 +513,7 @@ export interface FileRoutesByTo {
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
   '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
   '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
@@ -571,6 +579,7 @@ export interface FileRoutesById {
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
   '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
   '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
@@ -637,6 +646,7 @@ export interface FileRouteTypes {
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
+    | '/api/public/billing/webhook'
     | '/api/public/gmail/activity'
     | '/api/public/gmail/contact'
     | '/api/public/gmail/deal'
@@ -701,6 +711,7 @@ export interface FileRouteTypes {
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users/$userId/permissions'
+    | '/api/public/billing/webhook'
     | '/api/public/gmail/activity'
     | '/api/public/gmail/contact'
     | '/api/public/gmail/deal'
@@ -765,6 +776,7 @@ export interface FileRouteTypes {
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
     | '/users_/$userId/permissions'
+    | '/api/public/billing/webhook'
     | '/api/public/gmail/activity'
     | '/api/public/gmail/contact'
     | '/api/public/gmail/deal'
@@ -819,6 +831,7 @@ export interface RootRouteChildren {
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
+  ApiPublicBillingWebhookRoute: typeof ApiPublicBillingWebhookRoute
   ApiPublicGmailActivityRoute: typeof ApiPublicGmailActivityRoute
   ApiPublicGmailContactRoute: typeof ApiPublicGmailContactRoute
   ApiPublicGmailDealRoute: typeof ApiPublicGmailDealRoute
@@ -1254,6 +1267,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicGmailActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/billing/webhook': {
+      id: '/api/public/billing/webhook'
+      path: '/api/public/billing/webhook'
+      fullPath: '/api/public/billing/webhook'
+      preLoaderRoute: typeof ApiPublicBillingWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/google/oauth/start': {
       id: '/api/public/google/oauth/start'
       path: '/api/public/google/oauth/start'
@@ -1380,6 +1400,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
+  ApiPublicBillingWebhookRoute: ApiPublicBillingWebhookRoute,
   ApiPublicGmailActivityRoute: ApiPublicGmailActivityRoute,
   ApiPublicGmailContactRoute: ApiPublicGmailContactRoute,
   ApiPublicGmailDealRoute: ApiPublicGmailDealRoute,

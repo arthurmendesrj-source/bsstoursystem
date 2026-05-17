@@ -301,7 +301,8 @@ function ItinerariesPage() {
     try {
       const ext = file.name.split(".").pop()!.toLowerCase();
       const fmt = ext === "doc" ? "doc" : ext === "pdf" ? "pdf" : "docx";
-      const path = `${user.id}/${crypto.randomUUID()}-${file.name}`;
+      if (!tenant) throw new Error("Empresa não selecionada");
+      const path = tenantPath(tenant.id, user.id, `${crypto.randomUUID()}-${file.name}`);
       const { error: upErr } = await supabase.storage
         .from("itineraries")
         .upload(path, file, { contentType: file.type || undefined });

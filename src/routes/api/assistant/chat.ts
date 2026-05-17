@@ -60,7 +60,7 @@ async function webSearch(query: string): Promise<string> {
   }
 }
 
-async function generateImageTool(prompt: string, userId: string, conversationId: string): Promise<string> {
+async function generateImageTool(prompt: string, userId: string, conversationId: string, tenantId: string): Promise<string> {
   const apiKey = process.env.LOVABLE_API_KEY;
   if (!apiKey) throw new Error("LOVABLE_API_KEY ausente");
   const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

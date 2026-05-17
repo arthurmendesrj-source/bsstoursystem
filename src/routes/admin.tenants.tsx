@@ -94,8 +94,9 @@ function AdminTenantsPage() {
   };
 
   const setSubStatus = async (subId: string, status: Subscription["status"]) => {
-    const patch: Record<string, unknown> = { status };
-    if (status === "canceled") patch.canceled_at = new Date().toISOString();
+    const patch = status === "canceled"
+      ? { status, canceled_at: new Date().toISOString() }
+      : { status };
     const { error } = await supabase.from("subscriptions").update(patch).eq("id", subId);
     if (error) return toast.error(error.message);
     toast.success("Assinatura atualizada");

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { GlobalSearchTrigger } from "@/components/GlobalSearch";
+import { TenantSwitcher } from "@/components/TenantSwitcher";
 import { useAuth } from "@/lib/auth";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
@@ -366,6 +367,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-16 items-center justify-end gap-2 border-b border-border bg-card px-4 md:px-6">
+          <TenantSwitcher />
           <GlobalSearchTrigger />
           <AssistantFab />
           <NotificationBell />

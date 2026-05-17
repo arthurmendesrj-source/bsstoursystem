@@ -17,7 +17,7 @@ import {
   syncWhatsappTemplates,
 } from "@/server/whatsapp.functions";
 
-export const Route = createFileRoute("/settings/whatsapp")({
+export const Route = createFileRoute("/settings_/whatsapp")({
   component: () => (
     <AuthGate>
       <AppShell>

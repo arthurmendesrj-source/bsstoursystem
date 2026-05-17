@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/settings/permissions")({
+export const Route = createFileRoute("/settings_/permissions")({
   component: () => (
     <AuthGate>
       <AppShell>

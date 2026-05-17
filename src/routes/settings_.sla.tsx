@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { DEFAULT_SLA_HOURS, invalidateSlaSettingsCache } from "@/lib/leadSla";
 
-export const Route = createFileRoute("/settings/sla")({
+export const Route = createFileRoute("/settings_/sla")({
   component: () => (
     <AuthGate>
       <AppShell>

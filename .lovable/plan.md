@@ -1,23 +1,29 @@
-# Corrigir acesso a /settings/whatsapp (e demais subpáginas de settings)
+## Problema
 
-## Causa
-Em TanStack Router (roteamento flat), `src/routes/settings.tsx` vira **layout pai** de todos os arquivos `settings.*.tsx`. Para o filho aparecer, o pai precisa renderizar `<Outlet />`. Hoje `settings.tsx` renderiza diretamente o formulário de perfil, sem Outlet — então `/settings/whatsapp` (e `/settings/sla`, `/settings/templates`, `/settings/permissions`) mostram a tela de perfil em vez do conteúdo da subpágina.
+A página `/settings/whatsapp` (e demais subpáginas de settings) quebra com:
 
-Sintoma confirmado no replay: ao abrir `/settings/whatsapp` aparecem campos email/nome/telefone e botão "Salvar" — exatamente o `SettingsPage`.
+> Invariant failed: Expected to find a match below the root match in SPA mode.
 
-## Solução
-Renomear `src/routes/settings.tsx` para `src/routes/settings.index.tsx`.
+A causa é o arquivo `src/routes/settings.index.tsx` com `createFileRoute("/settings/")`. Na convenção plana do TanStack Router, o sufixo `.index` declara que existe um pai chamado `settings` com layout próprio. Como não existe `settings.tsx` renderizando `<Outlet />`, as rotas filhas (`settings.whatsapp`, `settings.templates`, `settings.sla`, `settings.permissions`) ficam órfãs sob um pai virtual sem ponto de montagem — daí o invariant.
 
-Com isso, no roteamento flat:
-- não existe mais um layout pai `/settings` capturando os filhos;
-- `/settings` continua funcionando (servido por `settings.index.tsx`);
-- `/settings/whatsapp`, `/settings/sla`, `/settings/templates`, `/settings/permissions` passam a renderizar suas próprias páginas normalmente.
+Além disso, cada subpágina de settings já encapsula seu próprio `<AuthGate><AppShell>...</AppShell></AuthGate>`, então não há motivo para um layout compartilhado.
 
-## Passos
-1. Renomear arquivo: `src/routes/settings.tsx` → `src/routes/settings.index.tsx`.
-2. Ajustar o `createFileRoute("/settings")` para `createFileRoute("/settings/")` dentro do arquivo renomeado (convenção do TanStack para index routes).
-3. Deixar o plugin do TanStack regenerar `routeTree.gen.ts` automaticamente (não editar manualmente).
-4. Verificar no preview que `/settings`, `/settings/whatsapp`, `/settings/sla`, `/settings/templates` e `/settings/permissions` abrem corretamente.
+## Plano
 
-## Fora de escopo
-Nenhuma mudança em lógica de WhatsApp, autenticação ou backend — só a estrutura de rotas.
+Tornar todas as rotas de settings irmãs planas sob a raiz, sem pai compartilhado.
+
+1. Renomear `src/routes/settings.index.tsx` → `src/routes/settings.tsx`.
+2. Dentro dele, trocar `createFileRoute("/settings/")` por `createFileRoute("/settings")`.
+3. Renomear os filhos para usar o sufixo `_` (opt-out de nesting):
+   - `settings.whatsapp.tsx` → `settings_.whatsapp.tsx`
+   - `settings.templates.tsx` → `settings_.templates.tsx`
+   - `settings.sla.tsx` → `settings_.sla.tsx`
+   - `settings.permissions.tsx` → `settings_.permissions.tsx`
+4. Em cada arquivo renomeado, manter o `createFileRoute("/settings/whatsapp")` etc. (o caminho de URL não muda; só o filename muda para evitar o agrupamento sob `settings`).
+5. Deixar o Vite plugin regenerar `src/routeTree.gen.ts` — nenhum link/import precisa mudar porque as URLs permanecem `/settings`, `/settings/whatsapp`, etc.
+
+## Verificação
+
+- Navegar para `/settings/whatsapp` — deve renderizar a tela de configuração sem invariant.
+- Navegar para `/settings`, `/settings/templates`, `/settings/sla`, `/settings/permissions` — todas devem abrir normalmente.
+- Confirmar no console que o erro `Expected to find a match below the root match` sumiu.

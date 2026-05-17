@@ -20,7 +20,7 @@ import {
   type MessageTemplates,
 } from "@/lib/messageTemplates";
 
-export const Route = createFileRoute("/settings/templates")({
+export const Route = createFileRoute("/settings_/templates")({
   component: () => (
     <AuthGate>
       <AppShell>

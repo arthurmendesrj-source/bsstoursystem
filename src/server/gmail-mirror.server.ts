@@ -90,18 +90,18 @@ function b64UrlToBytes(s: string): Uint8Array {
   return out;
 }
 
-function attStoragePath(owner: string, emailId: string, attachmentId: string, filename: string): string {
+function attStoragePath(tenantId: string, owner: string, emailId: string, attachmentId: string, filename: string): string {
   const safeName = (filename || "file").replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
-  return `${owner}/${emailId}/${attachmentId}_${safeName}`;
+  return `${tenantId}/${owner}/${emailId}/${attachmentId}_${safeName}`;
 }
 
 async function downloadAttachmentToStorage(
-  supabase: SupabaseClient, owner: string, messageId: string, emailId: string,
+  supabase: SupabaseClient, tenantId: string, owner: string, messageId: string, emailId: string,
   att: { attachment_id: string; filename: string; mime_type: string; size: number },
 ): Promise<string | null> {
   if (att.size && att.size > MAX_ATTACHMENT_BYTES) return null;
-  const path = attStoragePath(owner, emailId, att.attachment_id, att.filename);
-  const { data: existing } = await supabase.storage.from(ATTACHMENT_BUCKET).list(`${owner}/${emailId}`, { search: `${att.attachment_id}_` });
+  const path = attStoragePath(tenantId, owner, emailId, att.attachment_id, att.filename);
+  const { data: existing } = await supabase.storage.from(ATTACHMENT_BUCKET).list(`${tenantId}/${owner}/${emailId}`, { search: `${att.attachment_id}_` });
   if (existing && existing.length > 0) return path;
   try {
     const r = (await gw(`/users/me/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(att.attachment_id)}`)) as { data: string; size: number };
@@ -115,6 +115,16 @@ async function downloadAttachmentToStorage(
     console.error("attachment fetch failed", att.filename, e);
     return null;
   }
+}
+
+async function resolveOwnerTenantId(supabase: SupabaseClient, owner: string): Promise<string | null> {
+  const { data } = await supabase
+    .from("user_email_accounts")
+    .select("tenant_id")
+    .eq("email_address", owner)
+    .limit(1)
+    .maybeSingle();
+  return (data as any)?.tenant_id ?? null;
 }
 
 export async function fetchAndStoreMessage(supabase: SupabaseClient, owner: string, messageId: string) {

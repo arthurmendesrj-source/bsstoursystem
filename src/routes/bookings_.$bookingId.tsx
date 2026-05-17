@@ -235,9 +235,9 @@ function BookingDetailPage() {
   };
 
   const downloadProof = async (path: string) => {
-    const { data, error } = await supabase.storage.from("booking-proofs").createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) { toast.error(error?.message ?? "Error"); return; }
-    window.open(data.signedUrl, "_blank");
+    const res = await downloadTenantFile({ bucket: "booking-proofs", path });
+    if (!res.ok) { toast.error(res.error); return; }
+    window.open(res.signedUrl, "_blank");
   };
 
   const setStatus = async (item: QuoteItem, status: string) => {

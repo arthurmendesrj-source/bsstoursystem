@@ -29,7 +29,7 @@ function OnboardingPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [plans, setPlans] = useState<Array<{ id: string; code: string; name: string; price_cents: number; currency: string; trial_days: number }>>([]);
+  const [plans, setPlans] = useState<Array<{ id: string; code: string; name: string; price_cents: number | null; currency: string; trial_days: number }>>([]);
   const [planId, setPlanId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
@@ -134,7 +134,7 @@ function OnboardingPage() {
                         <div className="text-xs text-muted-foreground">{p.trial_days} dias de teste</div>
                       </div>
                       <div className="font-semibold">
-                        {p.currency} {(p.price_cents / 100).toFixed(2)}
+                        {p.price_cents == null ? "Sob proposta" : `${p.currency} ${(p.price_cents / 100).toFixed(2)}`}
                       </div>
                     </div>
                   </button>

@@ -420,7 +420,7 @@ Deno.serve(async (req) => {
         beneficiary,
         total,
       });
-      const path = `${bookingId}/${ts}-${baseName}.pdf`;
+      const path = `${(booking as any).tenant_id}/${bookingId}/${ts}-${baseName}.pdf`;
       const { error: upErr } = await admin.storage
         .from("invoice-docs")
         .upload(path, pdfBytes, { contentType: "application/pdf", upsert: true });

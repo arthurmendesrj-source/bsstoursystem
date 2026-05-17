@@ -95,6 +95,7 @@ function BookingDetailPage() {
   const { bookingId } = Route.useParams();
   const { t } = useI18n();
   const { user } = useAuth();
+  const { tenant } = useTenant();
   const { format } = useCurrency();
   const navigate = useNavigate();
   const [booking, setBooking] = useState<Booking | null>(null);

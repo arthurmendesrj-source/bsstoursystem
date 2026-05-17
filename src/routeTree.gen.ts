@@ -18,12 +18,14 @@ import { Route as SecurityAuditRouteImport } from './routes/security-audit'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as PermissionsAuditRouteImport } from './routes/permissions-audit'
 import { Route as PackagesRouteImport } from './routes/packages'
+import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ItinerariesRouteImport } from './routes/itineraries'
 import { Route as InboxIaRouteImport } from './routes/inbox-ia'
 import { Route as GerencialRouteImport } from './routes/gerencial'
 import { Route as FunnelRouteImport } from './routes/funnel'
+import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
@@ -110,6 +112,11 @@ const PackagesRoute = PackagesRouteImport.update({
   path: '/packages',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MarketingRoute = MarketingRouteImport.update({
+  id: '/marketing',
+  path: '/marketing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -138,6 +145,11 @@ const GerencialRoute = GerencialRouteImport.update({
 const FunnelRoute = FunnelRouteImport.update({
   id: '/funnel',
   path: '/funnel',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FinanceiroRoute = FinanceiroRouteImport.update({
+  id: '/financeiro',
+  path: '/financeiro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmailRoute = EmailRouteImport.update({
@@ -358,12 +370,14 @@ export interface FileRoutesByFullPath {
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
+  '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
+  '/marketing': typeof MarketingRoute
   '/packages': typeof PackagesRoute
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -415,12 +429,14 @@ export interface FileRoutesByTo {
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
+  '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
+  '/marketing': typeof MarketingRoute
   '/packages': typeof PackagesRoute
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -473,12 +489,14 @@ export interface FileRoutesById {
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
   '/email': typeof EmailRoute
+  '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/login': typeof LoginRoute
+  '/marketing': typeof MarketingRoute
   '/packages': typeof PackagesRoute
   '/permissions-audit': typeof PermissionsAuditRouteWithChildren
   '/reset-password': typeof ResetPasswordRoute
@@ -532,12 +550,14 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/email'
+    | '/financeiro'
     | '/funnel'
     | '/gerencial'
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/login'
+    | '/marketing'
     | '/packages'
     | '/permissions-audit'
     | '/reset-password'
@@ -589,12 +609,14 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/email'
+    | '/financeiro'
     | '/funnel'
     | '/gerencial'
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/login'
+    | '/marketing'
     | '/packages'
     | '/permissions-audit'
     | '/reset-password'
@@ -646,12 +668,14 @@ export interface FileRouteTypes {
     | '/customers'
     | '/dashboard'
     | '/email'
+    | '/financeiro'
     | '/funnel'
     | '/gerencial'
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/login'
+    | '/marketing'
     | '/packages'
     | '/permissions-audit'
     | '/reset-password'
@@ -704,12 +728,14 @@ export interface RootRouteChildren {
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
   EmailRoute: typeof EmailRoute
+  FinanceiroRoute: typeof FinanceiroRoute
   FunnelRoute: typeof FunnelRoute
   GerencialRoute: typeof GerencialRouteWithChildren
   InboxIaRoute: typeof InboxIaRoute
   ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
   LoginRoute: typeof LoginRoute
+  MarketingRoute: typeof MarketingRoute
   PackagesRoute: typeof PackagesRoute
   PermissionsAuditRoute: typeof PermissionsAuditRouteWithChildren
   ResetPasswordRoute: typeof ResetPasswordRoute
@@ -806,6 +832,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PackagesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/marketing': {
+      id: '/marketing'
+      path: '/marketing'
+      fullPath: '/marketing'
+      preLoaderRoute: typeof MarketingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -846,6 +879,13 @@ declare module '@tanstack/react-router' {
       path: '/funnel'
       fullPath: '/funnel'
       preLoaderRoute: typeof FunnelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/financeiro': {
+      id: '/financeiro'
+      path: '/financeiro'
+      fullPath: '/financeiro'
+      preLoaderRoute: typeof FinanceiroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/email': {
@@ -1209,12 +1249,14 @@ const rootRouteChildren: RootRouteChildren = {
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
   EmailRoute: EmailRoute,
+  FinanceiroRoute: FinanceiroRoute,
   FunnelRoute: FunnelRoute,
   GerencialRoute: GerencialRouteWithChildren,
   InboxIaRoute: InboxIaRoute,
   ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,
   LoginRoute: LoginRoute,
+  MarketingRoute: MarketingRoute,
   PackagesRoute: PackagesRoute,
   PermissionsAuditRoute: PermissionsAuditRouteWithChildren,
   ResetPasswordRoute: ResetPasswordRoute,

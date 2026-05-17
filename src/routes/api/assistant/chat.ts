@@ -108,6 +108,8 @@ export const Route = createFileRoute("/api/assistant/chat")({
         const userMessage: string = body.message;
         if (!conversationId || !userMessage) return new Response("missing fields", { status: 400 });
 
+        const tenantId = await resolveUserTenantId(userId, body.tenantId);
+
         // Verify conversation belongs to user
         const { data: conv } = await supabase
           .from("ai_conversations")

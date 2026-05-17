@@ -29,7 +29,7 @@ function OnboardingPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
-  const [plans, setPlans] = useState<Array<{ id: string; code: string; name: string; price_cents: number; currency: string; trial_days: number }>>([]);
+  const [plans, setPlans] = useState<Array<{ id: string; code: string; name: string; price_cents: number | null; currency: string; trial_days: number }>>([]);
   const [planId, setPlanId] = useState<string>("");
   const [saving, setSaving] = useState(false);
 

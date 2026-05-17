@@ -270,7 +270,7 @@ Deno.serve(async (req) => {
     // Booking
     const { data: booking, error: bErr } = await userClient
       .from("bookings")
-      .select("id, customer_id, quote_id, total_amount, currency, departure_date")
+      .select("id, customer_id, quote_id, total_amount, currency, departure_date, tenant_id")
       .eq("id", bookingId)
       .maybeSingle();
     if (bErr || !booking) {

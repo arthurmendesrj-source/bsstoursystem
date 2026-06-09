@@ -210,7 +210,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
             {extraUsers > 0 && <> · <strong>{extraUsers} extra(s)</strong></>}
           </p>
           <p className="text-xs text-muted-foreground">
-            Reservas: {plan?.features?.bookings_unlimited ? <strong>ilimitadas</strong> : <>{(plan?.features?.bookings_per_month as number) ?? "—"}/mês</>}
+            Reservas: {planFeatures.bookings_unlimited ? <strong>ilimitadas</strong> : <>{(planFeatures.bookings_per_month as number) ?? "—"}/mês</>}
           </p>
         </CardContent>
       </Card>

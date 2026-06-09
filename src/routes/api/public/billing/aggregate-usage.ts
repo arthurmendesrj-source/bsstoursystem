@@ -16,8 +16,8 @@ export const Route = createFileRoute("/api/public/billing/aggregate-usage")({
         );
 
         // Pull all objects (capped) and aggregate in memory.
-        // For large deployments, replace with a SQL aggregation function.
-        const { data: objects, error } = await supabaseAdmin
+        // Storage schema isn't in the generated types — cast to any.
+        const { data: objects, error } = await (supabaseAdmin as any)
           .schema("storage")
           .from("objects")
           .select("bucket_id, name, metadata")
@@ -30,10 +30,10 @@ export const Route = createFileRoute("/api/public/billing/aggregate-usage")({
         const today = new Date().toISOString().slice(0, 10);
         const agg = new Map<string, { bytes: number; files: number }>();
 
-        for (const obj of objects ?? []) {
+        for (const obj of (objects ?? []) as Array<{ bucket_id: string; name: string; metadata: any }>) {
           const firstSeg = String(obj.name ?? "").split("/")[0];
           if (!firstSeg || firstSeg.length < 32) continue; // not uuid
-          const size = Number((obj.metadata as any)?.size ?? 0);
+          const size = Number(obj.metadata?.size ?? 0);
           const key = `${firstSeg}::${obj.bucket_id}`;
           const cur = agg.get(key) ?? { bytes: 0, files: 0 };
           cur.bytes += size;

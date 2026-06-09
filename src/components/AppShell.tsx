@@ -42,6 +42,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
+import { BillingAccessGate } from "@/components/BillingAccessGate";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
@@ -149,7 +150,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   if (isEmbed) {
     return (
-      <div className="h-screen w-full overflow-auto bg-background p-4 md:p-6">{children}</div>
+      <div className="h-screen w-full overflow-auto bg-background p-4 md:p-6">
+        <BillingAccessGate>{children}</BillingAccessGate>
+      </div>
     );
   }
 
@@ -409,7 +412,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Button>
           </div>
         )}
-        <main className="flex-1 overflow-auto p-4 md:p-8">{children}</main>
+        <main className="flex-1 overflow-auto p-4 md:p-8">
+          <BillingAccessGate>{children}</BillingAccessGate>
+        </main>
       </div>
     </div>
   );

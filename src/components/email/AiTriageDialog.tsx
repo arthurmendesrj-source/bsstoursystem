@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Loader2, Languages, Link2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
-import { emailAnalyze, emailTranslate } from "@/server/gmail.functions";
+import { emailAnalyze, emailTranslate } from "@/lib/gmail.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { linkEmailThread } from "@/lib/linkEmailToEntity";
 import { useAuth } from "@/lib/auth";

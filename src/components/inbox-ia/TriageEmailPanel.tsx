@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { gmailIncrementalSync } from "@/server/gmail-mirror.functions";
-import { gmailModify } from "@/server/gmail.functions";
+import { gmailIncrementalSync } from "@/lib/gmail-mirror.functions";
+import { gmailModify } from "@/lib/gmail.functions";
 import { AiTriageDialog } from "@/components/email/AiTriageDialog";
 import { cn } from "@/lib/utils";
 

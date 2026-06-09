@@ -399,6 +399,7 @@ export type Database = {
           id: string
           infinitepay_charge_id: string | null
           kind: string
+          last_attempt_at: string | null
           last_error: string | null
           paid_at: string | null
           payment_method: string | null
@@ -423,6 +424,7 @@ export type Database = {
           id?: string
           infinitepay_charge_id?: string | null
           kind?: string
+          last_attempt_at?: string | null
           last_error?: string | null
           paid_at?: string | null
           payment_method?: string | null
@@ -447,6 +449,7 @@ export type Database = {
           id?: string
           infinitepay_charge_id?: string | null
           kind?: string
+          last_attempt_at?: string | null
           last_error?: string | null
           paid_at?: string | null
           payment_method?: string | null

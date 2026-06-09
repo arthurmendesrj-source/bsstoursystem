@@ -100,19 +100,42 @@ async function getValidAccessToken(userId: string, emailAddress: string): Promis
   // Refresh 60s before expiry
   if (Date.now() < expiresAt - 60_000) return row.access_token;
 
-  const refreshed = await refreshAccessToken(row.refresh_token);
-  const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
-  const { error } = await supabaseAdmin
-    .from("user_gmail_tokens")
-    .update({
-      access_token: refreshed.access_token,
-      expires_at: newExpiresAt,
-      scope: refreshed.scope ?? row.scope,
-    })
-    .eq("user_id", userId)
-    .eq("email_address", emailAddress.toLowerCase());
-  if (error) console.error("token update failed", error.message);
-  return refreshed.access_token;
+  try {
+    const refreshed = await refreshAccessToken(row.refresh_token);
+    const newExpiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
+    const { error } = await supabaseAdmin
+      .from("user_gmail_tokens")
+      .update({
+        access_token: refreshed.access_token,
+        expires_at: newExpiresAt,
+        scope: refreshed.scope ?? row.scope,
+        last_refresh_at: new Date().toISOString(),
+        last_refresh_error: null,
+        refresh_error_count: 0,
+      })
+      .eq("user_id", userId)
+      .eq("email_address", emailAddress.toLowerCase());
+    if (error) console.error("token update failed", error.message);
+    return refreshed.access_token;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const { data: cur } = await supabaseAdmin
+      .from("user_gmail_tokens")
+      .select("refresh_error_count")
+      .eq("user_id", userId)
+      .eq("email_address", emailAddress.toLowerCase())
+      .maybeSingle();
+    const prev = (cur as { refresh_error_count?: number } | null)?.refresh_error_count ?? 0;
+    await supabaseAdmin
+      .from("user_gmail_tokens")
+      .update({
+        last_refresh_error: msg.slice(0, 500),
+        refresh_error_count: prev + 1,
+      })
+      .eq("user_id", userId)
+      .eq("email_address", emailAddress.toLowerCase());
+    throw e;
+  }
 }
 
 // ---------------- gmailFetch (replaces gw) ----------------

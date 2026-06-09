@@ -3730,10 +3730,15 @@ export type Database = {
       user_gmail_tokens: {
         Row: {
           access_token: string
+          connected_at: string
           created_at: string
           email_address: string
           expires_at: string
           id: string
+          last_refresh_at: string | null
+          last_refresh_error: string | null
+          last_used_at: string | null
+          refresh_error_count: number
           refresh_token: string
           scope: string | null
           tenant_id: string
@@ -3742,10 +3747,15 @@ export type Database = {
         }
         Insert: {
           access_token: string
+          connected_at?: string
           created_at?: string
           email_address: string
           expires_at: string
           id?: string
+          last_refresh_at?: string | null
+          last_refresh_error?: string | null
+          last_used_at?: string | null
+          refresh_error_count?: number
           refresh_token: string
           scope?: string | null
           tenant_id?: string
@@ -3754,10 +3764,15 @@ export type Database = {
         }
         Update: {
           access_token?: string
+          connected_at?: string
           created_at?: string
           email_address?: string
           expires_at?: string
           id?: string
+          last_refresh_at?: string | null
+          last_refresh_error?: string | null
+          last_used_at?: string | null
+          refresh_error_count?: number
           refresh_token?: string
           scope?: string | null
           tenant_id?: string

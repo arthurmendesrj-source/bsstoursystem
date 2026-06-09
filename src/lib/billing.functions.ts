@@ -21,7 +21,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
     await requireOwner(context, data.tenant_id);
     const { supabase } = context;
 
-    const [{ data: sub }, { data: wallet }, { data: customer }, { data: pms }] =
+    const [{ data: sub }, { data: wallet }, { data: customer }, { data: pms }, { count: activeUsers }] =
       await Promise.all([
         supabase
           .from("subscriptions")
@@ -45,6 +45,11 @@ export const getBillingOverview = createServerFn({ method: "POST" })
           .select("id, brand, last4, exp_month, exp_year, is_default")
           .eq("tenant_id", data.tenant_id)
           .order("is_default", { ascending: false }),
+        supabase
+          .from("tenant_members")
+          .select("user_id", { count: "exact", head: true })
+          .eq("tenant_id", data.tenant_id)
+          .eq("is_active", true),
       ]);
 
     // Current cycle AI usage

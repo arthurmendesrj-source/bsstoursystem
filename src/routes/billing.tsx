@@ -42,6 +42,22 @@ const fmtBytes = (b: number) => {
   return `${(b / 1024 ** 3).toFixed(2)} GB`;
 };
 
+/** Normalize plan features into a plain object. Backend may return null,
+ *  a JSON string, an array, or an object — UI must never call `.map` on it. */
+function normalizeFeatures(raw: unknown): Record<string, any> {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw);
+      return v && typeof v === "object" && !Array.isArray(v) ? (v as any) : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as any;
+  return {};
+}
+
 function BillingPage() {
   const { tenant, tenants, loading } = useTenant();
   const isOwner = tenant?.role_in_tenant === "owner";

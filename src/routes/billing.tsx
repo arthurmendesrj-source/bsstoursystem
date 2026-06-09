@@ -224,7 +224,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   );
 }
 
-function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; currentPlanCode: string | null }) {
+function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; currentPlanCode: string | null }) {
   const listFn = useServerFn(listPublicPlans);
   const changeFn = useServerFn(changeSubscriptionPlan);
   const qc = useQueryClient();

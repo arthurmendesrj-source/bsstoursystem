@@ -61,9 +61,12 @@ export function GmailConnectCard() {
   const [syncs, setSyncs] = useState<Record<string, SyncRow>>({});
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [showAudit, setShowAudit] = useState(false);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [lastSyncResult, setLastSyncResult] = useState<Record<string, { ok: boolean; message: string; at: string }>>({});
 
   const disconnectFn = useServerFn(disconnectGmailAccount);
   const auditFn = useServerFn(listGmailAudit);
+  const syncFn = useServerFn(gmailIncrementalSync);
 
   const load = useCallback(async () => {
     setLoading(true);

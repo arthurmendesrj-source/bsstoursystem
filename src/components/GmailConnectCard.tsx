@@ -231,6 +231,14 @@ export function GmailConnectCard() {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                </div>
+                {lastSyncResult[t.email_address] && (
+                  <div className={`rounded text-xs p-2 break-words ${lastSyncResult[t.email_address].ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
+                    <strong>{lastSyncResult[t.email_address].ok ? "Sincronizado:" : "Falha:"}</strong>{" "}
+                    {lastSyncResult[t.email_address].message}{" "}
+                    <span className="text-muted-foreground">({fmt(lastSyncResult[t.email_address].at)})</span>
+                  </div>
+                )}
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <dt>Conectada em</dt><dd className="text-foreground">{fmt(t.connected_at)}</dd>
                   <dt>Expira em</dt><dd className="text-foreground">{fmt(t.expires_at)}</dd>

@@ -1237,6 +1237,39 @@ export type Database = {
           },
         ]
       }
+      gmail_connection_audit: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          email_address: string
+          event: string
+          id: string
+          metadata: Json
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          email_address: string
+          event: string
+          id?: string
+          metadata?: Json
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          email_address?: string
+          event?: string
+          id?: string
+          metadata?: Json
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       interactions: {
         Row: {
           content: string | null

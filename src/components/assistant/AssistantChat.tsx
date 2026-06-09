@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Send, Loader2, Check, X, Sparkles } from "lucide-react";
-import { approveAction, rejectAction } from "@/server/assistant.functions";
+import { approveAction, rejectAction } from "@/lib/assistant.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
 import { Button } from "@/components/ui/button";
-import { listConversations, createConversation, deleteConversation } from "@/server/assistant.functions";
+import { listConversations, createConversation, deleteConversation } from "@/lib/assistant.functions";
 import { Plus, Trash2, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 

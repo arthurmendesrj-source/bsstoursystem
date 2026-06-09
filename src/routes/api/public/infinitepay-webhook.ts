@@ -95,12 +95,12 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
         } else if (event === "charge.failed" || event === "charge.refused") {
           await supabaseAdmin
             .from("billing_invoices")
-            .update({ status: "overdue", last_error: charge?.failure_reason ?? null })
+            .update({ status: "uncollectible", last_error: charge?.failure_reason ?? null })
             .eq("id", invoice.id);
         } else if (event === "charge.refunded") {
           await supabaseAdmin
             .from("billing_invoices")
-            .update({ status: "cancelled" })
+            .update({ status: "void" })
             .eq("id", invoice.id);
         }
 

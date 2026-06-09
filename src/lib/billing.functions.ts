@@ -392,7 +392,7 @@ export const createTopup = createServerFn({ method: "POST" })
         tenant_id: data.tenant_id,
         amount_cents,
         currency: "BRL",
-        status: charge.status === "paid" ? "paid" : "issued",
+        status: charge.status === "paid" ? "paid" : "open",
         kind: "topup",
         payment_method: data.payment_method,
         pix_qr: charge.pix?.qr_code ?? null,

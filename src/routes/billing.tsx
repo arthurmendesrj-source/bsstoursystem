@@ -159,6 +159,9 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
             {includedUsers} incluídos · {brl(extraPerCents)} por extra
             {extraUsers > 0 && <> · <strong>{extraUsers} extra(s)</strong></>}
           </p>
+          <p className="text-xs text-muted-foreground">
+            Reservas: {plan?.features?.bookings_unlimited ? <strong>ilimitadas</strong> : <>{(plan?.features?.bookings_per_month as number) ?? "—"}/mês</>}
+          </p>
         </CardContent>
       </Card>
       <Card>

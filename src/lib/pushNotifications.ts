@@ -1,5 +1,5 @@
 // Helpers para gerenciar permissão e registro de Web Push.
-import { savePushSubscription, deletePushSubscription } from "@/server/push.functions";
+import { savePushSubscription, deletePushSubscription } from "@/lib/push.functions";
 import { VAPID_PUBLIC_KEY, urlBase64ToUint8Array } from "./vapid";
 
 export type PushPermission = "default" | "granted" | "denied" | "unsupported";

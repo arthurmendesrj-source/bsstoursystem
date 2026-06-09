@@ -8,7 +8,7 @@ import {
   sendPushToUser,
   sendPushToLeadRecipients,
   type NotificationEventType,
-} from "./push.server";
+} from "@/server/push.server";
 
 async function assertAdmin(userId: string) {
   const { data, error } = await supabaseAdmin

@@ -282,10 +282,11 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; 
                 </ul>
                 <Button
                   className="w-full"
-                  disabled={isCurrent || mut.isPending}
+                  disabled={isCurrent || mut.isPending || !tenantId}
                   onClick={() => mut.mutate(p.code)}
+                  title={!tenantId ? "Selecione uma empresa para assinar" : undefined}
                 >
-                  {isCurrent ? "Plano atual" : mut.isPending ? "Aplicando…" : "Assinar este plano"}
+                  {isCurrent ? "Plano atual" : mut.isPending ? "Aplicando…" : !tenantId ? "Selecione uma empresa" : "Assinar este plano"}
                 </Button>
               </CardContent>
             </Card>

@@ -35,8 +35,8 @@ export async function logAiUsage(input: {
       prompt_tokens: input.prompt_tokens,
       completion_tokens: input.completion_tokens,
       credits_charged: credits,
-      metadata: input.metadata ?? {},
-    });
+      metadata: (input.metadata ?? {}) as any,
+    } as any);
 
     // Debit wallet via ledger (consume).
     const { data: wallet } = await supabaseAdmin

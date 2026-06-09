@@ -3273,6 +3273,7 @@ export type Database = {
           gateway: string | null
           gateway_customer_id: string | null
           gateway_subscription_id: string | null
+          grace_until: string | null
           id: string
           plan_id: string
           status: Database["public"]["Enums"]["subscription_status"]
@@ -3289,6 +3290,7 @@ export type Database = {
           gateway?: string | null
           gateway_customer_id?: string | null
           gateway_subscription_id?: string | null
+          grace_until?: string | null
           id?: string
           plan_id: string
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -3305,6 +3307,7 @@ export type Database = {
           gateway?: string | null
           gateway_customer_id?: string | null
           gateway_subscription_id?: string | null
+          grace_until?: string | null
           id?: string
           plan_id?: string
           status?: Database["public"]["Enums"]["subscription_status"]
@@ -4827,6 +4830,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_tenant_billing_blocked: {
+        Args: { _tenant_id: string }
+        Returns: boolean
+      }
       is_tenant_member: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
@@ -4935,6 +4942,7 @@ export type Database = {
         | "past_due"
         | "canceled"
         | "incomplete"
+        | "suspended"
       supplier_category:
         | "hotel"
         | "aerea"
@@ -5135,6 +5143,7 @@ export const Constants = {
         "past_due",
         "canceled",
         "incomplete",
+        "suspended",
       ],
       supplier_category: [
         "hotel",

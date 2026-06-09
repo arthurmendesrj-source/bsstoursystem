@@ -1,49 +1,37 @@
+# Plano — Exibir aba "Licença" para todos
+
 ## Problema
+Em `src/components/AppShell.tsx` o link **Licença** só é renderizado quando:
+- `isAdmin === true`, ou
+- `tenant?.role_in_tenant === "owner"`
 
-`src/routes/billing.tsx` usa `useQuery` / `useMutation` / `useQueryClient` do `@tanstack/react-query`, mas o app **não tem `QueryClientProvider` em lugar nenhum**. Por isso aparece o erro "No QueryClient set, use QueryClientProvider to set one" toda vez que `/billing` renderiza.
+Usuários comuns (e contas novas em trial sem tenant carregado) não veem o item, então não conseguem chegar em `/billing` pelo menu.
 
-Nenhum outro arquivo do projeto usa react-query — só billing.tsx — então basta plugar o provider uma vez na raiz.
+## Mudança
 
-## Mudanças
+Arquivo: `src/components/AppShell.tsx`
 
-**1. `src/router.tsx`** — criar um `QueryClient` por request dentro de `getRouter` e passar via `context` (padrão SSR-safe do template TanStack Start + Query):
-
-```ts
-import { QueryClient } from "@tanstack/react-query";
-
-export const getRouter = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { staleTime: 30_000 } },
-  });
-  const router = createRouter({
-    routeTree,
-    context: { queryClient },
-    defaultPreloadStaleTime: 0,
-    scrollRestoration: true,
-    defaultErrorComponent: DefaultErrorComponent,
-  });
-  return router;
-};
-```
-
-**2. `src/routes/__root.tsx`** — trocar `createRootRoute` por `createRootRouteWithContext<{ queryClient: QueryClient }>()` e envolver o `<Outlet />` com `<QueryClientProvider client={queryClient}>` lendo do contexto da rota:
+1. **Remover** o bloco do link "Licença" que está dentro do `if (isAdmin)` (junto com Usuários / Auditoria).
+2. **Remover** o bloco duplicado `!isAdmin && tenant?.role_in_tenant === "owner"`.
+3. **Adicionar** um único link "Licença" sempre visível, posicionado **logo antes de `/settings`** (no final da nav, junto com Configurações), usando o mesmo `itemClass` e o ícone `Receipt` já importado.
 
 ```tsx
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({ /* mesmas meta tags */ }),
-  shellComponent: RootShell,
-  component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-});
-
-function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-  return (
-    <QueryClientProvider client={queryClient}>
-      <I18nProvider> … <Outlet /> … </I18nProvider>
-    </QueryClientProvider>
-  );
-}
+<Link
+  to="/billing"
+  onClick={() => minimizeAllWindows()}
+  className={itemClass(path.startsWith("/billing"))}
+  title={collapsed ? "Licença" : undefined}
+>
+  <Receipt className="h-4 w-4 shrink-0" />
+  {!collapsed && <span className="truncate">Licença</span>}
+</Link>
 ```
 
-Sem mudanças em `billing.tsx`, banco de dados ou outras rotas. Depois disso, recarregar `/billing` para confirmar que o erro some.
+## Não muda
+- Página `/billing` em si — as ações de assinar/gerenciar plano continuam protegidas server-side (RLS + checagens no `billing.functions.ts`), então expor o menu não dá privilégio extra.
+- `BillingAccessGate`, rotas, banners de trial.
+- Nenhuma mudança em backend / migrations.
+
+## Verificação
+- Abrir preview como usuário não-admin: o item "Licença" aparece no final do menu lateral, acima de "Configurações".
+- Clicar leva para `/billing` normalmente.

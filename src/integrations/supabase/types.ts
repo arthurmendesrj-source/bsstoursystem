@@ -259,9 +259,137 @@ export type Database = {
           },
         ]
       }
+      billing_credit_ledger: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          id: string
+          kind: string
+          note: string | null
+          reference_id: string | null
+          reference_type: string | null
+          resource: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          id?: string
+          kind: string
+          note?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          resource: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          id?: string
+          kind?: string
+          note?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          resource?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_credit_ledger_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_credit_wallet: {
+        Row: {
+          ai_credits: number
+          storage_gb_extra: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_credits?: number
+          storage_gb_extra?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_credits?: number
+          storage_gb_extra?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_credit_wallet_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_customers: {
+        Row: {
+          address: Json
+          created_at: string
+          doc_number: string
+          doc_type: string
+          email: string
+          id: string
+          infinitepay_customer_id: string | null
+          legal_name: string
+          phone: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          address?: Json
+          created_at?: string
+          doc_number: string
+          doc_type: string
+          email: string
+          id?: string
+          infinitepay_customer_id?: string | null
+          legal_name: string
+          phone?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          address?: Json
+          created_at?: string
+          doc_number?: string
+          doc_type?: string
+          email?: string
+          id?: string
+          infinitepay_customer_id?: string | null
+          legal_name?: string
+          phone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_customers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_invoices: {
         Row: {
           amount_cents: number
+          attempt_count: number
+          boleto_url: string | null
           created_at: string
           currency: string
           due_date: string | null
@@ -269,13 +397,23 @@ export type Database = {
           gateway_invoice_id: string | null
           hosted_invoice_url: string | null
           id: string
+          infinitepay_charge_id: string | null
+          kind: string
+          last_error: string | null
           paid_at: string | null
+          payment_method: string | null
+          period_end: string | null
+          period_start: string | null
+          pix_copia_cola: string | null
+          pix_qr: string | null
           status: Database["public"]["Enums"]["billing_invoice_status"]
           subscription_id: string | null
           tenant_id: string
         }
         Insert: {
           amount_cents: number
+          attempt_count?: number
+          boleto_url?: string | null
           created_at?: string
           currency?: string
           due_date?: string | null
@@ -283,13 +421,23 @@ export type Database = {
           gateway_invoice_id?: string | null
           hosted_invoice_url?: string | null
           id?: string
+          infinitepay_charge_id?: string | null
+          kind?: string
+          last_error?: string | null
           paid_at?: string | null
+          payment_method?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          pix_copia_cola?: string | null
+          pix_qr?: string | null
           status?: Database["public"]["Enums"]["billing_invoice_status"]
           subscription_id?: string | null
           tenant_id: string
         }
         Update: {
           amount_cents?: number
+          attempt_count?: number
+          boleto_url?: string | null
           created_at?: string
           currency?: string
           due_date?: string | null
@@ -297,7 +445,15 @@ export type Database = {
           gateway_invoice_id?: string | null
           hosted_invoice_url?: string | null
           id?: string
+          infinitepay_charge_id?: string | null
+          kind?: string
+          last_error?: string | null
           paid_at?: string | null
+          payment_method?: string | null
+          period_end?: string | null
+          period_start?: string | null
+          pix_copia_cola?: string | null
+          pix_qr?: string | null
           status?: Database["public"]["Enums"]["billing_invoice_status"]
           subscription_id?: string | null
           tenant_id?: string
@@ -312,6 +468,110 @@ export type Database = {
           },
           {
             foreignKeyName: "billing_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_payment_methods: {
+        Row: {
+          brand: string | null
+          created_at: string
+          exp_month: number | null
+          exp_year: number | null
+          holder_name: string | null
+          id: string
+          infinitepay_card_token: string
+          is_default: boolean
+          last4: string | null
+          tenant_id: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          holder_name?: string | null
+          id?: string
+          infinitepay_card_token: string
+          is_default?: boolean
+          last4?: string | null
+          tenant_id: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          exp_month?: number | null
+          exp_year?: number | null
+          holder_name?: string | null
+          id?: string
+          infinitepay_card_token?: string
+          is_default?: boolean
+          last4?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_payment_methods_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_topups: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          id: string
+          infinitepay_charge_id: string | null
+          invoice_id: string | null
+          payment_method: string
+          quantity: number
+          resource: string
+          status: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          id?: string
+          infinitepay_charge_id?: string | null
+          invoice_id?: string | null
+          payment_method: string
+          quantity: number
+          resource: string
+          status?: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          id?: string
+          infinitepay_charge_id?: string | null
+          invoice_id?: string | null
+          payment_method?: string
+          quantity?: number
+          resource?: string
+          status?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_topups_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "billing_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "billing_topups_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -3645,6 +3905,94 @@ export type Database = {
         }
         Relationships: []
       }
+      usage_ai_events: {
+        Row: {
+          completion_tokens: number
+          created_at: string
+          credits_charged: number
+          feature: string
+          id: string
+          metadata: Json
+          model: string
+          prompt_tokens: number
+          tenant_id: string
+          total_tokens: number | null
+          user_id: string | null
+        }
+        Insert: {
+          completion_tokens?: number
+          created_at?: string
+          credits_charged?: number
+          feature: string
+          id?: string
+          metadata?: Json
+          model: string
+          prompt_tokens?: number
+          tenant_id: string
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          completion_tokens?: number
+          created_at?: string
+          credits_charged?: number
+          feature?: string
+          id?: string
+          metadata?: Json
+          model?: string
+          prompt_tokens?: number
+          tenant_id?: string
+          total_tokens?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_ai_events_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      usage_storage_daily: {
+        Row: {
+          bucket: string
+          bytes: number
+          created_at: string
+          file_count: number
+          id: string
+          snapshot_date: string
+          tenant_id: string
+        }
+        Insert: {
+          bucket: string
+          bytes?: number
+          created_at?: string
+          file_count?: number
+          id?: string
+          snapshot_date: string
+          tenant_id: string
+        }
+        Update: {
+          bucket?: string
+          bytes?: number
+          created_at?: string
+          file_count?: number
+          id?: string
+          snapshot_date?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "usage_storage_daily_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_audit_log: {
         Row: {
           action: string
@@ -4480,6 +4828,10 @@ export type Database = {
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_tenant_member: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_tenant_owner: {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }

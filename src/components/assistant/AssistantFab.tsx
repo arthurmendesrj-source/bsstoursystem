@@ -4,7 +4,7 @@ import { Sparkles, Maximize2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { AssistantChat } from "@/components/assistant/AssistantChat";
-import { listConversations, createConversation } from "@/server/assistant.functions";
+import { listConversations, createConversation } from "@/lib/assistant.functions";
 import { useAuth } from "@/lib/auth";
 
 export function AssistantFab() {

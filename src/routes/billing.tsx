@@ -129,7 +129,8 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   const usersPct = includedUsers > 0 ? Math.min(100, (activeUsers / includedUsers) * 100) : 0;
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader>
           <CardTitle>Plano atual</CardTitle>
@@ -182,6 +183,77 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
           <p className="text-xs text-muted-foreground">Extra: {Number(data.wallet?.storage_gb_extra ?? 0).toFixed(2)} GB</p>
         </CardContent>
       </Card>
+      </div>
+      <PlansSection tenantId={tenantId} currentPlanCode={plan?.code ?? null} />
+    </div>
+  );
+}
+
+function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; currentPlanCode: string | null }) {
+  const listFn = useServerFn(listPublicPlans);
+  const changeFn = useServerFn(changeSubscriptionPlan);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ["public-plans"],
+    queryFn: () => listFn(),
+  });
+  const mut = useMutation({
+    mutationFn: (plan_code: string) => changeFn({ data: { tenant_id: tenantId, plan_code } }),
+    onSuccess: () => {
+      toast.success("Plano atualizado");
+      qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao trocar de plano"),
+  });
+  const plans = (data?.plans ?? []) as any[];
+  if (isLoading) return <div className="text-sm text-muted-foreground">Carregando planos…</div>;
+  if (plans.length === 0) return null;
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h2 className="text-xl font-semibold">Planos disponíveis</h2>
+        <p className="text-sm text-muted-foreground">Escolha a opção que melhor se adapta à sua operação.</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {plans.map((p) => {
+          const isCurrent = p.code === currentPlanCode;
+          const f = (p.features ?? {}) as any;
+          return (
+            <Card key={p.id} className={isCurrent ? "border-primary" : ""}>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle>{p.name}</CardTitle>
+                    <CardDescription>{p.included_users} usuário{p.included_users === 1 ? "" : "s"} incluso{p.included_users === 1 ? "" : "s"}</CardDescription>
+                  </div>
+                  {isCurrent && <Badge>Atual</Badge>}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-3xl font-bold">
+                  {brl(p.price_cents)}<span className="text-sm font-normal text-muted-foreground">/mês</span>
+                </div>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• {p.included_users} usuário(s) incluso(s)</li>
+                  <li>• Usuário extra: {brl(p.extra_user_cents)}/mês</li>
+                  <li>• Reservas: {f.bookings_unlimited ? "ilimitadas" : `${f.bookings_per_month ?? "—"}/mês`}</li>
+                  {f.gmail_integration && <li>• Integração Gmail</li>}
+                  {f.advanced_permissions && <li>• Permissões avançadas</li>}
+                  {f.advanced_reports && <li>• Relatórios avançados</li>}
+                </ul>
+                <Button
+                  className="w-full"
+                  disabled={isCurrent || mut.isPending}
+                  onClick={() => mut.mutate(p.code)}
+                >
+                  {isCurrent ? "Plano atual" : mut.isPending ? "Aplicando…" : "Assinar este plano"}
+                </Button>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }

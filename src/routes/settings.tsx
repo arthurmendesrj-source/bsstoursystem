@@ -62,6 +62,7 @@ function SettingsPage() {
           <Button type="submit">{t("save")}</Button>
         </form>
       </Card>
+      <GmailConnectCard />
     </div>
   );
 }

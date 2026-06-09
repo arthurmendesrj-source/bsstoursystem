@@ -52,6 +52,26 @@ export const Route = createFileRoute("/api/public/infinitepay-webhook")({
             .update({ status: "paid", paid_at: new Date().toISOString() })
             .eq("id", invoice.id);
 
+          // Subscription invoice paid -> unblock tenant access.
+          if (invoice.kind === "subscription") {
+            const { data: invFull } = await supabaseAdmin
+              .from("billing_invoices")
+              .select("subscription_id, period_start, period_end")
+              .eq("id", invoice.id)
+              .maybeSingle();
+            if (invFull?.subscription_id) {
+              await supabaseAdmin
+                .from("subscriptions")
+                .update({
+                  status: "active",
+                  grace_until: null,
+                  current_period_start: invFull.period_start,
+                  current_period_end: invFull.period_end,
+                })
+                .eq("id", invFull.subscription_id);
+            }
+          }
+
           if (invoice.kind === "topup") {
             const { data: topup } = await supabaseAdmin
               .from("billing_topups")

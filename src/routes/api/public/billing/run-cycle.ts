@@ -239,6 +239,7 @@ async function recordFailure(
       .update({
         status: "uncollectible",
         attempt_count: attempt,
+        last_attempt_at: new Date().toISOString(),
         last_error: reason,
       })
       .eq("id", existing.id);
@@ -255,6 +256,7 @@ async function recordFailure(
       period_end: periodEnd,
       last_error: reason,
       attempt_count: attempt,
+      last_attempt_at: new Date().toISOString(),
     });
   }
   await markPastDue(db, sub, graceDays);

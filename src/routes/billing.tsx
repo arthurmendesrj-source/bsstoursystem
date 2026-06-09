@@ -42,6 +42,22 @@ const fmtBytes = (b: number) => {
   return `${(b / 1024 ** 3).toFixed(2)} GB`;
 };
 
+/** Normalize plan features into a plain object. Backend may return null,
+ *  a JSON string, an array, or an object — UI must never call `.map` on it. */
+function normalizeFeatures(raw: unknown): Record<string, any> {
+  if (!raw) return {};
+  if (typeof raw === "string") {
+    try {
+      const v = JSON.parse(raw);
+      return v && typeof v === "object" && !Array.isArray(v) ? (v as any) : {};
+    } catch {
+      return {};
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as any;
+  return {};
+}
+
 function BillingPage() {
   const { tenant, tenants, loading } = useTenant();
   const isOwner = tenant?.role_in_tenant === "owner";
@@ -139,8 +155,9 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   if (!data) return null;
 
   const plan = (data.subscription as any)?.plans;
-  const includedAi = (plan?.features?.ai_credits as number) ?? 100_000;
-  const includedGb = (plan?.features?.storage_gb as number) ?? 5;
+  const planFeatures = normalizeFeatures(plan?.features);
+  const includedAi = (planFeatures.ai_credits as number) ?? 100_000;
+  const includedGb = (planFeatures.storage_gb as number) ?? 5;
   const aiUsed = Number(data.ai_used_in_cycle ?? 0);
   const aiPct = Math.min(100, (aiUsed / includedAi) * 100);
 
@@ -193,7 +210,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
             {extraUsers > 0 && <> · <strong>{extraUsers} extra(s)</strong></>}
           </p>
           <p className="text-xs text-muted-foreground">
-            Reservas: {plan?.features?.bookings_unlimited ? <strong>ilimitadas</strong> : <>{(plan?.features?.bookings_per_month as number) ?? "—"}/mês</>}
+            Reservas: {planFeatures.bookings_unlimited ? <strong>ilimitadas</strong> : <>{(planFeatures.bookings_per_month as number) ?? "—"}/mês</>}
           </p>
         </CardContent>
       </Card>
@@ -248,7 +265,7 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; current
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {plans.map((p) => {
           const isCurrent = p.code === currentPlanCode;
-          const f = (p.features ?? {}) as any;
+          const f = normalizeFeatures(p.features);
           return (
             <Card key={p.id} className={isCurrent ? "border-primary" : ""}>
               <CardHeader>

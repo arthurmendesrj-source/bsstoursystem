@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Send, Search, AlertCircle, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { listWhatsappAccounts, sendWhatsappText } from "@/server/whatsapp.functions";
+import { listWhatsappAccounts, sendWhatsappText } from "@/lib/whatsapp.functions";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/whatsapp")({

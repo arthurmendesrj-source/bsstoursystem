@@ -15,7 +15,7 @@ import {
   disconnectWhatsappAccount,
   listWhatsappAccounts,
   syncWhatsappTemplates,
-} from "@/server/whatsapp.functions";
+} from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/settings_/whatsapp")({
   component: () => (

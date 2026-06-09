@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Mail, RefreshCw, Trash2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Mail, RefreshCw, Trash2, AlertCircle, CheckCircle2, History } from "lucide-react";
+import { disconnectGmailAccount, listGmailAudit } from "@/lib/gmail-audit.functions";
 
 type TokenRow = {
   email_address: string;
@@ -21,6 +23,16 @@ type SyncRow = {
   last_incremental_sync_at: string | null;
 };
 
+type AuditRow = {
+  id: string;
+  email_address: string;
+  event: "connected" | "reconnected" | "disconnected" | "refresh_failed" | "refresh_recovered";
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  actor_id: string | null;
+};
+
 function fmt(d: string | null): string {
   if (!d) return "—";
   try { return new Date(d).toLocaleString(); } catch { return d; }
@@ -33,17 +45,30 @@ function statusOf(t: TokenRow): { label: string; tone: "ok" | "warn" | "err" } {
   return { label: "Ativo", tone: "ok" };
 }
 
+const EVENT_LABEL: Record<AuditRow["event"], { text: string; tone: "ok" | "warn" | "err" | "muted" }> = {
+  connected: { text: "Conectada", tone: "ok" },
+  reconnected: { text: "Reconectada", tone: "ok" },
+  disconnected: { text: "Desconectada", tone: "muted" },
+  refresh_failed: { text: "Falha no refresh", tone: "err" },
+  refresh_recovered: { text: "Refresh recuperado", tone: "warn" },
+};
+
 export function GmailConnectCard() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [tokens, setTokens] = useState<TokenRow[]>([]);
   const [syncs, setSyncs] = useState<Record<string, SyncRow>>({});
+  const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [showAudit, setShowAudit] = useState(false);
+
+  const disconnectFn = useServerFn(disconnectGmailAccount);
+  const auditFn = useServerFn(listGmailAudit);
 
   const load = useCallback(async () => {
     setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
-    if (!uid) { setTokens([]); setLoading(false); return; }
+    if (!uid) { setTokens([]); setAudit([]); setLoading(false); return; }
     const { data: tk } = await supabase
       .from("user_gmail_tokens")
       .select("email_address,expires_at,connected_at,last_refresh_at,last_refresh_error,refresh_error_count,scope")
@@ -62,8 +87,14 @@ export function GmailConnectCard() {
     } else {
       setSyncs({});
     }
+    try {
+      const res = await auditFn();
+      setAudit((res as { entries: AuditRow[] }).entries);
+    } catch (e) {
+      console.error("listGmailAudit", e);
+    }
     setLoading(false);
-  }, []);
+  }, [auditFn]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -101,15 +132,14 @@ export function GmailConnectCard() {
 
   const disconnect = useCallback(async (email: string) => {
     if (!confirm(`Desconectar ${email}? Os tokens serão removidos.`)) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const uid = userData.user?.id;
-    if (!uid) return;
-    const { error } = await supabase.from("user_gmail_tokens").delete()
-      .eq("user_id", uid).eq("email_address", email.toLowerCase());
-    if (error) { toast.error(error.message); return; }
-    toast.success(`Conta ${email} desconectada`);
-    await load();
-  }, [load]);
+    try {
+      await disconnectFn({ data: { emailAddress: email } });
+      toast.success(`Conta ${email} desconectada`);
+      await load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao desconectar");
+    }
+  }, [disconnectFn, load]);
 
   return (
     <Card className="p-6 space-y-4">
@@ -178,6 +208,49 @@ export function GmailConnectCard() {
           })}
         </div>
       )}
+
+      <div className="border-t pt-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowAudit((v) => !v)}
+          className="gap-2"
+        >
+          <History className="h-4 w-4" />
+          {showAudit ? "Ocultar" : "Mostrar"} histórico de conexões ({audit.length})
+        </Button>
+        {showAudit && (
+          <div className="mt-3">
+            {audit.length === 0 ? (
+              <div className="text-sm text-muted-foreground">Nenhum evento registrado ainda.</div>
+            ) : (
+              <ul className="space-y-2 max-h-96 overflow-auto pr-2">
+                {audit.map((a) => {
+                  const cfg = EVENT_LABEL[a.event];
+                  const tone =
+                    cfg.tone === "ok" ? "secondary" :
+                    cfg.tone === "err" ? "destructive" :
+                    cfg.tone === "warn" ? "outline" : "outline";
+                  return (
+                    <li key={a.id} className="rounded border p-2 text-xs space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Badge variant={tone as "secondary" | "destructive" | "outline"}>{cfg.text}</Badge>
+                          <span className="truncate font-mono text-muted-foreground">{a.email_address}</span>
+                        </div>
+                        <span className="text-muted-foreground whitespace-nowrap">{fmt(a.created_at)}</span>
+                      </div>
+                      {a.reason && (
+                        <div className="text-destructive break-words">{a.reason}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

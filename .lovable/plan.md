@@ -1,14 +1,26 @@
-## Plano para corrigir a aba “Licença”
+## Ajustar a aba “Licença”
 
-1. **Corrigir o crash da página `/billing`**
-   - A página está quebrando ao renderizar planos porque os recursos do plano (`features`) podem vir do backend em formatos diferentes.
-   - Vou normalizar esse campo antes de renderizar, garantindo que nunca seja chamado `.map` em um valor que não é lista.
+**Problema atual**: quando o usuário não tem empresa selecionada, a página `/billing` mostra um card com botão “Criar empresa”. Você quer que essa aba mostre **pacotes (planos) e o pacote assinado**, sem botão de criar empresa.
 
-2. **Manter o menu “Licença” navegando para `/billing`**
-   - O item do menu já aponta para `/billing`; vou preservar isso e corrigir a renderização da página de destino.
+### Mudanças em `src/routes/billing.tsx`
 
-3. **Deixar o Plano Avulso aparecendo de forma segura**
-   - Vou garantir que o card do plano continue mostrando R$150/mês, 1 usuário e o botão “Assinar este plano”, sem depender de um formato frágil de `features`.
+1. **Remover o fallback “Criar empresa”** (linhas ~73–100).
+   - Sem tenant selecionado, não mostrar mais o card com `Link to="/onboarding"`.
+   - Remover imports `Building2`, `Plus`, `Link` que ficam sem uso.
 
-4. **Validar o resultado**
-   - Confirmar que clicar em “Licença” não deixa mais a tela em branco e que a aba carrega com os cards de cobrança/planos.
+2. **Mostrar sempre a lista de pacotes**.
+   - Renderizar a seção de planos (`PlansSection`) mesmo quando não há tenant/assinatura, usando `currentPlanCode = null`.
+   - Quando houver tenant + assinatura, marcar o plano atual como “Atual” (comportamento já existente) e manter o botão “Assinar este plano” nos demais.
+   - Quando não houver tenant, desabilitar o botão “Assinar este plano” com um aviso curto (“Selecione uma empresa para assinar”), já que `changeSubscriptionPlan` exige `tenant_id`.
+
+3. **Cabeçalho da página**.
+   - Manter o título “Cobrança / Licença”.
+   - Quando houver tenant: continuar mostrando as abas (Visão geral, IA, Nuvem, Pagamentos, Dados) — a aba “Visão geral” já lista o plano atual + pacotes.
+   - Quando não houver tenant: mostrar apenas a seção de pacotes (sem abas), com um destaque “Nenhum pacote assinado”.
+
+4. **Bloqueio para não-owner** permanece igual (card “Acesso restrito”).
+
+### Resultado esperado
+- A aba “Licença” nunca mostra botão de criar empresa.
+- Sempre exibe os pacotes disponíveis.
+- Indica claramente qual é o pacote assinado (quando houver assinatura).

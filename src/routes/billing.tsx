@@ -14,8 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, Cloud, Sparkles, Receipt, User, Lock, Building2, Plus } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { CreditCard, Cloud, Sparkles, Receipt, User, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   getBillingOverview,
@@ -73,27 +72,16 @@ function BillingPage() {
   if (!tenant) {
     return (
       <AppShell>
-        <div className="max-w-2xl mx-auto p-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                {tenants.length === 0 ? "Nenhuma empresa" : "Selecione uma empresa"}
-              </CardTitle>
-              <CardDescription>
-                {tenants.length === 0
-                  ? "Você ainda não tem uma empresa cadastrada. Crie uma para acessar a área de cobrança."
-                  : "Escolha uma empresa no seletor do topo para visualizar planos e cobrança."}
-              </CardDescription>
-            </CardHeader>
-            {tenants.length === 0 && (
-              <CardContent>
-                <Button asChild>
-                  <Link to="/onboarding"><Plus className="mr-2 h-4 w-4" /> Criar empresa</Link>
-                </Button>
-              </CardContent>
-            )}
-          </Card>
+        <div className="max-w-7xl mx-auto p-6 space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Licença</h1>
+            <p className="text-muted-foreground">
+              {tenants.length === 0
+                ? "Você ainda não tem um pacote assinado. Confira os pacotes disponíveis abaixo."
+                : "Selecione uma empresa no topo para gerenciar sua assinatura. Pacotes disponíveis:"}
+            </p>
+          </div>
+          <PlansSection tenantId={null} currentPlanCode={null} />
         </div>
       </AppShell>
     );
@@ -236,7 +224,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   );
 }
 
-function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; currentPlanCode: string | null }) {
+function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; currentPlanCode: string | null }) {
   const listFn = useServerFn(listPublicPlans);
   const changeFn = useServerFn(changeSubscriptionPlan);
   const qc = useQueryClient();
@@ -245,10 +233,13 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; current
     queryFn: () => listFn(),
   });
   const mut = useMutation({
-    mutationFn: (plan_code: string) => changeFn({ data: { tenant_id: tenantId, plan_code } }),
+    mutationFn: (plan_code: string) => {
+      if (!tenantId) throw new Error("Selecione uma empresa para assinar um pacote.");
+      return changeFn({ data: { tenant_id: tenantId, plan_code } });
+    },
     onSuccess: () => {
       toast.success("Plano atualizado");
-      qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
+      if (tenantId) qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao trocar de plano"),
   });
@@ -291,10 +282,11 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; current
                 </ul>
                 <Button
                   className="w-full"
-                  disabled={isCurrent || mut.isPending}
+                  disabled={isCurrent || mut.isPending || !tenantId}
                   onClick={() => mut.mutate(p.code)}
+                  title={!tenantId ? "Selecione uma empresa para assinar" : undefined}
                 >
-                  {isCurrent ? "Plano atual" : mut.isPending ? "Aplicando…" : "Assinar este plano"}
+                  {isCurrent ? "Plano atual" : mut.isPending ? "Aplicando…" : !tenantId ? "Selecione uma empresa" : "Assinar este plano"}
                 </Button>
               </CardContent>
             </Card>

@@ -49,7 +49,6 @@ export function TenantSwitcher() {
         ))}
         {isSuperAdmin && (
           <>
-            <DropdownMenuSeparator>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs">Admin do SaaS</DropdownMenuLabel>
             <DropdownMenuItem onSelect={() => navigate({ to: "/admin/tenants" })}>

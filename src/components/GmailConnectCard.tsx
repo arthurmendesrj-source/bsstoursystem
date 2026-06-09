@@ -148,7 +148,7 @@ export function GmailConnectCard() {
   const syncNow = useCallback(async (email: string) => {
     setSyncing(email);
     try {
-      const r = await syncFn({ data: { emailAddress: email } }) as { inserted?: number; updated?: number; owner?: string };
+      const r = await syncFn() as { inserted?: number; updated?: number; owner?: string };
       const inserted = r.inserted ?? 0;
       const updated = r.updated ?? 0;
       const msg = `${inserted} novas, ${updated} atualizadas`;

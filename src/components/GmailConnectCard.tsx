@@ -141,21 +141,27 @@ export function GmailConnectCard() {
     }
   }, [disconnectFn, load]);
 
+  const alreadyConnected = tokens.length >= 1;
+
   return (
     <Card className="p-6 space-y-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold flex items-center gap-2"><Mail className="h-5 w-5" /> Gmail</h2>
-          <p className="text-sm text-muted-foreground">Conecte sua conta Google para sincronizar e-mails, criar leads e responder a partir do CRM.</p>
+          <p className="text-sm text-muted-foreground">
+            Cada usuário pode conectar <strong>uma</strong> conta Gmail. Para trocar de conta, desconecte a atual primeiro.
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button onClick={connect} disabled={connecting}>
-            {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
-            Conectar Gmail
-          </Button>
+          {!alreadyConnected && (
+            <Button onClick={connect} disabled={connecting}>
+              {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
+              Conectar Gmail
+            </Button>
+          )}
         </div>
       </div>
 

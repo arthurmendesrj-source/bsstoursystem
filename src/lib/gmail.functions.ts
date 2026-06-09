@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireGmailAccount } from "@/server/gmail-auth-middleware";
-import { gmailFetch } from "@/server/gmail-auth.server";
+import { requireGmailAccount } from "@/lib/gmail-auth-middleware";
 
 async function gw(path: string, init?: RequestInit) {
+  const { gmailFetch } = await import("@/server/gmail-auth.server");
   return gmailFetch(path, init);
 }
 

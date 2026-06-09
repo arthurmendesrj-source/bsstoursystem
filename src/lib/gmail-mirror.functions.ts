@@ -1,16 +1,19 @@
 // Thin createServerFn wrappers around shared helpers in gmail-mirror.server.ts.
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requireGmailAccount } from "@/server/gmail-auth-middleware";
-import {
-  gw, findHeader, parseFrom, extractBody, extractAttachments, type GmailPart,
-  listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe,
-} from "@/server/gmail-mirror.server";
+import { requireGmailAccount } from "@/lib/gmail-auth-middleware";
+import type { GmailPart } from "@/server/gmail-mirror.server";
+
+// Dynamically import server-only helpers so this client-reachable
+// `.functions.ts` file does not statically reference `src/server/*`
+// (blocked by Vite import-protection).
+const loadSrv = () => import("@/server/gmail-mirror.server");
 
 // ---------------- LABELS ----------------
 export const gmailListLabels = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const r = await listAndPersistLabels(supabase);
     return { count: r.labels.length, owner: r.owner };
@@ -25,6 +28,7 @@ export const gmailListLive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { labelId: string; pageToken?: string; maxResults?: number; q?: string }) => d)
   .handler(async ({ data, context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
     const owner = profile.emailAddress.toLowerCase();
@@ -122,6 +126,7 @@ export const gmailListLive = createServerFn({ method: "POST" })
 export const gmailStartFullMirror = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const r = await startFullMirror(supabase);
     return { owner: r.owner, queueLength: r.queue.length };
@@ -134,6 +139,7 @@ export const gmailStartFullMirror = createServerFn({ method: "POST" })
 export const gmailCancelFullMirror = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
     const owner = profile.emailAddress.toLowerCase();
@@ -154,6 +160,7 @@ export const gmailCancelFullMirror = createServerFn({ method: "POST" })
 export const gmailResetFullMirror = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
     const owner = profile.emailAddress.toLowerCase();
@@ -201,6 +208,7 @@ export const gmailWipeAndRestart = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
     const owner = profile.emailAddress.toLowerCase();
@@ -215,6 +223,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d?: { restart?: boolean; windowDays?: number }) => d ?? {})
   .handler(async ({ data, context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     if (data.restart) {
       // Reuse start flow when caller asks for a fresh run.
@@ -252,6 +261,7 @@ export const gmailFullSync = createServerFn({ method: "POST" })
 export const gmailIncrementalSync = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .handler(async ({ context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const profile = (await gw(`/users/me/profile`)) as { emailAddress: string };
     const owner = profile.emailAddress.toLowerCase();
@@ -264,6 +274,7 @@ export const gmailGetThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { threadId: string }) => d)
   .handler(async ({ data }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const t = (await gw(`/users/me/threads/${encodeURIComponent(data.threadId)}?format=full`)) as {
       id: string; messages: Array<{ id: string; threadId: string; labelIds?: string[]; snippet?: string; internalDate?: string; payload?: GmailPart }>;
     };
@@ -297,6 +308,7 @@ export const gmailGetAttachment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((d: { messageId: string; attachmentId: string }) => d)
   .handler(async ({ data, context }) => {
+    const { gw, findHeader, parseFrom, extractBody, extractAttachments, listAndPersistLabels, startFullMirror, runFullSyncTick, runIncrementalSync, enqueueWipe } = await loadSrv();
     const { supabase } = context;
     const { data: row } = await supabase
       .from("email_attachments")

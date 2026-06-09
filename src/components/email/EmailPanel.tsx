@@ -13,8 +13,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailListLive } from "@/server/gmail-mirror.functions";
-import { gmailSend } from "@/server/gmail.functions";
+import { gmailListLabels, gmailIncrementalSync, gmailGetThread, gmailGetAttachment, gmailListLive } from "@/lib/gmail-mirror.functions";
+import { gmailSend } from "@/lib/gmail.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";

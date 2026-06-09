@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, Mail, RefreshCw, Trash2, AlertCircle, CheckCircle2, History, RotateCw } from "lucide-react";
 import { disconnectGmailAccount, listGmailAudit } from "@/lib/gmail-audit.functions";
-import { gmailIncrementalSync } from "@/server/gmail-mirror.functions";
+import { gmailIncrementalSync } from "@/lib/gmail-mirror.functions";
 
 type TokenRow = {
   email_address: string;

@@ -105,6 +105,14 @@ export const Route = createFileRoute("/api/public/google/oauth/callback")({
         const emailAddress = uinfo.email.toLowerCase();
         const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
+        // Detect previous connection for this email → reconnected vs connected.
+        const { data: prior } = await supabaseAdmin
+          .from("user_gmail_tokens")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("email_address", emailAddress)
+          .maybeSingle();
+
         // Upsert tokens
         const { error: upErr } = await supabaseAdmin
           .from("user_gmail_tokens")
@@ -117,6 +125,14 @@ export const Route = createFileRoute("/api/public/google/oauth/callback")({
             scope,
           }, { onConflict: "user_id,email_address" });
         if (upErr) return popupClose(`Erro ao salvar tokens: ${upErr.message}`, false);
+
+        await supabaseAdmin.from("gmail_connection_audit").insert({
+          user_id: userId,
+          email_address: emailAddress,
+          event: prior ? "reconnected" : "connected",
+          actor_id: userId,
+          metadata: { scope },
+        });
 
         // Link email to user (best-effort; ignore unique violation)
         const { data: anyAcc } = await supabaseAdmin

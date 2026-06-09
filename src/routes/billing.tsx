@@ -163,8 +163,38 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   const monthlyTotal = Number(plan?.price_cents ?? 0) + extraUsers * extraPerCents;
   const usersPct = includedUsers > 0 ? Math.min(100, (activeUsers / includedUsers) * 100) : 0;
 
+  const sub = data.subscription as any;
+  const trialEnd = sub?.trial_end ? new Date(sub.trial_end) : null;
+  const now = new Date();
+  const trialActive = sub?.status === "trialing" && trialEnd && trialEnd > now;
+  const trialExpired = sub?.status === "trialing" && trialEnd && trialEnd <= now;
+  const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / 86_400_000)) : 0;
+
   return (
     <div className="space-y-6">
+      {trialActive && (
+        <Card className="border-primary bg-primary/5">
+          <CardContent className="py-4 flex items-center justify-between gap-4">
+            <div>
+              <p className="font-semibold">Período de teste ativo</p>
+              <p className="text-sm text-muted-foreground">
+                Faltam <strong>{daysLeft} dia{daysLeft === 1 ? "" : "s"}</strong> grátis. Assine um pacote antes do fim do teste para não perder o acesso.
+              </p>
+            </div>
+            <Badge>Trial</Badge>
+          </CardContent>
+        </Card>
+      )}
+      {trialExpired && (
+        <Card className="border-destructive bg-destructive/5">
+          <CardContent className="py-4">
+            <p className="font-semibold text-destructive">Período de teste encerrado</p>
+            <p className="text-sm text-muted-foreground">
+              Escolha um pacote abaixo para reativar o acesso à plataforma.
+            </p>
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader>
@@ -173,17 +203,21 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="text-3xl font-bold">{brl(monthlyTotal)}<span className="text-sm font-normal text-muted-foreground">/mês</span></div>
-          <Badge variant={data.subscription?.status === "active" ? "default" : "secondary"}>
-            {data.subscription?.status ?? "—"}
+          <Badge variant={sub?.status === "active" ? "default" : "secondary"}>
+            {sub?.status ?? "—"}
           </Badge>
           {extraUsers > 0 && (
             <p className="text-xs text-muted-foreground">
               Base {brl(plan?.price_cents)} + {extraUsers} × {brl(extraPerCents)}
             </p>
           )}
-          {data.subscription?.current_period_end && (
+          {trialActive ? (
             <p className="text-xs text-muted-foreground">
-              Próxima cobrança: {new Date(data.subscription.current_period_end).toLocaleDateString("pt-BR")}
+              Teste termina em {trialEnd!.toLocaleDateString("pt-BR")}
+            </p>
+          ) : sub?.current_period_end && (
+            <p className="text-xs text-muted-foreground">
+              Próxima cobrança: {new Date(sub.current_period_end).toLocaleDateString("pt-BR")}
             </p>
           )}
         </CardContent>
@@ -203,7 +237,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Créditos de IA</CardTitle><CardDescription>Tokens consumidos no ciclo</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Créditos de IA</CardTitle><CardDescription>Cobrança à parte do pacote</CardDescription></CardHeader>
         <CardContent className="space-y-2">
           <div className="text-2xl font-bold">{aiUsed.toLocaleString("pt-BR")} <span className="text-sm font-normal text-muted-foreground">/ {includedAi.toLocaleString("pt-BR")}</span></div>
           <Progress value={aiPct} />
@@ -211,7 +245,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Armazenamento</CardTitle><CardDescription>Buckets do tenant</CardDescription></CardHeader>
+        <CardHeader><CardTitle>Armazenamento</CardTitle><CardDescription>Cobrança à parte do pacote</CardDescription></CardHeader>
         <CardContent className="space-y-2">
           <div className="text-2xl font-bold">{storageGb.toFixed(2)} GB <span className="text-sm font-normal text-muted-foreground">/ {includedGb} GB</span></div>
           <Progress value={stPct} />
@@ -223,6 +257,7 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
     </div>
   );
 }
+
 
 function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; currentPlanCode: string | null }) {
   const listFn = useServerFn(listPublicPlans);

@@ -34,6 +34,7 @@ import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { GlobalSearchTrigger } from "@/components/GlobalSearch";
 import { TenantSwitcher } from "@/components/TenantSwitcher";
 import { useAuth } from "@/lib/auth";
+import { useTenant } from "@/lib/tenant";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
@@ -49,7 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { isAdmin, hasRole } = useEffectiveAuth();
   const { viewAs, exitViewAs } = useViewAs();
-  const { tenant } = (require("@/lib/tenant") as typeof import("@/lib/tenant")).useTenant();
+  const { tenant } = useTenant();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const showFinanceiro = isAdmin || hasRole("diretor") || hasRole("financeiro");
   const showMarketing = isAdmin || hasRole("diretor") || hasRole("gerente");

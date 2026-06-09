@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { debugTriggerNotification } from "@/server/debug-notifications.functions";
+import { debugTriggerNotification } from "@/lib/debug-notifications.functions";
 
 type EventType =
   | "lead_assigned"

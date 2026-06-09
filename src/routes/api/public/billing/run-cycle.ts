@@ -61,7 +61,7 @@ export const Route = createFileRoute("/api/public/billing/run-cycle")({
           // Look up existing invoice for this period.
           const { data: existing } = await supabaseAdmin
             .from("billing_invoices")
-            .select("id, status, attempt_count, updated_at")
+            .select("id, status, attempt_count, last_attempt_at, created_at")
             .eq("subscription_id", sub.id)
             .eq("kind", "subscription")
             .eq("period_start", periodStart)
@@ -74,8 +74,9 @@ export const Route = createFileRoute("/api/public/billing/run-cycle")({
 
           // Throttle retries.
           if (existing) {
-            const last = new Date(existing.updated_at ?? 0).getTime();
-            const hoursSince = (now.getTime() - last) / 3_600_000;
+            const lastIso = existing.last_attempt_at ?? existing.created_at;
+            const hoursSince =
+              (now.getTime() - new Date(lastIso ?? 0).getTime()) / 3_600_000;
             if (hoursSince < RETRY_INTERVAL_HOURS) {
               skipped += 1;
               continue;

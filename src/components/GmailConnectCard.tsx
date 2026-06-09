@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Mail, RefreshCw, Trash2, AlertCircle, CheckCircle2, History } from "lucide-react";
+import { Loader2, Mail, RefreshCw, Trash2, AlertCircle, CheckCircle2, History, RotateCw } from "lucide-react";
 import { disconnectGmailAccount, listGmailAudit } from "@/lib/gmail-audit.functions";
+import { gmailIncrementalSync } from "@/server/gmail-mirror.functions";
 
 type TokenRow = {
   email_address: string;
@@ -60,9 +61,12 @@ export function GmailConnectCard() {
   const [syncs, setSyncs] = useState<Record<string, SyncRow>>({});
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [showAudit, setShowAudit] = useState(false);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [lastSyncResult, setLastSyncResult] = useState<Record<string, { ok: boolean; message: string; at: string }>>({});
 
   const disconnectFn = useServerFn(disconnectGmailAccount);
   const auditFn = useServerFn(listGmailAudit);
+  const syncFn = useServerFn(gmailIncrementalSync);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,6 +145,26 @@ export function GmailConnectCard() {
     }
   }, [disconnectFn, load]);
 
+  const syncNow = useCallback(async (email: string) => {
+    setSyncing(email);
+    try {
+      const r = await syncFn() as { inserted?: number; updated?: number; owner?: string };
+      const inserted = r.inserted ?? 0;
+      const updated = r.updated ?? 0;
+      const msg = `${inserted} novas, ${updated} atualizadas`;
+      setLastSyncResult((prev) => ({ ...prev, [email]: { ok: true, message: msg, at: new Date().toISOString() } }));
+      toast.success(`Sincronização concluída: ${msg}`);
+      await load();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha ao sincronizar";
+      setLastSyncResult((prev) => ({ ...prev, [email]: { ok: false, message, at: new Date().toISOString() } }));
+      toast.error(message);
+    } finally {
+      setSyncing(null);
+    }
+  }, [syncFn, load]);
+
+
   const alreadyConnected = tokens.length >= 1;
 
   return (
@@ -190,10 +214,31 @@ export function GmailConnectCard() {
                       {st.label}
                     </Badge>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => void disconnect(t.email_address)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void syncNow(t.email_address)}
+                      disabled={syncing === t.email_address}
+                      className="gap-2"
+                    >
+                      {syncing === t.email_address
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <RotateCw className="h-4 w-4" />}
+                      Sincronizar agora
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => void disconnect(t.email_address)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
+                {lastSyncResult[t.email_address] && (
+                  <div className={`rounded text-xs p-2 break-words ${lastSyncResult[t.email_address].ok ? "bg-green-500/10 text-green-700 dark:text-green-400" : "bg-destructive/10 text-destructive"}`}>
+                    <strong>{lastSyncResult[t.email_address].ok ? "Sincronizado:" : "Falha:"}</strong>{" "}
+                    {lastSyncResult[t.email_address].message}{" "}
+                    <span className="text-muted-foreground">({fmt(lastSyncResult[t.email_address].at)})</span>
+                  </div>
+                )}
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <dt>Conectada em</dt><dd className="text-foreground">{fmt(t.connected_at)}</dd>
                   <dt>Expira em</dt><dd className="text-foreground">{fmt(t.expires_at)}</dd>

@@ -1,5 +1,6 @@
 import { Building2, Check, ChevronsUpDown, Plus, Shield } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
+// Nova empresa / Cobrança movidos para a sidebar (item "Licença").
 import { useTenant } from "@/lib/tenant";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,13 +47,6 @@ export function TenantSwitcher() {
             </div>
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => navigate({ to: "/onboarding" })}>
-          <Plus className="mr-2 h-4 w-4" /> Nova empresa
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => navigate({ to: "/billing" })}>
-          <Building2 className="mr-2 h-4 w-4" /> Cobrança
-        </DropdownMenuItem>
         {isSuperAdmin && (
           <>
             <DropdownMenuSeparator />

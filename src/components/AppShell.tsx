@@ -28,11 +28,13 @@ import {
   Sparkles,
   Wallet,
   Megaphone,
+  Receipt,
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { GlobalSearchTrigger } from "@/components/GlobalSearch";
 import { TenantSwitcher } from "@/components/TenantSwitcher";
 import { useAuth } from "@/lib/auth";
+import { useTenant } from "@/lib/tenant";
 import { useViewAs, useEffectiveAuth } from "@/lib/viewAs";
 import { useI18n, type Lang } from "@/lib/i18n";
 import { useCurrency, type Currency } from "@/lib/currency";
@@ -48,6 +50,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { isAdmin, hasRole } = useEffectiveAuth();
   const { viewAs, exitViewAs } = useViewAs();
+  const { tenant } = useTenant();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const showFinanceiro = isAdmin || hasRole("diretor") || hasRole("financeiro");
   const showMarketing = isAdmin || hasRole("diretor") || hasRole("gerente");
@@ -270,11 +273,21 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Shield className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{t("users")}</span>}
               </Link>
+              <Link to="/billing" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/billing"))} title={collapsed ? "Licença" : undefined}>
+                <Receipt className="h-4 w-4 shrink-0" />
+                {!collapsed && <span className="truncate">Licença</span>}
+              </Link>
               <Link to="/security-audit" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/security-audit"))} title={collapsed ? t("secAuditTitle") : undefined}>
                 <ShieldAlert className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{t("secAuditTitle")}</span>}
               </Link>
             </>
+          )}
+          {!isAdmin && tenant?.role_in_tenant === "owner" && (
+            <Link to="/billing" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/billing"))} title={collapsed ? "Licença" : undefined}>
+              <Receipt className="h-4 w-4 shrink-0" />
+              {!collapsed && <span className="truncate">Licença</span>}
+            </Link>
           )}
           <Link to="/permissions-audit" onClick={() => minimizeAllWindows()} className={itemClass(path === "/permissions-audit")} title={collapsed ? "Minhas permissões" : undefined}>
             <Shield className="h-4 w-4 shrink-0" />

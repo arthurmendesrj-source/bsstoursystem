@@ -119,23 +119,46 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   const storageGb = storageBytes / 1024 ** 3;
   const stPct = Math.min(100, (storageGb / includedGb) * 100);
 
+  const includedUsers = Number(plan?.included_users ?? 0);
+  const extraPerCents = Number(plan?.extra_user_cents ?? 0);
+  const activeUsers = Number((data as any).active_users ?? 0);
+  const extraUsers = Math.max(0, activeUsers - includedUsers);
+  const monthlyTotal = Number(plan?.price_cents ?? 0) + extraUsers * extraPerCents;
+  const usersPct = includedUsers > 0 ? Math.min(100, (activeUsers / includedUsers) * 100) : 0;
+
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <Card>
         <CardHeader>
           <CardTitle>Plano atual</CardTitle>
           <CardDescription>{plan?.name ?? "Sem assinatura"}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-2">
-          <div className="text-3xl font-bold">{brl(plan?.price_cents)}<span className="text-sm font-normal text-muted-foreground">/mês</span></div>
+          <div className="text-3xl font-bold">{brl(monthlyTotal)}<span className="text-sm font-normal text-muted-foreground">/mês</span></div>
           <Badge variant={data.subscription?.status === "active" ? "default" : "secondary"}>
             {data.subscription?.status ?? "—"}
           </Badge>
+          {extraUsers > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Base {brl(plan?.price_cents)} + {extraUsers} × {brl(extraPerCents)}
+            </p>
+          )}
           {data.subscription?.current_period_end && (
             <p className="text-xs text-muted-foreground">
               Próxima cobrança: {new Date(data.subscription.current_period_end).toLocaleDateString("pt-BR")}
             </p>
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader><CardTitle>Usuários da licença</CardTitle><CardDescription>Ativos × incluídos no plano</CardDescription></CardHeader>
+        <CardContent className="space-y-2">
+          <div className="text-2xl font-bold">{activeUsers} <span className="text-sm font-normal text-muted-foreground">/ {includedUsers || "—"}</span></div>
+          {includedUsers > 0 && <Progress value={usersPct} />}
+          <p className="text-xs text-muted-foreground">
+            {includedUsers} incluídos · {brl(extraPerCents)} por extra
+            {extraUsers > 0 && <> · <strong>{extraUsers} extra(s)</strong></>}
+          </p>
         </CardContent>
       </Card>
       <Card>

@@ -1,4 +1,5 @@
-import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { Outlet, Link, createRootRouteWithContext, HeadContent, Scripts } from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import appCss from "../styles.css?url";
 import { AuthProvider } from "@/lib/auth";
@@ -32,7 +33,7 @@ function NotFoundComponent() {
   );
 }
 
-export const Route = createRootRoute({
+export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -70,26 +71,29 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
   return (
-    <I18nProvider>
-      <CurrencyProvider>
-        <AuthProvider>
-          <TenantProvider>
-            <ViewAsProvider>
-              <PermissionsProvider>
-                <TooltipProvider delayDuration={400}>
-                  <WorkspaceWindowsProvider>
-                    <Outlet />
-                    <PermissionFieldHighlighter />
-                    <GlobalButtonTooltips />
-                    <Toaster />
-                  </WorkspaceWindowsProvider>
-                </TooltipProvider>
-              </PermissionsProvider>
-            </ViewAsProvider>
-          </TenantProvider>
-        </AuthProvider>
-      </CurrencyProvider>
-    </I18nProvider>
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <CurrencyProvider>
+          <AuthProvider>
+            <TenantProvider>
+              <ViewAsProvider>
+                <PermissionsProvider>
+                  <TooltipProvider delayDuration={400}>
+                    <WorkspaceWindowsProvider>
+                      <Outlet />
+                      <PermissionFieldHighlighter />
+                      <GlobalButtonTooltips />
+                      <Toaster />
+                    </WorkspaceWindowsProvider>
+                  </TooltipProvider>
+                </PermissionsProvider>
+              </ViewAsProvider>
+            </TenantProvider>
+          </AuthProvider>
+        </CurrencyProvider>
+      </I18nProvider>
+    </QueryClientProvider>
   );
 }

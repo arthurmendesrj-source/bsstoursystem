@@ -1,84 +1,126 @@
 
-# Plano — Área de Cobrança (`/billing`)
+# Plano: Área de Cobrança com InfinitePay
 
-Modelo: **base mensal + R$/usuário adicional + cr&eacute;ditos de Storage (GB-mês) e IA (tokens)**. Gateway: **Stripe (integrado Lovable)**. Acesso: somente **owner** do tenant.
+## Decisões confirmadas
+- **Gateway:** InfinitePay (taxas baixas; app controla recorrência)
+- **Mensalidade:** Cartão tokenizado — cobrança automática mensal no cartão salvo
+- **Top-ups avulsos:** PIX, Boleto ou Cartão (créditos de IA e GB extra de Storage)
+- **Destino dos valores:** conta InfinitePay (transferível para Nubank PJ)
+- **Acesso ao módulo:** somente owner do tenant
+- **Modelo:** Base mensal + R$/usuário adicional + créditos consumíveis (IA tokens, Storage GB-mês)
 
-## 1. Banco de dados (migration)
+---
 
-Aproveita o que já existe (`tenants`, `subscriptions`, `plans`, `billing_invoices`, `plan_addons`) e adiciona o que falta para medição/uso.
+## 1. Banco de dados (1 migration)
 
-Novas tabelas (todas com RLS, somente owner do tenant lê via `has_role`/`tenant_members.role_in_tenant = 'owner'`; writes = `service_role`):
+Tabelas novas (todas com RLS owner-only, GRANTs para `authenticated` e `service_role`):
 
-- `ai_usage_log` — `tenant_id`, `user_id`, `model`, `feature` (triage/proposal/assistant/etc.), `input_tokens`, `output_tokens`, `cost_credits`, `meta jsonb`, `created_at`. Índice por `(tenant_id, created_at)`.
-- `storage_usage_daily` — `tenant_id`, `day date`, `bucket`, `bytes bigint`, `objects int`. PK `(tenant_id, day, bucket)`. Alimentada por job diário que soma `storage.objects.metadata->>size`.
-- `billing_usage_periods` — `tenant_id`, `subscription_id`, `period_start`, `period_end`, `ai_tokens_input`, `ai_tokens_output`, `ai_credits_used`, `storage_gb_avg`, `seats_avg`, `status` (open/closed/invoiced), `invoice_id`. Fechado no fim do ciclo, vira `billing_invoices`.
-- `payment_methods` — `tenant_id`, `stripe_customer_id`, `stripe_payment_method_id`, `brand`, `last4`, `exp_month/year`, `is_default`.
-- `billing_credits_ledger` — `tenant_id`, `kind` (ai|storage), `delta_credits numeric`, `reason`, `ref_id`, `created_at`. Para top-ups avulsos e ajustes.
+- **`billing_plans`** — catálogo: name, monthly_price_cents, included_seats, included_ai_credits, included_storage_gb, extra_seat_price_cents, is_active
+- **`billing_customers`** — 1 por tenant: tenant_id, legal_name, doc (CPF/CNPJ), email, phone, address_json, `infinitepay_customer_id`
+- **`billing_payment_methods`** — cartões tokenizados: tenant_id, `infinitepay_card_token`, brand, last4, exp_month, exp_year, is_default
+- **`billing_subscriptions`** — 1 ativa por tenant: plan_id, seats, status (`active|past_due|canceled|trialing`), current_period_start/end, next_charge_at, payment_method_id
+- **`billing_invoices`** (estender existente) — adicionar: subscription_id, period_start, period_end, kind (`subscription|topup`), `infinitepay_charge_id`, payment_method (`card|pix|boleto`), pix_qr, pix_copia_cola, boleto_url, paid_at
+- **`billing_credit_wallet`** — saldo por tenant: ai_credits, storage_gb_extra, updated_at
+- **`billing_credit_ledger`** — todas movimentações: tenant_id, kind (`grant|consume|topup|expire`), amount, balance_after, reference_type, reference_id, created_at
+- **`usage_ai_events`** — por chamada: tenant_id, user_id, feature (`chat|itinerary|email|image`), model, prompt_tokens, completion_tokens, credits_charged, created_at
+- **`usage_storage_daily`** — snapshot diário: tenant_id, bucket, bytes, file_count, snapshot_date
+- **`billing_topups`** — pedidos avulsos: tenant_id, kind (`ai_credits|storage_gb`), quantity, amount_cents, status, invoice_id
 
-Colunas adicionais:
-- `tenants.stripe_customer_id text`
-- `subscriptions.stripe_subscription_id text`, `seats int default 1`, `included_ai_credits int`, `included_storage_gb int`
-- `plans` ganha `price_per_seat_cents`, `included_ai_credits`, `included_storage_gb`, `overage_ai_credit_cents`, `overage_storage_gb_cents`
+Helper SQL: `is_tenant_owner(_tenant_id, _user_id)` (security definer) + grants.
 
-Todas seguem a regra GRANT → ENABLE RLS → POLICY.
+---
 
-## 2. Backend (server fns + 1 webhook)
+## 2. Backend (TanStack server functions)
 
-`src/lib/billing.functions.ts` (todos com `requireSupabaseAuth` + checagem `is_owner(tenant_id)`):
-- `getBillingOverview` — plano atual, assentos, cartão default, próximo vencimento, uso do período corrente (IA + storage + assentos) com % consumido.
-- `getUsageBreakdown({ range })` — séries diárias de tokens IA (por feature/user) e GB de storage (por bucket). Alimenta gráficos.
-- `getInvoices` / `getInvoicePdfUrl(id)` — lista e link Stripe-hosted.
-- `changePlan({ planId })`, `updateSeats({ seats })`, `cancelSubscription()`, `resumeSubscription()`.
-- `createCheckoutSession({ planId, seats })` — Stripe Checkout para nova assinatura.
-- `createBillingPortalSession()` — redirect ao portal Stripe (gerenciar cartão).
-- `topUpCredits({ kind, amount })` — checkout one-shot para pacote de créditos.
+**`src/server/infinitepay.server.ts`** — wrapper REST (lê `process.env.INFINITEPAY_*` dentro do `.handler()`):
+- `createCustomer`, `tokenizeCard`, `chargeCard` (mensalidade), `createPixCharge`, `createBoletoCharge`, `createCardCharge` (top-up)
 
-`src/server/billing.server.ts` — wrapper do SDK Stripe (server-only, importado via `await import` dentro dos handlers).
+**`src/lib/billing.functions.ts`** — todas com `requireSupabaseAuth` + check `is_tenant_owner`:
+- `getBillingOverview` — plano atual, próxima cobrança, saldo wallet, % uso
+- `getUsageAi` — agregado por período/feature/modelo/usuário
+- `getUsageStorage` — por bucket + série diária
+- `listInvoices` — paginado, com links PIX/boleto
+- `subscribePlan` — cria subscription, tokeniza cartão se preciso, cobra primeira fatura
+- `changePlan` / `updateSeats` / `cancelSubscription`
+- `updateBillingCustomer`, `savePaymentMethod`, `setDefaultPaymentMethod`, `removePaymentMethod`
+- `createTopup` — PIX/Boleto/Cartão para créditos avulsos
 
-`src/server/ai-meter.server.ts` — helper `logAiUsage(...)` chamado em **todas** as chamadas existentes ao Lovable AI (assistant, triage, propose-tour, transcribe, generate-doc, extract-supplier-*). Lê `usage.input_tokens/output_tokens` da resposta e grava em `ai_usage_log`.
+**`src/server/ai-meter.server.ts`** — `logAiUsage({tenantId, userId, feature, model, promptTokens, completionTokens})`: grava em `usage_ai_events`, debita `billing_credit_wallet` via ledger.
 
-Rota pública: `src/routes/api/public/stripe/webhook.ts` — verifica assinatura `STRIPE_WEBHOOK_SECRET`, processa `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`, `checkout.session.completed`. Usa `supabaseAdmin` para atualizar `subscriptions`, `billing_invoices`, `payment_methods`, `billing_credits_ledger`.
+**Edits:** todas as chamadas Lovable AI existentes (chat, itinerários, emails, imagens) passam a chamar `logAiUsage` após sucesso.
 
-Cron diário (pg_cron + `/api/public/billing/aggregate`) consolida `storage.objects` → `storage_usage_daily` e fecha período de assinaturas vencidas → reporta uso ao Stripe (`subscription_item.usage_record`).
+---
 
-## 3. Frontend — `/billing` (owner-only)
+## 3. Webhook + cron
 
-Rota `src/routes/billing.tsx` já existe (gate de assinatura). Vamos transformá-la em hub com abas:
+**`src/routes/api/public/infinitepay-webhook.ts`** — valida HMAC (`x-signature`), trata eventos:
+- `charge.paid` → marca invoice `paid`, se for topup credita wallet via ledger
+- `charge.failed` / `charge.refused` → marca invoice `past_due`, marca subscription `past_due` após N tentativas
+- `charge.refunded` → estorna ledger
+- Idempotente via `infinitepay_charge_id`
 
-1. **Visão geral** — card do plano atual, próximo vencimento, status, botões "Mudar de plano" / "Gerenciar cartão" (portal Stripe). Cards de uso (IA, Storage, Assentos) com barras de progresso `usado / incluído` e custo projetado de excedente.
-2. **Uso & Créditos** (componente novo `UsageDashboard.tsx`):
-   - Gráficos (recharts) de tokens IA por dia, separados por feature e top-5 usuários.
-   - Gráfico de GB de storage por bucket.
-   - Tabela "últimas 50 chamadas de IA" com modelo, feature, tokens, custo.
-   - Botões **"Comprar créditos IA"** e **"Comprar pacote de Storage"** (top-ups).
-3. **Assinatura** — seletor de plano (cards Starter/Pro/Business com preço por assento e cotas), input de assentos, preview de novo total, botão "Aplicar".
-4. **Faturas** — tabela (`billing_invoices` + Stripe) com download PDF e status.
-5. **Método de pagamento** — cartão default; abre Stripe Billing Portal.
+**`src/routes/api/public/billing/run-cycle.ts`** — chamado por `pg_cron` diário (apikey header):
+- Para cada subscription com `next_charge_at <= now()`: gera invoice do próximo ciclo, chama `chargeCard` no cartão default, agenda retry se falhar
+- Reseta créditos inclusos no novo ciclo (mantém top-ups)
 
-Sidebar (`AppShell`): novo item "Cobrança" visível só para owner (`tenant.role_in_tenant === 'owner'`). Membros que tentarem acessar veem aviso "Apenas o proprietário pode ver cobrança".
+**`src/routes/api/public/billing/aggregate-usage.ts`** — diário:
+- Soma `storage.objects.metadata->>size` por bucket → `usage_storage_daily`
+- Calcula GB-mês acumulado vs incluído; alerta a >80%, debita wallet a 100%
 
-## 4. Stripe — setup
+**pg_cron:** 2 jobs diários (`run-cycle` 03:00, `aggregate-usage` 02:00).
 
-Antes de codar:
-1. Rodar `recommend_payment_provider` (esperado: Stripe, SaaS).
-2. `enable_stripe_payments` (cria conta sandbox automática).
-3. Criar produtos via `batch_create_product`: 3 planos base + add-on "Assento adicional" (per-seat metered) + 2 metered products "AI tokens" e "Storage GB-mês" + 2 one-time "Pacote 10k créditos IA" e "Pacote 10 GB".
+---
 
-## 5. Segurança
+## 4. Frontend `/billing` (owner-only)
 
-- `is_owner(tenant_id)` policy helper. Todas as policies de billing exigem owner.
-- Webhook valida assinatura HMAC antes de qualquer write.
-- `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` via `add_secret` (passo após enable).
-- Nenhum endpoint `/api/public/*` retorna PII; webhook só usa IDs do Stripe.
+Rota em `src/routes/_authenticated/billing.tsx` com guarda `is_tenant_owner` (redirect + toast se não for).
 
-## 6. Fora deste escopo
+5 tabs:
 
-- Cobrança em PIX/boleto (gateway separado).
-- Visualização de consumo por membro comum (só owner por enquanto).
-- Conversão automática real→USD; preços ficam em BRL via Stripe.
-- Refunds automáticos (feito manualmente no Stripe Dashboard).
+1. **Visão geral** — card do plano atual, próxima cobrança (data + valor + cartão), barras de progresso (assentos, IA, Storage) com custo projetado de excedente
+2. **Uso de IA** — gráficos (recharts): tokens/dia, por feature, por modelo, top usuários; tabela das últimas 50 chamadas
+3. **Uso de Nuvem** — barras por bucket, série diária, alerta de quota
+4. **Plano & Assentos** — cards Starter/Pro/Business, input de seats, botão alterar (preview proração)
+5. **Pagamentos** — tabela de faturas (status, vencimento, valor, "Ver PIX/Boleto/Recibo"), cartões salvos (gerenciar default, remover), botão **Comprar créditos** (dialog: tipo + quantidade + PIX/Boleto/Cartão), formulário de dados de cobrança (obrigatório p/ boleto)
 
-## Arquivos a criar/editar
+Componentes: `BillingOverview`, `UsageAiPanel`, `UsageStoragePanel`, `PlanSelector`, `SeatsEditor`, `InvoicesTable`, `PaymentMethodsList`, `AddCardDialog` (iframe/JS SDK da InfinitePay para tokenizar), `TopUpDialog`, `CustomerForm`.
 
-- **Criar**: migration; `src/lib/billing.functions.ts`; `src/server/billing.server.ts`; `src/server/ai-meter.server.ts`; `src/routes/api/public/stripe/webhook.ts`; `src/routes/api/public/billing/aggregate.ts`; `src/components/billing/UsageDashboard.tsx`; `src/components/billing/PlanSelector.tsx`; `src/components/billing/InvoicesTable.tsx`; `src/components/billing/TopUpDialog.tsx`.
-- **Editar**: `src/routes/billing.tsx` (transformar em hub); `src/components/AppShell.tsx` (item de menu owner-only); todas as chamadas existentes ao Lovable AI para chamar `logAiUsage`.
+**Menu lateral (AppShell):** item "Cobrança" visível só se owner.
+
+---
+
+## 5. Secrets necessários
+- `INFINITEPAY_API_KEY`
+- `INFINITEPAY_WEBHOOK_SECRET`
+- `INFINITEPAY_ENV` (`sandbox|production`)
+
+Pedidos depois da migration aprovada.
+
+---
+
+## 6. Segurança
+- `is_tenant_owner` em todas RLS e em todos os handlers
+- Webhook: HMAC com `timingSafeEqual`
+- Nenhum dado de cartão no banco — só token + last4 + brand
+- `process.env.INFINITEPAY_*` lido só dentro de `.handler()`
+- Logs nunca contêm PAN/CVV — só IDs da InfinitePay
+
+---
+
+## 7. Fora de escopo
+- PIX recorrente (Pix Automático)
+- Split payments
+- Conversão de moeda
+- Estornos pela UI (faz manual no painel da InfinitePay; webhook reconcilia)
+
+---
+
+## 8. Ordem de implementação
+1. Migration (tabelas + RLS + helper + grants)
+2. `infinitepay.server.ts` + secrets
+3. `billing.functions.ts` + `ai-meter.server.ts`
+4. Webhook + 2 endpoints de cron + agendamento pg_cron
+5. Rota `/billing` + 5 tabs + componentes
+6. Item de menu owner-only
+7. Plugar `logAiUsage` em todas as chamadas Lovable AI existentes
+8. Seed dos planos base

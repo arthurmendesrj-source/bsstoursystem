@@ -233,10 +233,13 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; 
     queryFn: () => listFn(),
   });
   const mut = useMutation({
-    mutationFn: (plan_code: string) => changeFn({ data: { tenant_id: tenantId, plan_code } }),
+    mutationFn: (plan_code: string) => {
+      if (!tenantId) throw new Error("Selecione uma empresa para assinar um pacote.");
+      return changeFn({ data: { tenant_id: tenantId, plan_code } });
+    },
     onSuccess: () => {
       toast.success("Plano atualizado");
-      qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
+      if (tenantId) qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao trocar de plano"),
   });

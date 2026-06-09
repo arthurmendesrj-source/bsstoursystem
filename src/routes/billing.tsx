@@ -14,8 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, Cloud, Sparkles, Receipt, User, Lock, Building2, Plus } from "lucide-react";
-import { Link } from "@tanstack/react-router";
+import { CreditCard, Cloud, Sparkles, Receipt, User, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
   getBillingOverview,

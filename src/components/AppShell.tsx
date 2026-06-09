@@ -273,21 +273,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Shield className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{t("users")}</span>}
               </Link>
-              <Link to="/billing" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/billing"))} title={collapsed ? "Licença" : undefined}>
-                <Receipt className="h-4 w-4 shrink-0" />
-                {!collapsed && <span className="truncate">Licença</span>}
-              </Link>
               <Link to="/security-audit" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/security-audit"))} title={collapsed ? t("secAuditTitle") : undefined}>
                 <ShieldAlert className="h-4 w-4 shrink-0" />
                 {!collapsed && <span className="truncate">{t("secAuditTitle")}</span>}
               </Link>
             </>
-          )}
-          {!isAdmin && tenant?.role_in_tenant === "owner" && (
-            <Link to="/billing" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/billing"))} title={collapsed ? "Licença" : undefined}>
-              <Receipt className="h-4 w-4 shrink-0" />
-              {!collapsed && <span className="truncate">Licença</span>}
-            </Link>
           )}
           <Link to="/permissions-audit" onClick={() => minimizeAllWindows()} className={itemClass(path === "/permissions-audit")} title={collapsed ? "Minhas permissões" : undefined}>
             <Shield className="h-4 w-4 shrink-0" />

@@ -214,10 +214,23 @@ export function GmailConnectCard() {
                       {st.label}
                     </Badge>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => void disconnect(t.email_address)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void syncNow(t.email_address)}
+                      disabled={syncing === t.email_address}
+                      className="gap-2"
+                    >
+                      {syncing === t.email_address
+                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                        : <RotateCw className="h-4 w-4" />}
+                      Sincronizar agora
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => void disconnect(t.email_address)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                   <dt>Conectada em</dt><dd className="text-foreground">{fmt(t.connected_at)}</dd>
                   <dt>Expira em</dt><dd className="text-foreground">{fmt(t.expires_at)}</dd>

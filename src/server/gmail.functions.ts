@@ -146,7 +146,24 @@ function buildRfc2822({
 export const gmailSend = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth, requireGmailAccount])
   .inputValidator((data: { to: string; subject: string; body: string; threadId?: string; inReplyTo?: string; references?: string; cc?: string }) => data)
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
+    // Enforce: replies/forwards must come from the same Gmail account that owns the thread.
+    if (data.threadId) {
+      const { supabase } = context as { supabase: import("@supabase/supabase-js").SupabaseClient };
+      const { data: row } = await supabase
+        .from("emails")
+        .select("owner_email")
+        .eq("thread_id", data.threadId)
+        .not("owner_email", "is", null)
+        .order("received_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const owner = (row as { owner_email: string | null } | null)?.owner_email?.toLowerCase() ?? null;
+      const acct = (context as { gmailAccount?: { emailAddress: string } }).gmailAccount?.emailAddress?.toLowerCase();
+      if (owner && acct && owner !== acct) {
+        throw new Error(`Apenas o dono da caixa ${owner} pode responder esta conversa.`);
+      }
+    }
     const raw = toBase64Url(buildRfc2822(data));
     const body: Record<string, unknown> = { raw };
     if (data.threadId) body.threadId = data.threadId;

@@ -105,13 +105,37 @@ export const Route = createFileRoute("/api/public/google/oauth/callback")({
         const emailAddress = uinfo.email.toLowerCase();
         const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
 
-        // Detect previous connection for this email → reconnected vs connected.
-        const { data: prior } = await supabaseAdmin
+        // Enforce 1 user = 1 Gmail and 1 Gmail = 1 user.
+        const { data: userTokens } = await supabaseAdmin
           .from("user_gmail_tokens")
-          .select("id")
-          .eq("user_id", userId)
-          .eq("email_address", emailAddress)
-          .maybeSingle();
+          .select("id, user_id, email_address")
+          .or(`user_id.eq.${userId},email_address.eq.${emailAddress}`);
+        const rows = (userTokens ?? []) as Array<{ id: string; user_id: string; email_address: string }>;
+        const otherEmailForThisUser = rows.find((r) => r.user_id === userId && r.email_address !== emailAddress);
+        if (otherEmailForThisUser) {
+          await supabaseAdmin.from("gmail_connection_audit").insert({
+            user_id: userId, email_address: emailAddress,
+            event: "refresh_failed", reason: `Usuário já possui ${otherEmailForThisUser.email_address} conectada`,
+            metadata: { conflict: "user_has_other_account" },
+          });
+          return popupClose(
+            `Este usuário já tem a conta ${otherEmailForThisUser.email_address} conectada. Desconecte-a em Configurações antes de conectar ${emailAddress}.`,
+            false,
+          );
+        }
+        const sameEmailOtherUser = rows.find((r) => r.email_address === emailAddress && r.user_id !== userId);
+        if (sameEmailOtherUser) {
+          await supabaseAdmin.from("gmail_connection_audit").insert({
+            user_id: userId, email_address: emailAddress,
+            event: "refresh_failed", reason: "Conta Gmail já está conectada em outro usuário",
+            metadata: { conflict: "email_in_other_user", other_user_id: sameEmailOtherUser.user_id },
+          });
+          return popupClose(
+            `A conta ${emailAddress} já está conectada por outro usuário do sistema. Cada caixa Gmail pode pertencer a apenas um usuário.`,
+            false,
+          );
+        }
+        const prior = rows.find((r) => r.user_id === userId && r.email_address === emailAddress) ?? null;
 
         // Upsert tokens
         const { error: upErr } = await supabaseAdmin
@@ -123,7 +147,7 @@ export const Route = createFileRoute("/api/public/google/oauth/callback")({
             refresh_token: refreshToken,
             expires_at: expiresAt,
             scope,
-          }, { onConflict: "user_id,email_address" });
+          }, { onConflict: "user_id" });
         if (upErr) return popupClose(`Erro ao salvar tokens: ${upErr.message}`, false);
 
         await supabaseAdmin.from("gmail_connection_audit").insert({

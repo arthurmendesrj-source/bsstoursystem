@@ -28,6 +28,7 @@ import {
   Sparkles,
   Wallet,
   Megaphone,
+  Receipt,
 } from "lucide-react";
 import { AssistantFab } from "@/components/assistant/AssistantFab";
 import { GlobalSearchTrigger } from "@/components/GlobalSearch";
@@ -48,6 +49,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { isAdmin, hasRole } = useEffectiveAuth();
   const { viewAs, exitViewAs } = useViewAs();
+  const { tenant } = (require("@/lib/tenant") as typeof import("@/lib/tenant")).useTenant();
   const showManagerial = isAdmin || hasRole("diretor") || hasRole("gerente");
   const showFinanceiro = isAdmin || hasRole("diretor") || hasRole("financeiro");
   const showMarketing = isAdmin || hasRole("diretor") || hasRole("gerente");

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
-import { listSecurityDefinerFunctions, type SecurityDefinerFn } from "@/server/security-audit.functions";
+import { listSecurityDefinerFunctions, type SecurityDefinerFn } from "@/lib/security-audit.functions";
 
 export const Route = createFileRoute("/security-audit")({
   component: () => (

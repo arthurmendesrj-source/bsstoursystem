@@ -26,6 +26,8 @@ import {
   setDefaultCard,
   removeCard,
   createTopup,
+  listPublicPlans,
+  changeSubscriptionPlan,
 } from "@/lib/billing.functions";
 
 export const Route = createFileRoute("/billing")({ component: BillingPage });

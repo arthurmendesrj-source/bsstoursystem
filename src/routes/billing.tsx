@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CreditCard, Cloud, Sparkles, Receipt, User, Lock } from "lucide-react";
+import { CreditCard, Cloud, Sparkles, Receipt, User, Lock, Building2, Plus } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
   getBillingOverview,
@@ -42,13 +43,42 @@ const fmtBytes = (b: number) => {
 };
 
 function BillingPage() {
-  const { tenant } = useTenant();
+  const { tenant, tenants, loading } = useTenant();
   const isOwner = tenant?.role_in_tenant === "owner";
+
+  if (loading) {
+    return (
+      <AppShell>
+        <div className="p-8">Carregando…</div>
+      </AppShell>
+    );
+  }
 
   if (!tenant) {
     return (
       <AppShell>
-        <div className="p-8">Carregando…</div>
+        <div className="max-w-2xl mx-auto p-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                {tenants.length === 0 ? "Nenhuma empresa" : "Selecione uma empresa"}
+              </CardTitle>
+              <CardDescription>
+                {tenants.length === 0
+                  ? "Você ainda não tem uma empresa cadastrada. Crie uma para acessar a área de cobrança."
+                  : "Escolha uma empresa no seletor do topo para visualizar planos e cobrança."}
+              </CardDescription>
+            </CardHeader>
+            {tenants.length === 0 && (
+              <CardContent>
+                <Button asChild>
+                  <Link to="/onboarding"><Plus className="mr-2 h-4 w-4" /> Criar empresa</Link>
+                </Button>
+              </CardContent>
+            )}
+          </Card>
+        </div>
       </AppShell>
     );
   }

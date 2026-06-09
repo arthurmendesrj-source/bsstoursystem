@@ -155,8 +155,9 @@ function OverviewTab({ tenantId }: { tenantId: string }) {
   if (!data) return null;
 
   const plan = (data.subscription as any)?.plans;
-  const includedAi = (plan?.features?.ai_credits as number) ?? 100_000;
-  const includedGb = (plan?.features?.storage_gb as number) ?? 5;
+  const planFeatures = normalizeFeatures(plan?.features);
+  const includedAi = (planFeatures.ai_credits as number) ?? 100_000;
+  const includedGb = (planFeatures.storage_gb as number) ?? 5;
   const aiUsed = Number(data.ai_used_in_cycle ?? 0);
   const aiPct = Math.min(100, (aiUsed / includedAi) * 100);
 

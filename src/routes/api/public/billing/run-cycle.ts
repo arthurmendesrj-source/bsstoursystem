@@ -136,6 +136,7 @@ export const Route = createFileRoute("/api/public/billing/run-cycle")({
                 .update({
                   status: paid ? "paid" : "open",
                   attempt_count: attempt,
+                  last_attempt_at: new Date().toISOString(),
                   infinitepay_charge_id: charge.id,
                   paid_at: paid ? new Date().toISOString() : null,
                   last_error: paid ? null : "charge_not_paid",
@@ -155,6 +156,7 @@ export const Route = createFileRoute("/api/public/billing/run-cycle")({
                 infinitepay_charge_id: charge.id,
                 paid_at: paid ? new Date().toISOString() : null,
                 attempt_count: attempt,
+                last_attempt_at: new Date().toISOString(),
               });
             }
 

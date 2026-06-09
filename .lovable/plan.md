@@ -1,163 +1,75 @@
-## Decisões confirmadas
-1. **Enterprise**: produto sem price (sob proposta).
-2. **Usuário extra**: price recorrente separado no Stripe, cobrado via `quantity` no checkout.
-3. **IA excedente / créditos**: cobrança manual fora do Stripe — não criar metered.
-4. **Banco de horas adicional (R$ 180/h)**: não aplicar agora.
-5. **Migração Completa (faixa)**: não criar no Stripe — proposta manual.
 
-## 1. Migrations (schema)
+# Auditoria Sênior do App — Engenharia de Dados & O&M
 
-### 1.1 Estender `plans`
-```sql
-ALTER TABLE public.plans
-  ADD COLUMN IF NOT EXISTS stripe_product_id text,
-  ADD COLUMN IF NOT EXISTS stripe_price_id   text,
-  ADD COLUMN IF NOT EXISTS included_users    int DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS extra_user_cents  int DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS stripe_extra_user_price_id text,
-  ADD COLUMN IF NOT EXISTS description       text,
-  ADD COLUMN IF NOT EXISTS features          jsonb DEFAULT '[]'::jsonb,
-  ADD COLUMN IF NOT EXISTS is_quote          boolean DEFAULT false;
-```
+Objetivo: produzir um diagnóstico independente do estado atual do CRM (BSS Tour System) e um plano de melhorias priorizado, sem alterar código nesta etapa. Entrega: um relatório em `/docs/auditoria-2026-06.md` + um backlog priorizado.
 
-### 1.2 `plan_addons` (recorrentes)
-WhatsApp, IA Starter, IA Pro, BI, Banco 10h.
-```sql
-CREATE TABLE public.plan_addons (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  code text UNIQUE NOT NULL,
-  name text NOT NULL,
-  description text,
-  price_cents int NOT NULL,
-  currency text DEFAULT 'BRL',
-  interval text DEFAULT 'month',
-  category text,                 -- 'integration' | 'ai' | 'bi' | 'support'
-  metadata jsonb DEFAULT '{}',   -- ex: { credits: 1000 }
-  stripe_product_id text,
-  stripe_price_id text,
-  is_active boolean DEFAULT true,
-  sort_order int DEFAULT 0,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-ALTER TABLE public.plan_addons ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "addons readable" ON public.plan_addons FOR SELECT USING (true);
-CREATE POLICY "addons admin write" ON public.plan_addons FOR ALL
-  USING (public.is_super_admin(auth.uid()))
-  WITH CHECK (public.is_super_admin(auth.uid()));
-```
+## Escopo da auditoria
 
-### 1.3 `plan_one_time` (cobranças únicas)
-Setup Essencial/Completo, Setup WhatsApp, Migração Básica. (Migração Completa fica `is_quote=true` sem price.)
-```sql
-CREATE TABLE public.plan_one_time (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  code text UNIQUE NOT NULL,
-  name text NOT NULL,
-  description text,
-  price_cents int,
-  price_min_cents int,
-  price_max_cents int,
-  currency text DEFAULT 'BRL',
-  category text,                 -- 'setup' | 'migration' | 'integration_setup'
-  payment_split jsonb DEFAULT '{"upfront_pct":50,"on_delivery_pct":50}',
-  stripe_product_id text,
-  stripe_price_id text,
-  is_active boolean DEFAULT true,
-  is_quote boolean DEFAULT false,
-  sort_order int DEFAULT 0,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-ALTER TABLE public.plan_one_time ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "one_time readable" ON public.plan_one_time FOR SELECT USING (true);
-CREATE POLICY "one_time admin write" ON public.plan_one_time FOR ALL
-  USING (public.is_super_admin(auth.uid()))
-  WITH CHECK (public.is_super_admin(auth.uid()));
-```
+### 1. Engenharia de Dados
+- **Modelo de dados** — revisar as ~70 tabelas (`leads`, `customers`, `suppliers`, `bookings`, `quotes`, `emails`, `whatsapp_*`, `tasks`, `itineraries`, `permissions`, `tenants`, etc.): normalização, FKs faltantes, índices ausentes em colunas de filtro/junção, colunas órfãs, tipos inadequados.
+- **Multi-tenant** — coerência de `tenant_id` em todas as tabelas, uso de `current_tenant_id()` nas policies, vazamentos potenciais entre tenants.
+- **RLS & GRANTs** — rodar linter, conferir cada tabela `public.*`: RLS habilitado, policies coerentes, GRANTs corretos para `authenticated`/`anon`/`service_role`.
+- **Funções e triggers** — auditar as funções `SECURITY DEFINER` (`has_role`, `has_module_permission`, `generate_entity_code`, `on_lead_event`, `link_email_thread`, etc.): `search_path`, riscos de privilege escalation, performance.
+- **Integridade & qualidade** — registros órfãos, duplicatas (ex.: `emails` 1016 vs `user_gmail_tokens` 0), `email_sync_state` inconsistente, `activity_log` crescimento, dados de teste em produção.
+- **Performance** — tabelas grandes sem índice, queries N+1 prováveis na UI (`leads.tsx`, `dashboard.tsx`), uso de `pg_stat_statements` se disponível, `db_health`.
+- **Storage** — 9 buckets privados: política `storage_path_allowed_for_user`, tamanho, lixo (anexos órfãos).
 
-### 1.4 `subscription_addons` (suporte a múltiplos itens por assinatura)
-```sql
-CREATE TABLE public.subscription_addons (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  subscription_id uuid REFERENCES public.subscriptions(id) ON DELETE CASCADE,
-  addon_id uuid REFERENCES public.plan_addons(id),
-  quantity int DEFAULT 1,
-  stripe_subscription_item_id text,
-  added_at timestamptz DEFAULT now()
-);
-ALTER TABLE public.subscription_addons ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "sub addons by tenant" ON public.subscription_addons FOR SELECT
-  USING (EXISTS (
-    SELECT 1 FROM public.subscriptions s
-    WHERE s.id = subscription_id AND public.is_tenant_member(s.tenant_id, auth.uid())
-  ));
-```
+### 2. Segurança
+- Resultado do `security--run_security_scan` + `supabase--linter`.
+- Secrets expostos vs server-only (`SUPABASE_SERVICE_ROLE_KEY`, `CRM_GMAIL_ADDON_TOKEN`, VAPID, WhatsApp encryption key).
+- Rotas `/api/public/*`: verificação de assinatura, rate-limit, validação Zod.
+- Sistema de permissões (`role_module_permissions`, `role_field_permissions`, overrides por usuário) — gaps de cobertura.
+- Auditoria (`activity_log`, `user_audit_log`, `storage_access_log`, `voucher_send_log`) — cobertura e retenção.
 
-## 2. Seed de dados (via `supabase--insert` após migration)
+### 3. Backend / Server Functions
+- Mapeamento de todas as `*.functions.ts` e `routes/api/*`: quais estão vivas, quais são stubs (`gmail-poll`).
+- Uso correto de `requireSupabaseAuth` + `attachSupabaseAuth` em `start.ts`.
+- Tratamento de erros, logs estruturados, idempotência de webhooks (Stripe/Paddle, WhatsApp, Gmail add-on).
+- Edge Functions legadas em `supabase/functions/*` (extract-supplier, generate-invoice/proposal-doc, transcribe, itinerary-search): manter em Edge ou migrar para serverFn.
 
-**`plans`** — desativa `free`/`pro` antigos e insere:
-- `essencial` — R$ 1.490, 5 usuários, extra R$ 79.
-- `profissional` — R$ 2.990, 12 usuários, extra R$ 99, gmail incluso, **destaque/recomendado**.
-- `enterprise` — `is_quote=true`, `price_cents=null`.
+### 4. Integrações
+- **Gmail/Google OAuth** — fluxo, refresh token, ausência de cron de sync (já levantado).
+- **WhatsApp Meta** — webhooks, criptografia de tokens, conversas/templates.
+- **Lovable AI** — assistant, triagem de email, geração de imagem, propostas, itinerários.
+- **Push (VAPID)** — assinaturas, logs de notificação, fallback.
+- **Billing** — webhook, planos, addons, status de assinatura.
 
-**`plan_addons`**:
-- `whatsapp` R$ 250 (integration)
-- `ia_starter` R$ 490 (ai, metadata `{credits:1000}`)
-- `ia_pro` R$ 990 (ai, metadata `{credits:3000}`)
-- `bi` R$ 390 (bi)
-- `horas_10` R$ 1.500 (support, metadata `{hours:10}`)
+### 5. Frontend / UX
+- Roteamento TanStack: 60+ rotas, possíveis duplicações, rotas sem `errorComponent`/`notFoundComponent`.
+- Estados de loading/erro consistentes, uso de `useSuspenseQuery` vs `useEffect+fetch`.
+- Performance percebida: bundles grandes, lazy-loading, imagens.
+- Acessibilidade básica e responsividade.
+- i18n (`i18n.tsx`) — cobertura PT/EN.
 
-**`plan_one_time`**:
-- `setup_essencial` R$ 3.500
-- `setup_completo` R$ 6.500
-- `setup_whatsapp` R$ 1.500
-- `migracao_basica` R$ 2.500
-- `migracao_completa` `is_quote=true`, price_min 6.000 / price_max 12.000
+### 6. O&M (Operação & Manutenção)
+- **Observabilidade** — logs (worker, edge, postgres), métricas, alertas; o que falta para ter um "painel verde/vermelho".
+- **Cron / Jobs** — `pg_cron` está vazio; mapear jobs necessários (sync Gmail, SLA, cobrança, limpeza de logs, reprocessamento).
+- **Backups & DR** — política de backup Supabase, RPO/RTO declarados.
+- **Deploy & ambientes** — preview vs produção, secrets por ambiente, processo de release.
+- **Runbooks** — o que fazer quando: webhook falha, OAuth expira, fila trava, tenant solicita exportação/exclusão LGPD.
+- **Custos** — estimativa por tenant (DB, storage, AI tokens, edge invocations).
+- **SLA interno** — definir SLOs (uptime, latência p95, erro de webhook).
 
-## 3. Ativar Stripe nativo
-`payments--enable_stripe_payments` → cria ambiente test.
-Stripe Tax = **sem automação** (BR).
+## Entregáveis
 
-## 4. Espelhar no Stripe (`batch_create_product`)
+1. `docs/auditoria-2026-06.md` — relatório consolidado com achados por área, severidade (Crítico/Alto/Médio/Baixo) e referência ao arquivo/tabela.
+2. `docs/auditoria-backlog.md` — backlog priorizado (Impacto × Esforço) com 3 ondas:
+   - **Onda 1 (1–2 semanas):** correções críticas de segurança/dados, ativar Gmail polling, corrigir RLS/GRANTs faltantes.
+   - **Onda 2 (3–6 semanas):** observabilidade, runbooks, índices/performance, consolidar serverFn.
+   - **Onda 3 (>6 semanas):** evoluções de produto (planos, billing, AI, multi-tenant maduro).
+3. Atualização do `mem://index.md` com regras descobertas (ex.: padrões de RLS, padrão de logs).
 
-Recorrentes:
-- Essencial + price R$ 1.490/mês BRL + price extra R$ 79/mês (quantity).
-- Profissional + price R$ 2.990/mês + extra R$ 99/mês.
-- Enterprise: produto **sem price**.
-- WhatsApp R$ 250/mês.
-- IA Starter R$ 490/mês.
-- IA Pro R$ 990/mês.
-- BI R$ 390/mês.
-- Banco 10h R$ 1.500/mês.
+## Método
 
-One-time:
-- Setup Essencial R$ 3.500.
-- Setup Completo R$ 6.500.
-- Setup WhatsApp R$ 1.500.
-- Migração Básica R$ 2.500.
-- Migração Completa: produto **sem price**.
+- **Read-only.** Nenhuma migração, nenhum código alterado nesta fase.
+- Ferramentas: `supabase--linter`, `security--run_security_scan`, `supabase--read_query`, `supabase--db_health`, `rg` no código, leitura de rotas/serverFn críticos.
+- Uso de subagents em paralelo para áreas independentes (Dados, Segurança, Integrações, Frontend, O&M) e consolidação por mim.
 
-Persistir `stripe_product_id`/`stripe_price_id` (e `stripe_extra_user_price_id` em planos) via UPDATE.
+## Perguntas antes de começar
 
-## 5. UI `/billing` (apresentação dos planos e presets Boa/Melhor/Ideal)
-- 3 cards de plano com features e CTA "Assinar". Enterprise → "Falar com vendas".
-- Seção de add-ons com toggles.
-- Seção de serviços únicos (Setup / Migração) — cards com "Contratar".
-- 3 presets pré-configurados (Boa / Melhor / Ideal) que selecionam plano + add-ons + setup + migração e abrem checkout.
+1. **Profundidade**: auditoria executiva (~2 h de exploração, relatório de 6–10 páginas) ou aprofundada (varredura tabela-a-tabela e rota-a-rota, relatório de 20+ páginas)?
+2. **Foco prioritário**: tudo com peso igual, ou priorizar uma área (ex.: segurança/LGPD, performance, integrações Gmail/WhatsApp, billing)?
+3. **Formato do relatório**: markdown em `/docs` (versionado no repo) — ok, ou preferes PDF/Google Doc exportado?
+4. **Backlog**: gerar como markdown, ou já criar issues/tasks dentro do próprio app (tabela `tasks`)?
 
-## 6. Admin `/admin/plans` — expandir
-- Aba **Planos** (campos extras).
-- Aba **Add-ons** (CRUD).
-- Aba **Serviços únicos** (CRUD).
-- Botão "Sincronizar com Stripe" por linha.
-
-## 7. Fora desta fase
-- `/api/billing/checkout` real (monta line_items com plano + extras + addons + one-time selecionados).
-- `/api/billing/portal` (Customer Portal).
-- Substituir `src/routes/api/public/billing.webhook.ts` para validar assinatura Stripe e mapear eventos → `subscriptions` + `subscription_addons` + `billing_invoices`.
-- Lógica 50/50 para Setup/Migração (estratégia sugerida: 1ª invoice no checkout = 50%, 2ª invoice manual no go-live).
-
----
-
-Pronto para implementar nesta ordem: **migration → seed → enable Stripe → batch_create_product → UPDATE com ids → UI planos**. Posso começar pela migration?
+Responda essas 4 (ou apenas "tudo padrão: aprofundada, foco igual, markdown, backlog markdown") e eu sigo para o modo de execução.

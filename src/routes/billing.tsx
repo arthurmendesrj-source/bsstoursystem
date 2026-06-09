@@ -265,7 +265,7 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string; current
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {plans.map((p) => {
           const isCurrent = p.code === currentPlanCode;
-          const f = (p.features ?? {}) as any;
+          const f = normalizeFeatures(p.features);
           return (
             <Card key={p.id} className={isCurrent ? "border-primary" : ""}>
               <CardHeader>

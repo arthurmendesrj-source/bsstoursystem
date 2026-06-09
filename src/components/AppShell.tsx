@@ -297,6 +297,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               Campos financeiros
             </Link>
           )}
+          <Link to="/billing" onClick={() => minimizeAllWindows()} className={itemClass(path.startsWith("/billing"))} title={collapsed ? "Licença" : undefined}>
+            <Receipt className="h-4 w-4 shrink-0" />
+            {!collapsed && <span className="truncate">Licença</span>}
+          </Link>
           <Link to="/settings" onClick={() => minimizeAllWindows()} className={itemClass(path === "/settings")} title={collapsed ? t("settings") : undefined}>
             <Settings className="h-4 w-4 shrink-0" />
             {!collapsed && <span className="truncate">{t("settings")}</span>}

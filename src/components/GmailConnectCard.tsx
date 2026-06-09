@@ -145,6 +145,26 @@ export function GmailConnectCard() {
     }
   }, [disconnectFn, load]);
 
+  const syncNow = useCallback(async (email: string) => {
+    setSyncing(email);
+    try {
+      const r = await syncFn({ data: { emailAddress: email } }) as { inserted?: number; updated?: number; owner?: string };
+      const inserted = r.inserted ?? 0;
+      const updated = r.updated ?? 0;
+      const msg = `${inserted} novas, ${updated} atualizadas`;
+      setLastSyncResult((prev) => ({ ...prev, [email]: { ok: true, message: msg, at: new Date().toISOString() } }));
+      toast.success(`Sincronização concluída: ${msg}`);
+      await load();
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Falha ao sincronizar";
+      setLastSyncResult((prev) => ({ ...prev, [email]: { ok: false, message, at: new Date().toISOString() } }));
+      toast.error(message);
+    } finally {
+      setSyncing(null);
+    }
+  }, [syncFn, load]);
+
+
   const alreadyConnected = tokens.length >= 1;
 
   return (

@@ -58,6 +58,7 @@ import { Route as AlertsDebugRouteImport } from './routes/alerts.debug'
 import { Route as AdminTenantsRouteImport } from './routes/admin.tenants'
 import { Route as AdminPlansRouteImport } from './routes/admin.plans'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
+import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
 import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
@@ -70,6 +71,8 @@ import { Route as ApiPublicGmailDealRouteImport } from './routes/api/public/gmai
 import { Route as ApiPublicGmailContactRouteImport } from './routes/api/public/gmail/contact'
 import { Route as ApiPublicGmailActivityRouteImport } from './routes/api/public/gmail/activity'
 import { Route as ApiPublicBillingWebhookRouteImport } from './routes/api/public/billing.webhook'
+import { Route as ApiPublicBillingRunCycleRouteImport } from './routes/api/public/billing/run-cycle'
+import { Route as ApiPublicBillingAggregateUsageRouteImport } from './routes/api/public/billing/aggregate-usage'
 import { Route as ApiPublicGoogleOauthStartRouteImport } from './routes/api/public/google/oauth/start'
 import { Route as ApiPublicGoogleOauthCallbackRouteImport } from './routes/api/public/google/oauth/callback'
 
@@ -320,6 +323,12 @@ const UsersUserIdPermissionsRoute = UsersUserIdPermissionsRouteImport.update({
   path: '/users/$userId/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicInfinitepayWebhookRoute =
+  ApiPublicInfinitepayWebhookRouteImport.update({
+    id: '/api/public/infinitepay-webhook',
+    path: '/api/public/infinitepay-webhook',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicGmailPollRoute = ApiPublicGmailPollRouteImport.update({
   id: '/api/public/gmail-poll',
   path: '/api/public/gmail-poll',
@@ -383,6 +392,18 @@ const ApiPublicBillingWebhookRoute = ApiPublicBillingWebhookRouteImport.update({
   path: '/api/public/billing/webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicBillingRunCycleRoute =
+  ApiPublicBillingRunCycleRouteImport.update({
+    id: '/api/public/billing/run-cycle',
+    path: '/api/public/billing/run-cycle',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicBillingAggregateUsageRoute =
+  ApiPublicBillingAggregateUsageRouteImport.update({
+    id: '/api/public/billing/aggregate-usage',
+    path: '/api/public/billing/aggregate-usage',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicGoogleOauthStartRoute =
   ApiPublicGoogleOauthStartRouteImport.update({
     id: '/api/public/google/oauth/start',
@@ -447,7 +468,10 @@ export interface FileRoutesByFullPath {
   '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
+  '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
+  '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
   '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
@@ -512,7 +536,10 @@ export interface FileRoutesByTo {
   '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
+  '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
+  '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
   '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
@@ -578,7 +605,10 @@ export interface FileRoutesById {
   '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
   '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
+  '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
+  '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
+  '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
   '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
   '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
@@ -645,7 +675,10 @@ export interface FileRouteTypes {
     | '/t/$tenantSlug'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
+    | '/api/public/infinitepay-webhook'
     | '/users/$userId/permissions'
+    | '/api/public/billing/aggregate-usage'
+    | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
     | '/api/public/gmail/activity'
     | '/api/public/gmail/contact'
@@ -710,7 +743,10 @@ export interface FileRouteTypes {
     | '/t/$tenantSlug'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
+    | '/api/public/infinitepay-webhook'
     | '/users/$userId/permissions'
+    | '/api/public/billing/aggregate-usage'
+    | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
     | '/api/public/gmail/activity'
     | '/api/public/gmail/contact'
@@ -775,7 +811,10 @@ export interface FileRouteTypes {
     | '/t/$tenantSlug'
     | '/api/assistant/chat'
     | '/api/public/gmail-poll'
+    | '/api/public/infinitepay-webhook'
     | '/users_/$userId/permissions'
+    | '/api/public/billing/aggregate-usage'
+    | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
     | '/api/public/gmail/activity'
     | '/api/public/gmail/contact'
@@ -830,7 +869,10 @@ export interface RootRouteChildren {
   TTenantSlugRoute: typeof TTenantSlugRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
   ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
+  ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
+  ApiPublicBillingAggregateUsageRoute: typeof ApiPublicBillingAggregateUsageRoute
+  ApiPublicBillingRunCycleRoute: typeof ApiPublicBillingRunCycleRoute
   ApiPublicBillingWebhookRoute: typeof ApiPublicBillingWebhookRoute
   ApiPublicGmailActivityRoute: typeof ApiPublicGmailActivityRoute
   ApiPublicGmailContactRoute: typeof ApiPublicGmailContactRoute
@@ -1190,6 +1232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsersUserIdPermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/infinitepay-webhook': {
+      id: '/api/public/infinitepay-webhook'
+      path: '/api/public/infinitepay-webhook'
+      fullPath: '/api/public/infinitepay-webhook'
+      preLoaderRoute: typeof ApiPublicInfinitepayWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/gmail-poll': {
       id: '/api/public/gmail-poll'
       path: '/api/public/gmail-poll'
@@ -1272,6 +1321,20 @@ declare module '@tanstack/react-router' {
       path: '/api/public/billing/webhook'
       fullPath: '/api/public/billing/webhook'
       preLoaderRoute: typeof ApiPublicBillingWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/billing/run-cycle': {
+      id: '/api/public/billing/run-cycle'
+      path: '/api/public/billing/run-cycle'
+      fullPath: '/api/public/billing/run-cycle'
+      preLoaderRoute: typeof ApiPublicBillingRunCycleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/billing/aggregate-usage': {
+      id: '/api/public/billing/aggregate-usage'
+      path: '/api/public/billing/aggregate-usage'
+      fullPath: '/api/public/billing/aggregate-usage'
+      preLoaderRoute: typeof ApiPublicBillingAggregateUsageRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/google/oauth/start': {
@@ -1399,7 +1462,10 @@ const rootRouteChildren: RootRouteChildren = {
   TTenantSlugRoute: TTenantSlugRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
   ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
+  ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
+  ApiPublicBillingAggregateUsageRoute: ApiPublicBillingAggregateUsageRoute,
+  ApiPublicBillingRunCycleRoute: ApiPublicBillingRunCycleRoute,
   ApiPublicBillingWebhookRoute: ApiPublicBillingWebhookRoute,
   ApiPublicGmailActivityRoute: ApiPublicGmailActivityRoute,
   ApiPublicGmailContactRoute: ApiPublicGmailContactRoute,

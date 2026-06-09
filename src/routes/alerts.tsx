@@ -32,7 +32,7 @@ import {
   unsubscribeFromPush,
   type PushPermission,
 } from "@/lib/pushNotifications";
-import { sendTestPush } from "@/server/push.functions";
+import { sendTestPush } from "@/lib/push.functions";
 import { toast } from "sonner";
 import { logNotification } from "@/lib/notificationLogs";
 

@@ -81,6 +81,7 @@ export const getBillingOverview = createServerFn({ method: "POST" })
       payment_methods: pms ?? [],
       ai_used_in_cycle: aiUsed,
       storage_latest: storage ?? [],
+      active_users: activeUsers ?? 0,
     };
   });
 

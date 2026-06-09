@@ -1,75 +1,118 @@
+## Objetivo
 
-# Auditoria Sênior do App — Engenharia de Dados & O&M
+Resolver o problema de múltiplas contas Gmail por usuário, padronizando: **1 usuário = 1 Gmail**, **visibilidade da thread = quem tem acesso ao lead**, **envio sempre pela conta dona da thread**.
 
-Objetivo: produzir um diagnóstico independente do estado atual do CRM (BSS Tour System) e um plano de melhorias priorizado, sem alterar código nesta etapa. Entrega: um relatório em `/docs/auditoria-2026-06.md` + um backlog priorizado.
+---
 
-## Escopo da auditoria
+## 1. Banco (migração única)
 
-### 1. Engenharia de Dados
-- **Modelo de dados** — revisar as ~70 tabelas (`leads`, `customers`, `suppliers`, `bookings`, `quotes`, `emails`, `whatsapp_*`, `tasks`, `itineraries`, `permissions`, `tenants`, etc.): normalização, FKs faltantes, índices ausentes em colunas de filtro/junção, colunas órfãs, tipos inadequados.
-- **Multi-tenant** — coerência de `tenant_id` em todas as tabelas, uso de `current_tenant_id()` nas policies, vazamentos potenciais entre tenants.
-- **RLS & GRANTs** — rodar linter, conferir cada tabela `public.*`: RLS habilitado, policies coerentes, GRANTs corretos para `authenticated`/`anon`/`service_role`.
-- **Funções e triggers** — auditar as funções `SECURITY DEFINER` (`has_role`, `has_module_permission`, `generate_entity_code`, `on_lead_event`, `link_email_thread`, etc.): `search_path`, riscos de privilege escalation, performance.
-- **Integridade & qualidade** — registros órfãos, duplicatas (ex.: `emails` 1016 vs `user_gmail_tokens` 0), `email_sync_state` inconsistente, `activity_log` crescimento, dados de teste em produção.
-- **Performance** — tabelas grandes sem índice, queries N+1 prováveis na UI (`leads.tsx`, `dashboard.tsx`), uso de `pg_stat_statements` se disponível, `db_health`.
-- **Storage** — 9 buckets privados: política `storage_path_allowed_for_user`, tamanho, lixo (anexos órfãos).
+### 1.1 Garantir 1 conta por usuário e 1 dono por conta Gmail
+- `user_gmail_tokens`: criar índice **único parcial** em `user_id` (1 token vivo por usuário) e manter `UNIQUE (email_address)` global (impedir mesma caixa em 2 usuários).
+- Limpar duplicatas se existirem (consulta + delete dos mais antigos) antes de criar a constraint.
 
-### 2. Segurança
-- Resultado do `security--run_security_scan` + `supabase--linter`.
-- Secrets expostos vs server-only (`SUPABASE_SERVICE_ROLE_KEY`, `CRM_GMAIL_ADDON_TOKEN`, VAPID, WhatsApp encryption key).
-- Rotas `/api/public/*`: verificação de assinatura, rate-limit, validação Zod.
-- Sistema de permissões (`role_module_permissions`, `role_field_permissions`, overrides por usuário) — gaps de cobertura.
-- Auditoria (`activity_log`, `user_audit_log`, `storage_access_log`, `voucher_send_log`) — cobertura e retenção.
+### 1.2 OAuth callback rejeita 2ª conta
+- Em `src/routes/api/public/google/oauth/callback.ts`: antes do upsert, se já existe token para este `user_id` com **outro** `email_address`, retornar tela de erro pedindo desconectar a anterior. Se a conta Gmail já está em **outro** `user_id`, idem.
 
-### 3. Backend / Server Functions
-- Mapeamento de todas as `*.functions.ts` e `routes/api/*`: quais estão vivas, quais são stubs (`gmail-poll`).
-- Uso correto de `requireSupabaseAuth` + `attachSupabaseAuth` em `start.ts`.
-- Tratamento de erros, logs estruturados, idempotência de webhooks (Stripe/Paddle, WhatsApp, Gmail add-on).
-- Edge Functions legadas em `supabase/functions/*` (extract-supplier, generate-invoice/proposal-doc, transcribe, itinerary-search): manter em Edge ou migrar para serverFn.
+### 1.3 Visibilidade por lead (não por dono da caixa)
+- Alterar política RLS de `emails`, `email_threads`, `email_message_links`, `email_attachments`:
+  - SELECT permitido se `tenant_id = current_tenant_id()` **E** (`lead_id IS NULL` ou `can_access_lead(lead_id, auth.uid())` ou `customer_id` acessível ou `user_has_email_account(auth.uid(), owner_email)`).
+- Hoje a regra é via `user_has_email_account`; vamos relaxar para incluir threads ligadas a leads/clientes que o usuário enxerga.
 
-### 4. Integrações
-- **Gmail/Google OAuth** — fluxo, refresh token, ausência de cron de sync (já levantado).
-- **WhatsApp Meta** — webhooks, criptografia de tokens, conversas/templates.
-- **Lovable AI** — assistant, triagem de email, geração de imagem, propostas, itinerários.
-- **Push (VAPID)** — assinaturas, logs de notificação, fallback.
-- **Billing** — webhook, planos, addons, status de assinatura.
+### 1.4 Telemetria
+- Aproveitar `gmail_connection_audit` já existente para registrar tentativas rejeitadas (event = `connect_rejected_conflict`).
 
-### 5. Frontend / UX
-- Roteamento TanStack: 60+ rotas, possíveis duplicações, rotas sem `errorComponent`/`notFoundComponent`.
-- Estados de loading/erro consistentes, uso de `useSuspenseQuery` vs `useEffect+fetch`.
-- Performance percebida: bundles grandes, lazy-loading, imagens.
-- Acessibilidade básica e responsividade.
-- i18n (`i18n.tsx`) — cobertura PT/EN.
+---
 
-### 6. O&M (Operação & Manutenção)
-- **Observabilidade** — logs (worker, edge, postgres), métricas, alertas; o que falta para ter um "painel verde/vermelho".
-- **Cron / Jobs** — `pg_cron` está vazio; mapear jobs necessários (sync Gmail, SLA, cobrança, limpeza de logs, reprocessamento).
-- **Backups & DR** — política de backup Supabase, RPO/RTO declarados.
-- **Deploy & ambientes** — preview vs produção, secrets por ambiente, processo de release.
-- **Runbooks** — o que fazer quando: webhook falha, OAuth expira, fila trava, tenant solicita exportação/exclusão LGPD.
-- **Custos** — estimativa por tenant (DB, storage, AI tokens, edge invocations).
-- **SLA interno** — definir SLOs (uptime, latência p95, erro de webhook).
+## 2. Backend / Server functions
 
-## Entregáveis
+### 2.1 Resolver “conta dona da thread” no envio
+- `gmailSend` hoje usa `requireGmailAccount` que pega a conta mais antiga. Mudar para:
+  - Receber `threadId` opcional → buscar `emails.owner_email` do thread → forçar `emailAddress = owner_email`.
+  - Se o usuário logado **não é dono dessa caixa** (consulta `user_gmail_tokens.user_id`), bloquear com mensagem clara: "Apenas {dono} pode responder esta thread".
+- Resposta/encaminhamento no `ThreadReader` passa `threadId` explicitamente.
 
-1. `docs/auditoria-2026-06.md` — relatório consolidado com achados por área, severidade (Crítico/Alto/Médio/Baixo) e referência ao arquivo/tabela.
-2. `docs/auditoria-backlog.md` — backlog priorizado (Impacto × Esforço) com 3 ondas:
-   - **Onda 1 (1–2 semanas):** correções críticas de segurança/dados, ativar Gmail polling, corrigir RLS/GRANTs faltantes.
-   - **Onda 2 (3–6 semanas):** observabilidade, runbooks, índices/performance, consolidar serverFn.
-   - **Onda 3 (>6 semanas):** evoluções de produto (planos, billing, AI, multi-tenant maduro).
-3. Atualização do `mem://index.md` com regras descobertas (ex.: padrões de RLS, padrão de logs).
+### 2.2 Polling `/gmail-poll`
+- Já itera por todas as contas conectadas — sem mudança necessária.
 
-## Método
+### 2.3 Remover seleção implícita
+- `requireGmailAccount`: quando `emailAddress` não vem, usar a **única** conta do usuário; se houver >1 (não deveria mais), logar warning e usar a primária.
 
-- **Read-only.** Nenhuma migração, nenhum código alterado nesta fase.
-- Ferramentas: `supabase--linter`, `security--run_security_scan`, `supabase--read_query`, `supabase--db_health`, `rg` no código, leitura de rotas/serverFn críticos.
-- Uso de subagents em paralelo para áreas independentes (Dados, Segurança, Integrações, Frontend, O&M) e consolidação por mim.
+---
 
-## Perguntas antes de começar
+## 3. Frontend
 
-1. **Profundidade**: auditoria executiva (~2 h de exploração, relatório de 6–10 páginas) ou aprofundada (varredura tabela-a-tabela e rota-a-rota, relatório de 20+ páginas)?
-2. **Foco prioritário**: tudo com peso igual, ou priorizar uma área (ex.: segurança/LGPD, performance, integrações Gmail/WhatsApp, billing)?
-3. **Formato do relatório**: markdown em `/docs` (versionado no repo) — ok, ou preferes PDF/Google Doc exportado?
-4. **Backlog**: gerar como markdown, ou já criar issues/tasks dentro do próprio app (tabela `tasks`)?
+### 3.1 `/settings` — `GmailConnectCard`
+- Esconder botão "Conectar Gmail" se já existe 1 token; mostrar mensagem "Desconecte a conta atual para conectar outra".
+- Mostrar com destaque a única conta vinculada.
 
-Responda essas 4 (ou apenas "tudo padrão: aprofundada, foco igual, markdown, backlog markdown") e eu sigo para o modo de execução.
+### 3.2 `EmailPanel`
+- Remover qualquer suposição de "primeira conta"; carregar a conta única do usuário (via novo serverFn `getMyGmailAccount`).
+- Banner se o usuário não tem conta conectada (CTA → `/settings`).
+- Listagem de threads agora pode incluir threads de **outras caixas** vinculadas a leads que o usuário acessa (vinda do banco, não do Gmail API). Renderizar badge "via {owner_email}" quando `owner_email ≠ minha conta`.
+
+### 3.3 `ThreadReader` / resposta
+- Botão "Responder" desabilitado quando `owner_email` da thread não é a conta do usuário logado; tooltip explica e sugere encaminhar via nota interna ou pedir ao dono.
+
+---
+
+## 4. Detalhes técnicos
+
+```text
+Migração SQL (resumo):
+  -- limpeza
+  WITH ranked AS (
+    SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at) rn
+    FROM public.user_gmail_tokens
+  )
+  DELETE FROM public.user_gmail_tokens WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+
+  -- 1 token por usuário
+  CREATE UNIQUE INDEX user_gmail_tokens_user_unique ON public.user_gmail_tokens(user_id);
+
+  -- 1 dono por caixa Gmail (já existe UNIQUE user_id+email_address; trocar por unique só em email_address)
+  ALTER TABLE public.user_gmail_tokens
+    DROP CONSTRAINT IF EXISTS user_gmail_tokens_user_id_email_address_key,
+    ADD CONSTRAINT user_gmail_tokens_email_unique UNIQUE (email_address);
+
+  -- RLS emails (recriar)
+  DROP POLICY ... ; CREATE POLICY "emails read by lead access" ON public.emails
+    FOR SELECT TO authenticated USING (
+      tenant_id = public.current_tenant_id() AND (
+        public.user_has_email_account(auth.uid(), owner_email)
+        OR (lead_id IS NOT NULL AND public.can_access_lead(lead_id, auth.uid()))
+        OR public.is_admin(auth.uid())
+      )
+    );
+  -- repetir lógica análoga em email_threads / email_message_links / email_attachments
+```
+
+```text
+Arquivos a editar:
+  src/server/gmail-auth-middleware.ts          (resolver owner por threadId)
+  src/server/gmail.functions.ts                (gmailSend exige threadId/account)
+  src/routes/api/public/google/oauth/callback.ts (rejeitar 2ª conta + conflito)
+  src/components/GmailConnectCard.tsx          (esconder botão se já conectado)
+  src/components/email/EmailPanel.tsx          (carregar conta única, banner)
+  src/components/email/ThreadReader.tsx        (bloquear envio se não-dono)
+  src/lib/gmail-audit.functions.ts             (novo: getMyGmailAccount)
+  supabase/migrations/<timestamp>_gmail_one_per_user.sql
+```
+
+---
+
+## 5. O que NÃO entra agora (fora de escopo)
+
+- Caixas compartilhadas (vendas@, suporte@) — postergado.
+- Seletor de conta ativa na UI — não necessário no modelo 1:1.
+- Migração de tokens órfãos antigos — só roda a limpeza inicial.
+
+---
+
+## 6. Verificação após implementar
+
+1. Tentar conectar 2 contas Gmail no mesmo usuário → callback rejeita.
+2. Conectar mesma conta em 2 usuários → callback rejeita.
+3. Lead com thread cuja `owner_email` é de outro usuário → o assigned_to vê a thread (RLS).
+4. Botão "Responder" desabilitado para quem não é dono da caixa.
+5. `gmailSend` sem `threadId` em fluxo de novo e-mail → usa a conta única do usuário.
+6. Cron `/gmail-poll` continua processando todas as contas (sem regressão).

@@ -72,27 +72,16 @@ function BillingPage() {
   if (!tenant) {
     return (
       <AppShell>
-        <div className="max-w-2xl mx-auto p-8">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                {tenants.length === 0 ? "Nenhuma empresa" : "Selecione uma empresa"}
-              </CardTitle>
-              <CardDescription>
-                {tenants.length === 0
-                  ? "Você ainda não tem uma empresa cadastrada. Crie uma para acessar a área de cobrança."
-                  : "Escolha uma empresa no seletor do topo para visualizar planos e cobrança."}
-              </CardDescription>
-            </CardHeader>
-            {tenants.length === 0 && (
-              <CardContent>
-                <Button asChild>
-                  <Link to="/onboarding"><Plus className="mr-2 h-4 w-4" /> Criar empresa</Link>
-                </Button>
-              </CardContent>
-            )}
-          </Card>
+        <div className="max-w-7xl mx-auto p-6 space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Licença</h1>
+            <p className="text-muted-foreground">
+              {tenants.length === 0
+                ? "Você ainda não tem um pacote assinado. Confira os pacotes disponíveis abaixo."
+                : "Selecione uma empresa no topo para gerenciar sua assinatura. Pacotes disponíveis:"}
+            </p>
+          </div>
+          <PlansSection tenantId={null} currentPlanCode={null} />
         </div>
       </AppShell>
     );

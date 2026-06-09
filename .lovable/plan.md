@@ -1,118 +1,84 @@
-## Objetivo
 
-Resolver o problema de múltiplas contas Gmail por usuário, padronizando: **1 usuário = 1 Gmail**, **visibilidade da thread = quem tem acesso ao lead**, **envio sempre pela conta dona da thread**.
+# Plano — Área de Cobrança (`/billing`)
 
----
+Modelo: **base mensal + R$/usuário adicional + cr&eacute;ditos de Storage (GB-mês) e IA (tokens)**. Gateway: **Stripe (integrado Lovable)**. Acesso: somente **owner** do tenant.
 
-## 1. Banco (migração única)
+## 1. Banco de dados (migration)
 
-### 1.1 Garantir 1 conta por usuário e 1 dono por conta Gmail
-- `user_gmail_tokens`: criar índice **único parcial** em `user_id` (1 token vivo por usuário) e manter `UNIQUE (email_address)` global (impedir mesma caixa em 2 usuários).
-- Limpar duplicatas se existirem (consulta + delete dos mais antigos) antes de criar a constraint.
+Aproveita o que já existe (`tenants`, `subscriptions`, `plans`, `billing_invoices`, `plan_addons`) e adiciona o que falta para medição/uso.
 
-### 1.2 OAuth callback rejeita 2ª conta
-- Em `src/routes/api/public/google/oauth/callback.ts`: antes do upsert, se já existe token para este `user_id` com **outro** `email_address`, retornar tela de erro pedindo desconectar a anterior. Se a conta Gmail já está em **outro** `user_id`, idem.
+Novas tabelas (todas com RLS, somente owner do tenant lê via `has_role`/`tenant_members.role_in_tenant = 'owner'`; writes = `service_role`):
 
-### 1.3 Visibilidade por lead (não por dono da caixa)
-- Alterar política RLS de `emails`, `email_threads`, `email_message_links`, `email_attachments`:
-  - SELECT permitido se `tenant_id = current_tenant_id()` **E** (`lead_id IS NULL` ou `can_access_lead(lead_id, auth.uid())` ou `customer_id` acessível ou `user_has_email_account(auth.uid(), owner_email)`).
-- Hoje a regra é via `user_has_email_account`; vamos relaxar para incluir threads ligadas a leads/clientes que o usuário enxerga.
+- `ai_usage_log` — `tenant_id`, `user_id`, `model`, `feature` (triage/proposal/assistant/etc.), `input_tokens`, `output_tokens`, `cost_credits`, `meta jsonb`, `created_at`. Índice por `(tenant_id, created_at)`.
+- `storage_usage_daily` — `tenant_id`, `day date`, `bucket`, `bytes bigint`, `objects int`. PK `(tenant_id, day, bucket)`. Alimentada por job diário que soma `storage.objects.metadata->>size`.
+- `billing_usage_periods` — `tenant_id`, `subscription_id`, `period_start`, `period_end`, `ai_tokens_input`, `ai_tokens_output`, `ai_credits_used`, `storage_gb_avg`, `seats_avg`, `status` (open/closed/invoiced), `invoice_id`. Fechado no fim do ciclo, vira `billing_invoices`.
+- `payment_methods` — `tenant_id`, `stripe_customer_id`, `stripe_payment_method_id`, `brand`, `last4`, `exp_month/year`, `is_default`.
+- `billing_credits_ledger` — `tenant_id`, `kind` (ai|storage), `delta_credits numeric`, `reason`, `ref_id`, `created_at`. Para top-ups avulsos e ajustes.
 
-### 1.4 Telemetria
-- Aproveitar `gmail_connection_audit` já existente para registrar tentativas rejeitadas (event = `connect_rejected_conflict`).
+Colunas adicionais:
+- `tenants.stripe_customer_id text`
+- `subscriptions.stripe_subscription_id text`, `seats int default 1`, `included_ai_credits int`, `included_storage_gb int`
+- `plans` ganha `price_per_seat_cents`, `included_ai_credits`, `included_storage_gb`, `overage_ai_credit_cents`, `overage_storage_gb_cents`
 
----
+Todas seguem a regra GRANT → ENABLE RLS → POLICY.
 
-## 2. Backend / Server functions
+## 2. Backend (server fns + 1 webhook)
 
-### 2.1 Resolver “conta dona da thread” no envio
-- `gmailSend` hoje usa `requireGmailAccount` que pega a conta mais antiga. Mudar para:
-  - Receber `threadId` opcional → buscar `emails.owner_email` do thread → forçar `emailAddress = owner_email`.
-  - Se o usuário logado **não é dono dessa caixa** (consulta `user_gmail_tokens.user_id`), bloquear com mensagem clara: "Apenas {dono} pode responder esta thread".
-- Resposta/encaminhamento no `ThreadReader` passa `threadId` explicitamente.
+`src/lib/billing.functions.ts` (todos com `requireSupabaseAuth` + checagem `is_owner(tenant_id)`):
+- `getBillingOverview` — plano atual, assentos, cartão default, próximo vencimento, uso do período corrente (IA + storage + assentos) com % consumido.
+- `getUsageBreakdown({ range })` — séries diárias de tokens IA (por feature/user) e GB de storage (por bucket). Alimenta gráficos.
+- `getInvoices` / `getInvoicePdfUrl(id)` — lista e link Stripe-hosted.
+- `changePlan({ planId })`, `updateSeats({ seats })`, `cancelSubscription()`, `resumeSubscription()`.
+- `createCheckoutSession({ planId, seats })` — Stripe Checkout para nova assinatura.
+- `createBillingPortalSession()` — redirect ao portal Stripe (gerenciar cartão).
+- `topUpCredits({ kind, amount })` — checkout one-shot para pacote de créditos.
 
-### 2.2 Polling `/gmail-poll`
-- Já itera por todas as contas conectadas — sem mudança necessária.
+`src/server/billing.server.ts` — wrapper do SDK Stripe (server-only, importado via `await import` dentro dos handlers).
 
-### 2.3 Remover seleção implícita
-- `requireGmailAccount`: quando `emailAddress` não vem, usar a **única** conta do usuário; se houver >1 (não deveria mais), logar warning e usar a primária.
+`src/server/ai-meter.server.ts` — helper `logAiUsage(...)` chamado em **todas** as chamadas existentes ao Lovable AI (assistant, triage, propose-tour, transcribe, generate-doc, extract-supplier-*). Lê `usage.input_tokens/output_tokens` da resposta e grava em `ai_usage_log`.
 
----
+Rota pública: `src/routes/api/public/stripe/webhook.ts` — verifica assinatura `STRIPE_WEBHOOK_SECRET`, processa `customer.subscription.*`, `invoice.paid`, `invoice.payment_failed`, `checkout.session.completed`. Usa `supabaseAdmin` para atualizar `subscriptions`, `billing_invoices`, `payment_methods`, `billing_credits_ledger`.
 
-## 3. Frontend
+Cron diário (pg_cron + `/api/public/billing/aggregate`) consolida `storage.objects` → `storage_usage_daily` e fecha período de assinaturas vencidas → reporta uso ao Stripe (`subscription_item.usage_record`).
 
-### 3.1 `/settings` — `GmailConnectCard`
-- Esconder botão "Conectar Gmail" se já existe 1 token; mostrar mensagem "Desconecte a conta atual para conectar outra".
-- Mostrar com destaque a única conta vinculada.
+## 3. Frontend — `/billing` (owner-only)
 
-### 3.2 `EmailPanel`
-- Remover qualquer suposição de "primeira conta"; carregar a conta única do usuário (via novo serverFn `getMyGmailAccount`).
-- Banner se o usuário não tem conta conectada (CTA → `/settings`).
-- Listagem de threads agora pode incluir threads de **outras caixas** vinculadas a leads que o usuário acessa (vinda do banco, não do Gmail API). Renderizar badge "via {owner_email}" quando `owner_email ≠ minha conta`.
+Rota `src/routes/billing.tsx` já existe (gate de assinatura). Vamos transformá-la em hub com abas:
 
-### 3.3 `ThreadReader` / resposta
-- Botão "Responder" desabilitado quando `owner_email` da thread não é a conta do usuário logado; tooltip explica e sugere encaminhar via nota interna ou pedir ao dono.
+1. **Visão geral** — card do plano atual, próximo vencimento, status, botões "Mudar de plano" / "Gerenciar cartão" (portal Stripe). Cards de uso (IA, Storage, Assentos) com barras de progresso `usado / incluído` e custo projetado de excedente.
+2. **Uso & Créditos** (componente novo `UsageDashboard.tsx`):
+   - Gráficos (recharts) de tokens IA por dia, separados por feature e top-5 usuários.
+   - Gráfico de GB de storage por bucket.
+   - Tabela "últimas 50 chamadas de IA" com modelo, feature, tokens, custo.
+   - Botões **"Comprar créditos IA"** e **"Comprar pacote de Storage"** (top-ups).
+3. **Assinatura** — seletor de plano (cards Starter/Pro/Business com preço por assento e cotas), input de assentos, preview de novo total, botão "Aplicar".
+4. **Faturas** — tabela (`billing_invoices` + Stripe) com download PDF e status.
+5. **Método de pagamento** — cartão default; abre Stripe Billing Portal.
 
----
+Sidebar (`AppShell`): novo item "Cobrança" visível só para owner (`tenant.role_in_tenant === 'owner'`). Membros que tentarem acessar veem aviso "Apenas o proprietário pode ver cobrança".
 
-## 4. Detalhes técnicos
+## 4. Stripe — setup
 
-```text
-Migração SQL (resumo):
-  -- limpeza
-  WITH ranked AS (
-    SELECT id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY created_at) rn
-    FROM public.user_gmail_tokens
-  )
-  DELETE FROM public.user_gmail_tokens WHERE id IN (SELECT id FROM ranked WHERE rn > 1);
+Antes de codar:
+1. Rodar `recommend_payment_provider` (esperado: Stripe, SaaS).
+2. `enable_stripe_payments` (cria conta sandbox automática).
+3. Criar produtos via `batch_create_product`: 3 planos base + add-on "Assento adicional" (per-seat metered) + 2 metered products "AI tokens" e "Storage GB-mês" + 2 one-time "Pacote 10k créditos IA" e "Pacote 10 GB".
 
-  -- 1 token por usuário
-  CREATE UNIQUE INDEX user_gmail_tokens_user_unique ON public.user_gmail_tokens(user_id);
+## 5. Segurança
 
-  -- 1 dono por caixa Gmail (já existe UNIQUE user_id+email_address; trocar por unique só em email_address)
-  ALTER TABLE public.user_gmail_tokens
-    DROP CONSTRAINT IF EXISTS user_gmail_tokens_user_id_email_address_key,
-    ADD CONSTRAINT user_gmail_tokens_email_unique UNIQUE (email_address);
+- `is_owner(tenant_id)` policy helper. Todas as policies de billing exigem owner.
+- Webhook valida assinatura HMAC antes de qualquer write.
+- `STRIPE_SECRET_KEY` e `STRIPE_WEBHOOK_SECRET` via `add_secret` (passo após enable).
+- Nenhum endpoint `/api/public/*` retorna PII; webhook só usa IDs do Stripe.
 
-  -- RLS emails (recriar)
-  DROP POLICY ... ; CREATE POLICY "emails read by lead access" ON public.emails
-    FOR SELECT TO authenticated USING (
-      tenant_id = public.current_tenant_id() AND (
-        public.user_has_email_account(auth.uid(), owner_email)
-        OR (lead_id IS NOT NULL AND public.can_access_lead(lead_id, auth.uid()))
-        OR public.is_admin(auth.uid())
-      )
-    );
-  -- repetir lógica análoga em email_threads / email_message_links / email_attachments
-```
+## 6. Fora deste escopo
 
-```text
-Arquivos a editar:
-  src/server/gmail-auth-middleware.ts          (resolver owner por threadId)
-  src/server/gmail.functions.ts                (gmailSend exige threadId/account)
-  src/routes/api/public/google/oauth/callback.ts (rejeitar 2ª conta + conflito)
-  src/components/GmailConnectCard.tsx          (esconder botão se já conectado)
-  src/components/email/EmailPanel.tsx          (carregar conta única, banner)
-  src/components/email/ThreadReader.tsx        (bloquear envio se não-dono)
-  src/lib/gmail-audit.functions.ts             (novo: getMyGmailAccount)
-  supabase/migrations/<timestamp>_gmail_one_per_user.sql
-```
+- Cobrança em PIX/boleto (gateway separado).
+- Visualização de consumo por membro comum (só owner por enquanto).
+- Conversão automática real→USD; preços ficam em BRL via Stripe.
+- Refunds automáticos (feito manualmente no Stripe Dashboard).
 
----
+## Arquivos a criar/editar
 
-## 5. O que NÃO entra agora (fora de escopo)
-
-- Caixas compartilhadas (vendas@, suporte@) — postergado.
-- Seletor de conta ativa na UI — não necessário no modelo 1:1.
-- Migração de tokens órfãos antigos — só roda a limpeza inicial.
-
----
-
-## 6. Verificação após implementar
-
-1. Tentar conectar 2 contas Gmail no mesmo usuário → callback rejeita.
-2. Conectar mesma conta em 2 usuários → callback rejeita.
-3. Lead com thread cuja `owner_email` é de outro usuário → o assigned_to vê a thread (RLS).
-4. Botão "Responder" desabilitado para quem não é dono da caixa.
-5. `gmailSend` sem `threadId` em fluxo de novo e-mail → usa a conta única do usuário.
-6. Cron `/gmail-poll` continua processando todas as contas (sem regressão).
+- **Criar**: migration; `src/lib/billing.functions.ts`; `src/server/billing.server.ts`; `src/server/ai-meter.server.ts`; `src/routes/api/public/stripe/webhook.ts`; `src/routes/api/public/billing/aggregate.ts`; `src/components/billing/UsageDashboard.tsx`; `src/components/billing/PlanSelector.tsx`; `src/components/billing/InvoicesTable.tsx`; `src/components/billing/TopUpDialog.tsx`.
+- **Editar**: `src/routes/billing.tsx` (transformar em hub); `src/components/AppShell.tsx` (item de menu owner-only); todas as chamadas existentes ao Lovable AI para chamar `logAiUsage`.

@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/public/billing/run-cycle")({
         const { data: subs, error } = await supabaseAdmin
           .from("subscriptions")
           .select(
-            "id, tenant_id, status, current_period_start, current_period_end, grace_until, plans:plan_id (price_cents, currency, name, interval)",
+            "id, tenant_id, status, current_period_start, current_period_end, grace_until, plans:plan_id (price_cents, currency, name, interval, included_users, extra_user_cents)",
           )
           .in("status", ["active", "past_due"])
           .lte("current_period_end", now.toISOString());
@@ -46,7 +46,18 @@ export const Route = createFileRoute("/api/public/billing/run-cycle")({
 
         for (const sub of subs ?? []) {
           const plan: any = sub.plans;
-          const amount = Number(plan?.price_cents ?? 0);
+          const base = Number(plan?.price_cents ?? 0);
+          const included = Number(plan?.included_users ?? 0);
+          const extraPer = Number(plan?.extra_user_cents ?? 0);
+
+          // Count active users for this tenant
+          const { count: activeUsers } = await supabaseAdmin
+            .from("tenant_members")
+            .select("user_id", { count: "exact", head: true })
+            .eq("tenant_id", sub.tenant_id)
+            .eq("is_active", true);
+          const extras = Math.max(0, (activeUsers ?? 0) - included);
+          const amount = base + extras * extraPer;
           if (amount <= 0) {
             skipped += 1;
             continue;

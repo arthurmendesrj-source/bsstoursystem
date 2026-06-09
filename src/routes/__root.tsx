@@ -71,26 +71,29 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  const { queryClient } = Route.useRouteContext();
   return (
-    <I18nProvider>
-      <CurrencyProvider>
-        <AuthProvider>
-          <TenantProvider>
-            <ViewAsProvider>
-              <PermissionsProvider>
-                <TooltipProvider delayDuration={400}>
-                  <WorkspaceWindowsProvider>
-                    <Outlet />
-                    <PermissionFieldHighlighter />
-                    <GlobalButtonTooltips />
-                    <Toaster />
-                  </WorkspaceWindowsProvider>
-                </TooltipProvider>
-              </PermissionsProvider>
-            </ViewAsProvider>
-          </TenantProvider>
-        </AuthProvider>
-      </CurrencyProvider>
-    </I18nProvider>
+    <QueryClientProvider client={queryClient}>
+      <I18nProvider>
+        <CurrencyProvider>
+          <AuthProvider>
+            <TenantProvider>
+              <ViewAsProvider>
+                <PermissionsProvider>
+                  <TooltipProvider delayDuration={400}>
+                    <WorkspaceWindowsProvider>
+                      <Outlet />
+                      <PermissionFieldHighlighter />
+                      <GlobalButtonTooltips />
+                      <Toaster />
+                    </WorkspaceWindowsProvider>
+                  </TooltipProvider>
+                </PermissionsProvider>
+              </ViewAsProvider>
+            </TenantProvider>
+          </AuthProvider>
+        </CurrencyProvider>
+      </I18nProvider>
+    </QueryClientProvider>
   );
 }

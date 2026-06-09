@@ -447,3 +447,63 @@ export const cancelSubscription = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ─────────────────────────── list public plans ───────────────────────────
+export const listPublicPlans = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context;
+    const { data, error } = await supabase
+      .from("plans")
+      .select("id, code, name, price_cents, currency, interval, included_users, extra_user_cents, features, sort_order")
+      .eq("is_public", true)
+      .order("sort_order", { ascending: true });
+    if (error) throw new Error(error.message);
+    return { plans: data ?? [] };
+  });
+
+// ─────────────────────────── change plan ───────────────────────────
+export const changeSubscriptionPlan = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) =>
+    z.object({ tenant_id: z.string().uuid(), plan_code: z.string().min(1).max(50) }).parse(i),
+  )
+  .handler(async ({ data, context }) => {
+    await requireOwner(context, data.tenant_id);
+    const { supabase } = context;
+    const { data: plan, error: pErr } = await supabase
+      .from("plans")
+      .select("id")
+      .eq("code", data.plan_code)
+      .eq("is_public", true)
+      .maybeSingle();
+    if (pErr) throw new Error(pErr.message);
+    if (!plan) throw new Error("Plano não encontrado");
+
+    const { data: existing } = await supabase
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", data.tenant_id)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabase
+        .from("subscriptions")
+        .update({ plan_id: plan.id, cancel_at_period_end: false, canceled_at: null })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const now = new Date();
+      const end = new Date(now);
+      end.setMonth(end.getMonth() + 1);
+      const { error } = await supabase.from("subscriptions").insert({
+        tenant_id: data.tenant_id,
+        plan_id: plan.id,
+        status: "active",
+        current_period_start: now.toISOString(),
+        current_period_end: end.toISOString(),
+      });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true };
+  });

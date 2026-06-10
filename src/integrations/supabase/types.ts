@@ -1976,6 +1976,59 @@ export type Database = {
           },
         ]
       }
+      license_codes: {
+        Row: {
+          code: string
+          created_at: string
+          duration_days: number
+          id: string
+          is_active: boolean
+          max_uses: number
+          plan_code: string
+          redeemed_at: string | null
+          redeemed_by_tenant_id: string | null
+          redeemed_by_user_id: string | null
+          updated_at: string
+          uses_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          duration_days?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+          plan_code: string
+          redeemed_at?: string | null
+          redeemed_by_tenant_id?: string | null
+          redeemed_by_user_id?: string | null
+          updated_at?: string
+          uses_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          duration_days?: number
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+          plan_code?: string
+          redeemed_at?: string | null
+          redeemed_by_tenant_id?: string | null
+          redeemed_by_user_id?: string | null
+          updated_at?: string
+          uses_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "license_codes_redeemed_by_tenant_id_fkey"
+            columns: ["redeemed_by_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           body: string | null

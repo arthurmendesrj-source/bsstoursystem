@@ -39,7 +39,7 @@ import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { EmailPanel } from "@/components/email/EmailPanel";
+// EmailPanel removed — email feature being rebuilt at /email
 import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";
@@ -299,7 +299,7 @@ function WorkspacePage() {
     let content: React.ReactNode = null;
     if (key === "email") {
       title = t("intEmail");
-      content = <div className="h-full"><EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader /></div>;
+      content = <div className="p-4 text-sm text-muted-foreground">Email agora vive em /email.</div>;
     } else if (key === "activities") {
       title = t("activities");
       content = <div className="p-4"><ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} /></div>;
@@ -727,7 +727,7 @@ function WorkspacePage() {
                   {!hasLead || !lead ? (
                     <EmptyTab text={t("selectLeadToView")} />
                   ) : (
-                    <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader />
+                    <div className="p-4 text-sm text-muted-foreground">Email agora vive em <a className="underline" href="/email">/email</a>.</div>
                   )}
                 </AccordionContent>
               </AccordionItem>

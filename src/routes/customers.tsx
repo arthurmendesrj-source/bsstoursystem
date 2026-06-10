@@ -335,7 +335,7 @@ function CustomerDrawer({ customer, onClose }: { customer: Customer | null; onCl
       const [l, b, e, i, ts] = await Promise.all([
         supabase.from("leads").select("id,name,status,destination,created_at").eq("customer_id", customer.id).order("created_at", { ascending: false }),
         supabase.from("bookings").select("id,status,total_amount,currency,departure_date,created_at").eq("customer_id", customer.id).order("created_at", { ascending: false }),
-        supabase.from("emails").select("id,subject,from_email,received_at").eq("customer_id", customer.id).order("received_at", { ascending: false }).limit(20),
+        Promise.resolve({ data: [] as any[] }),
         supabase.from("interactions").select("id,type,subject,occurred_at").eq("customer_id", customer.id).order("occurred_at", { ascending: false }).limit(20),
         supabase.from("tasks").select("id,title,completed,due_date").eq("customer_id", customer.id).order("created_at", { ascending: false }).limit(20),
       ]);

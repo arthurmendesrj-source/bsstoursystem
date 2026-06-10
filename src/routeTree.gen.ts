@@ -24,12 +24,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicencaRouteImport } from './routes/licenca'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ItinerariesRouteImport } from './routes/itineraries'
-import { Route as InboxIaRouteImport } from './routes/inbox-ia'
-import { Route as GoogleOauthPopupRouteImport } from './routes/google-oauth-popup'
 import { Route as GerencialRouteImport } from './routes/gerencial'
 import { Route as FunnelRouteImport } from './routes/funnel'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
-import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BookingsRouteImport } from './routes/bookings'
@@ -48,10 +45,8 @@ import { Route as SettingsWhatsappRouteImport } from './routes/settings_.whatsap
 import { Route as SettingsTemplatesRouteImport } from './routes/settings_.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings_.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings_.permissions'
-import { Route as SettingsGoogleDiagnosticoRouteImport } from './routes/settings_.google-diagnostico'
 import { Route as PermissionsAuditFinancialRouteImport } from './routes/permissions-audit.financial'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
-import { Route as InboxIaEmailRouteImport } from './routes/inbox-ia_.email'
 import { Route as GerencialUserIdRouteImport } from './routes/gerencial.$userId'
 import { Route as BookingsBookingIdRouteImport } from './routes/bookings_.$bookingId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
@@ -62,22 +57,14 @@ import { Route as AdminTenantsRouteImport } from './routes/admin.tenants'
 import { Route as AdminPlansRouteImport } from './routes/admin.plans'
 import { Route as UsersUserIdPermissionsRouteImport } from './routes/users_.$userId.permissions'
 import { Route as ApiPublicInfinitepayWebhookRouteImport } from './routes/api/public/infinitepay-webhook'
-import { Route as ApiPublicGmailPollRouteImport } from './routes/api/public/gmail-poll'
 import { Route as ApiAssistantChatRouteImport } from './routes/api/assistant/chat'
 import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/public/whatsapp/webhook'
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
-import { Route as ApiPublicGmailLookupRouteImport } from './routes/api/public/gmail/lookup'
-import { Route as ApiPublicGmailLeadRouteImport } from './routes/api/public/gmail/lead'
-import { Route as ApiPublicGmailDealRouteImport } from './routes/api/public/gmail/deal'
-import { Route as ApiPublicGmailContactRouteImport } from './routes/api/public/gmail/contact'
-import { Route as ApiPublicGmailActivityRouteImport } from './routes/api/public/gmail/activity'
 import { Route as ApiPublicBillingWebhookRouteImport } from './routes/api/public/billing.webhook'
 import { Route as ApiPublicBillingRunCycleRouteImport } from './routes/api/public/billing/run-cycle'
 import { Route as ApiPublicBillingAggregateUsageRouteImport } from './routes/api/public/billing/aggregate-usage'
-import { Route as ApiPublicGoogleOauthStartRouteImport } from './routes/api/public/google/oauth/start'
-import { Route as ApiPublicGoogleOauthCallbackRouteImport } from './routes/api/public/google/oauth/callback'
 
 const WorkspaceRoute = WorkspaceRouteImport.update({
   id: '/workspace',
@@ -154,16 +141,6 @@ const ItinerariesRoute = ItinerariesRouteImport.update({
   path: '/itineraries',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InboxIaRoute = InboxIaRouteImport.update({
-  id: '/inbox-ia',
-  path: '/inbox-ia',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const GoogleOauthPopupRoute = GoogleOauthPopupRouteImport.update({
-  id: '/google-oauth-popup',
-  path: '/google-oauth-popup',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GerencialRoute = GerencialRouteImport.update({
   id: '/gerencial',
   path: '/gerencial',
@@ -177,11 +154,6 @@ const FunnelRoute = FunnelRouteImport.update({
 const FinanceiroRoute = FinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EmailRoute = EmailRouteImport.update({
-  id: '/email',
-  path: '/email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -275,12 +247,6 @@ const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
   path: '/settings/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SettingsGoogleDiagnosticoRoute =
-  SettingsGoogleDiagnosticoRouteImport.update({
-    id: '/settings_/google-diagnostico',
-    path: '/settings/google-diagnostico',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const PermissionsAuditFinancialRoute =
   PermissionsAuditFinancialRouteImport.update({
     id: '/financial',
@@ -291,11 +257,6 @@ const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   id: '/$leadId',
   path: '/$leadId',
   getParentRoute: () => LeadsRoute,
-} as any)
-const InboxIaEmailRoute = InboxIaEmailRouteImport.update({
-  id: '/inbox-ia_/email',
-  path: '/inbox-ia/email',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const GerencialUserIdRoute = GerencialUserIdRouteImport.update({
   id: '/$userId',
@@ -348,11 +309,6 @@ const ApiPublicInfinitepayWebhookRoute =
     path: '/api/public/infinitepay-webhook',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicGmailPollRoute = ApiPublicGmailPollRouteImport.update({
-  id: '/api/public/gmail-poll',
-  path: '/api/public/gmail-poll',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiAssistantChatRoute = ApiAssistantChatRouteImport.update({
   id: '/api/assistant/chat',
   path: '/api/assistant/chat',
@@ -381,31 +337,6 @@ const ApiPublicHooksLeadEventsRoute =
     path: '/api/public/hooks/lead-events',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicGmailLookupRoute = ApiPublicGmailLookupRouteImport.update({
-  id: '/api/public/gmail/lookup',
-  path: '/api/public/gmail/lookup',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicGmailLeadRoute = ApiPublicGmailLeadRouteImport.update({
-  id: '/api/public/gmail/lead',
-  path: '/api/public/gmail/lead',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicGmailDealRoute = ApiPublicGmailDealRouteImport.update({
-  id: '/api/public/gmail/deal',
-  path: '/api/public/gmail/deal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicGmailContactRoute = ApiPublicGmailContactRouteImport.update({
-  id: '/api/public/gmail/contact',
-  path: '/api/public/gmail/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicGmailActivityRoute = ApiPublicGmailActivityRouteImport.update({
-  id: '/api/public/gmail/activity',
-  path: '/api/public/gmail/activity',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicBillingWebhookRoute = ApiPublicBillingWebhookRouteImport.update({
   id: '/api/public/billing/webhook',
   path: '/api/public/billing/webhook',
@@ -423,18 +354,6 @@ const ApiPublicBillingAggregateUsageRoute =
     path: '/api/public/billing/aggregate-usage',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicGoogleOauthStartRoute =
-  ApiPublicGoogleOauthStartRouteImport.update({
-    id: '/api/public/google/oauth/start',
-    path: '/api/public/google/oauth/start',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicGoogleOauthCallbackRoute =
-  ApiPublicGoogleOauthCallbackRouteImport.update({
-    id: '/api/public/google/oauth/callback',
-    path: '/api/public/google/oauth/callback',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -446,12 +365,9 @@ export interface FileRoutesByFullPath {
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
-  '/email': typeof EmailRoute
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
-  '/google-oauth-popup': typeof GoogleOauthPopupRoute
-  '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/licenca': typeof LicencaRoute
@@ -475,10 +391,8 @@ export interface FileRoutesByFullPath {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/gerencial/$userId': typeof GerencialUserIdRoute
-  '/inbox-ia/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
-  '/settings/google-diagnostico': typeof SettingsGoogleDiagnosticoRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -489,23 +403,15 @@ export interface FileRoutesByFullPath {
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
   '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
-  '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
-  '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
-  '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
-  '/api/public/gmail/lead': typeof ApiPublicGmailLeadRoute
-  '/api/public/gmail/lookup': typeof ApiPublicGmailLookupRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
-  '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
-  '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -517,12 +423,9 @@ export interface FileRoutesByTo {
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
-  '/email': typeof EmailRoute
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
-  '/google-oauth-popup': typeof GoogleOauthPopupRoute
-  '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/licenca': typeof LicencaRoute
@@ -546,10 +449,8 @@ export interface FileRoutesByTo {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/gerencial/$userId': typeof GerencialUserIdRoute
-  '/inbox-ia/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
-  '/settings/google-diagnostico': typeof SettingsGoogleDiagnosticoRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -560,23 +461,15 @@ export interface FileRoutesByTo {
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/users/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
   '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
-  '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
-  '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
-  '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
-  '/api/public/gmail/lead': typeof ApiPublicGmailLeadRoute
-  '/api/public/gmail/lookup': typeof ApiPublicGmailLookupRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
-  '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
-  '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -589,12 +482,9 @@ export interface FileRoutesById {
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
-  '/email': typeof EmailRoute
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
-  '/google-oauth-popup': typeof GoogleOauthPopupRoute
-  '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
   '/licenca': typeof LicencaRoute
@@ -618,10 +508,8 @@ export interface FileRoutesById {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings_/$bookingId': typeof BookingsBookingIdRoute
   '/gerencial/$userId': typeof GerencialUserIdRoute
-  '/inbox-ia_/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
-  '/settings_/google-diagnostico': typeof SettingsGoogleDiagnosticoRoute
   '/settings_/permissions': typeof SettingsPermissionsRoute
   '/settings_/sla': typeof SettingsSlaRoute
   '/settings_/templates': typeof SettingsTemplatesRoute
@@ -632,23 +520,15 @@ export interface FileRoutesById {
   '/suppliers/references': typeof SuppliersReferencesRoute
   '/t/$tenantSlug': typeof TTenantSlugRoute
   '/api/assistant/chat': typeof ApiAssistantChatRoute
-  '/api/public/gmail-poll': typeof ApiPublicGmailPollRoute
   '/api/public/infinitepay-webhook': typeof ApiPublicInfinitepayWebhookRoute
   '/users_/$userId/permissions': typeof UsersUserIdPermissionsRoute
   '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
   '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
-  '/api/public/gmail/activity': typeof ApiPublicGmailActivityRoute
-  '/api/public/gmail/contact': typeof ApiPublicGmailContactRoute
-  '/api/public/gmail/deal': typeof ApiPublicGmailDealRoute
-  '/api/public/gmail/lead': typeof ApiPublicGmailLeadRoute
-  '/api/public/gmail/lookup': typeof ApiPublicGmailLookupRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
   '/api/public/whatsapp/webhook': typeof ApiPublicWhatsappWebhookRoute
-  '/api/public/google/oauth/callback': typeof ApiPublicGoogleOauthCallbackRoute
-  '/api/public/google/oauth/start': typeof ApiPublicGoogleOauthStartRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -662,12 +542,9 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/dashboard'
-    | '/email'
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
-    | '/google-oauth-popup'
-    | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/licenca'
@@ -691,10 +568,8 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/gerencial/$userId'
-    | '/inbox-ia/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
-    | '/settings/google-diagnostico'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -705,23 +580,15 @@ export interface FileRouteTypes {
     | '/suppliers/references'
     | '/t/$tenantSlug'
     | '/api/assistant/chat'
-    | '/api/public/gmail-poll'
     | '/api/public/infinitepay-webhook'
     | '/users/$userId/permissions'
     | '/api/public/billing/aggregate-usage'
     | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
-    | '/api/public/gmail/activity'
-    | '/api/public/gmail/contact'
-    | '/api/public/gmail/deal'
-    | '/api/public/gmail/lead'
-    | '/api/public/gmail/lookup'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
     | '/api/public/whatsapp/webhook'
-    | '/api/public/google/oauth/callback'
-    | '/api/public/google/oauth/start'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -733,12 +600,9 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/dashboard'
-    | '/email'
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
-    | '/google-oauth-popup'
-    | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/licenca'
@@ -762,10 +626,8 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/gerencial/$userId'
-    | '/inbox-ia/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
-    | '/settings/google-diagnostico'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -776,23 +638,15 @@ export interface FileRouteTypes {
     | '/suppliers/references'
     | '/t/$tenantSlug'
     | '/api/assistant/chat'
-    | '/api/public/gmail-poll'
     | '/api/public/infinitepay-webhook'
     | '/users/$userId/permissions'
     | '/api/public/billing/aggregate-usage'
     | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
-    | '/api/public/gmail/activity'
-    | '/api/public/gmail/contact'
-    | '/api/public/gmail/deal'
-    | '/api/public/gmail/lead'
-    | '/api/public/gmail/lookup'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
     | '/api/public/whatsapp/webhook'
-    | '/api/public/google/oauth/callback'
-    | '/api/public/google/oauth/start'
   id:
     | '__root__'
     | '/'
@@ -804,12 +658,9 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/dashboard'
-    | '/email'
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
-    | '/google-oauth-popup'
-    | '/inbox-ia'
     | '/itineraries'
     | '/leads'
     | '/licenca'
@@ -833,10 +684,8 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings_/$bookingId'
     | '/gerencial/$userId'
-    | '/inbox-ia_/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
-    | '/settings_/google-diagnostico'
     | '/settings_/permissions'
     | '/settings_/sla'
     | '/settings_/templates'
@@ -847,23 +696,15 @@ export interface FileRouteTypes {
     | '/suppliers/references'
     | '/t/$tenantSlug'
     | '/api/assistant/chat'
-    | '/api/public/gmail-poll'
     | '/api/public/infinitepay-webhook'
     | '/users_/$userId/permissions'
     | '/api/public/billing/aggregate-usage'
     | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
-    | '/api/public/gmail/activity'
-    | '/api/public/gmail/contact'
-    | '/api/public/gmail/deal'
-    | '/api/public/gmail/lead'
-    | '/api/public/gmail/lookup'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
     | '/api/public/whatsapp/webhook'
-    | '/api/public/google/oauth/callback'
-    | '/api/public/google/oauth/start'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -876,12 +717,9 @@ export interface RootRouteChildren {
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
-  EmailRoute: typeof EmailRoute
   FinanceiroRoute: typeof FinanceiroRoute
   FunnelRoute: typeof FunnelRoute
   GerencialRoute: typeof GerencialRouteWithChildren
-  GoogleOauthPopupRoute: typeof GoogleOauthPopupRoute
-  InboxIaRoute: typeof InboxIaRoute
   ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
   LicencaRoute: typeof LicencaRoute
@@ -900,31 +738,21 @@ export interface RootRouteChildren {
   AdminPlansRoute: typeof AdminPlansRoute
   AdminTenantsRoute: typeof AdminTenantsRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
-  InboxIaEmailRoute: typeof InboxIaEmailRoute
-  SettingsGoogleDiagnosticoRoute: typeof SettingsGoogleDiagnosticoRoute
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
   SettingsWhatsappRoute: typeof SettingsWhatsappRoute
   TTenantSlugRoute: typeof TTenantSlugRoute
   ApiAssistantChatRoute: typeof ApiAssistantChatRoute
-  ApiPublicGmailPollRoute: typeof ApiPublicGmailPollRoute
   ApiPublicInfinitepayWebhookRoute: typeof ApiPublicInfinitepayWebhookRoute
   UsersUserIdPermissionsRoute: typeof UsersUserIdPermissionsRoute
   ApiPublicBillingAggregateUsageRoute: typeof ApiPublicBillingAggregateUsageRoute
   ApiPublicBillingRunCycleRoute: typeof ApiPublicBillingRunCycleRoute
   ApiPublicBillingWebhookRoute: typeof ApiPublicBillingWebhookRoute
-  ApiPublicGmailActivityRoute: typeof ApiPublicGmailActivityRoute
-  ApiPublicGmailContactRoute: typeof ApiPublicGmailContactRoute
-  ApiPublicGmailDealRoute: typeof ApiPublicGmailDealRoute
-  ApiPublicGmailLeadRoute: typeof ApiPublicGmailLeadRoute
-  ApiPublicGmailLookupRoute: typeof ApiPublicGmailLookupRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
   ApiPublicWhatsappWebhookRoute: typeof ApiPublicWhatsappWebhookRoute
-  ApiPublicGoogleOauthCallbackRoute: typeof ApiPublicGoogleOauthCallbackRoute
-  ApiPublicGoogleOauthStartRoute: typeof ApiPublicGoogleOauthStartRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1034,20 +862,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ItinerariesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/inbox-ia': {
-      id: '/inbox-ia'
-      path: '/inbox-ia'
-      fullPath: '/inbox-ia'
-      preLoaderRoute: typeof InboxIaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/google-oauth-popup': {
-      id: '/google-oauth-popup'
-      path: '/google-oauth-popup'
-      fullPath: '/google-oauth-popup'
-      preLoaderRoute: typeof GoogleOauthPopupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/gerencial': {
       id: '/gerencial'
       path: '/gerencial'
@@ -1067,13 +881,6 @@ declare module '@tanstack/react-router' {
       path: '/financeiro'
       fullPath: '/financeiro'
       preLoaderRoute: typeof FinanceiroRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/email': {
-      id: '/email'
-      path: '/email'
-      fullPath: '/email'
-      preLoaderRoute: typeof EmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -1202,13 +1009,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SettingsPermissionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/settings_/google-diagnostico': {
-      id: '/settings_/google-diagnostico'
-      path: '/settings/google-diagnostico'
-      fullPath: '/settings/google-diagnostico'
-      preLoaderRoute: typeof SettingsGoogleDiagnosticoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/permissions-audit/financial': {
       id: '/permissions-audit/financial'
       path: '/financial'
@@ -1222,13 +1022,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/leads/$leadId'
       preLoaderRoute: typeof LeadsLeadIdRouteImport
       parentRoute: typeof LeadsRoute
-    }
-    '/inbox-ia_/email': {
-      id: '/inbox-ia_/email'
-      path: '/inbox-ia/email'
-      fullPath: '/inbox-ia/email'
-      preLoaderRoute: typeof InboxIaEmailRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/gerencial/$userId': {
       id: '/gerencial/$userId'
@@ -1300,13 +1093,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicInfinitepayWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/gmail-poll': {
-      id: '/api/public/gmail-poll'
-      path: '/api/public/gmail-poll'
-      fullPath: '/api/public/gmail-poll'
-      preLoaderRoute: typeof ApiPublicGmailPollRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/assistant/chat': {
       id: '/api/assistant/chat'
       path: '/api/assistant/chat'
@@ -1342,41 +1128,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksLeadEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/gmail/lookup': {
-      id: '/api/public/gmail/lookup'
-      path: '/api/public/gmail/lookup'
-      fullPath: '/api/public/gmail/lookup'
-      preLoaderRoute: typeof ApiPublicGmailLookupRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/gmail/lead': {
-      id: '/api/public/gmail/lead'
-      path: '/api/public/gmail/lead'
-      fullPath: '/api/public/gmail/lead'
-      preLoaderRoute: typeof ApiPublicGmailLeadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/gmail/deal': {
-      id: '/api/public/gmail/deal'
-      path: '/api/public/gmail/deal'
-      fullPath: '/api/public/gmail/deal'
-      preLoaderRoute: typeof ApiPublicGmailDealRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/gmail/contact': {
-      id: '/api/public/gmail/contact'
-      path: '/api/public/gmail/contact'
-      fullPath: '/api/public/gmail/contact'
-      preLoaderRoute: typeof ApiPublicGmailContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/gmail/activity': {
-      id: '/api/public/gmail/activity'
-      path: '/api/public/gmail/activity'
-      fullPath: '/api/public/gmail/activity'
-      preLoaderRoute: typeof ApiPublicGmailActivityRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/billing/webhook': {
       id: '/api/public/billing/webhook'
       path: '/api/public/billing/webhook'
@@ -1396,20 +1147,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/billing/aggregate-usage'
       fullPath: '/api/public/billing/aggregate-usage'
       preLoaderRoute: typeof ApiPublicBillingAggregateUsageRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/google/oauth/start': {
-      id: '/api/public/google/oauth/start'
-      path: '/api/public/google/oauth/start'
-      fullPath: '/api/public/google/oauth/start'
-      preLoaderRoute: typeof ApiPublicGoogleOauthStartRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/google/oauth/callback': {
-      id: '/api/public/google/oauth/callback'
-      path: '/api/public/google/oauth/callback'
-      fullPath: '/api/public/google/oauth/callback'
-      preLoaderRoute: typeof ApiPublicGoogleOauthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -1493,12 +1230,9 @@ const rootRouteChildren: RootRouteChildren = {
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
-  EmailRoute: EmailRoute,
   FinanceiroRoute: FinanceiroRoute,
   FunnelRoute: FunnelRoute,
   GerencialRoute: GerencialRouteWithChildren,
-  GoogleOauthPopupRoute: GoogleOauthPopupRoute,
-  InboxIaRoute: InboxIaRoute,
   ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,
   LicencaRoute: LicencaRoute,
@@ -1517,41 +1251,22 @@ const rootRouteChildren: RootRouteChildren = {
   AdminPlansRoute: AdminPlansRoute,
   AdminTenantsRoute: AdminTenantsRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
-  InboxIaEmailRoute: InboxIaEmailRoute,
-  SettingsGoogleDiagnosticoRoute: SettingsGoogleDiagnosticoRoute,
   SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,
   SettingsWhatsappRoute: SettingsWhatsappRoute,
   TTenantSlugRoute: TTenantSlugRoute,
   ApiAssistantChatRoute: ApiAssistantChatRoute,
-  ApiPublicGmailPollRoute: ApiPublicGmailPollRoute,
   ApiPublicInfinitepayWebhookRoute: ApiPublicInfinitepayWebhookRoute,
   UsersUserIdPermissionsRoute: UsersUserIdPermissionsRoute,
   ApiPublicBillingAggregateUsageRoute: ApiPublicBillingAggregateUsageRoute,
   ApiPublicBillingRunCycleRoute: ApiPublicBillingRunCycleRoute,
   ApiPublicBillingWebhookRoute: ApiPublicBillingWebhookRoute,
-  ApiPublicGmailActivityRoute: ApiPublicGmailActivityRoute,
-  ApiPublicGmailContactRoute: ApiPublicGmailContactRoute,
-  ApiPublicGmailDealRoute: ApiPublicGmailDealRoute,
-  ApiPublicGmailLeadRoute: ApiPublicGmailLeadRoute,
-  ApiPublicGmailLookupRoute: ApiPublicGmailLookupRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,
   ApiPublicWhatsappWebhookRoute: ApiPublicWhatsappWebhookRoute,
-  ApiPublicGoogleOauthCallbackRoute: ApiPublicGoogleOauthCallbackRoute,
-  ApiPublicGoogleOauthStartRoute: ApiPublicGoogleOauthStartRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

@@ -10,8 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { GmailConnectCard } from "@/components/GmailConnectCard";
-import { SmtpEmailConnectCard } from "@/components/SmtpEmailConnectCard";
+import { ConnectEmailCard } from "@/components/email/ConnectEmailCard";
 
 export const Route = createFileRoute("/settings")({
   component: () => (
@@ -63,15 +62,7 @@ function SettingsPage() {
           <Button type="submit">{t("save")}</Button>
         </form>
       </Card>
-      <GmailConnectCard />
-      <SmtpEmailConnectCard />
-      <Card className="p-4 flex items-center justify-between">
-        <div>
-          <div className="font-medium">Diagnóstico Google OAuth</div>
-          <p className="text-sm text-muted-foreground">Verifica passo a passo onde a conexão Gmail está falhando.</p>
-        </div>
-        <a href="/settings/google-diagnostico" className="text-sm underline">Abrir</a>
-      </Card>
+      <ConnectEmailCard />
     </div>
   );
 }

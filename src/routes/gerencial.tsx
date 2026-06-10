@@ -78,7 +78,7 @@ function GerencialPage() {
       const leadsQ = supabase.from("leads").select("id,assigned_to,created_by,status,estimated_value,currency,created_at,next_action_date,updated_at").in("assigned_to", userIds);
       const tasksQ = supabase.from("tasks").select("id,assigned_to,completed,due_date,created_at").in("assigned_to", userIds);
       const bookingsQ = supabase.from("bookings").select("created_by,total_amount,status,created_at").in("created_by", userIds).eq("status", "confirmada");
-      const emailsQ = supabase.from("emails").select("id,is_unread,lead_id,received_at");
+      const emailsQ = Promise.resolve({ data: [] as Array<{ id: string; is_unread: boolean | null; lead_id: string | null; received_at: string | null }> });
 
       const [{ data: leads }, { data: tasks }, { data: bookings }, { data: emails }] =
         await Promise.all([leadsQ, tasksQ, bookingsQ, emailsQ]);

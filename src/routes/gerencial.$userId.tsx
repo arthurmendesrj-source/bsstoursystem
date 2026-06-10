@@ -98,12 +98,7 @@ function UserDetailPage() {
       let emailsCount = 0;
       let emailsUnread = 0;
       if (ids.length > 0) {
-        const [eAll, eUnread] = await Promise.all([
-          supabase.from("emails").select("id", { count: "exact", head: true }).in("lead_id", ids),
-          supabase.from("emails").select("id", { count: "exact", head: true }).in("lead_id", ids).eq("is_unread", true),
-        ]);
-        emailsCount = eAll.count ?? 0;
-        emailsUnread = eUnread.count ?? 0;
+        // emails table removed during email rebuild
       }
       if (cancel) return;
 
@@ -313,13 +308,8 @@ function EmailsTable({ leadIds, total }: { leadIds: string[]; total: number }) {
     (async () => {
       setLoading(true);
       if (leadIds.length === 0) { setRows([]); setLoading(false); return; }
-      const from = page * PAGE_SIZE;
-      const { data } = await supabase.from("emails")
-        .select("id,subject,from_name,from_email,is_unread,received_at,lead_id")
-        .in("lead_id", leadIds)
-        .order("received_at", { ascending: false })
-        .range(from, from + PAGE_SIZE - 1);
-      if (!cancel) { setRows(data ?? []); setLoading(false); }
+      void page;
+      if (!cancel) { setRows([]); setLoading(false); }
     })();
     return () => { cancel = true; };
   }, [key, page]);

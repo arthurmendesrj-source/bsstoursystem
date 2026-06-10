@@ -65,11 +65,7 @@ export function GlobalSearchTrigger() {
           .select("id,status,departure_date,notes")
           .ilike("notes", like)
           .limit(6),
-        supabase.from("emails")
-          .select("id,thread_id,subject,from_name,from_email,snippet")
-          .or(`subject.ilike.${like},from_name.ilike.${like},from_email.ilike.${like},snippet.ilike.${like},body_text.ilike.${like}`)
-          .order("received_at", { ascending: false })
-          .limit(8),
+        Promise.resolve({ data: [] as any[] }),
       ]);
       setResults({
         leads: (leads.data ?? []) as Results["leads"],

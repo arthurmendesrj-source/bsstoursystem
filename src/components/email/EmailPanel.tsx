@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";
 import { ThreadWindowManager, type ThreadWindowManagerHandle } from "@/components/email/ThreadWindowManager";
 import { Maximize2 } from "lucide-react";
+import { SmtpInbox } from "@/components/email/SmtpInbox";
 
 type Folder = { id: string; name: string; type: string; unread_count: number; total_count: number; color_bg: string | null; color_text: string | null };
 type ThreadRow = {

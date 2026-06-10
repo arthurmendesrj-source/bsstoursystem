@@ -82,15 +82,7 @@ function LeadsPage() {
       assigned_to: form.assigned_to || ownerId,
     }).select("id").single();
     if (error) { toast.error(error.message); return; }
-    // Auto-link existing email threads from this contact's address
-    if (form.email && created?.id) {
-      const { linkThreadsByEmail } = await import("@/lib/linkEmailToEntity");
-      const n = await linkThreadsByEmail(form.email, { lead_id: created.id });
-      if (n > 0) toast.success(`Lead criado · ${n} thread(s) de e-mail vinculadas`);
-      else toast.success(t("saved"));
-    } else {
-      toast.success(t("saved"));
-    }
+    toast.success(t("saved"));
     setOpen(false);
     setForm({ name: "", email: "", phone: "", destination: "", estimated_value: "", status: "novo", assigned_to: "" });
     load();

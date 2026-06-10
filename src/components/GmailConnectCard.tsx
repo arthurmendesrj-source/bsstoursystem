@@ -105,7 +105,11 @@ export function GmailConnectCard() {
   const connect = useCallback(async () => {
     setConnecting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        const refreshed = await supabase.auth.refreshSession();
+        session = refreshed.data.session ?? null;
+      }
       if (!session?.access_token) { toast.error("Sessão expirada — faça login novamente."); setConnecting(false); return; }
       // Open a popup on OUR origin first (top-level window). The bridge page
       // fetches the Google auth URL and then navigates the popup to Google,

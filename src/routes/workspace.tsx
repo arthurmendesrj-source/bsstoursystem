@@ -39,7 +39,7 @@ import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { EmailPanel } from "@/components/email/EmailPanel";
+// EmailPanel removed — email feature being rebuilt at /email
 import { ProposalEditor } from "@/components/proposal/ProposalEditor";
 import { TaskUpdatesPanel } from "@/components/TaskUpdatesPanel";
 import { useWorkspaceWindows } from "@/components/workspace/WorkspaceWindowsProvider";

@@ -25,6 +25,7 @@ import { Route as LicencaRouteImport } from './routes/licenca'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ItinerariesRouteImport } from './routes/itineraries'
 import { Route as InboxIaRouteImport } from './routes/inbox-ia'
+import { Route as GoogleOauthPopupRouteImport } from './routes/google-oauth-popup'
 import { Route as GerencialRouteImport } from './routes/gerencial'
 import { Route as FunnelRouteImport } from './routes/funnel'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
@@ -156,6 +157,11 @@ const ItinerariesRoute = ItinerariesRouteImport.update({
 const InboxIaRoute = InboxIaRouteImport.update({
   id: '/inbox-ia',
   path: '/inbox-ia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GoogleOauthPopupRoute = GoogleOauthPopupRouteImport.update({
+  id: '/google-oauth-popup',
+  path: '/google-oauth-popup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GerencialRoute = GerencialRouteImport.update({
@@ -444,6 +450,7 @@ export interface FileRoutesByFullPath {
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
+  '/google-oauth-popup': typeof GoogleOauthPopupRoute
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
@@ -514,6 +521,7 @@ export interface FileRoutesByTo {
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
+  '/google-oauth-popup': typeof GoogleOauthPopupRoute
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
@@ -585,6 +593,7 @@ export interface FileRoutesById {
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
+  '/google-oauth-popup': typeof GoogleOauthPopupRoute
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
@@ -657,6 +666,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
+    | '/google-oauth-popup'
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
@@ -727,6 +737,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
+    | '/google-oauth-popup'
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
@@ -797,6 +808,7 @@ export interface FileRouteTypes {
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
+    | '/google-oauth-popup'
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
@@ -868,6 +880,7 @@ export interface RootRouteChildren {
   FinanceiroRoute: typeof FinanceiroRoute
   FunnelRoute: typeof FunnelRoute
   GerencialRoute: typeof GerencialRouteWithChildren
+  GoogleOauthPopupRoute: typeof GoogleOauthPopupRoute
   InboxIaRoute: typeof InboxIaRoute
   ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
@@ -1026,6 +1039,13 @@ declare module '@tanstack/react-router' {
       path: '/inbox-ia'
       fullPath: '/inbox-ia'
       preLoaderRoute: typeof InboxIaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/google-oauth-popup': {
+      id: '/google-oauth-popup'
+      path: '/google-oauth-popup'
+      fullPath: '/google-oauth-popup'
+      preLoaderRoute: typeof GoogleOauthPopupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/gerencial': {
@@ -1477,6 +1497,7 @@ const rootRouteChildren: RootRouteChildren = {
   FinanceiroRoute: FinanceiroRoute,
   FunnelRoute: FunnelRoute,
   GerencialRoute: GerencialRouteWithChildren,
+  GoogleOauthPopupRoute: GoogleOauthPopupRoute,
   InboxIaRoute: InboxIaRoute,
   ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,

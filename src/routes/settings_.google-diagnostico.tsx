@@ -142,7 +142,7 @@ function DiagnosticPage() {
   }, []);
 
   const openOAuthPopup = () => {
-    const w = window.open(startUrl, "google-oauth-diag", "width=520,height=640");
+    const w = window.open("/google-oauth-popup", "google-oauth-diag", "width=520,height=640");
     if (!w) toast.error("Popup bloqueado pelo navegador");
   };
 

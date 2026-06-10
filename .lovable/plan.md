@@ -1,29 +1,37 @@
-# Diagnóstico do Google OAuth
+## Plano para corrigir o Google OAuth bloqueado
 
-Página nova em `/settings/google-diagnostico` (rota autenticada) para identificar exatamente onde o fluxo `/api/public/google/oauth/start` → Google → `/api/public/google/oauth/callback` quebra.
+O erro da imagem (`accounts.google.com está bloqueado / ERR_BLOCKED_BY_RESPONSE`) indica que o Google está sendo aberto dentro de um contexto bloqueado pelo navegador/iframe. A correção é garantir que o fluxo sempre abra o Google em uma janela real e que o diagnóstico capture essa falha claramente.
 
-## O que a página mostra
+### 1. Ajustar o início do OAuth Gmail
+- Manter o clique do usuário abrindo uma janela popup imediatamente.
+- Em vez de apontar o popup diretamente para `/api/public/google/oauth/start?token=...`, abrir primeiro uma página intermediária local do app.
+- Essa página intermediária roda fora do iframe do app, chama o endpoint `/start` e só então redireciona a janela popup para `accounts.google.com`.
+- Isso evita que o Google seja carregado dentro do preview/iframe onde ele bloqueia com `ERR_BLOCKED_BY_RESPONSE`.
 
-Lista de checks executados em ordem, cada um com status (ok / erro / aviso) e detalhes expansíveis (JSON cru, headers relevantes, mensagem completa):
+### 2. Criar rota intermediária de popup
+- Criar uma rota como `/google-oauth-popup`.
+- Ela receberá o token temporário na URL.
+- Mostrará estado simples: “Abrindo Google…”, erro de sessão, erro do endpoint `/start`, ou timeout.
+- Se o `/start` devolver redirect válido, a própria popup navegará para o Google.
 
-1. **Sessão Supabase** — usuário logado, `user.id`, e-mail, validade do access_token.
-2. **Variáveis de ambiente do servidor** — presença (sem valor) de `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_STATE_SECRET`. Feito por nova serverFn `diagnoseGoogleOauth` que só retorna booleans + tamanho dos secrets.
-3. **Redirect URI esperado** — calcula `${window.location.origin}/api/public/google/oauth/callback` e mostra para o usuário copiar e comparar com o Google Cloud Console.
-4. **Probe do endpoint `/start`** — `fetch('/api/public/google/oauth/start', { redirect: 'manual', headers: Authorization })` e mostra status, `location` header, ou corpo do erro 4xx/5xx.
-5. **Probe do `state` HMAC** — serverFn gera um state de teste e devolve para validar que `GOOGLE_OAUTH_STATE_SECRET` está configurado.
-6. **Tokens Gmail já salvos** — consulta `user_gmail_tokens` do usuário atual: se há linha, mostra `email_address`, `expires_at`, `scope`. Indica se "já está conectado".
-7. **Últimos eventos de auditoria** — últimas 10 linhas de `gmail_connection_audit` do usuário (event, reason, metadata, created_at).
-8. **Botão "Iniciar OAuth em nova aba com log"** — abre `/api/public/google/oauth/start` em popup e escuta `postMessage` do callback (`type: 'gmail-oauth'`) para registrar `ok`/`message` na própria página.
+### 3. Melhorar o endpoint `/api/public/google/oauth/start`
+- Adicionar suporte a modo JSON/diagnóstico, por exemplo `?mode=json`, para retornar a URL de autorização do Google sem lançar redirect.
+- Preservar o comportamento atual de redirect para não quebrar links existentes.
+- Retornar mensagens mais estruturadas quando faltar token, Client ID ou segredo de state.
 
-## Arquivos
+### 4. Atualizar o botão “Conectar Gmail”
+- Alterar `GmailConnectCard` para abrir a nova rota intermediária no popup.
+- Continuar ouvindo `postMessage` do callback (`type: 'gmail-oauth'`) para mostrar sucesso/falha e recarregar tokens.
 
-- `src/lib/google-oauth-diagnose.functions.ts` — serverFn `diagnoseGoogleOauth` (env presence, gera state de teste, lê tokens + audit do `userId` do middleware `requireSupabaseAuth`).
-- `src/routes/settings_.google-diagnostico.tsx` — UI da página, dentro de `AuthGate`+`AppShell`, executa todos os checks ao montar e reexecuta no botão "Rodar novamente".
-- Link de acesso: adicionar item "Diagnóstico Google" em `src/routes/settings.tsx`.
+### 5. Atualizar a página de Diagnóstico
+- Adicionar um teste explícito “Popup bridge” para diferenciar:
+  - falha no start;
+  - redirect gerado corretamente;
+  - Google bloqueado no iframe/popup;
+  - callback retornou erro.
+- Ajustar o botão “Executar OAuth em popup” para usar a mesma rota intermediária real.
 
-## Notas técnicas
-
-- Nenhum secret é retornado em texto, só `present: boolean` + comprimento.
-- O probe do `/start` usa `redirect: 'manual'` para capturar o 302 sem seguir até o Google.
-- A página é só para diretor/super_admin (mesma checagem usada em outras telas de settings).
-- Sem alteração no fluxo OAuth real — somente leitura/diagnóstico.
+### 6. Validar
+- Verificar que os arquivos alterados não introduzem imports inválidos.
+- Confirmar que o fluxo preserva o callback atual e o salvamento de tokens.
+- Depois da implementação, você testa pelo botão “Conectar Gmail” e pela página `/settings/google-diagnostico`.

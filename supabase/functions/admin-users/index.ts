@@ -145,9 +145,27 @@ Deno.serve(async (req) => {
         return json({ error: "Diretor não pode atribuir admin/diretor" }, 403);
       }
 
+      // Resolve o tenant do convidador — convidado herda o mesmo tenant.
+      const { data: callerTenant } = await admin
+        .from("tenant_members")
+        .select("tenant_id, created_at")
+        .eq("user_id", callerId)
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      const inviterTenantId = callerTenant?.tenant_id as string | undefined;
+      if (!inviterTenantId) {
+        return json({ error: "Convidador sem tenant ativo. Acesse /licenca ou contate o suporte." }, 400);
+      }
+
       const redirectTo = `${APP_URL}/`;
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
-        data: fullName ? { full_name: fullName } : undefined,
+        data: {
+          ...(fullName ? { full_name: fullName } : {}),
+          invited_by_tenant_id: inviterTenantId,
+          invited_by_user_id: callerId,
+        },
         redirectTo,
       });
       if (invErr || !invited.user) return json({ error: invErr?.message ?? "Falha no convite" }, 400);
@@ -172,11 +190,18 @@ Deno.serve(async (req) => {
           { user_id: invited.user.id, email_address: email.toLowerCase(), is_primary: true },
           { onConflict: "user_id,email_address" }
         );
+      // Vincula o convidado ao tenant do convidador
+      await admin
+        .from("tenant_members")
+        .upsert(
+          { tenant_id: inviterTenantId, user_id: invited.user.id, role_in_tenant: "member", is_active: true },
+          { onConflict: "tenant_id,user_id" }
+        );
       await audit({
         action: "invite",
         target_user_id: invited.user.id,
         target_email: email,
-        details: { roles: requestedRoles, full_name: fullName },
+        details: { roles: requestedRoles, full_name: fullName, tenant_id: inviterTenantId },
       });
       return json({ ok: true, user_id: invited.user.id });
     }

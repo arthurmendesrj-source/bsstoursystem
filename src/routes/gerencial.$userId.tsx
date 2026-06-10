@@ -98,12 +98,7 @@ function UserDetailPage() {
       let emailsCount = 0;
       let emailsUnread = 0;
       if (ids.length > 0) {
-        const [eAll, eUnread] = await Promise.all([
-          supabase.from("emails").select("id", { count: "exact", head: true }).in("lead_id", ids),
-          supabase.from("emails").select("id", { count: "exact", head: true }).in("lead_id", ids).eq("is_unread", true),
-        ]);
-        emailsCount = eAll.count ?? 0;
-        emailsUnread = eUnread.count ?? 0;
+        // emails table removed during email rebuild
       }
       if (cancel) return;
 

@@ -1,57 +1,47 @@
-
 ## Objetivo
 
-- `diretorturismos@gmail.com` (Diretor1) deve ter alçada total agora.
-- Toda nova conta criada via cadastro direto (signup público) vira **conta master**: tenant próprio + papel `admin`.
-- Toda conta criada via **convite** fica vinculada ao tenant de quem convidou (subordinada).
+Garantir isolamento total entre empresas:
+- Toda conta criada via signup público → conta master (diretor), com tenant próprio.
+- Nenhum usuário enxerga dados de outro tenant.
+- Apenas `super_admin` (desenvolvedor) atravessa tenants.
+- Usuários convidados herdam o tenant de quem convidou (já feito).
 
-## Situação atual (verificada no banco)
+## Diagnóstico
 
-- Diretor1 existe em `auth.users` e `profiles`, mas **não tem nenhum papel em `user_roles` e nenhum tenant em `tenant_members`** — por isso não tem acesso a nada.
-- O trigger `handle_new_user` hoje só cria `profiles` + `user_email_accounts`. Não cria tenant nem papel.
-- O edge function `admin-users` (ação `invite`) cria o usuário convidado e atribui papéis, mas **não o vincula ao tenant do convidador**.
+O signup → master e o convite → membro já estão corretos (correção anterior). O problema restante são as **políticas RLS legadas** que ainda existem em paralelo às `tenant_isolation_*`. Políticas permissivas se combinam com OR, então o filtro de tenant é ignorado.
 
-## O que será feito
+Exemplo: Diretor1 (admin do tenant Diretor1) hoje enxergaria os 638 fornecedores e 233 clientes da BSS Tour porque `suppliers_select` libera para qualquer `is_admin(auth.uid())` sem checar `tenant_id`.
 
-### 1. Conserto pontual do Diretor1 (dados, agora)
+## Plano
 
-- Criar um tenant "Diretor1" (slug `diretor1` ou derivado do nome) com `created_by = id do Diretor1`.
-- Inserir `tenant_members(tenant_id, user_id, role_in_tenant='owner', is_active=true)`.
-- Inserir em `user_roles` os papéis `admin` **e** `diretor` para o user_id do Diretor1 (admin garante alçada total no app; diretor habilita as telas que checam `isDirector`).
-- O trigger existente `trg_create_trial_subscription` já cria a assinatura trial automaticamente quando o tenant nasce.
+### 1. Migration: tornar isolamento de tenant obrigatório
 
-### 2. Signup direto → conta master automática (migração de schema)
+Para cada tabela `public.*` que tem coluna `tenant_id` (customers, leads, suppliers, supplier_contacts, supplier_rates, supplier_documents, bookings, booking_pax, booking_suppliers, booking_item_confirmations, quotes, quote_items, quote_flights, quote_documents, quote_item_notes, tasks, invoices, vouchers, voucher_send_log, interactions, itineraries, itinerary_chunks, packages, package_dates, activity_log, ai_conversations, ai_messages, ai_pending_actions, ai_generated_images, emails, email_threads, email_attachments, email_labels, email_message_links, email_sync_state, exchange_rates, lead_alert_snoozes, notification_logs, notification_preferences, operations_activities, push_subscriptions, sla_escalations, sla_settings, storage_access_log, user_email_accounts, user_field_permissions, user_gmail_tokens, user_module_permissions, whatsapp_accounts, whatsapp_conversations, whatsapp_messages, whatsapp_templates, tenant_domains):
 
-Substituir `public.handle_new_user()` para, além do que já faz, quando o novo usuário **não** veio de convite:
+- `DROP POLICY tenant_isolation_<tabela>` (permissiva atual).
+- Recriar como **RESTRICTIVE** para `ALL`:
+  ```
+  is_super_admin(auth.uid())
+  OR tenant_id = current_tenant_id()
+  OR (current_tenant_id() IS NULL AND is_tenant_member(tenant_id, auth.uid()))
+  ```
+- Adicionar política RESTRICTIVE de `INSERT` exigindo
+  `tenant_id = current_tenant_id() OR is_super_admin(auth.uid())`.
 
-- Detectar convite por `NEW.invited_at IS NOT NULL` ou pela flag `NEW.raw_user_meta_data ? 'invited_by_tenant_id'` (que a edge function vai passar — ver item 3). Se qualquer um dos dois indicar convite, **não** cria tenant nem papel master.
-- Caso contrário (signup público):
-  - `INSERT INTO public.tenants(name, slug, created_by)` usando `full_name` (ou email) como nome e um slug único.
-  - `INSERT INTO public.tenant_members(tenant_id, user_id, role_in_tenant='owner', is_active=true)`.
-  - `INSERT INTO public.user_roles(user_id, role)` com `'admin'` e `'diretor'`.
+Resultado: a regra antiga de papel (admin/operador/módulo) continua valendo, mas **sempre** combinada com AND ao filtro de tenant.
 
-O trigger continua `SECURITY DEFINER` para conseguir escrever em `tenants`, `tenant_members` e `user_roles`.
+### 2. Trigger `set_tenant_id_default`
 
-### 3. Convite herda o tenant do convidador (edge function `admin-users`)
+`BEFORE INSERT` em cada tabela: se `NEW.tenant_id IS NULL`, preenche com `current_tenant_id()`. Evita quebrar inserts existentes do app que ainda não passam `tenant_id` explicitamente.
 
-Em `supabase/functions/admin-users/index.ts`, ação `invite`:
+### 3. Validação após aplicar
 
-- Antes de chamar `inviteUserByEmail`, resolver o `tenant_id` do convidador via `tenant_members` (membership ativa do `callerId`). Se o convidador não tiver tenant, devolver erro claro.
-- Passar `data: { ..., invited_by_tenant_id: <tenant_id>, invited_by_user_id: <callerId> }` na chamada de `inviteUserByEmail` — isso vira `raw_user_meta_data` do novo `auth.users` e é o sinal que o trigger usa para **não** criar tenant novo.
-- Após o convite, inserir no banco:
-  - `tenant_members(tenant_id=<tenant do convidador>, user_id=<invited.user.id>, role_in_tenant='member', is_active=true)`.
-- Os papéis em `user_roles` continuam sendo atribuídos como hoje (padrão `operador`, ou os papéis selecionados; diretor continua impedido de conceder `admin`/`diretor`).
+- Logar como Diretor1 → `customers`, `leads`, `suppliers` devem vir **vazios**.
+- Logar como usuário BSS Tour → continua vendo os 233 clientes / 638 fornecedores / 9 leads normalmente.
+- Criar registro como Diretor1 → fica visível só dentro do tenant Diretor1.
 
-### 4. Validação
+## Fora de escopo
 
-- Logar com `diretorturismos@gmail.com` e confirmar que aparece o painel completo (admin + diretor).
-- Criar um novo signup direto com outro e-mail → conferir que nasceu com tenant próprio, virou owner e tem `admin`.
-- A partir do Diretor1, convidar outro e-mail → conferir que o convidado entra no **mesmo tenant** do Diretor1 (não cria tenant novo) e fica com o papel solicitado.
-
-## Detalhes técnicos
-
-- Geração de slug do tenant no trigger: `public.slugify_text(coalesce(full_name, split_part(email,'@',1)))` + sufixo aleatório se já existir.
-- `handle_new_user` precisa tratar `ON CONFLICT DO NOTHING` em todos os inserts para ser idempotente (caso o trigger rode mais de uma vez).
-- A inserção em `user_roles` usa o enum `app_role` existente (`admin`, `diretor`, ...).
-- Nenhuma policy RLS de `tenants`/`tenant_members`/`user_roles` precisa mudar — o trigger roda como definer e o edge function usa service role.
-- Nada muda no fluxo de `/licenca`: o código `BOSCO1` continua ativando a assinatura do tenant do usuário (que agora sempre existirá).
+- Lógica de papéis (admin, diretor, operador) e de módulos permanece intacta.
+- Dados existentes já estão corretamente marcados com `tenant_id` — sem backfill necessário.
+- Fluxo de signup/convite já corrigido na rodada anterior.

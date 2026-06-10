@@ -58,14 +58,6 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    if (!user) {
-      setTenants([]);
-      setTenant(null);
-      setIsSuperAdmin(false);
-      setLoading(false);
-      return;
-    }
   const createDefaultTenant = useCallback(async () => {
     if (!user) return null;
     try {

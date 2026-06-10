@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { GmailConnectCard } from "@/components/GmailConnectCard";
+import { SmtpEmailConnectCard } from "@/components/SmtpEmailConnectCard";
 
 export const Route = createFileRoute("/settings")({
   component: () => (
@@ -63,6 +64,7 @@ function SettingsPage() {
         </form>
       </Card>
       <GmailConnectCard />
+      <SmtpEmailConnectCard />
       <Card className="p-4 flex items-center justify-between">
         <div>
           <div className="font-medium">Diagnóstico Google OAuth</div>

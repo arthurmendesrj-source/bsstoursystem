@@ -1195,6 +1195,69 @@ export type Database = {
           },
         ]
       }
+      email_smtp_accounts: {
+        Row: {
+          auth_password_encrypted: string
+          auth_username: string
+          created_at: string
+          display_name: string | null
+          email_address: string
+          id: string
+          imap_host: string
+          imap_port: number
+          imap_secure: boolean
+          last_test_at: string | null
+          last_test_error: string | null
+          last_test_ok: boolean | null
+          provider: string
+          smtp_host: string
+          smtp_port: number
+          smtp_secure: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth_password_encrypted: string
+          auth_username: string
+          created_at?: string
+          display_name?: string | null
+          email_address: string
+          id?: string
+          imap_host: string
+          imap_port: number
+          imap_secure?: boolean
+          last_test_at?: string | null
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          provider: string
+          smtp_host: string
+          smtp_port: number
+          smtp_secure?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth_password_encrypted?: string
+          auth_username?: string
+          created_at?: string
+          display_name?: string | null
+          email_address?: string
+          id?: string
+          imap_host?: string
+          imap_port?: number
+          imap_secure?: boolean
+          last_test_at?: string | null
+          last_test_error?: string | null
+          last_test_ok?: boolean | null
+          provider?: string
+          smtp_host?: string
+          smtp_port?: number
+          smtp_secure?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_sync_state: {
         Row: {
           full_sync_current_label: string | null

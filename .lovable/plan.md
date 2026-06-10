@@ -1,42 +1,63 @@
-## Problema
-Na tela `/billing` quando não há tenant selecionado, o botão dos cards de plano mostra "Selecione uma empresa" e fica desabilitado. Quero que ele diga "Selecionar plano" e funcione.
+## Objetivo
 
-## Diagnóstico
-- `PlansSection` recebe `tenantId={null}` no branch sem tenant (linha 84 de `src/routes/billing.tsx`) → botão desabilitado com texto "Selecione uma empresa".
-- A criação automática de empresa já existe em `TenantProvider.load()` (mexido na sessão anterior). Falta uma forma imperativa de garantir o tenant **no momento do clique** quando, por qualquer motivo, ainda não há um.
+Criar uma página `/licenca` onde o usuário (logado, dono de uma empresa) digita um código. Ao inserir `BOSCO1`, a empresa ganha acesso total ao app por **12 meses**. O código é de **uso único** — depois de resgatado uma vez, ninguém mais consegue ativar.
 
-## Mudanças
+## Banco de dados (migração)
 
-### 1. `src/lib/tenant.tsx`
-- Extrair a lógica de auto-criação de tenant numa função interna `createDefaultTenant(userId, email)` (mesma regra: nome do profile/email, slug + sufixo do user.id, retry com sufixo aleatório, insert em `tenants` + `tenant_members`).
-- Reutilizar essa função em `load()` (refactor sem mudar comportamento).
-- Expor no contexto um novo método `ensureTenant(): Promise<Tenant | null>` que:
-  1. Se já existe `tenant`, retorna ele.
-  2. Caso contrário, chama `createDefaultTenant`, depois `load()`, e retorna o tenant ativo resultante.
+Criar tabela `public.license_codes` para gerenciar códigos de licença reutilizáveis no futuro:
 
-### 2. `src/routes/billing.tsx` — `PlansSection`
-- Passar a usar `useTenant()` para pegar `ensureTenant`.
-- Botão: o `disabled` deixa de depender de `!tenantId`; passa a depender só de `isCurrent || mut.isPending`.
-- Label do botão:
-  - `isCurrent` → "Plano atual"
-  - `mut.isPending` → "Aplicando…"
-  - sem tenant ainda → "Selecionar plano" (em vez de "Selecione uma empresa")
-  - caso normal → "Assinar este plano"
-- Remover o `title` "Selecione uma empresa para assinar".
-- `mutationFn` recebe `plan_code` e resolve o tenant via `ensureTenant()` antes de chamar `changeFn`:
-  ```ts
-  mutationFn: async (plan_code: string) => {
-    const t = tenantId ? { id: tenantId } : await ensureTenant();
-    if (!t) throw new Error("Não foi possível preparar sua empresa. Tente novamente.");
-    return changeFn({ data: { tenant_id: t.id, plan_code } });
-  }
-  ```
-- Após sucesso, além de invalidar `billing-overview`, chamar `reload()` do tenant context para refletir a nova empresa/assinatura.
+```
+license_codes
+- id uuid pk
+- code text unique not null            (ex.: 'BOSCO1', case-insensitive)
+- plan_code text not null              (qual plano libera — usaremos 'premium' ou o melhor existente)
+- duration_days int not null           (365 para BOSCO1)
+- max_uses int not null default 1
+- uses_count int not null default 0
+- is_active bool not null default true
+- redeemed_by_tenant_id uuid           (preenchido ao resgatar — auditoria)
+- redeemed_by_user_id uuid
+- redeemed_at timestamptz
+- created_at / updated_at
+```
 
-### 3. Texto do branch sem tenant (linha 79-82)
-Trocar a frase secundária para algo neutro (já que a empresa será criada automaticamente ao escolher um plano):
-> "Você ainda não tem um pacote assinado. Escolha um plano abaixo para começar."
+Grants para `authenticated` (SELECT para checar validade) e `service_role` (escrita via serverFn admin). RLS habilitada com policy de SELECT apenas em códigos ativos.
 
-## Fora de escopo
-- Nada muda no schema, nas server functions de billing, nem no fluxo de troca de plano para usuários que já têm tenant.
-- O gate de assinatura bloqueada (`/billing` redirect) continua igual.
+Seed: inserir `BOSCO1` com `duration_days = 365`, `max_uses = 1`, `plan_code = 'premium'` (ou o code do plano de maior nível existente — vou conferir `plans` na hora e usar o equivalente "acesso total").
+
+## Server function
+
+`src/lib/license.functions.ts` — `redeemLicenseCode({ code })`:
+
+1. `requireSupabaseAuth` — pega `userId`.
+2. Resolve tenant ativo do usuário (`resolveUserTenantId`).
+3. Verifica que o usuário é `owner` do tenant (senão, erro).
+4. Carrega `license_codes` por `lower(code)`; valida `is_active`, `uses_count < max_uses`.
+5. Em transação (via `supabaseAdmin`):
+   - Incrementa `uses_count`, grava `redeemed_by_tenant_id/user_id/at`. Se atingiu `max_uses`, marca `is_active = false`.
+   - Faz upsert em `subscriptions` para o tenant: `plan_id` do plano `premium`, `status = 'active'`, `current_period_start = now()`, `current_period_end = now() + 365 days`, `trial_end = null`, `grace_until = null`.
+6. Retorna `{ ok: true, expires_at }`.
+
+Tratamento de erros amigável: "Código inválido", "Código já utilizado", "Apenas o dono da empresa pode ativar".
+
+## Rota / UI
+
+`src/routes/licenca.tsx` — dentro de `AuthGate` + `AppShell`:
+
+- Card centralizado com título "Ativar licença".
+- Input para o código + botão "Ativar".
+- Validação Zod (1–32 chars, alfanumérico).
+- Ao sucesso: toast "Licença ativada até dd/mm/aaaa", `reload()` do `TenantProvider`, invalida `billing-overview`, redireciona para `/dashboard`.
+- Mostra também o status atual da assinatura (se já houver acesso ativo via licença, exibe "Licença ativa até X").
+
+Link discreto no menu lateral (`AppShell`) e na página `/billing` ("Tenho um código de licença → /licenca").
+
+## Arquivos a criar/editar
+
+- `supabase/migrations/<timestamp>_license_codes.sql` — tabela, grants, RLS, seed `BOSCO1`.
+- `src/lib/license.functions.ts` — serverFn `redeemLicenseCode`.
+- `src/routes/licenca.tsx` — UI da página.
+- `src/components/AppShell.tsx` — adicionar item de menu "Licença".
+- `src/routes/billing.tsx` — link "Tenho um código de licença".
+
+Sem mudanças em `BillingAccessGate` — ele já libera quando `subscriptions.status = 'active'` e `current_period_end` no futuro.

@@ -108,9 +108,17 @@ function BillingPage() {
   return (
     <AppShell>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Cobrança</h1>
-          <p className="text-muted-foreground">Plano, uso e pagamentos de {tenant.name}.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-3xl font-bold">Cobrança</h1>
+            <p className="text-muted-foreground">Plano, uso e pagamentos de {tenant.name}.</p>
+          </div>
+          <a
+            href="/licenca"
+            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Tenho um código de licença
+          </a>
         </div>
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList>

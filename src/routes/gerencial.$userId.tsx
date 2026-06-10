@@ -308,7 +308,7 @@ function EmailsTable({ leadIds, total }: { leadIds: string[]; total: number }) {
     (async () => {
       setLoading(true);
       if (leadIds.length === 0) { setRows([]); setLoading(false); return; }
-      void page; void from;
+      void page;
       if (!cancel) { setRows([]); setLoading(false); }
     })();
     return () => { cancel = true; };

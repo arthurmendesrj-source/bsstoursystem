@@ -21,6 +21,7 @@ import { Route as PackagesRouteImport } from './routes/packages'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as MarketingRouteImport } from './routes/marketing'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LicencaRouteImport } from './routes/licenca'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as ItinerariesRouteImport } from './routes/itineraries'
 import { Route as InboxIaRouteImport } from './routes/inbox-ia'
@@ -134,6 +135,11 @@ const MarketingRoute = MarketingRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LicencaRoute = LicencaRouteImport.update({
+  id: '/licenca',
+  path: '/licenca',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeadsRoute = LeadsRouteImport.update({
@@ -434,6 +440,7 @@ export interface FileRoutesByFullPath {
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
+  '/licenca': typeof LicencaRoute
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/onboarding': typeof OnboardingRoute
@@ -502,6 +509,7 @@ export interface FileRoutesByTo {
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
+  '/licenca': typeof LicencaRoute
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/onboarding': typeof OnboardingRoute
@@ -571,6 +579,7 @@ export interface FileRoutesById {
   '/inbox-ia': typeof InboxIaRoute
   '/itineraries': typeof ItinerariesRoute
   '/leads': typeof LeadsRouteWithChildren
+  '/licenca': typeof LicencaRoute
   '/login': typeof LoginRoute
   '/marketing': typeof MarketingRoute
   '/onboarding': typeof OnboardingRoute
@@ -641,6 +650,7 @@ export interface FileRouteTypes {
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
+    | '/licenca'
     | '/login'
     | '/marketing'
     | '/onboarding'
@@ -709,6 +719,7 @@ export interface FileRouteTypes {
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
+    | '/licenca'
     | '/login'
     | '/marketing'
     | '/onboarding'
@@ -777,6 +788,7 @@ export interface FileRouteTypes {
     | '/inbox-ia'
     | '/itineraries'
     | '/leads'
+    | '/licenca'
     | '/login'
     | '/marketing'
     | '/onboarding'
@@ -846,6 +858,7 @@ export interface RootRouteChildren {
   InboxIaRoute: typeof InboxIaRoute
   ItinerariesRoute: typeof ItinerariesRoute
   LeadsRoute: typeof LeadsRouteWithChildren
+  LicencaRoute: typeof LicencaRoute
   LoginRoute: typeof LoginRoute
   MarketingRoute: typeof MarketingRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -971,6 +984,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/licenca': {
+      id: '/licenca'
+      path: '/licenca'
+      fullPath: '/licenca'
+      preLoaderRoute: typeof LicencaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leads': {
@@ -1439,6 +1459,7 @@ const rootRouteChildren: RootRouteChildren = {
   InboxIaRoute: InboxIaRoute,
   ItinerariesRoute: ItinerariesRoute,
   LeadsRoute: LeadsRouteWithChildren,
+  LicencaRoute: LicencaRoute,
   LoginRoute: LoginRoute,
   MarketingRoute: MarketingRoute,
   OnboardingRoute: OnboardingRoute,

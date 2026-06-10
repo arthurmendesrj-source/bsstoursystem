@@ -140,7 +140,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
 
 
-    const list: Tenant[] = (memberships ?? [])
+    const list: Tenant[] = memberships
       .filter((m: any) => m.tenants)
       .map((m: any) => {
         const sub = Array.isArray(m.tenants.subscriptions) ? m.tenants.subscriptions[0] : m.tenants.subscriptions;

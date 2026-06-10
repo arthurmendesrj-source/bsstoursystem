@@ -190,8 +190,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   const startGoogleConnect = useCallback(async () => {
     setConnecting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      let { data: { session } } = await supabase.auth.getSession();
+      let token = session?.access_token;
+      if (!token) {
+        const refreshed = await supabase.auth.refreshSession();
+        token = refreshed.data.session?.access_token;
+      }
       if (!token) { toast.error("Sessão expirada — faça login novamente."); return; }
       const popup = window.open("/google-oauth-popup", "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
       if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups para este site."); return; }

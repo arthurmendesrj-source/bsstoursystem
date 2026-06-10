@@ -105,7 +105,7 @@ function LeadWorkspace() {
       supabase.from("leads").select("*").eq("id", leadId).maybeSingle(),
       supabase.from("tasks").select("id,title,description,due_date,completed").eq("lead_id", leadId).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", leadId).order("occurred_at", { ascending: false }),
-      supabase.from("emails").select("id,subject,from_name,from_email,snippet,received_at,is_unread").eq("lead_id", leadId).order("received_at", { ascending: false }).limit(50),
+      Promise.resolve({ data: [] as any[] }),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", leadId).order("created_at", { ascending: false }),
       supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", leadId).order("created_at", { ascending: false }),
     ]);

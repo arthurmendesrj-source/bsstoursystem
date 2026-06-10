@@ -1,38 +1,42 @@
-## Objetivo
+## Problema
+Na tela `/billing` quando não há tenant selecionado, o botão dos cards de plano mostra "Selecione uma empresa" e fica desabilitado. Quero que ele diga "Selecionar plano" e funcione.
 
-Eliminar a tela "Criar empresa". Ao fazer login, se o usuário ainda não tem nenhuma empresa, o sistema cria uma automaticamente e leva direto ao dashboard.
+## Diagnóstico
+- `PlansSection` recebe `tenantId={null}` no branch sem tenant (linha 84 de `src/routes/billing.tsx`) → botão desabilitado com texto "Selecione uma empresa".
+- A criação automática de empresa já existe em `TenantProvider.load()` (mexido na sessão anterior). Falta uma forma imperativa de garantir o tenant **no momento do clique** quando, por qualquer motivo, ainda não há um.
 
-## O que vou alterar
+## Mudanças
 
-### 1. `src/lib/tenant.tsx` — criação automática
-No `load()` do `TenantProvider`, quando `memberships` vier vazio (e o usuário não for super-admin):
+### 1. `src/lib/tenant.tsx`
+- Extrair a lógica de auto-criação de tenant numa função interna `createDefaultTenant(userId, email)` (mesma regra: nome do profile/email, slug + sufixo do user.id, retry com sufixo aleatório, insert em `tenants` + `tenant_members`).
+- Reutilizar essa função em `load()` (refactor sem mudar comportamento).
+- Expor no contexto um novo método `ensureTenant(): Promise<Tenant | null>` que:
+  1. Se já existe `tenant`, retorna ele.
+  2. Caso contrário, chama `createDefaultTenant`, depois `load()`, e retorna o tenant ativo resultante.
 
-1. Buscar `full_name` em `profiles` (fallback: parte do email antes do `@`, ou "Minha Empresa").
-2. Gerar slug a partir desse nome + sufixo curto do `user.id` (ex.: `joao-silva-a1b2c3`) para evitar colisão.
-3. `insert` em `public.tenants` com `created_by = user.id`, `status = 'active'`.
-4. `insert` em `public.tenant_members` com `role_in_tenant = 'owner'`, `is_active = true`.
-   (O trigger `create_trial_subscription_for_tenant` já cria a assinatura trial de 30 dias.)
-5. Releitura das memberships e seguir o fluxo normal.
+### 2. `src/routes/billing.tsx` — `PlansSection`
+- Passar a usar `useTenant()` para pegar `ensureTenant`.
+- Botão: o `disabled` deixa de depender de `!tenantId`; passa a depender só de `isCurrent || mut.isPending`.
+- Label do botão:
+  - `isCurrent` → "Plano atual"
+  - `mut.isPending` → "Aplicando…"
+  - sem tenant ainda → "Selecionar plano" (em vez de "Selecione uma empresa")
+  - caso normal → "Assinar este plano"
+- Remover o `title` "Selecione uma empresa para assinar".
+- `mutationFn` recebe `plan_code` e resolve o tenant via `ensureTenant()` antes de chamar `changeFn`:
+  ```ts
+  mutationFn: async (plan_code: string) => {
+    const t = tenantId ? { id: tenantId } : await ensureTenant();
+    if (!t) throw new Error("Não foi possível preparar sua empresa. Tente novamente.");
+    return changeFn({ data: { tenant_id: t.id, plan_code } });
+  }
+  ```
+- Após sucesso, além de invalidar `billing-overview`, chamar `reload()` do tenant context para refletir a nova empresa/assinatura.
 
-Em caso de erro (ex.: corrida), reler memberships antes de desistir; se ainda vazio, mostrar toast e manter o usuário onde está (sem redirect para `/onboarding`).
+### 3. Texto do branch sem tenant (linha 79-82)
+Trocar a frase secundária para algo neutro (já que a empresa será criada automaticamente ao escolher um plano):
+> "Você ainda não tem um pacote assinado. Escolha um plano abaixo para começar."
 
-### 2. Remover redirect para onboarding
-Em `TenantProvider`, tirar o bloco que faz `navigate({ to: "/onboarding" })` quando `tenants.length === 0`. Após a auto-criação, sempre haverá tenant.
-
-### 3. `src/routes/index.tsx`
-Já redireciona logado → `/dashboard`. Nenhuma mudança necessária.
-
-### 4. `src/routes/onboarding.tsx`
-Manter o arquivo (para não quebrar imports/rota gerada), mas torná-lo um redirect simples para `/dashboard` — assim nenhum link antigo cai numa tela morta.
-
-## O que NÃO vou mexer
-
-- Schema do banco (tabelas, RLS, triggers permanecem).
-- Billing/assinatura — trial de 30 dias continua sendo criado pelo trigger.
-- Fluxo de troca de empresa (`/t/$tenantSlug`) e super-admin.
-- Gate de assinatura bloqueada (`past_due`, `canceled` etc.) continua redirecionando para `/billing`.
-
-## Riscos / observações
-
-- Slug duplicado: mitigado pelo sufixo do `user.id`. Se ainda assim colidir, faço retry com sufixo aleatório curto.
-- Usuários que hoje já têm o caminho `/onboarding` aberto: passam a ser levados ao dashboard automaticamente.
+## Fora de escopo
+- Nada muda no schema, nas server functions de billing, nem no fluxo de troca de plano para usuários que já têm tenant.
+- O gate de assinatura bloqueada (`/billing` redirect) continua igual.

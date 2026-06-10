@@ -262,21 +262,29 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; 
   const listFn = useServerFn(listPublicPlans);
   const changeFn = useServerFn(changeSubscriptionPlan);
   const qc = useQueryClient();
+  const { ensureTenant, reload } = useTenant();
   const { data, isLoading } = useQuery({
     queryKey: ["public-plans"],
     queryFn: () => listFn(),
   });
   const mut = useMutation({
-    mutationFn: (plan_code: string) => {
-      if (!tenantId) throw new Error("Selecione uma empresa para assinar um pacote.");
-      return changeFn({ data: { tenant_id: tenantId, plan_code } });
+    mutationFn: async (plan_code: string) => {
+      let tid = tenantId;
+      if (!tid) {
+        const t = await ensureTenant();
+        if (!t) throw new Error("Não foi possível preparar sua empresa. Tente novamente.");
+        tid = t.id;
+      }
+      return changeFn({ data: { tenant_id: tid, plan_code } });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Plano atualizado");
-      if (tenantId) qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
+      await reload();
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao trocar de plano"),
   });
+
   const plans = (data?.plans ?? []) as any[];
   if (isLoading) return <div className="text-sm text-muted-foreground">Carregando planos…</div>;
   if (plans.length === 0) return null;

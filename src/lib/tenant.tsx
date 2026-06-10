@@ -24,7 +24,9 @@ type TenantCtx = {
   isSuperAdmin: boolean;
   switchTenant: (slug: string) => Promise<void>;
   reload: () => Promise<void>;
+  ensureTenant: () => Promise<Tenant | null>;
 };
+
 
 const Ctx = createContext<TenantCtx | null>(null);
 const ACTIVE_KEY = "active_tenant_slug";

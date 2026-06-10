@@ -22,17 +22,27 @@ function signState(payload: string): string {
   return createHmac("sha256", secret).update(payload).digest("hex");
 }
 
+function jsonError(status: number, error: string) {
+  return new Response(JSON.stringify({ ok: false, error }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 export const Route = createFileRoute("/api/public/google/oauth/start")({
   server: {
     handlers: {
       GET: async ({ request }) => {
         const url = new URL(request.url);
+        const mode = url.searchParams.get("mode"); // "json" → return URL instead of redirecting
         const accessToken =
           request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
           url.searchParams.get("token") ?? "";
 
         if (!accessToken) {
-          return new Response("Missing user access token", { status: 401 });
+          return mode === "json"
+            ? jsonError(401, "Missing user access token")
+            : new Response("Missing user access token", { status: 401 });
         }
 
         const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -42,13 +52,22 @@ export const Route = createFileRoute("/api/public/google/oauth/start")({
         });
         const { data, error } = await supabase.auth.getClaims(accessToken);
         if (error || !data?.claims?.sub) {
-          return new Response("Invalid user token", { status: 401 });
+          return mode === "json"
+            ? jsonError(401, "Invalid user token")
+            : new Response("Invalid user token", { status: 401 });
         }
         const userId = data.claims.sub as string;
 
         const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
         if (!clientId) {
-          return new Response("GOOGLE_OAUTH_CLIENT_ID is not configured", { status: 500 });
+          return mode === "json"
+            ? jsonError(500, "GOOGLE_OAUTH_CLIENT_ID is not configured")
+            : new Response("GOOGLE_OAUTH_CLIENT_ID is not configured", { status: 500 });
+        }
+        if (!process.env.GOOGLE_OAUTH_STATE_SECRET) {
+          return mode === "json"
+            ? jsonError(500, "GOOGLE_OAUTH_STATE_SECRET is not configured")
+            : new Response("GOOGLE_OAUTH_STATE_SECRET is not configured", { status: 500 });
         }
 
         const redirectUri = `${url.origin}/api/public/google/oauth/callback`;
@@ -69,7 +88,16 @@ export const Route = createFileRoute("/api/public/google/oauth/start")({
           state,
         });
 
-        throw redirect({ href: `${GOOGLE_AUTH_URL}?${params.toString()}` });
+        const authorizationUrl = `${GOOGLE_AUTH_URL}?${params.toString()}`;
+
+        if (mode === "json") {
+          return new Response(
+            JSON.stringify({ ok: true, authorizationUrl, redirectUri }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
+
+        throw redirect({ href: authorizationUrl });
       },
     },
   },

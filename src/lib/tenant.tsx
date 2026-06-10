@@ -168,7 +168,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (!authLoading) void load();
   }, [authLoading, load]);
 
-  // Gate: redirect users without tenant to /onboarding, or to /billing when subscription is blocked.
+  // Gate: redirect users to /billing when subscription is blocked.
+  // (We auto-create a tenant on first login, so there's no "no tenant" state to gate.)
   useEffect(() => {
     if (authLoading || loading) return;
     if (!user) return;
@@ -176,13 +177,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
     const path = location.pathname;
 
-    // No tenants at all → onboarding
-    if (tenants.length === 0) {
-      if (!isPathAllowedWithoutTenant(path)) {
-        navigate({ to: "/onboarding" });
-      }
-      return;
-    }
+    if (tenants.length === 0) return; // auto-creation failed; don't trap the user
+
 
     // Has tenant but subscription is blocked
     if (tenant) {

@@ -106,11 +106,13 @@ export function GmailConnectCard() {
     setConnecting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) { toast.error("Sessão expirada — faça login novamente."); return; }
-      const url = `/api/public/google/oauth/start?token=${encodeURIComponent(token)}`;
-      const popup = window.open(url, "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
-      if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups."); return; }
+      if (!session?.access_token) { toast.error("Sessão expirada — faça login novamente."); setConnecting(false); return; }
+      // Open a popup on OUR origin first (top-level window). The bridge page
+      // fetches the Google auth URL and then navigates the popup to Google,
+      // avoiding the iframe block that triggers ERR_BLOCKED_BY_RESPONSE on
+      // accounts.google.com inside the editor preview.
+      const popup = window.open("/google-oauth-popup", "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
+      if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups e tente novamente."); setConnecting(false); return; }
       const onMessage = (ev: MessageEvent) => {
         const msg = ev.data as { type?: string; ok?: boolean; message?: string } | undefined;
         if (!msg || msg.type !== "gmail-oauth") return;

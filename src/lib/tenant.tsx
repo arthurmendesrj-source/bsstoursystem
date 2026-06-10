@@ -24,7 +24,9 @@ type TenantCtx = {
   isSuperAdmin: boolean;
   switchTenant: (slug: string) => Promise<void>;
   reload: () => Promise<void>;
+  ensureTenant: () => Promise<Tenant | null>;
 };
+
 
 const Ctx = createContext<TenantCtx | null>(null);
 const ACTIVE_KEY = "active_tenant_slug";
@@ -55,6 +57,59 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  const createDefaultTenant = useCallback(async () => {
+    if (!user) return null;
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const baseName =
+        profile?.full_name?.trim() || user.email?.split("@")[0] || "Minha Empresa";
+      const slugify = (s: string) =>
+        s
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-+|-+$)/g, "")
+          .slice(0, 40) || "empresa";
+      const suffix = user.id.replace(/-/g, "").slice(0, 6);
+      let slug = `${slugify(baseName)}-${suffix}`;
+
+      let { data: newTenant, error: te } = await supabase
+        .from("tenants")
+        .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
+        .select("id, slug")
+        .single();
+
+      if (te) {
+        slug = `${slugify(baseName)}-${Math.random().toString(36).slice(2, 8)}`;
+        const retry = await supabase
+          .from("tenants")
+          .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
+          .select("id, slug")
+          .single();
+        newTenant = retry.data;
+        te = retry.error;
+      }
+
+      if (!te && newTenant) {
+        await supabase.from("tenant_members").insert({
+          tenant_id: newTenant.id,
+          user_id: user.id,
+          role_in_tenant: "owner",
+          is_active: true,
+        });
+        return newTenant;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [user]);
 
   const load = useCallback(async () => {
     if (!user) {
@@ -87,57 +142,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     // Auto-create a default tenant on first login so the user never sees the
     // "Criar empresa" screen. Super-admins are exempt.
     if (memberships.length === 0 && !sa) {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        const baseName =
-          profile?.full_name?.trim() || user.email?.split("@")[0] || "Minha Empresa";
-        const slugify = (s: string) =>
-          s
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-+|-+$)/g, "")
-            .slice(0, 40) || "empresa";
-        const suffix = user.id.replace(/-/g, "").slice(0, 6);
-        let slug = `${slugify(baseName)}-${suffix}`;
-
-        let { data: newTenant, error: te } = await supabase
-          .from("tenants")
-          .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
-          .select("id, slug")
-          .single();
-
-        if (te) {
-          slug = `${slugify(baseName)}-${Math.random().toString(36).slice(2, 8)}`;
-          const retry = await supabase
-            .from("tenants")
-            .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
-            .select("id, slug")
-            .single();
-          newTenant = retry.data;
-          te = retry.error;
-        }
-
-        if (!te && newTenant) {
-          await supabase.from("tenant_members").insert({
-            tenant_id: newTenant.id,
-            user_id: user.id,
-            role_in_tenant: "owner",
-            is_active: true,
-          });
-        }
-
-        const refetched = await fetchMemberships();
-        memberships = refetched.data ?? [];
-      } catch {
-        // Fall through; gate below keeps the user where they are.
-      }
+      await createDefaultTenant();
+      const refetched = await fetchMemberships();
+      memberships = refetched.data ?? [];
     }
+
 
 
     const list: Tenant[] = memberships
@@ -199,11 +208,42 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [tenants],
   );
 
+  const ensureTenant = useCallback(async (): Promise<Tenant | null> => {
+    if (tenant) return tenant;
+    if (tenants.length > 0) return tenants[0];
+    if (!user) return null;
+    await createDefaultTenant();
+    await load();
+    // Read freshest data via a direct query to avoid stale state.
+    const { data } = await supabase
+      .from("tenant_members")
+      .select(
+        "role_in_tenant, tenants:tenant_id (id, slug, name, status, subscriptions:subscriptions (status, trial_end, current_period_end))",
+      )
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .limit(1);
+    const row: any = data?.[0];
+    if (!row?.tenants) return null;
+    const sub = Array.isArray(row.tenants.subscriptions) ? row.tenants.subscriptions[0] : row.tenants.subscriptions;
+    return {
+      id: row.tenants.id,
+      slug: row.tenants.slug,
+      name: row.tenants.name,
+      status: row.tenants.status,
+      role_in_tenant: row.role_in_tenant,
+      subscription_status: (sub?.status ?? "none") as SubscriptionStatus,
+      trial_end: sub?.trial_end ?? null,
+      current_period_end: sub?.current_period_end ?? null,
+    };
+  }, [tenant, tenants, user, createDefaultTenant, load]);
+
   return (
-    <Ctx.Provider value={{ tenant, tenants, loading, isSuperAdmin, switchTenant, reload: load }}>
+    <Ctx.Provider value={{ tenant, tenants, loading, isSuperAdmin, switchTenant, reload: load, ensureTenant }}>
       {children}
     </Ctx.Provider>
   );
+
 }
 
 export function useTenant() {

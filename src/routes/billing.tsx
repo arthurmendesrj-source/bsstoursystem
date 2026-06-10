@@ -76,10 +76,9 @@ function BillingPage() {
           <div>
             <h1 className="text-3xl font-bold">Licença</h1>
             <p className="text-muted-foreground">
-              {tenants.length === 0
-                ? "Você ainda não tem um pacote assinado. Confira os pacotes disponíveis abaixo."
-                : "Selecione uma empresa no topo para gerenciar sua assinatura. Pacotes disponíveis:"}
+              Você ainda não tem um pacote assinado. Escolha um plano abaixo para começar.
             </p>
+
           </div>
           <PlansSection tenantId={null} currentPlanCode={null} />
         </div>
@@ -263,21 +262,29 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; 
   const listFn = useServerFn(listPublicPlans);
   const changeFn = useServerFn(changeSubscriptionPlan);
   const qc = useQueryClient();
+  const { ensureTenant, reload } = useTenant();
   const { data, isLoading } = useQuery({
     queryKey: ["public-plans"],
     queryFn: () => listFn(),
   });
   const mut = useMutation({
-    mutationFn: (plan_code: string) => {
-      if (!tenantId) throw new Error("Selecione uma empresa para assinar um pacote.");
-      return changeFn({ data: { tenant_id: tenantId, plan_code } });
+    mutationFn: async (plan_code: string) => {
+      let tid = tenantId;
+      if (!tid) {
+        const t = await ensureTenant();
+        if (!t) throw new Error("Não foi possível preparar sua empresa. Tente novamente.");
+        tid = t.id;
+      }
+      return changeFn({ data: { tenant_id: tid, plan_code } });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success("Plano atualizado");
-      if (tenantId) qc.invalidateQueries({ queryKey: ["billing-overview", tenantId] });
+      await reload();
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao trocar de plano"),
   });
+
   const plans = (data?.plans ?? []) as any[];
   if (isLoading) return <div className="text-sm text-muted-foreground">Carregando planos…</div>;
   if (plans.length === 0) return null;
@@ -317,12 +324,18 @@ function PlansSection({ tenantId, currentPlanCode }: { tenantId: string | null; 
                 </ul>
                 <Button
                   className="w-full"
-                  disabled={isCurrent || mut.isPending || !tenantId}
+                  disabled={isCurrent || mut.isPending}
                   onClick={() => mut.mutate(p.code)}
-                  title={!tenantId ? "Selecione uma empresa para assinar" : undefined}
                 >
-                  {isCurrent ? "Plano atual" : mut.isPending ? "Aplicando…" : !tenantId ? "Selecione uma empresa" : "Assinar este plano"}
+                  {isCurrent
+                    ? "Plano atual"
+                    : mut.isPending
+                    ? "Aplicando…"
+                    : !tenantId
+                    ? "Selecionar plano"
+                    : "Assinar este plano"}
                 </Button>
+
               </CardContent>
             </Card>
           );

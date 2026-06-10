@@ -1,37 +1,38 @@
-# Plano — Exibir aba "Licença" para todos
+## Objetivo
 
-## Problema
-Em `src/components/AppShell.tsx` o link **Licença** só é renderizado quando:
-- `isAdmin === true`, ou
-- `tenant?.role_in_tenant === "owner"`
+Eliminar a tela "Criar empresa". Ao fazer login, se o usuário ainda não tem nenhuma empresa, o sistema cria uma automaticamente e leva direto ao dashboard.
 
-Usuários comuns (e contas novas em trial sem tenant carregado) não veem o item, então não conseguem chegar em `/billing` pelo menu.
+## O que vou alterar
 
-## Mudança
+### 1. `src/lib/tenant.tsx` — criação automática
+No `load()` do `TenantProvider`, quando `memberships` vier vazio (e o usuário não for super-admin):
 
-Arquivo: `src/components/AppShell.tsx`
+1. Buscar `full_name` em `profiles` (fallback: parte do email antes do `@`, ou "Minha Empresa").
+2. Gerar slug a partir desse nome + sufixo curto do `user.id` (ex.: `joao-silva-a1b2c3`) para evitar colisão.
+3. `insert` em `public.tenants` com `created_by = user.id`, `status = 'active'`.
+4. `insert` em `public.tenant_members` com `role_in_tenant = 'owner'`, `is_active = true`.
+   (O trigger `create_trial_subscription_for_tenant` já cria a assinatura trial de 30 dias.)
+5. Releitura das memberships e seguir o fluxo normal.
 
-1. **Remover** o bloco do link "Licença" que está dentro do `if (isAdmin)` (junto com Usuários / Auditoria).
-2. **Remover** o bloco duplicado `!isAdmin && tenant?.role_in_tenant === "owner"`.
-3. **Adicionar** um único link "Licença" sempre visível, posicionado **logo antes de `/settings`** (no final da nav, junto com Configurações), usando o mesmo `itemClass` e o ícone `Receipt` já importado.
+Em caso de erro (ex.: corrida), reler memberships antes de desistir; se ainda vazio, mostrar toast e manter o usuário onde está (sem redirect para `/onboarding`).
 
-```tsx
-<Link
-  to="/billing"
-  onClick={() => minimizeAllWindows()}
-  className={itemClass(path.startsWith("/billing"))}
-  title={collapsed ? "Licença" : undefined}
->
-  <Receipt className="h-4 w-4 shrink-0" />
-  {!collapsed && <span className="truncate">Licença</span>}
-</Link>
-```
+### 2. Remover redirect para onboarding
+Em `TenantProvider`, tirar o bloco que faz `navigate({ to: "/onboarding" })` quando `tenants.length === 0`. Após a auto-criação, sempre haverá tenant.
 
-## Não muda
-- Página `/billing` em si — as ações de assinar/gerenciar plano continuam protegidas server-side (RLS + checagens no `billing.functions.ts`), então expor o menu não dá privilégio extra.
-- `BillingAccessGate`, rotas, banners de trial.
-- Nenhuma mudança em backend / migrations.
+### 3. `src/routes/index.tsx`
+Já redireciona logado → `/dashboard`. Nenhuma mudança necessária.
 
-## Verificação
-- Abrir preview como usuário não-admin: o item "Licença" aparece no final do menu lateral, acima de "Configurações".
-- Clicar leva para `/billing` normalmente.
+### 4. `src/routes/onboarding.tsx`
+Manter o arquivo (para não quebrar imports/rota gerada), mas torná-lo um redirect simples para `/dashboard` — assim nenhum link antigo cai numa tela morta.
+
+## O que NÃO vou mexer
+
+- Schema do banco (tabelas, RLS, triggers permanecem).
+- Billing/assinatura — trial de 30 dias continua sendo criado pelo trigger.
+- Fluxo de troca de empresa (`/t/$tenantSlug`) e super-admin.
+- Gate de assinatura bloqueada (`past_due`, `canceled` etc.) continua redirecionando para `/billing`.
+
+## Riscos / observações
+
+- Slug duplicado: mitigado pelo sufixo do `user.id`. Se ainda assim colidir, faço retry com sufixo aleatório curto.
+- Usuários que hoje já têm o caminho `/onboarding` aberto: passam a ser levados ao dashboard automaticamente.

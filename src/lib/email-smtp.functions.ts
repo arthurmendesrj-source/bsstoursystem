@@ -239,13 +239,27 @@ export const fetchEmailBody = createServerFn({ method: "POST" })
       const lock = await client.getMailboxLock(data.mailbox);
       try {
         const msg = await client.fetchOne(String(data.uid), { source: true, envelope: true }, { uid: true });
-        if (!msg || !msg.source) return { html: null, text: null, subject: null };
-        const raw = msg.source.toString("utf8");
+        if (!msg || !msg.source) return { subject: null, from: null, to: null, date: null, html: null, text: null };
+        // Cap raw size to avoid CPU spikes
+        const src = msg.source.length > 5_000_000 ? msg.source.subarray(0, 5_000_000) : msg.source;
+        const { simpleParser } = await import("mailparser");
+        const parsed = await simpleParser(src);
+        const fmtAddr = (a: unknown): string | null => {
+          if (!a) return null;
+          if (typeof a === "string") return a;
+          if (typeof a === "object" && a !== null && "text" in (a as Record<string, unknown>)) {
+            const t = (a as { text?: unknown }).text;
+            return typeof t === "string" ? t : null;
+          }
+          return null;
+        };
         return {
-          subject: msg.envelope?.subject ?? null,
-          raw,
-          html: null as string | null,
-          text: null as string | null,
+          subject: parsed.subject ?? msg.envelope?.subject ?? null,
+          from: fmtAddr(parsed.from),
+          to: fmtAddr(parsed.to),
+          date: parsed.date ? parsed.date.toISOString() : null,
+          html: typeof parsed.html === "string" ? parsed.html : null,
+          text: parsed.text ?? null,
         };
       } finally {
         lock.release();

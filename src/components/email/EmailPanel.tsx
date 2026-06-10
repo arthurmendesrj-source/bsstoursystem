@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { ThreadReader, type ThreadMessage } from "@/components/email/ThreadReader";
 import { ThreadWindowManager, type ThreadWindowManagerHandle } from "@/components/email/ThreadWindowManager";
 import { Maximize2 } from "lucide-react";
+import { SmtpInbox } from "@/components/email/SmtpInbox";
 
 type Folder = { id: string; name: string; type: string; unread_count: number; total_count: number; color_bg: string | null; color_text: string | null };
 type ThreadRow = {
@@ -153,6 +154,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
   const LS_SELECTED_ACCOUNT = "email.selectedAccount";
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
+  const [smtpAccounts, setSmtpAccounts] = useState<Array<{ id: string; email: string }>>([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(() => {
     try { return localStorage.getItem(LS_SELECTED_ACCOUNT); } catch { return null; }
   });
@@ -161,20 +163,22 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   const loadAccounts = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
-    if (!uid) { setAuthorizedEmails([]); return; }
-    // Load OAuth-connected accounts (source of truth) — falls back to user_email_accounts.
-    const { data: tokens } = await supabase
-      .from("user_gmail_tokens")
-      .select("email_address")
-      .eq("user_id", uid);
-    let emails = ((tokens ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
+    if (!uid) { setAuthorizedEmails([]); setSmtpAccounts([]); return; }
+    const [tokensRes, smtpRes] = await Promise.all([
+      supabase.from("user_gmail_tokens").select("email_address").eq("user_id", uid),
+      supabase.from("email_smtp_accounts").select("id, email_address").eq("user_id", uid),
+    ]);
+    let emails = ((tokensRes.data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
     if (emails.length === 0) {
       const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
       emails = ((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
     }
     setAuthorizedEmails(emails);
+    const smtp = ((smtpRes.data ?? []) as Array<{ id: string; email_address: string }>).map((r) => ({ id: r.id, email: r.email_address.toLowerCase() }));
+    setSmtpAccounts(smtp);
+    const all = [...emails, ...smtp.map((s) => s.email)];
     setSelectedAccount((prev) => {
-      const next = prev && emails.includes(prev) ? prev : (emails[0] ?? null);
+      const next = prev && all.includes(prev) ? prev : (all[0] ?? null);
       try { if (next) localStorage.setItem(LS_SELECTED_ACCOUNT, next); else localStorage.removeItem(LS_SELECTED_ACCOUNT); } catch {}
       return next;
     });
@@ -190,8 +194,12 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   const startGoogleConnect = useCallback(async () => {
     setConnecting(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      let { data: { session } } = await supabase.auth.getSession();
+      let token = session?.access_token;
+      if (!token) {
+        const refreshed = await supabase.auth.refreshSession();
+        token = refreshed.data.session?.access_token;
+      }
       if (!token) { toast.error("Sessão expirada — faça login novamente."); return; }
       const popup = window.open("/google-oauth-popup", "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
       if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups para este site."); return; }
@@ -641,6 +649,13 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   if (authorizedEmails === null) {
     return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
   }
+
+  // If the selected account is an SMTP account, render the SMTP inbox instead of the Gmail mirror UI.
+  const selectedSmtp = selectedAccount ? smtpAccounts.find((a) => a.email === selectedAccount) : null;
+  if (selectedSmtp) {
+    return <SmtpInbox accountId={selectedSmtp.id} email={selectedSmtp.email} className={className} />;
+  }
+
   const ConnectButton = ({ size = "default" }: { size?: "default" | "sm" }) => (
     <Button onClick={() => void startGoogleConnect()} disabled={connecting} size={size}>
       {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
@@ -648,20 +663,27 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     </Button>
   );
 
-  if (!hasMailbox) {
+  if (!hasMailbox && smtpAccounts.length === 0) {
     return (
       <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center bg-background", className)}>
         <div className="max-w-md text-center px-6 py-10 rounded-lg border bg-card">
           <Mail className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold mb-2">Nenhuma conta Google conectada</h2>
+          <h2 className="text-lg font-semibold mb-2">Nenhuma conta de email conectada</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Conecte sua conta Google para sincronizar e enviar emails. Você pode conectar várias contas e alternar entre elas.
+            Conecte sua conta Google para sincronizar e enviar emails, ou conecte qualquer email com login e senha em <a href="/settings" className="underline">Configurações</a>.
           </p>
           <ConnectButton />
         </div>
       </div>
     );
   }
+
+  if (!hasMailbox) {
+    // Only SMTP accounts exist but none selected — auto-select the first one (effect below).
+    // While selection settles, show a thin loader.
+    return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
+  }
+
 
   // ---- Sidebar render ----
   const renderFolderBtn = (f: Folder, isUser = false) => {
@@ -734,9 +756,28 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
                     <DropdownMenuSeparator />
                   </>
                 )}
+                {smtpAccounts.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Contas SMTP/IMAP</div>
+                    {smtpAccounts.map((sa) => (
+                      <DropdownMenuItem key={sa.id} onClick={() => pickAccount(sa.email)} className="flex items-center gap-2">
+                        <Check className={cn("h-3.5 w-3.5", sa.email === selectedAccount ? "opacity-100" : "opacity-0")} />
+                        <span className="flex-1 truncate">{sa.email}</span>
+                        <span className="text-[10px] font-semibold rounded bg-muted px-1.5 py-0.5">SMTP</span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={() => void startGoogleConnect()} disabled={connecting}>
                   {connecting ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
                   <span className="flex-1">Conectar conta Google…</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href="/settings" className="flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5" />
+                    <span className="flex-1">Conectar email com senha…</span>
+                  </a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

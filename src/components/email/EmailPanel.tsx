@@ -193,8 +193,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) { toast.error("Sessão expirada — faça login novamente."); return; }
-      const url = `/api/public/google/oauth/start?token=${encodeURIComponent(token)}`;
-      const popup = window.open(url, "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
+      const popup = window.open("/google-oauth-popup", "gmail-oauth", "width=520,height=640,menubar=no,toolbar=no");
       if (!popup) { toast.error("Bloqueador de pop-up impediu a janela. Permita pop-ups para este site."); return; }
       const onMessage = (ev: MessageEvent) => {
         const msg = ev.data as { type?: string; ok?: boolean; message?: string } | undefined;

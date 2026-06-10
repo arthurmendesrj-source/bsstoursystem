@@ -60,6 +60,17 @@ async function callAdminUsers(action: string, payload: Record<string, unknown> =
   const { data, error } = await supabase.functions.invoke("admin-users", {
     body: { action, ...payload },
   });
+  const msg = error?.message ?? data?.error;
+  const isUnauthorized =
+    (error as any)?.context?.status === 401 ||
+    /unauthorized|401/i.test(String(msg ?? ""));
+  if (isUnauthorized) {
+    try { await supabase.auth.signOut(); } catch {}
+    if (typeof window !== "undefined") {
+      window.location.href = "/login?reason=session_expired";
+    }
+    throw new Error("Sessão expirada. Faça login novamente.");
+  }
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
   return data;

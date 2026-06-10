@@ -648,6 +648,13 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   if (authorizedEmails === null) {
     return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
   }
+
+  // If the selected account is an SMTP account, render the SMTP inbox instead of the Gmail mirror UI.
+  const selectedSmtp = selectedAccount ? smtpAccounts.find((a) => a.email === selectedAccount) : null;
+  if (selectedSmtp) {
+    return <SmtpInbox accountId={selectedSmtp.id} email={selectedSmtp.email} className={className} />;
+  }
+
   const ConnectButton = ({ size = "default" }: { size?: "default" | "sm" }) => (
     <Button onClick={() => void startGoogleConnect()} disabled={connecting} size={size}>
       {connecting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Mail className="h-4 w-4 mr-2" />}
@@ -655,20 +662,27 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
     </Button>
   );
 
-  if (!hasMailbox) {
+  if (!hasMailbox && smtpAccounts.length === 0) {
     return (
       <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center bg-background", className)}>
         <div className="max-w-md text-center px-6 py-10 rounded-lg border bg-card">
           <Mail className="h-10 w-10 mx-auto mb-4 text-muted-foreground" />
-          <h2 className="text-lg font-semibold mb-2">Nenhuma conta Google conectada</h2>
+          <h2 className="text-lg font-semibold mb-2">Nenhuma conta de email conectada</h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Conecte sua conta Google para sincronizar e enviar emails. Você pode conectar várias contas e alternar entre elas.
+            Conecte sua conta Google para sincronizar e enviar emails, ou conecte qualquer email com login e senha em <a href="/settings" className="underline">Configurações</a>.
           </p>
           <ConnectButton />
         </div>
       </div>
     );
   }
+
+  if (!hasMailbox) {
+    // Only SMTP accounts exist but none selected — auto-select the first one (effect below).
+    // While selection settles, show a thin loader.
+    return <div className={cn("flex h-[calc(100vh-4rem)] items-center justify-center text-sm text-muted-foreground", className)}>Carregando…</div>;
+  }
+
 
   // ---- Sidebar render ----
   const renderFolderBtn = (f: Folder, isUser = false) => {

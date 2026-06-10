@@ -299,7 +299,7 @@ function WorkspacePage() {
     let content: React.ReactNode = null;
     if (key === "email") {
       title = t("intEmail");
-      content = <div className="h-full"><EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader /></div>;
+      content = <div className="p-4 text-sm text-muted-foreground">Email agora vive em /email.</div>;
     } else if (key === "activities") {
       title = t("activities");
       content = <div className="p-4"><ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} /></div>;

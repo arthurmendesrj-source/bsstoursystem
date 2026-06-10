@@ -332,7 +332,7 @@ function SupplierDrawer({ supplier, onClose }: { supplier: Supplier | null; onCl
     if (!supplier) return;
     const [c, e, b, d, r] = await Promise.all([
       supabase.from("supplier_contacts").select("*").eq("supplier_id", supplier.id).order("is_primary", { ascending: false }),
-      supabase.from("emails").select("id,subject,from_email,received_at").eq("supplier_id", supplier.id).order("received_at", { ascending: false }).limit(20),
+      Promise.resolve({ data: [] as any[] }),
       supabase.from("booking_suppliers").select("id,service_type,confirmation_code,cost,currency,status,booking_id").eq("supplier_id", supplier.id).order("created_at", { ascending: false }).limit(20),
       supabase.from("supplier_documents").select("*").eq("supplier_id", supplier.id).order("created_at", { ascending: false }),
       supabase.from("supplier_rates").select("*").eq("supplier_id", supplier.id).order("city").limit(200),

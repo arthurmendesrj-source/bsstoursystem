@@ -66,20 +66,81 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
 
-    const [{ data: memberships }, { data: sa }] = await Promise.all([
+    const fetchMemberships = async () =>
       supabase
         .from("tenant_members")
         .select(
           "role_in_tenant, tenants:tenant_id (id, slug, name, status, subscriptions:subscriptions (status, trial_end, current_period_end))",
         )
         .eq("user_id", user.id)
-        .eq("is_active", true),
+        .eq("is_active", true);
+
+    const [{ data: initialMemberships }, { data: sa }] = await Promise.all([
+      fetchMemberships(),
       supabase.from("super_admins").select("user_id").eq("user_id", user.id).maybeSingle(),
     ]);
 
     setIsSuperAdmin(!!sa);
 
-    const list: Tenant[] = (memberships ?? [])
+    let memberships = initialMemberships ?? [];
+
+    // Auto-create a default tenant on first login so the user never sees the
+    // "Criar empresa" screen. Super-admins are exempt.
+    if (memberships.length === 0 && !sa) {
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        const baseName =
+          profile?.full_name?.trim() || user.email?.split("@")[0] || "Minha Empresa";
+        const slugify = (s: string) =>
+          s
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-+|-+$)/g, "")
+            .slice(0, 40) || "empresa";
+        const suffix = user.id.replace(/-/g, "").slice(0, 6);
+        let slug = `${slugify(baseName)}-${suffix}`;
+
+        let { data: newTenant, error: te } = await supabase
+          .from("tenants")
+          .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
+          .select("id, slug")
+          .single();
+
+        if (te) {
+          slug = `${slugify(baseName)}-${Math.random().toString(36).slice(2, 8)}`;
+          const retry = await supabase
+            .from("tenants")
+            .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
+            .select("id, slug")
+            .single();
+          newTenant = retry.data;
+          te = retry.error;
+        }
+
+        if (!te && newTenant) {
+          await supabase.from("tenant_members").insert({
+            tenant_id: newTenant.id,
+            user_id: user.id,
+            role_in_tenant: "owner",
+            is_active: true,
+          });
+        }
+
+        const refetched = await fetchMemberships();
+        memberships = refetched.data ?? [];
+      } catch {
+        // Fall through; gate below keeps the user where they are.
+      }
+    }
+
+
+    const list: Tenant[] = memberships
       .filter((m: any) => m.tenants)
       .map((m: any) => {
         const sub = Array.isArray(m.tenants.subscriptions) ? m.tenants.subscriptions[0] : m.tenants.subscriptions;
@@ -107,7 +168,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     if (!authLoading) void load();
   }, [authLoading, load]);
 
-  // Gate: redirect users without tenant to /onboarding, or to /billing when subscription is blocked.
+  // Gate: redirect users to /billing when subscription is blocked.
+  // (We auto-create a tenant on first login, so there's no "no tenant" state to gate.)
   useEffect(() => {
     if (authLoading || loading) return;
     if (!user) return;
@@ -115,13 +177,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
     const path = location.pathname;
 
-    // No tenants at all → onboarding
-    if (tenants.length === 0) {
-      if (!isPathAllowedWithoutTenant(path)) {
-        navigate({ to: "/onboarding" });
-      }
-      return;
-    }
+    if (tenants.length === 0) return; // auto-creation failed; don't trap the user
+
 
     // Has tenant but subscription is blocked
     if (tenant) {

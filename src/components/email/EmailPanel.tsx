@@ -756,9 +756,28 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
                     <DropdownMenuSeparator />
                   </>
                 )}
+                {smtpAccounts.length > 0 && (
+                  <>
+                    <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Contas SMTP/IMAP</div>
+                    {smtpAccounts.map((sa) => (
+                      <DropdownMenuItem key={sa.id} onClick={() => pickAccount(sa.email)} className="flex items-center gap-2">
+                        <Check className={cn("h-3.5 w-3.5", sa.email === selectedAccount ? "opacity-100" : "opacity-0")} />
+                        <span className="flex-1 truncate">{sa.email}</span>
+                        <span className="text-[10px] font-semibold rounded bg-muted px-1.5 py-0.5">SMTP</span>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={() => void startGoogleConnect()} disabled={connecting}>
                   {connecting ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" /> : <Mail className="h-3.5 w-3.5 mr-2" />}
                   <span className="flex-1">Conectar conta Google…</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href="/settings" className="flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5" />
+                    <span className="flex-1">Conectar email com senha…</span>
+                  </a>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

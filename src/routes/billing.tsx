@@ -76,10 +76,9 @@ function BillingPage() {
           <div>
             <h1 className="text-3xl font-bold">Licença</h1>
             <p className="text-muted-foreground">
-              {tenants.length === 0
-                ? "Você ainda não tem um pacote assinado. Confira os pacotes disponíveis abaixo."
-                : "Selecione uma empresa no topo para gerenciar sua assinatura. Pacotes disponíveis:"}
+              Você ainda não tem um pacote assinado. Escolha um plano abaixo para começar.
             </p>
+
           </div>
           <PlansSection tenantId={null} currentPlanCode={null} />
         </div>

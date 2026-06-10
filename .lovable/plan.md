@@ -1,47 +1,29 @@
-## Objetivo
+# Diagnóstico do Google OAuth
 
-Garantir isolamento total entre empresas:
-- Toda conta criada via signup público → conta master (diretor), com tenant próprio.
-- Nenhum usuário enxerga dados de outro tenant.
-- Apenas `super_admin` (desenvolvedor) atravessa tenants.
-- Usuários convidados herdam o tenant de quem convidou (já feito).
+Página nova em `/settings/google-diagnostico` (rota autenticada) para identificar exatamente onde o fluxo `/api/public/google/oauth/start` → Google → `/api/public/google/oauth/callback` quebra.
 
-## Diagnóstico
+## O que a página mostra
 
-O signup → master e o convite → membro já estão corretos (correção anterior). O problema restante são as **políticas RLS legadas** que ainda existem em paralelo às `tenant_isolation_*`. Políticas permissivas se combinam com OR, então o filtro de tenant é ignorado.
+Lista de checks executados em ordem, cada um com status (ok / erro / aviso) e detalhes expansíveis (JSON cru, headers relevantes, mensagem completa):
 
-Exemplo: Diretor1 (admin do tenant Diretor1) hoje enxergaria os 638 fornecedores e 233 clientes da BSS Tour porque `suppliers_select` libera para qualquer `is_admin(auth.uid())` sem checar `tenant_id`.
+1. **Sessão Supabase** — usuário logado, `user.id`, e-mail, validade do access_token.
+2. **Variáveis de ambiente do servidor** — presença (sem valor) de `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_STATE_SECRET`. Feito por nova serverFn `diagnoseGoogleOauth` que só retorna booleans + tamanho dos secrets.
+3. **Redirect URI esperado** — calcula `${window.location.origin}/api/public/google/oauth/callback` e mostra para o usuário copiar e comparar com o Google Cloud Console.
+4. **Probe do endpoint `/start`** — `fetch('/api/public/google/oauth/start', { redirect: 'manual', headers: Authorization })` e mostra status, `location` header, ou corpo do erro 4xx/5xx.
+5. **Probe do `state` HMAC** — serverFn gera um state de teste e devolve para validar que `GOOGLE_OAUTH_STATE_SECRET` está configurado.
+6. **Tokens Gmail já salvos** — consulta `user_gmail_tokens` do usuário atual: se há linha, mostra `email_address`, `expires_at`, `scope`. Indica se "já está conectado".
+7. **Últimos eventos de auditoria** — últimas 10 linhas de `gmail_connection_audit` do usuário (event, reason, metadata, created_at).
+8. **Botão "Iniciar OAuth em nova aba com log"** — abre `/api/public/google/oauth/start` em popup e escuta `postMessage` do callback (`type: 'gmail-oauth'`) para registrar `ok`/`message` na própria página.
 
-## Plano
+## Arquivos
 
-### 1. Migration: tornar isolamento de tenant obrigatório
+- `src/lib/google-oauth-diagnose.functions.ts` — serverFn `diagnoseGoogleOauth` (env presence, gera state de teste, lê tokens + audit do `userId` do middleware `requireSupabaseAuth`).
+- `src/routes/settings_.google-diagnostico.tsx` — UI da página, dentro de `AuthGate`+`AppShell`, executa todos os checks ao montar e reexecuta no botão "Rodar novamente".
+- Link de acesso: adicionar item "Diagnóstico Google" em `src/routes/settings.tsx`.
 
-Para cada tabela `public.*` que tem coluna `tenant_id` (customers, leads, suppliers, supplier_contacts, supplier_rates, supplier_documents, bookings, booking_pax, booking_suppliers, booking_item_confirmations, quotes, quote_items, quote_flights, quote_documents, quote_item_notes, tasks, invoices, vouchers, voucher_send_log, interactions, itineraries, itinerary_chunks, packages, package_dates, activity_log, ai_conversations, ai_messages, ai_pending_actions, ai_generated_images, emails, email_threads, email_attachments, email_labels, email_message_links, email_sync_state, exchange_rates, lead_alert_snoozes, notification_logs, notification_preferences, operations_activities, push_subscriptions, sla_escalations, sla_settings, storage_access_log, user_email_accounts, user_field_permissions, user_gmail_tokens, user_module_permissions, whatsapp_accounts, whatsapp_conversations, whatsapp_messages, whatsapp_templates, tenant_domains):
+## Notas técnicas
 
-- `DROP POLICY tenant_isolation_<tabela>` (permissiva atual).
-- Recriar como **RESTRICTIVE** para `ALL`:
-  ```
-  is_super_admin(auth.uid())
-  OR tenant_id = current_tenant_id()
-  OR (current_tenant_id() IS NULL AND is_tenant_member(tenant_id, auth.uid()))
-  ```
-- Adicionar política RESTRICTIVE de `INSERT` exigindo
-  `tenant_id = current_tenant_id() OR is_super_admin(auth.uid())`.
-
-Resultado: a regra antiga de papel (admin/operador/módulo) continua valendo, mas **sempre** combinada com AND ao filtro de tenant.
-
-### 2. Trigger `set_tenant_id_default`
-
-`BEFORE INSERT` em cada tabela: se `NEW.tenant_id IS NULL`, preenche com `current_tenant_id()`. Evita quebrar inserts existentes do app que ainda não passam `tenant_id` explicitamente.
-
-### 3. Validação após aplicar
-
-- Logar como Diretor1 → `customers`, `leads`, `suppliers` devem vir **vazios**.
-- Logar como usuário BSS Tour → continua vendo os 233 clientes / 638 fornecedores / 9 leads normalmente.
-- Criar registro como Diretor1 → fica visível só dentro do tenant Diretor1.
-
-## Fora de escopo
-
-- Lógica de papéis (admin, diretor, operador) e de módulos permanece intacta.
-- Dados existentes já estão corretamente marcados com `tenant_id` — sem backfill necessário.
-- Fluxo de signup/convite já corrigido na rodada anterior.
+- Nenhum secret é retornado em texto, só `present: boolean` + comprimento.
+- O probe do `/start` usa `redirect: 'manual'` para capturar o 302 sem seguir até o Google.
+- A página é só para diretor/super_admin (mesma checagem usada em outras telas de settings).
+- Sem alteração no fluxo OAuth real — somente leitura/diagnóstico.

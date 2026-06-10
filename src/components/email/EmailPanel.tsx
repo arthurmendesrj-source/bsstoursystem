@@ -153,6 +153,7 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
 
   const LS_SELECTED_ACCOUNT = "email.selectedAccount";
   const [authorizedEmails, setAuthorizedEmails] = useState<string[] | null>(null);
+  const [smtpAccounts, setSmtpAccounts] = useState<Array<{ id: string; email: string }>>([]);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(() => {
     try { return localStorage.getItem(LS_SELECTED_ACCOUNT); } catch { return null; }
   });
@@ -161,20 +162,22 @@ export function EmailPanel({ mode, leadId, customerId: _customerId, className, i
   const loadAccounts = useCallback(async () => {
     const { data: userData } = await supabase.auth.getUser();
     const uid = userData.user?.id;
-    if (!uid) { setAuthorizedEmails([]); return; }
-    // Load OAuth-connected accounts (source of truth) — falls back to user_email_accounts.
-    const { data: tokens } = await supabase
-      .from("user_gmail_tokens")
-      .select("email_address")
-      .eq("user_id", uid);
-    let emails = ((tokens ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
+    if (!uid) { setAuthorizedEmails([]); setSmtpAccounts([]); return; }
+    const [tokensRes, smtpRes] = await Promise.all([
+      supabase.from("user_gmail_tokens").select("email_address").eq("user_id", uid),
+      supabase.from("email_smtp_accounts").select("id, email_address").eq("user_id", uid),
+    ]);
+    let emails = ((tokensRes.data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
     if (emails.length === 0) {
       const { data } = await supabase.from("user_email_accounts").select("email_address").eq("user_id", uid);
       emails = ((data ?? []) as Array<{ email_address: string }>).map((r) => r.email_address.toLowerCase());
     }
     setAuthorizedEmails(emails);
+    const smtp = ((smtpRes.data ?? []) as Array<{ id: string; email_address: string }>).map((r) => ({ id: r.id, email: r.email_address.toLowerCase() }));
+    setSmtpAccounts(smtp);
+    const all = [...emails, ...smtp.map((s) => s.email)];
     setSelectedAccount((prev) => {
-      const next = prev && emails.includes(prev) ? prev : (emails[0] ?? null);
+      const next = prev && all.includes(prev) ? prev : (all[0] ?? null);
       try { if (next) localStorage.setItem(LS_SELECTED_ACCOUNT, next); else localStorage.removeItem(LS_SELECTED_ACCOUNT); } catch {}
       return next;
     });

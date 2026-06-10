@@ -310,8 +310,18 @@ Deno.serve(async (req) => {
       // 6) profile
       await admin.from("profiles").delete().eq("user_id", targetId);
 
+      // 6b) other FKs to auth.users that block deleteUser
+      await admin.from("email_message_links").delete().eq("created_by", targetId);
+      await admin.from("packages").delete().eq("created_by", targetId);
+      await admin.from("usage_ai_events").delete().eq("user_id", targetId);
+      await admin.from("super_admins").delete().eq("user_id", targetId);
+      await admin.from("tenant_members").delete().eq("user_id", targetId);
+      // Detach tenants owned by this user (keep tenant data; created_by is nullable)
+      await admin.from("tenants").update({ created_by: null }).eq("created_by", targetId);
+
       // 7) auth user
       const { error: delErr } = await admin.auth.admin.deleteUser(targetId);
+
       if (delErr) return json({ error: delErr.message }, 500);
 
       await audit({

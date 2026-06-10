@@ -66,6 +66,67 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
+  const createDefaultTenant = useCallback(async () => {
+    if (!user) return null;
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      const baseName =
+        profile?.full_name?.trim() || user.email?.split("@")[0] || "Minha Empresa";
+      const slugify = (s: string) =>
+        s
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-+|-+$)/g, "")
+          .slice(0, 40) || "empresa";
+      const suffix = user.id.replace(/-/g, "").slice(0, 6);
+      let slug = `${slugify(baseName)}-${suffix}`;
+
+      let { data: newTenant, error: te } = await supabase
+        .from("tenants")
+        .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
+        .select("id, slug")
+        .single();
+
+      if (te) {
+        slug = `${slugify(baseName)}-${Math.random().toString(36).slice(2, 8)}`;
+        const retry = await supabase
+          .from("tenants")
+          .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
+          .select("id, slug")
+          .single();
+        newTenant = retry.data;
+        te = retry.error;
+      }
+
+      if (!te && newTenant) {
+        await supabase.from("tenant_members").insert({
+          tenant_id: newTenant.id,
+          user_id: user.id,
+          role_in_tenant: "owner",
+          is_active: true,
+        });
+        return newTenant;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }, [user]);
+
+  const load = useCallback(async () => {
+    if (!user) {
+      setTenants([]);
+      setTenant(null);
+      setIsSuperAdmin(false);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     const fetchMemberships = async () =>
@@ -89,57 +150,11 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     // Auto-create a default tenant on first login so the user never sees the
     // "Criar empresa" screen. Super-admins are exempt.
     if (memberships.length === 0 && !sa) {
-      try {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        const baseName =
-          profile?.full_name?.trim() || user.email?.split("@")[0] || "Minha Empresa";
-        const slugify = (s: string) =>
-          s
-            .toLowerCase()
-            .normalize("NFD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-+|-+$)/g, "")
-            .slice(0, 40) || "empresa";
-        const suffix = user.id.replace(/-/g, "").slice(0, 6);
-        let slug = `${slugify(baseName)}-${suffix}`;
-
-        let { data: newTenant, error: te } = await supabase
-          .from("tenants")
-          .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
-          .select("id, slug")
-          .single();
-
-        if (te) {
-          slug = `${slugify(baseName)}-${Math.random().toString(36).slice(2, 8)}`;
-          const retry = await supabase
-            .from("tenants")
-            .insert([{ name: baseName, slug, created_by: user.id, status: "active" as const }])
-            .select("id, slug")
-            .single();
-          newTenant = retry.data;
-          te = retry.error;
-        }
-
-        if (!te && newTenant) {
-          await supabase.from("tenant_members").insert({
-            tenant_id: newTenant.id,
-            user_id: user.id,
-            role_in_tenant: "owner",
-            is_active: true,
-          });
-        }
-
-        const refetched = await fetchMemberships();
-        memberships = refetched.data ?? [];
-      } catch {
-        // Fall through; gate below keeps the user where they are.
-      }
+      await createDefaultTenant();
+      const refetched = await fetchMemberships();
+      memberships = refetched.data ?? [];
     }
+
 
 
     const list: Tenant[] = memberships

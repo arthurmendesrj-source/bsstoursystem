@@ -191,7 +191,7 @@ export const fetchInbox = createServerFn({ method: "POST" })
             seq: msg.seq ?? 0,
             subject: env?.subject ?? "(sem assunto)",
             from: env?.from?.[0] ? `${env.from[0].name ?? ""} <${env.from[0].address ?? ""}>`.trim() : "",
-            date: (msg.internalDate ?? env?.date ?? null)?.toISOString?.() ?? null,
+            date: (() => { const d = msg.internalDate ?? env?.date ?? null; if (!d) return null; return d instanceof Date ? d.toISOString() : String(d); })(),
             flags: Array.from(msg.flags ?? []),
             preview: "",
           });

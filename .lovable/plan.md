@@ -1,63 +1,57 @@
+
 ## Objetivo
 
-Criar uma página `/licenca` onde o usuário (logado, dono de uma empresa) digita um código. Ao inserir `BOSCO1`, a empresa ganha acesso total ao app por **12 meses**. O código é de **uso único** — depois de resgatado uma vez, ninguém mais consegue ativar.
+- `diretorturismos@gmail.com` (Diretor1) deve ter alçada total agora.
+- Toda nova conta criada via cadastro direto (signup público) vira **conta master**: tenant próprio + papel `admin`.
+- Toda conta criada via **convite** fica vinculada ao tenant de quem convidou (subordinada).
 
-## Banco de dados (migração)
+## Situação atual (verificada no banco)
 
-Criar tabela `public.license_codes` para gerenciar códigos de licença reutilizáveis no futuro:
+- Diretor1 existe em `auth.users` e `profiles`, mas **não tem nenhum papel em `user_roles` e nenhum tenant em `tenant_members`** — por isso não tem acesso a nada.
+- O trigger `handle_new_user` hoje só cria `profiles` + `user_email_accounts`. Não cria tenant nem papel.
+- O edge function `admin-users` (ação `invite`) cria o usuário convidado e atribui papéis, mas **não o vincula ao tenant do convidador**.
 
-```
-license_codes
-- id uuid pk
-- code text unique not null            (ex.: 'BOSCO1', case-insensitive)
-- plan_code text not null              (qual plano libera — usaremos 'premium' ou o melhor existente)
-- duration_days int not null           (365 para BOSCO1)
-- max_uses int not null default 1
-- uses_count int not null default 0
-- is_active bool not null default true
-- redeemed_by_tenant_id uuid           (preenchido ao resgatar — auditoria)
-- redeemed_by_user_id uuid
-- redeemed_at timestamptz
-- created_at / updated_at
-```
+## O que será feito
 
-Grants para `authenticated` (SELECT para checar validade) e `service_role` (escrita via serverFn admin). RLS habilitada com policy de SELECT apenas em códigos ativos.
+### 1. Conserto pontual do Diretor1 (dados, agora)
 
-Seed: inserir `BOSCO1` com `duration_days = 365`, `max_uses = 1`, `plan_code = 'premium'` (ou o code do plano de maior nível existente — vou conferir `plans` na hora e usar o equivalente "acesso total").
+- Criar um tenant "Diretor1" (slug `diretor1` ou derivado do nome) com `created_by = id do Diretor1`.
+- Inserir `tenant_members(tenant_id, user_id, role_in_tenant='owner', is_active=true)`.
+- Inserir em `user_roles` os papéis `admin` **e** `diretor` para o user_id do Diretor1 (admin garante alçada total no app; diretor habilita as telas que checam `isDirector`).
+- O trigger existente `trg_create_trial_subscription` já cria a assinatura trial automaticamente quando o tenant nasce.
 
-## Server function
+### 2. Signup direto → conta master automática (migração de schema)
 
-`src/lib/license.functions.ts` — `redeemLicenseCode({ code })`:
+Substituir `public.handle_new_user()` para, além do que já faz, quando o novo usuário **não** veio de convite:
 
-1. `requireSupabaseAuth` — pega `userId`.
-2. Resolve tenant ativo do usuário (`resolveUserTenantId`).
-3. Verifica que o usuário é `owner` do tenant (senão, erro).
-4. Carrega `license_codes` por `lower(code)`; valida `is_active`, `uses_count < max_uses`.
-5. Em transação (via `supabaseAdmin`):
-   - Incrementa `uses_count`, grava `redeemed_by_tenant_id/user_id/at`. Se atingiu `max_uses`, marca `is_active = false`.
-   - Faz upsert em `subscriptions` para o tenant: `plan_id` do plano `premium`, `status = 'active'`, `current_period_start = now()`, `current_period_end = now() + 365 days`, `trial_end = null`, `grace_until = null`.
-6. Retorna `{ ok: true, expires_at }`.
+- Detectar convite por `NEW.invited_at IS NOT NULL` ou pela flag `NEW.raw_user_meta_data ? 'invited_by_tenant_id'` (que a edge function vai passar — ver item 3). Se qualquer um dos dois indicar convite, **não** cria tenant nem papel master.
+- Caso contrário (signup público):
+  - `INSERT INTO public.tenants(name, slug, created_by)` usando `full_name` (ou email) como nome e um slug único.
+  - `INSERT INTO public.tenant_members(tenant_id, user_id, role_in_tenant='owner', is_active=true)`.
+  - `INSERT INTO public.user_roles(user_id, role)` com `'admin'` e `'diretor'`.
 
-Tratamento de erros amigável: "Código inválido", "Código já utilizado", "Apenas o dono da empresa pode ativar".
+O trigger continua `SECURITY DEFINER` para conseguir escrever em `tenants`, `tenant_members` e `user_roles`.
 
-## Rota / UI
+### 3. Convite herda o tenant do convidador (edge function `admin-users`)
 
-`src/routes/licenca.tsx` — dentro de `AuthGate` + `AppShell`:
+Em `supabase/functions/admin-users/index.ts`, ação `invite`:
 
-- Card centralizado com título "Ativar licença".
-- Input para o código + botão "Ativar".
-- Validação Zod (1–32 chars, alfanumérico).
-- Ao sucesso: toast "Licença ativada até dd/mm/aaaa", `reload()` do `TenantProvider`, invalida `billing-overview`, redireciona para `/dashboard`.
-- Mostra também o status atual da assinatura (se já houver acesso ativo via licença, exibe "Licença ativa até X").
+- Antes de chamar `inviteUserByEmail`, resolver o `tenant_id` do convidador via `tenant_members` (membership ativa do `callerId`). Se o convidador não tiver tenant, devolver erro claro.
+- Passar `data: { ..., invited_by_tenant_id: <tenant_id>, invited_by_user_id: <callerId> }` na chamada de `inviteUserByEmail` — isso vira `raw_user_meta_data` do novo `auth.users` e é o sinal que o trigger usa para **não** criar tenant novo.
+- Após o convite, inserir no banco:
+  - `tenant_members(tenant_id=<tenant do convidador>, user_id=<invited.user.id>, role_in_tenant='member', is_active=true)`.
+- Os papéis em `user_roles` continuam sendo atribuídos como hoje (padrão `operador`, ou os papéis selecionados; diretor continua impedido de conceder `admin`/`diretor`).
 
-Link discreto no menu lateral (`AppShell`) e na página `/billing` ("Tenho um código de licença → /licenca").
+### 4. Validação
 
-## Arquivos a criar/editar
+- Logar com `diretorturismos@gmail.com` e confirmar que aparece o painel completo (admin + diretor).
+- Criar um novo signup direto com outro e-mail → conferir que nasceu com tenant próprio, virou owner e tem `admin`.
+- A partir do Diretor1, convidar outro e-mail → conferir que o convidado entra no **mesmo tenant** do Diretor1 (não cria tenant novo) e fica com o papel solicitado.
 
-- `supabase/migrations/<timestamp>_license_codes.sql` — tabela, grants, RLS, seed `BOSCO1`.
-- `src/lib/license.functions.ts` — serverFn `redeemLicenseCode`.
-- `src/routes/licenca.tsx` — UI da página.
-- `src/components/AppShell.tsx` — adicionar item de menu "Licença".
-- `src/routes/billing.tsx` — link "Tenho um código de licença".
+## Detalhes técnicos
 
-Sem mudanças em `BillingAccessGate` — ele já libera quando `subscriptions.status = 'active'` e `current_period_end` no futuro.
+- Geração de slug do tenant no trigger: `public.slugify_text(coalesce(full_name, split_part(email,'@',1)))` + sufixo aleatório se já existir.
+- `handle_new_user` precisa tratar `ON CONFLICT DO NOTHING` em todos os inserts para ser idempotente (caso o trigger rode mais de uma vez).
+- A inserção em `user_roles` usa o enum `app_role` existente (`admin`, `diretor`, ...).
+- Nenhuma policy RLS de `tenants`/`tenant_members`/`user_roles` precisa mudar — o trigger roda como definer e o edge function usa service role.
+- Nada muda no fluxo de `/licenca`: o código `BOSCO1` continua ativando a assinatura do tenant do usuário (que agora sempre existirá).

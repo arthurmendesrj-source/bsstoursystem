@@ -47,6 +47,7 @@ import { Route as SettingsWhatsappRouteImport } from './routes/settings_.whatsap
 import { Route as SettingsTemplatesRouteImport } from './routes/settings_.templates'
 import { Route as SettingsSlaRouteImport } from './routes/settings_.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings_.permissions'
+import { Route as SettingsGoogleDiagnosticoRouteImport } from './routes/settings_.google-diagnostico'
 import { Route as PermissionsAuditFinancialRouteImport } from './routes/permissions-audit.financial'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
 import { Route as InboxIaEmailRouteImport } from './routes/inbox-ia_.email'
@@ -268,6 +269,12 @@ const SettingsPermissionsRoute = SettingsPermissionsRouteImport.update({
   path: '/settings/permissions',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsGoogleDiagnosticoRoute =
+  SettingsGoogleDiagnosticoRouteImport.update({
+    id: '/settings_/google-diagnostico',
+    path: '/settings/google-diagnostico',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PermissionsAuditFinancialRoute =
   PermissionsAuditFinancialRouteImport.update({
     id: '/financial',
@@ -464,6 +471,7 @@ export interface FileRoutesByFullPath {
   '/inbox-ia/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
+  '/settings/google-diagnostico': typeof SettingsGoogleDiagnosticoRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -533,6 +541,7 @@ export interface FileRoutesByTo {
   '/inbox-ia/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
+  '/settings/google-diagnostico': typeof SettingsGoogleDiagnosticoRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
   '/settings/sla': typeof SettingsSlaRoute
   '/settings/templates': typeof SettingsTemplatesRoute
@@ -603,6 +612,7 @@ export interface FileRoutesById {
   '/inbox-ia_/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
+  '/settings_/google-diagnostico': typeof SettingsGoogleDiagnosticoRoute
   '/settings_/permissions': typeof SettingsPermissionsRoute
   '/settings_/sla': typeof SettingsSlaRoute
   '/settings_/templates': typeof SettingsTemplatesRoute
@@ -674,6 +684,7 @@ export interface FileRouteTypes {
     | '/inbox-ia/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
+    | '/settings/google-diagnostico'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -743,6 +754,7 @@ export interface FileRouteTypes {
     | '/inbox-ia/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
+    | '/settings/google-diagnostico'
     | '/settings/permissions'
     | '/settings/sla'
     | '/settings/templates'
@@ -812,6 +824,7 @@ export interface FileRouteTypes {
     | '/inbox-ia_/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
+    | '/settings_/google-diagnostico'
     | '/settings_/permissions'
     | '/settings_/sla'
     | '/settings_/templates'
@@ -875,6 +888,7 @@ export interface RootRouteChildren {
   AdminTenantsRoute: typeof AdminTenantsRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
   InboxIaEmailRoute: typeof InboxIaEmailRoute
+  SettingsGoogleDiagnosticoRoute: typeof SettingsGoogleDiagnosticoRoute
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
@@ -1166,6 +1180,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/permissions'
       fullPath: '/settings/permissions'
       preLoaderRoute: typeof SettingsPermissionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings_/google-diagnostico': {
+      id: '/settings_/google-diagnostico'
+      path: '/settings/google-diagnostico'
+      fullPath: '/settings/google-diagnostico'
+      preLoaderRoute: typeof SettingsGoogleDiagnosticoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/permissions-audit/financial': {
@@ -1476,6 +1497,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminTenantsRoute: AdminTenantsRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
   InboxIaEmailRoute: InboxIaEmailRoute,
+  SettingsGoogleDiagnosticoRoute: SettingsGoogleDiagnosticoRoute,
   SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,

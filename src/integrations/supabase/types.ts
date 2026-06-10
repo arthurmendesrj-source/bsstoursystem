@@ -1001,529 +1001,59 @@ export type Database = {
           },
         ]
       }
-      email_attachments: {
+      email_accounts: {
         Row: {
-          attachment_id: string
-          cached_url: string | null
-          created_at: string
-          email_id: string
-          filename: string | null
-          id: string
-          mime_type: string | null
-          part_id: string | null
-          size: number | null
-          storage_path: string | null
-          tenant_id: string
-        }
-        Insert: {
-          attachment_id: string
-          cached_url?: string | null
-          created_at?: string
-          email_id: string
-          filename?: string | null
-          id?: string
-          mime_type?: string | null
-          part_id?: string | null
-          size?: number | null
-          storage_path?: string | null
-          tenant_id?: string
-        }
-        Update: {
-          attachment_id?: string
-          cached_url?: string | null
-          created_at?: string
-          email_id?: string
-          filename?: string | null
-          id?: string
-          mime_type?: string | null
-          part_id?: string | null
-          size?: number | null
-          storage_path?: string | null
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "email_attachments_email_id_fkey"
-            columns: ["email_id"]
-            isOneToOne: false
-            referencedRelation: "emails"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_attachments_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      email_labels: {
-        Row: {
-          color_bg: string | null
-          color_text: string | null
-          id: string
-          label_list_visibility: string | null
-          message_list_visibility: string | null
-          name: string
-          owner_email: string
-          tenant_id: string
-          total_count: number
-          type: string
-          unread_count: number
-          updated_at: string
-        }
-        Insert: {
-          color_bg?: string | null
-          color_text?: string | null
-          id: string
-          label_list_visibility?: string | null
-          message_list_visibility?: string | null
-          name: string
-          owner_email: string
-          tenant_id?: string
-          total_count?: number
-          type?: string
-          unread_count?: number
-          updated_at?: string
-        }
-        Update: {
-          color_bg?: string | null
-          color_text?: string | null
-          id?: string
-          label_list_visibility?: string | null
-          message_list_visibility?: string | null
-          name?: string
-          owner_email?: string
-          tenant_id?: string
-          total_count?: number
-          type?: string
-          unread_count?: number
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "email_labels_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      email_message_links: {
-        Row: {
-          activity_id: string | null
-          booking_id: string | null
-          created_at: string
-          created_by: string | null
-          customer_id: string | null
-          from_email: string | null
-          gmail_message_id: string
-          gmail_thread_id: string | null
-          id: string
-          lead_id: string | null
-          snippet: string | null
-          subject: string | null
-          tenant_id: string
-        }
-        Insert: {
-          activity_id?: string | null
-          booking_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          customer_id?: string | null
-          from_email?: string | null
-          gmail_message_id: string
-          gmail_thread_id?: string | null
-          id?: string
-          lead_id?: string | null
-          snippet?: string | null
-          subject?: string | null
-          tenant_id?: string
-        }
-        Update: {
-          activity_id?: string | null
-          booking_id?: string | null
-          created_at?: string
-          created_by?: string | null
-          customer_id?: string | null
-          from_email?: string | null
-          gmail_message_id?: string
-          gmail_thread_id?: string | null
-          id?: string
-          lead_id?: string | null
-          snippet?: string | null
-          subject?: string | null
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "email_message_links_activity_id_fkey"
-            columns: ["activity_id"]
-            isOneToOne: false
-            referencedRelation: "operations_activities"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_message_links_booking_id_fkey"
-            columns: ["booking_id"]
-            isOneToOne: false
-            referencedRelation: "bookings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_message_links_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_message_links_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "email_message_links_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      email_smtp_accounts: {
-        Row: {
-          auth_password_encrypted: string
-          auth_username: string
           created_at: string
           display_name: string | null
-          email_address: string
+          email: string
           id: string
           imap_host: string
           imap_port: number
           imap_secure: boolean
-          last_test_at: string | null
-          last_test_error: string | null
-          last_test_ok: boolean | null
+          password_encrypted: string
           provider: string
           smtp_host: string
           smtp_port: number
           smtp_secure: boolean
           updated_at: string
           user_id: string
+          username: string
         }
         Insert: {
-          auth_password_encrypted: string
-          auth_username: string
           created_at?: string
           display_name?: string | null
-          email_address: string
+          email: string
           id?: string
           imap_host: string
           imap_port: number
           imap_secure?: boolean
-          last_test_at?: string | null
-          last_test_error?: string | null
-          last_test_ok?: boolean | null
+          password_encrypted: string
           provider: string
           smtp_host: string
           smtp_port: number
           smtp_secure?: boolean
           updated_at?: string
           user_id: string
+          username: string
         }
         Update: {
-          auth_password_encrypted?: string
-          auth_username?: string
           created_at?: string
           display_name?: string | null
-          email_address?: string
+          email?: string
           id?: string
           imap_host?: string
           imap_port?: number
           imap_secure?: boolean
-          last_test_at?: string | null
-          last_test_error?: string | null
-          last_test_ok?: boolean | null
+          password_encrypted?: string
           provider?: string
           smtp_host?: string
           smtp_port?: number
           smtp_secure?: boolean
           updated_at?: string
           user_id?: string
+          username?: string
         }
         Relationships: []
-      }
-      email_sync_state: {
-        Row: {
-          full_sync_current_label: string | null
-          full_sync_current_month_offset: number
-          full_sync_empty_streak: number
-          full_sync_in_progress: boolean
-          full_sync_label_queue: string[]
-          full_sync_page_token: string | null
-          full_sync_started_at: string | null
-          full_sync_total_synced: number
-          full_sync_window_days: number | null
-          last_full_sync_at: string | null
-          last_history_id: number | null
-          last_incremental_sync_at: string | null
-          owner_email: string
-          tenant_id: string
-          updated_at: string
-          watch_expiration: string | null
-          wipe_deleted_count: number
-          wipe_error: string | null
-          wipe_finished_at: string | null
-          wipe_started_at: string | null
-          wipe_status: string
-          wipe_step: string | null
-        }
-        Insert: {
-          full_sync_current_label?: string | null
-          full_sync_current_month_offset?: number
-          full_sync_empty_streak?: number
-          full_sync_in_progress?: boolean
-          full_sync_label_queue?: string[]
-          full_sync_page_token?: string | null
-          full_sync_started_at?: string | null
-          full_sync_total_synced?: number
-          full_sync_window_days?: number | null
-          last_full_sync_at?: string | null
-          last_history_id?: number | null
-          last_incremental_sync_at?: string | null
-          owner_email: string
-          tenant_id?: string
-          updated_at?: string
-          watch_expiration?: string | null
-          wipe_deleted_count?: number
-          wipe_error?: string | null
-          wipe_finished_at?: string | null
-          wipe_started_at?: string | null
-          wipe_status?: string
-          wipe_step?: string | null
-        }
-        Update: {
-          full_sync_current_label?: string | null
-          full_sync_current_month_offset?: number
-          full_sync_empty_streak?: number
-          full_sync_in_progress?: boolean
-          full_sync_label_queue?: string[]
-          full_sync_page_token?: string | null
-          full_sync_started_at?: string | null
-          full_sync_total_synced?: number
-          full_sync_window_days?: number | null
-          last_full_sync_at?: string | null
-          last_history_id?: number | null
-          last_incremental_sync_at?: string | null
-          owner_email?: string
-          tenant_id?: string
-          updated_at?: string
-          watch_expiration?: string | null
-          wipe_deleted_count?: number
-          wipe_error?: string | null
-          wipe_finished_at?: string | null
-          wipe_started_at?: string | null
-          wipe_status?: string
-          wipe_step?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "email_sync_state_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      email_threads: {
-        Row: {
-          has_attachments: boolean
-          history_id: number | null
-          id: string
-          is_important: boolean
-          is_starred: boolean
-          is_unread: boolean
-          labels: string[]
-          last_message_at: string | null
-          message_count: number
-          owner_email: string
-          participants: string[]
-          snippet: string | null
-          subject: string | null
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          has_attachments?: boolean
-          history_id?: number | null
-          id: string
-          is_important?: boolean
-          is_starred?: boolean
-          is_unread?: boolean
-          labels?: string[]
-          last_message_at?: string | null
-          message_count?: number
-          owner_email: string
-          participants?: string[]
-          snippet?: string | null
-          subject?: string | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Update: {
-          has_attachments?: boolean
-          history_id?: number | null
-          id?: string
-          is_important?: boolean
-          is_starred?: boolean
-          is_unread?: boolean
-          labels?: string[]
-          last_message_at?: string | null
-          message_count?: number
-          owner_email?: string
-          participants?: string[]
-          snippet?: string | null
-          subject?: string | null
-          tenant_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "email_threads_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      emails: {
-        Row: {
-          ai_suggestion: Json | null
-          body_html: string | null
-          body_text: string | null
-          category: string | null
-          created_at: string
-          customer_id: string | null
-          from_email: string | null
-          from_name: string | null
-          gmail_id: string
-          has_attachments: boolean
-          history_id: number | null
-          id: string
-          internal_date: string | null
-          is_important: boolean
-          is_starred: boolean
-          is_unread: boolean
-          labels: string[] | null
-          lead_id: string | null
-          owner_email: string | null
-          received_at: string | null
-          size_estimate: number | null
-          snippet: string | null
-          subject: string | null
-          supplier_id: string | null
-          tenant_id: string
-          thread_id: string | null
-          to_emails: string[] | null
-          updated_at: string
-        }
-        Insert: {
-          ai_suggestion?: Json | null
-          body_html?: string | null
-          body_text?: string | null
-          category?: string | null
-          created_at?: string
-          customer_id?: string | null
-          from_email?: string | null
-          from_name?: string | null
-          gmail_id: string
-          has_attachments?: boolean
-          history_id?: number | null
-          id?: string
-          internal_date?: string | null
-          is_important?: boolean
-          is_starred?: boolean
-          is_unread?: boolean
-          labels?: string[] | null
-          lead_id?: string | null
-          owner_email?: string | null
-          received_at?: string | null
-          size_estimate?: number | null
-          snippet?: string | null
-          subject?: string | null
-          supplier_id?: string | null
-          tenant_id?: string
-          thread_id?: string | null
-          to_emails?: string[] | null
-          updated_at?: string
-        }
-        Update: {
-          ai_suggestion?: Json | null
-          body_html?: string | null
-          body_text?: string | null
-          category?: string | null
-          created_at?: string
-          customer_id?: string | null
-          from_email?: string | null
-          from_name?: string | null
-          gmail_id?: string
-          has_attachments?: boolean
-          history_id?: number | null
-          id?: string
-          internal_date?: string | null
-          is_important?: boolean
-          is_starred?: boolean
-          is_unread?: boolean
-          labels?: string[] | null
-          lead_id?: string | null
-          owner_email?: string | null
-          received_at?: string | null
-          size_estimate?: number | null
-          snippet?: string | null
-          subject?: string | null
-          supplier_id?: string | null
-          tenant_id?: string
-          thread_id?: string | null
-          to_emails?: string[] | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "emails_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "emails_lead_id_fkey"
-            columns: ["lead_id"]
-            isOneToOne: false
-            referencedRelation: "leads"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "emails_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "emails_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       exchange_rates: {
         Row: {
@@ -1562,39 +1092,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      gmail_connection_audit: {
-        Row: {
-          actor_id: string | null
-          created_at: string
-          email_address: string
-          event: string
-          id: string
-          metadata: Json
-          reason: string | null
-          user_id: string
-        }
-        Insert: {
-          actor_id?: string | null
-          created_at?: string
-          email_address: string
-          event: string
-          id?: string
-          metadata?: Json
-          reason?: string | null
-          user_id: string
-        }
-        Update: {
-          actor_id?: string | null
-          created_at?: string
-          email_address?: string
-          event?: string
-          id?: string
-          metadata?: Json
-          reason?: string | null
-          user_id?: string
-        }
-        Relationships: []
       }
       interactions: {
         Row: {
@@ -4154,41 +3651,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_email_accounts: {
-        Row: {
-          created_at: string
-          email_address: string
-          id: string
-          is_primary: boolean
-          tenant_id: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          email_address: string
-          id?: string
-          is_primary?: boolean
-          tenant_id?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          email_address?: string
-          id?: string
-          is_primary?: boolean
-          tenant_id?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_email_accounts_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_field_permissions: {
         Row: {
           can_edit: boolean | null
@@ -4223,68 +3685,6 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_field_permissions_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_gmail_tokens: {
-        Row: {
-          access_token: string
-          connected_at: string
-          created_at: string
-          email_address: string
-          expires_at: string
-          id: string
-          last_refresh_at: string | null
-          last_refresh_error: string | null
-          last_used_at: string | null
-          refresh_error_count: number
-          refresh_token: string
-          scope: string | null
-          tenant_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          access_token: string
-          connected_at?: string
-          created_at?: string
-          email_address: string
-          expires_at: string
-          id?: string
-          last_refresh_at?: string | null
-          last_refresh_error?: string | null
-          last_used_at?: string | null
-          refresh_error_count?: number
-          refresh_token: string
-          scope?: string | null
-          tenant_id?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          access_token?: string
-          connected_at?: string
-          created_at?: string
-          email_address?: string
-          expires_at?: string
-          id?: string
-          last_refresh_at?: string | null
-          last_refresh_error?: string | null
-          last_used_at?: string | null
-          refresh_error_count?: number
-          refresh_token?: string
-          scope?: string | null
-          tenant_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_gmail_tokens_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -4791,27 +4191,6 @@ export type Database = {
       }
     }
     Views: {
-      user_gmail_accounts_public: {
-        Row: {
-          connected_at: string | null
-          email_address: string | null
-          last_refresh_at: string | null
-          user_id: string | null
-        }
-        Insert: {
-          connected_at?: string | null
-          email_address?: string | null
-          last_refresh_at?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          connected_at?: string | null
-          email_address?: string | null
-          last_refresh_at?: string | null
-          user_id?: string | null
-        }
-        Relationships: []
-      }
       v_supplier_rates_duplicates: {
         Row: {
           category: string | null
@@ -4961,15 +4340,6 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
-      link_email_thread: {
-        Args: {
-          _customer_id?: string
-          _lead_id?: string
-          _supplier_id?: string
-          _thread_id: string
-        }
-        Returns: number
-      }
       match_itineraries: {
         Args: {
           match_count?: number
@@ -5000,10 +4370,6 @@ export type Database = {
         Returns: boolean
       }
       unaccent: { Args: { "": string }; Returns: string }
-      user_has_email_account: {
-        Args: { _email: string; _user_id: string }
-        Returns: boolean
-      }
     }
     Enums: {
       app_role:

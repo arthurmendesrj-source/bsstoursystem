@@ -76,6 +76,7 @@ function DiagnosticPage() {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const redirectUri = `${origin}/api/public/google/oauth/callback`;
   const startUrl = `${origin}/api/public/google/oauth/start`;
+  const popupBridgeUrl = `${origin}/google-oauth-popup`;
 
   const runAll = useCallback(async () => {
     setRunning(true);
@@ -268,7 +269,15 @@ function DiagnosticPage() {
       </Section>
 
       <Section
-        title="6. Tokens Gmail salvos para este usuário"
+        title="6. Fluxo usado pelo app"
+        status="ok"
+        summary="Os botões de conexão devem abrir primeiro a ponte /google-oauth-popup, não o endpoint direto /api/public/google/oauth/start."
+      >
+        <Pre data={{ popupBridgeUrl, directEndpointIsOnlyForServerStart: startUrl }} />
+      </Section>
+
+      <Section
+        title="7. Tokens Gmail salvos para este usuário"
         status={tokensStatus}
         summary={
           server
@@ -283,7 +292,7 @@ function DiagnosticPage() {
       </Section>
 
       <Section
-        title="7. Auditoria de conexão (últimos 10 eventos)"
+        title="8. Auditoria de conexão (últimos 10 eventos)"
         status={server ? (server.audit.length > 0 ? "ok" : "warn") : "pending"}
         summary={
           server
@@ -301,9 +310,9 @@ function DiagnosticPage() {
         <div className="flex items-start gap-3">
           <ExternalLink className="h-5 w-5 text-primary" />
           <div className="flex-1">
-            <div className="font-medium">8. Testar OAuth em popup com log</div>
+            <div className="font-medium">9. Testar OAuth em popup com log</div>
             <p className="text-sm text-muted-foreground">
-              Abre o fluxo real em uma nova janela e captura a mensagem do callback (sucesso ou erro completo).
+              Abre o fluxo real pela ponte /google-oauth-popup e captura a mensagem do callback (sucesso ou erro completo).
             </p>
           </div>
         </div>
@@ -339,7 +348,7 @@ function DiagnosticPage() {
           <li>Se <strong>1</strong> falha: faça login novamente.</li>
           <li>Se <strong>2</strong> ou <strong>4</strong> falha: secret faltando no servidor (variáveis Google_OAUTH_*).</li>
           <li>Se <strong>5</strong> retorna HTTP 500: olhe o body — provável secret ausente ou token inválido.</li>
-          <li>Se <strong>5</strong> retorna 302 mas o <strong>popup (8)</strong> falha: o erro está no callback do Google — copie a mensagem do log do popup; geralmente <code>redirect_uri_mismatch</code> (compare com seção <strong>3</strong>) ou refresh_token ausente (precisa revogar acesso em myaccount.google.com/permissions).</li>
+          <li>Se <strong>5</strong> retorna 302 mas o <strong>popup (9)</strong> falha: o erro está no callback do Google — copie a mensagem do log do popup; geralmente <code>redirect_uri_mismatch</code> (compare com seção <strong>3</strong>) ou refresh_token ausente (precisa revogar acesso em myaccount.google.com/permissions).</li>
         </ul>
       </Card>
     </div>

@@ -4097,7 +4097,7 @@ export type Database = {
           email_address: string
           id: string
           is_primary: boolean
-          tenant_id: string
+          tenant_id: string | null
           user_id: string
         }
         Insert: {
@@ -4105,7 +4105,7 @@ export type Database = {
           email_address: string
           id?: string
           is_primary?: boolean
-          tenant_id?: string
+          tenant_id?: string | null
           user_id: string
         }
         Update: {
@@ -4113,7 +4113,7 @@ export type Database = {
           email_address?: string
           id?: string
           is_primary?: boolean
-          tenant_id?: string
+          tenant_id?: string | null
           user_id?: string
         }
         Relationships: [

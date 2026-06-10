@@ -216,11 +216,42 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     [tenants],
   );
 
+  const ensureTenant = useCallback(async (): Promise<Tenant | null> => {
+    if (tenant) return tenant;
+    if (tenants.length > 0) return tenants[0];
+    if (!user) return null;
+    await createDefaultTenant();
+    await load();
+    // Read freshest data via a direct query to avoid stale state.
+    const { data } = await supabase
+      .from("tenant_members")
+      .select(
+        "role_in_tenant, tenants:tenant_id (id, slug, name, status, subscriptions:subscriptions (status, trial_end, current_period_end))",
+      )
+      .eq("user_id", user.id)
+      .eq("is_active", true)
+      .limit(1);
+    const row: any = data?.[0];
+    if (!row?.tenants) return null;
+    const sub = Array.isArray(row.tenants.subscriptions) ? row.tenants.subscriptions[0] : row.tenants.subscriptions;
+    return {
+      id: row.tenants.id,
+      slug: row.tenants.slug,
+      name: row.tenants.name,
+      status: row.tenants.status,
+      role_in_tenant: row.role_in_tenant,
+      subscription_status: (sub?.status ?? "none") as SubscriptionStatus,
+      trial_end: sub?.trial_end ?? null,
+      current_period_end: sub?.current_period_end ?? null,
+    };
+  }, [tenant, tenants, user, createDefaultTenant, load]);
+
   return (
-    <Ctx.Provider value={{ tenant, tenants, loading, isSuperAdmin, switchTenant, reload: load }}>
+    <Ctx.Provider value={{ tenant, tenants, loading, isSuperAdmin, switchTenant, reload: load, ensureTenant }}>
       {children}
     </Ctx.Provider>
   );
+
 }
 
 export function useTenant() {

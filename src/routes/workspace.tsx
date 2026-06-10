@@ -727,7 +727,7 @@ function WorkspacePage() {
                   {!hasLead || !lead ? (
                     <EmptyTab text={t("selectLeadToView")} />
                   ) : (
-                    <EmailPanel mode="lead" leadId={lead.id} customerId={lead.customer_id} inlineReader />
+                    <div className="p-4 text-sm text-muted-foreground">Email agora vive em <a className="underline" href="/email">/email</a>.</div>
                   )}
                 </AccordionContent>
               </AccordionItem>

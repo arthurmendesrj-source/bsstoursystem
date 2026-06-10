@@ -61,8 +61,8 @@ function SettingsPage() {
           </div>
           <Button type="submit">{t("save")}</Button>
         </form>
+      </Card>
       <ConnectEmailCard />
-
     </div>
   );
 }

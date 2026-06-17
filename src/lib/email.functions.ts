@@ -113,10 +113,23 @@ export const listMessagesFn = createServerFn({ method: "POST" })
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
     const acc = await loadAccount(data.targetUserId);
-    if (!acc) return { connected: false, messages: [] as any[] };
+    if (!acc) return { connected: false, messages: [] as any[], error: null as string | null };
     const { listMessages } = await import("./email.server");
-    const messages = await listMessages(acc.email, acc.password, data.folder, { search: data.search });
-    return { connected: true, messages };
+    try {
+      const messages = await listMessages(acc.email, acc.password, data.folder, { search: data.search });
+      return { connected: true, messages, error: null as string | null };
+    } catch (e: any) {
+      const raw = String(e?.message ?? e ?? "");
+      let friendly = "Falha ao acessar a caixa no Gmail.";
+      if (/AUTHENTICATIONFAILED|Invalid credentials|Username and Password not accepted|BadCredentials/i.test(raw)) {
+        friendly = "Credenciais rejeitadas pelo Gmail. Gere uma nova senha de app e reconecte.";
+      } else if (/ETIMEDOUT|ECONNRESET|ENOTFOUND|ECONNREFUSED|timeout/i.test(raw)) {
+        friendly = "Não foi possível conectar ao Gmail (rede/IMAP). Tente novamente.";
+      } else if (/IMAP|imap\.gmail/i.test(raw)) {
+        friendly = "IMAP do Gmail indisponível ou desabilitado para esta conta.";
+      }
+      return { connected: true, messages: [] as any[], error: `${friendly} (${raw.slice(0, 200)})` };
+    }
   });
 
 export const fetchMessageFn = createServerFn({ method: "POST" })

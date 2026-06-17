@@ -40,29 +40,33 @@ export const Route = createFileRoute("/api/public/google/callback")({
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
 
-          // Upsert by (user_id, provider).
-          const { error: upsertErr } = await supabaseAdmin
+          // Remove any existing row that would collide on either unique
+          // constraint: (user_id, email) or (user_id, provider).
+          await supabaseAdmin
             .from("email_accounts")
-            .upsert(
-              {
-                user_id: v.userId,
-                provider: "gmail_oauth",
-                email: profile.emailAddress,
-                username: profile.emailAddress,
-                smtp_host: "smtp.gmail.com",
-                smtp_port: 465,
-                smtp_secure: true,
-                imap_host: "imap.gmail.com",
-                imap_port: 993,
-                imap_secure: true,
-                access_token: tokens.access_token,
-                refresh_token: tokens.refresh_token ?? null,
-                token_expires_at: expiresAt,
-                scope: tokens.scope,
-              } as any,
-              { onConflict: "user_id,provider" },
-            );
-          if (upsertErr) throw new Error(`Erro salvando conta: ${upsertErr.message}`);
+            .delete()
+            .eq("user_id", v.userId)
+            .or(`email.eq.${profile.emailAddress},provider.eq.gmail_oauth`);
+
+          const { error: insertErr } = await supabaseAdmin
+            .from("email_accounts")
+            .insert({
+              user_id: v.userId,
+              provider: "gmail_oauth",
+              email: profile.emailAddress,
+              username: profile.emailAddress,
+              smtp_host: "smtp.gmail.com",
+              smtp_port: 465,
+              smtp_secure: true,
+              imap_host: "imap.gmail.com",
+              imap_port: 993,
+              imap_secure: true,
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token ?? null,
+              token_expires_at: expiresAt,
+              scope: tokens.scope,
+            } as any);
+          if (insertErr) throw new Error(`Erro salvando conta: ${insertErr.message}`);
 
           return html(successPage(profile.emailAddress));
         } catch (e: any) {

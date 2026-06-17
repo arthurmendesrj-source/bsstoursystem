@@ -54,14 +54,16 @@ function EmailPage() {
   const handleConnect = async () => {
     if (!password) { toast.error("Informe a senha de app"); return; }
     setSubmitting(true);
+    const safety = setTimeout(() => setSubmitting(false), 45_000);
     try {
       await connect({ data: { password } });
       toast.success("Caixa conectada!");
       setPassword("");
       await reload();
     } catch (e: any) {
-      toast.error(e?.message ?? "Falha ao conectar");
+      toast.error(e?.message ?? "Falha ao conectar", { duration: 8000 });
     } finally {
+      clearTimeout(safety);
       setSubmitting(false);
     }
   };

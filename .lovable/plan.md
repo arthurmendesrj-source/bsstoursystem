@@ -1,33 +1,29 @@
-## Problema
+## Plano
 
-As políticas permissivas do bucket `proposal-docs` em `storage.objects` ainda checam **`auth.uid() = primeira pasta`**, padrão antigo onde o caminho começava pelo user UUID. Hoje os uploads salvam como `tenant_id/user_id/quote_id/arquivo.docx` (ver `generate-proposal-doc/index.ts` e `tenantStorage.ts`), então:
+Vou corrigir a tela de conexão do Gmail para que ela não fique presa em “Conectar” quando a validação demora ou falha no domínio publicado.
 
-- a política restritiva nova (`tenant_scope_proposal-docs_*` → `storage_path_allowed_for_user`) já bloqueia cruzamento entre tenants, mas
-- as permissivas comparam user UUID com `tenant_id` e **nunca casam** — qualquer não-admin é barrado dos próprios arquivos.
-- Falta também alinhamento conceitual com os outros buckets: tenant primeiro, isolamento via `is_tenant_member`.
+### Mudanças propostas
 
-## Solução (migração SQL)
+1. **Adicionar timeout na validação do Gmail**
+   - Limitar o tempo das tentativas SMTP/IMAP para evitar que o servidor fique esperando indefinidamente.
+   - Se passar do limite, retornar uma mensagem clara para tentar novamente ou verificar a senha de app/IMAP.
 
-Substituir as 4 políticas permissivas de `proposal-docs` por versões tenant-aware. Padrão: primeira pasta = `tenant_id` UUID e o usuário precisa ser membro ativo desse tenant (ou super_admin / admin global).
+2. **Melhorar tratamento de erro no botão Conectar**
+   - Garantir que qualquer erro do servidor libere o botão e mostre um aviso amigável.
+   - Evitar que o estado `submitting` fique preso.
 
-Migração:
+3. **Separar mensagens comuns de erro**
+   - Senha de app inválida.
+   - IMAP desativado no Gmail.
+   - Timeout/rede no servidor.
+   - Configuração de criptografia ausente.
 
-1. `DROP POLICY` em `storage.objects`:
-   - `Owners or admins read proposal-docs`
-   - `Authenticated users can upload proposal docs`
-   - `Owners or admins can update proposal docs`
-   - `Owners or admins can delete proposal docs`
+4. **Validar depois da alteração**
+   - Conferir que o botão volta ao normal quando a conexão falha.
+   - Conferir que, quando a conta já estiver conectada, a página sai do formulário e entra na caixa de emails.
 
-2. `CREATE POLICY` (permissive, TO authenticated) com `bucket_id = 'proposal-docs'` AND `public.storage_path_allowed_for_user(name)` para SELECT / INSERT / UPDATE.
+### Arquivos prováveis
 
-3. DELETE mais estrito: tenant member **AND** (`auth.uid()::text = (storage.foldername(name))[2]` — i.e. é o criador do arquivo) **OR** `has_role(auth.uid(),'admin')`. Mantém a regra original "dono ou admin pode apagar", mas dentro do escopo do tenant.
-
-A política restritiva existente continua intacta como segunda camada.
-
-## Dados antigos
-
-Se houver objetos legados com user UUID na primeira pasta (anteriores a `tenantStorage.ts`), eles passam a ficar inacessíveis (já estavam barrados pela restritiva). **Fora do escopo desta correção** — posso fazer uma varredura + migração de caminhos depois, se você quiser.
-
-## Sem alterações no código
-
-`generate-proposal-doc/index.ts` e `ProposalDocumentsList.tsx` já usam `tenant_id/...`, então nenhuma mudança em TypeScript é necessária.
+- `src/lib/email.server.ts`
+- `src/lib/email.functions.ts`
+- `src/routes/email.tsx`

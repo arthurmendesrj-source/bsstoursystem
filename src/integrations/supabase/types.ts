@@ -3636,6 +3636,7 @@ export type Database = {
           success: boolean
           target_email: string | null
           target_user_id: string | null
+          tenant_id: string | null
         }
         Insert: {
           action: string
@@ -3648,6 +3649,7 @@ export type Database = {
           success?: boolean
           target_email?: string | null
           target_user_id?: string | null
+          tenant_id?: string | null
         }
         Update: {
           action?: string
@@ -3660,6 +3662,7 @@ export type Database = {
           success?: boolean
           target_email?: string | null
           target_user_id?: string | null
+          tenant_id?: string | null
         }
         Relationships: []
       }

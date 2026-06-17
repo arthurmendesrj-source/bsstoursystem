@@ -37,13 +37,20 @@ export function EmailMailbox({
   const [selected, setSelected] = useState<any | null>(null);
   const [composing, setComposing] = useState<null | { to: string; subject: string; body: string; inReplyTo?: string }>(null);
   const [sending, setSending] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [notConnected, setNotConnected] = useState(false);
 
   const refresh = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
-      const r = await list({ data: { targetUserId, folder, search } });
+      const r: any = await list({ data: { targetUserId, folder, search } });
       setMessages(r.messages ?? []);
+      setNotConnected(r.connected === false);
+      setFetchError(r.error ?? null);
+      if (r.error) toast.error(r.error);
     } catch (e: any) {
+      setFetchError(e?.message ?? "Falha ao listar mensagens");
       toast.error(e?.message ?? "Falha ao listar mensagens");
     } finally {
       setLoading(false);
@@ -134,7 +141,17 @@ export function EmailMailbox({
                 {loading && messages.length === 0 && (
                   <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
                 )}
-                {!loading && messages.length === 0 && (
+                {!loading && messages.length === 0 && notConnected && (
+                  <div className="p-6 text-center text-sm text-amber-700">
+                    Sua conta não está conectada. Volte e informe a senha de app novamente.
+                  </div>
+                )}
+                {!loading && messages.length === 0 && !notConnected && fetchError && (
+                  <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
+                    {fetchError}
+                  </div>
+                )}
+                {!loading && messages.length === 0 && !notConnected && !fetchError && (
                   <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
                 )}
                 <ul className="divide-y">

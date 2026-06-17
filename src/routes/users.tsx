@@ -60,8 +60,34 @@ async function callAdminUsers(action: string, payload: Record<string, unknown> =
   const { data, error } = await supabase.functions.invoke("admin-users", {
     body: { action, ...payload },
   });
-  const msg = error?.message ?? data?.error;
+
+  // Em erro HTTP, supabase-js entrega só "non-2xx status code".
+  // Lemos o corpo real (JSON { error }) a partir de error.context (Response).
+  let serverMsg: string | null = null;
+  let httpStatus: number | null = null;
+  if (error) {
+    const ctx = (error as unknown as { context?: Response }).context;
+    if (ctx && typeof ctx.text === "function") {
+      httpStatus = ctx.status ?? null;
+      try {
+        const raw = await ctx.clone().text();
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw);
+            serverMsg = parsed?.error ?? parsed?.message ?? raw;
+          } catch {
+            serverMsg = raw;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const msg = serverMsg ?? error?.message ?? data?.error;
   const isUnauthorized =
+    httpStatus === 401 ||
     (error as any)?.context?.status === 401 ||
     /unauthorized|401/i.test(String(msg ?? ""));
   if (isUnauthorized) {
@@ -71,7 +97,7 @@ async function callAdminUsers(action: string, payload: Record<string, unknown> =
     }
     throw new Error("Sessão expirada. Faça login novamente.");
   }
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(serverMsg ?? error.message);
   if (data?.error) throw new Error(data.error);
   return data;
 }

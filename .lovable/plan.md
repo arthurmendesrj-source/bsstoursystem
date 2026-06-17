@@ -1,33 +1,34 @@
-## Diagnóstico
+## O que está acontecendo
 
-Os dados no banco já estão corretos:
-- 12 registros pertencem ao tenant **BSS Tour** (arthur)
-- 3 registros pertencem ao tenant **Diretor1** (diretorturismos)
+A função de convite (`admin-users`) está respondendo com status 400, mas o front-end mostra apenas a mensagem genérica do supabase-js: **"Edge Function returned a non-2xx status code"**. Isso acontece porque, quando há erro HTTP, o helper `callAdminUsers` em `src/routes/users.tsx` lê `error.message` (genérico) e ignora o corpo JSON com `{ error: "..." }` que a função devolve.
 
-A função `admin-users` foi atualizada para filtrar por tenant, mas o painel ainda mostra "15" no contador. Duas causas prováveis:
-
-1. **A nova versão da edge function ainda não respondeu** no navegador (ela faz deploy automático mas pode levar alguns segundos; a tela pode estar com o resultado da chamada antiga em cache).
-2. **O navegador serviu o JSON antigo** (não há Cache-Control explícito).
+Sem ver a mensagem real, não dá para saber se é:
+- "Diretor não pode atribuir admin/diretor" (papel selecionado foi **Diretor**, e somente Admin pode convidar outro Diretor — esse é o suspeito principal pelo print);
+- "Falha no convite" vindo do Auth (ex.: rate-limit de e-mail, e-mail inválido);
+- "Convidador sem tenant ativo".
 
 ## Plano
 
-### Passo 1 — Confirmar deploy e forçar atualização
-- Clicar no ícone de **atualizar (↻)** ao lado do contador "Log de auditoria" e/ou dar um **Ctrl+Shift+R** na página `/users`.
-- Resultado esperado para `diretorturismos@gmail.com`: contador cai para **3** (somente as ações executadas pela própria conta dele).
+### Passo 1 — Surface do erro real (1 arquivo)
 
-### Passo 2 — Se ainda mostrar 15, reforçar do lado do servidor
-Caso o filtro do edge function não esteja sendo aplicado, adicionar uma proteção redundante:
+Em `src/routes/users.tsx`, na função `callAdminUsers`, ler o corpo da resposta quando `error` vier de `FunctionsHttpError`:
 
-- Criar uma função SQL `public.list_user_audit_for_caller(_limit int)` `SECURITY DEFINER` que:
-  - Identifica o tenant do `auth.uid()` chamador.
-  - Retorna apenas registros desse tenant (super_admin vê todos).
-- Alterar o front-end (`src/routes/users.tsx`, `callAdminUsers("list_audit", ...)`) para chamar essa RPC via `supabase.rpc(...)` em vez da edge function.
+- Tentar `await (error as any).context.json()` e usar `body.error` se existir;
+- Fallback para `await (error as any).context.text()`;
+- Se nada vier, manter `error.message`.
 
-Isso elimina qualquer dependência de cache/deploy da edge function.
+Resultado: o toast vai mostrar exatamente o motivo (ex.: "Diretor não pode atribuir admin/diretor").
 
-### Passo 3 — Verificação final
-- Logar com `diretorturismos@gmail.com` → contador = 3.
-- Logar com `arthurmendesrj@hotmail.com` (BSS Tour) → contador = 12.
-- Logar como Desenvolvedor (super_admin = arthur) → vê todos = 15.
+### Passo 2 — Você reenvia o convite e me manda o novo texto do toast
 
-Quero começar pelo **Passo 1** (só recarregar). Se ainda aparecer 15, eu já parto direto para o Passo 2.
+Com a mensagem exata, eu corrijo a causa de verdade no próximo turno. Os caminhos mais prováveis:
+
+- **Se for "Diretor não pode atribuir admin/diretor":** mudar o papel padrão do diálogo de "Diretor" para "Operador" (ou esconder a opção "Diretor" quando o convidador não é admin), evitando que um Diretor tente convidar outro Diretor.
+- **Se for erro de e-mail do Auth (rate limit / SMTP):** ajustar a estratégia de envio (reduzir tentativas, configurar remetente próprio, etc.).
+- **Se for "Convidador sem tenant ativo":** garantir vínculo do `diretorturismos@gmail.com` em `tenant_members` antes do convite.
+
+## Detalhes técnicos
+
+- Nenhuma alteração de banco neste passo.
+- Apenas `src/routes/users.tsx` é tocado (~10 linhas dentro de `callAdminUsers`).
+- O edge function `admin-users` não muda agora; ele já devolve mensagem útil no JSON, só não estava sendo lida.

@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         return json({ error: "Convidador sem tenant ativo. Acesse /licenca ou contate o suporte." }, 400);
       }
 
-      const redirectTo = `${APP_URL}/`;
+      const redirectTo = `${APP_URL}/accept-invite`;
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
         data: {
           ...(fullName ? { full_name: fullName } : {}),

@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck } from "lucide-react";
+import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn } from "@/lib/email.functions";
 
 type Folder = "inbox" | "sent";
@@ -128,111 +128,107 @@ export function EmailMailbox({
         </div>
       </div>
 
-      <Tabs value={folder} onValueChange={(v) => { setFolder(v as Folder); setSelectedUid(null); }}>
-        <TabsList>
-          <TabsTrigger value="inbox"><InboxIcon className="h-4 w-4 mr-1" />Recebidos</TabsTrigger>
-          <TabsTrigger value="sent"><MailCheck className="h-4 w-4 mr-1" />Enviados</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-[auto_380px_1fr] gap-3">
+        <MailboxSidebar
+          folder={folder}
+          onChange={(f) => { setFolder(f); setSelectedUid(null); }}
+        />
 
-        <TabsContent value={folder} forceMount>
-          <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-3">
-            <Card>
-              <CardContent className="p-0 max-h-[70vh] overflow-y-auto">
-                {loading && messages.length === 0 && (
-                  <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
-                )}
-                {!loading && messages.length === 0 && notConnected && (
-                  <div className="p-6 text-center text-sm text-amber-700">
-                    Sua conta não está conectada. Volte e informe a senha de app novamente.
-                  </div>
-                )}
-                {!loading && messages.length === 0 && !notConnected && fetchError && (
-                  <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
-                    {fetchError}
-                  </div>
-                )}
-                {!loading && messages.length === 0 && !notConnected && !fetchError && (
-                  <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
-                )}
-                <ul className="divide-y">
-                  {messages.map((m) => {
-                    const active = m.uid === selectedUid;
-                    const who = folder === "inbox" ? m.from : m.to;
-                    return (
-                      <li key={m.uid}>
-                        <button
-                          onClick={() => setSelectedUid(m.uid)}
-                          className={`w-full text-left px-3 py-2 hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-semibold" : ""}`}>
-                              {who || "—"}
-                            </span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {m.date ? new Date(m.date).toLocaleDateString() : ""}
-                            </span>
-                          </div>
-                          <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
-                            {m.subject || "(sem assunto)"}
-                          </div>
-                          {folder === "inbox" && m.unread && (
-                            <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4 max-h-[70vh] overflow-y-auto">
-                {!selected && (
-                  <div className="text-sm text-muted-foreground text-center py-12">
-                    Selecione uma mensagem
-                  </div>
-                )}
-                {selected && (
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="text-lg font-semibold">{selected.subject || "(sem assunto)"}</h3>
-                      <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                        <div><strong>De:</strong> {selected.from}</div>
-                        <div><strong>Para:</strong> {selected.to}</div>
-                        {selected.cc && <div><strong>Cc:</strong> {selected.cc}</div>}
-                        {selected.date && <div>{new Date(selected.date).toLocaleString()}</div>}
+        <Card>
+          <CardContent className="p-0 max-h-[70vh] overflow-y-auto">
+            {loading && messages.length === 0 && (
+              <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
+            )}
+            {!loading && messages.length === 0 && notConnected && (
+              <div className="p-6 text-center text-sm text-amber-700">
+                Sua conta não está conectada. Volte e informe a senha de app novamente.
+              </div>
+            )}
+            {!loading && messages.length === 0 && !notConnected && fetchError && (
+              <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
+                {fetchError}
+              </div>
+            )}
+            {!loading && messages.length === 0 && !notConnected && !fetchError && (
+              <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
+            )}
+            <ul className="divide-y">
+              {messages.map((m) => {
+                const active = m.uid === selectedUid;
+                const who = folder === "inbox" ? m.from : m.to;
+                return (
+                  <li key={m.uid}>
+                    <button
+                      onClick={() => setSelectedUid(m.uid)}
+                      className={`w-full text-left px-3 py-2 hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-semibold" : ""}`}>
+                          {who || "—"}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {m.date ? new Date(m.date).toLocaleDateString() : ""}
+                        </span>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setComposing({
-                        to: folder === "inbox" ? extractEmail(selected.from) : extractEmail(selected.to),
-                        subject: selected.subject?.startsWith("Re:") ? selected.subject : `Re: ${selected.subject ?? ""}`,
-                        body: `\n\n---\nEm ${selected.date ? new Date(selected.date).toLocaleString() : ""}, ${selected.from} escreveu:\n${quote(selected.text)}`,
-                        inReplyTo: selected.messageId ?? undefined,
-                      })}>
-                        <Reply className="h-4 w-4 mr-1" />Responder
-                      </Button>
-                    </div>
-                    <div className="border-t pt-3">
-                      {selected.html ? (
-                        <iframe
-                          title="email"
-                          sandbox=""
-                          srcDoc={selected.html}
-                          className="w-full min-h-[400px] border-0"
-                        />
-                      ) : (
-                        <pre className="whitespace-pre-wrap text-sm font-sans">{selected.text || "(sem conteúdo)"}</pre>
+                      <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
+                        {m.subject || "(sem assunto)"}
+                      </div>
+                      {folder === "inbox" && m.unread && (
+                        <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
                       )}
-                    </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 max-h-[70vh] overflow-y-auto">
+            {!selected && (
+              <div className="text-sm text-muted-foreground text-center py-12">
+                Selecione uma mensagem
+              </div>
+            )}
+            {selected && (
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{selected.subject || "(sem assunto)"}</h3>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    <div><strong>De:</strong> {selected.from}</div>
+                    <div><strong>Para:</strong> {selected.to}</div>
+                    {selected.cc && <div><strong>Cc:</strong> {selected.cc}</div>}
+                    {selected.date && <div>{new Date(selected.date).toLocaleString()}</div>}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setComposing({
+                    to: folder === "inbox" ? extractEmail(selected.from) : extractEmail(selected.to),
+                    subject: selected.subject?.startsWith("Re:") ? selected.subject : `Re: ${selected.subject ?? ""}`,
+                    body: `\n\n---\nEm ${selected.date ? new Date(selected.date).toLocaleString() : ""}, ${selected.from} escreveu:\n${quote(selected.text)}`,
+                    inReplyTo: selected.messageId ?? undefined,
+                  })}>
+                    <Reply className="h-4 w-4 mr-1" />Responder
+                  </Button>
+                </div>
+                <div className="border-t pt-3">
+                  {selected.html ? (
+                    <iframe
+                      title="email"
+                      sandbox=""
+                      srcDoc={selected.html}
+                      className="w-full min-h-[400px] border-0"
+                    />
+                  ) : (
+                    <pre className="whitespace-pre-wrap text-sm font-sans">{selected.text || "(sem conteúdo)"}</pre>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={composing != null} onOpenChange={(o) => !o && setComposing(null)}>
         <DialogContent className="max-w-2xl">
@@ -276,4 +272,114 @@ function extractEmail(s: string): string {
 function quote(text: string | null | undefined): string {
   if (!text) return "";
   return text.split("\n").map((l) => `> ${l}`).join("\n");
+}
+
+function MailboxSidebar({
+  folder,
+  onChange,
+}: {
+  folder: Folder;
+  onChange: (f: Folder) => void;
+}) {
+  const COLLAPSED_W = 56;
+  const MIN_W = 160;
+  const MAX_W = 360;
+  const DEFAULT_W = 200;
+
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("email:sidebar:collapsed") === "1";
+  });
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return DEFAULT_W;
+    const v = Number(localStorage.getItem("email:sidebar:width"));
+    return Number.isFinite(v) && v >= MIN_W && v <= MAX_W ? v : DEFAULT_W;
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("email:sidebar:collapsed", collapsed ? "1" : "0"); } catch {}
+  }, [collapsed]);
+  useEffect(() => {
+    try { localStorage.setItem("email:sidebar:width", String(width)); } catch {}
+  }, [width]);
+
+  const dragging = useRef(false);
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (collapsed) return;
+    e.preventDefault();
+    dragging.current = true;
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const next = Math.min(MAX_W, Math.max(MIN_W, startW + (ev.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [collapsed, width]);
+
+  const items: { key: Folder; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { key: "inbox", label: "Recebidos", icon: InboxIcon },
+    { key: "sent", label: "Enviados", icon: MailCheck },
+  ];
+
+  const itemClass = (active: boolean) => cn(
+    "flex items-center gap-2 rounded-md text-sm transition-colors w-full",
+    collapsed ? "justify-center px-2 py-2" : "px-3 py-2",
+    active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+  );
+
+  return (
+    <div className="relative hidden md:block" style={{ width: collapsed ? COLLAPSED_W : width }}>
+      <Card className="h-full">
+        <CardContent className="p-2 max-h-[70vh] overflow-y-auto">
+          <div className={cn("flex items-center mb-2", collapsed ? "justify-center" : "justify-between px-1")}>
+            {!collapsed && <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Caixas</span>}
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              className="h-6 w-6 grid place-items-center rounded-md border border-border bg-background hover:bg-muted"
+              aria-label={collapsed ? "Expandir" : "Recolher"}
+              title={collapsed ? "Expandir" : "Recolher"}
+            >
+              {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+          <ul className="space-y-1">
+            {items.map((it) => {
+              const Icon = it.icon;
+              const active = folder === it.key;
+              return (
+                <li key={it.key}>
+                  <button
+                    type="button"
+                    onClick={() => onChange(it.key)}
+                    className={itemClass(active)}
+                    title={collapsed ? it.label : undefined}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span className="truncate">{it.label}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </CardContent>
+      </Card>
+      {!collapsed && (
+        <div
+          onMouseDown={onMouseDown}
+          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 active:bg-primary/50"
+          aria-label="Redimensionar"
+          title="Arraste para redimensionar"
+        />
+      )}
+    </div>
+  );
 }

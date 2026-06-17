@@ -184,10 +184,10 @@ function AcceptInvitePage() {
         {status === "invalid" && (
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Não foi possível validar este convite
-              {errorMsg ? `: ${errorMsg}` : "."}. O link pode ter expirado ou já
-              ter sido utilizado. Peça ao administrador para reenviar o convite.
+              {errorMsg ||
+                "Não foi possível validar este convite. O link pode ter expirado ou já ter sido utilizado. Peça ao administrador para reenviar."}
             </p>
+
             <Button variant="outline" onClick={() => navigate({ to: "/login" })}>
               Ir para o login
             </Button>

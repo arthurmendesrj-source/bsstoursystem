@@ -1,24 +1,38 @@
-## Corrigir "accounts.google.com está bloqueado" no fluxo Conectar Gmail
+## Causa
 
-### Causa
+O OAuth já chegou no callback. O erro atual acontece ao salvar a conta Gmail no banco:
 
-O Google envia `Cross-Origin-Opener-Policy: same-origin` no `accounts.google.com`. Quando abrimos a URL de OAuth em **popup** (`window.open(url, "gmail-oauth", "width=520,height=680")`) a partir do iframe do preview do Lovable, o navegador recusa carregar a resposta e mostra `ERR_BLOCKED_BY_RESPONSE`.
+`there is no unique or exclusion constraint matching the ON CONFLICT specification`
 
-Popups com tamanho/posição abertos de dentro de um iframe cross-origin são tratados de forma mais restrita; **novas abas (sem features de janela) não sofrem esse bloqueio**.
+A tabela `email_accounts` tem um índice parcial para `(user_id, provider)`, mas o salvamento usa conflito por `(user_id, provider)`, que exige uma constraint única normal. Além disso, a tabela ainda tem uma validação antiga que só permite `provider = 'gmail'`, enquanto o fluxo novo salva `provider = 'gmail_oauth'`.
 
-### Correção
+## Plano de correção
 
-Em `src/routes/email.tsx`, no `handleConnect`:
+1. **Ajustar a tabela `email_accounts`**
+   - Atualizar a validação de `provider` para permitir `gmail` e `gmail_oauth`.
+   - Remover o índice parcial antigo de `gmail_oauth`.
+   - Criar uma constraint única real para `(user_id, provider)`.
 
-1. Trocar `window.open(r.authUrl, "gmail-oauth", "width=520,height=680")` por `window.open(r.authUrl, "_blank")` — sem features, o Chrome abre como aba normal e o Google permite o carregamento.
-2. Remover a dependência de `postMessage` do popup (a aba nova não fica filha do iframe, então `window.opener.postMessage` é nulo). Em vez disso, após abrir a aba, **fazer polling** de `getMyAccount` a cada 2 s por até 2 min; assim que retornar `connected: true`, mostrar toast de sucesso e recarregar o estado.
-3. Manter o listener de `message` como bônus (caso o navegador ainda permita), mas não depender dele.
+2. **Manter o código atual de salvamento**
+   - O callback já faz `upsert` por `user_id,provider`; com a constraint correta, ele passa a funcionar.
+   - Não precisa mudar o fluxo OAuth para este erro específico.
 
-Em `src/routes/api/public/google.callback.ts`:
+3. **Validação após aplicar**
+   - Tentar conectar Gmail novamente.
+   - Esperado: página “Gmail conectado” e a aba `/email` detecta a conta conectada.
 
-- Manter a página de sucesso atual; o `window.close()` continua funcionando porque a aba foi aberta por `window.open`.
-- Texto: "Gmail conectado. Você já pode voltar à aba do app e fechar esta."
+## Migração prevista
 
-### Por que não usar redirect no iframe
+```sql
+alter table public.email_accounts
+  drop constraint if exists email_accounts_provider_check;
 
-Redirecionar o iframe inteiro para o Google funcionaria, mas ao voltar o callback cairia dentro do iframe e o Lovable preview poderia bloquear (mesma família de problema). Abrir em aba nova é o caminho compatível com o ambiente de preview e também com o site publicado.
+alter table public.email_accounts
+  add constraint email_accounts_provider_check
+  check (provider in ('gmail', 'gmail_oauth'));
+
+drop index if exists public.email_accounts_user_provider_unique;
+
+alter table public.email_accounts
+  add constraint email_accounts_user_provider_key unique (user_id, provider);
+```

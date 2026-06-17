@@ -1,5 +1,7 @@
 // OAuth callback: receives ?code&state from Google, exchanges code,
 // saves tokens to email_accounts for the user encoded in `state`.
+// rebuild
+
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/api/public/google/callback")({

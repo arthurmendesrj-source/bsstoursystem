@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useSubordinates } from "@/lib/hierarchy";
 import { useCurrency } from "@/lib/currency";
 import { supabase } from "@/integrations/supabase/client";
+import { EmailMailbox } from "@/components/email/EmailMailbox";
 
 export const Route = createFileRoute("/gerencial/$userId")({
   component: () => (
@@ -176,7 +177,7 @@ function UserDetailPage() {
         </TabsContent>
 
         <TabsContent value="emails">
-          <EmailsTable leadIds={leadIds} total={counts.emails} />
+          <EmailMailbox targetUserId={userId} targetEmail={null} managerMode managerName={name} />
         </TabsContent>
       </Tabs>
 

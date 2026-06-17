@@ -4296,6 +4296,8 @@ export type Database = {
       }
       check_realtime_security: { Args: never; Returns: Json }
       current_tenant_id: { Args: never; Returns: string }
+      decrypt_email_password: { Args: { _account_id: string }; Returns: string }
+      encrypt_email_password: { Args: { plain: string }; Returns: string }
       extract_initials: { Args: { _full_name: string }; Returns: string }
       generate_entity_code: {
         Args: { _entity: string; _user_id: string }

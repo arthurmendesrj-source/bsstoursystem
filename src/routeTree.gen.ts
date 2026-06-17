@@ -27,6 +27,7 @@ import { Route as ItinerariesRouteImport } from './routes/itineraries'
 import { Route as GerencialRouteImport } from './routes/gerencial'
 import { Route as FunnelRouteImport } from './routes/funnel'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
+import { Route as EmailRouteImport } from './routes/email'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as BookingsRouteImport } from './routes/bookings'
@@ -154,6 +155,11 @@ const FunnelRoute = FunnelRouteImport.update({
 const FinanceiroRoute = FinanceiroRouteImport.update({
   id: '/financeiro',
   path: '/financeiro',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmailRoute = EmailRouteImport.update({
+  id: '/email',
+  path: '/email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -365,6 +371,7 @@ export interface FileRoutesByFullPath {
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/email': typeof EmailRoute
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
@@ -423,6 +430,7 @@ export interface FileRoutesByTo {
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/email': typeof EmailRoute
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
@@ -482,6 +490,7 @@ export interface FileRoutesById {
   '/bookings': typeof BookingsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/email': typeof EmailRoute
   '/financeiro': typeof FinanceiroRoute
   '/funnel': typeof FunnelRoute
   '/gerencial': typeof GerencialRouteWithChildren
@@ -542,6 +551,7 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/dashboard'
+    | '/email'
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
@@ -600,6 +610,7 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/dashboard'
+    | '/email'
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
@@ -658,6 +669,7 @@ export interface FileRouteTypes {
     | '/bookings'
     | '/customers'
     | '/dashboard'
+    | '/email'
     | '/financeiro'
     | '/funnel'
     | '/gerencial'
@@ -717,6 +729,7 @@ export interface RootRouteChildren {
   BookingsRoute: typeof BookingsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
+  EmailRoute: typeof EmailRoute
   FinanceiroRoute: typeof FinanceiroRoute
   FunnelRoute: typeof FunnelRoute
   GerencialRoute: typeof GerencialRouteWithChildren
@@ -881,6 +894,13 @@ declare module '@tanstack/react-router' {
       path: '/financeiro'
       fullPath: '/financeiro'
       preLoaderRoute: typeof FinanceiroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/email': {
+      id: '/email'
+      path: '/email'
+      fullPath: '/email'
+      preLoaderRoute: typeof EmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -1230,6 +1250,7 @@ const rootRouteChildren: RootRouteChildren = {
   BookingsRoute: BookingsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
+  EmailRoute: EmailRoute,
   FinanceiroRoute: FinanceiroRoute,
   FunnelRoute: FunnelRoute,
   GerencialRoute: GerencialRouteWithChildren,

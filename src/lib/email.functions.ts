@@ -16,101 +16,51 @@ async function authorize(supabase: any, callerId: string, targetUserId: string) 
   return Boolean(isSub);
 }
 
-async function loadAccount(targetUserId: string): Promise<{ email: string; password: string; accountId: string } | null> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { decryptPassword } = await import("./email.server");
-  const { data } = await supabaseAdmin
-    .from("email_accounts")
-    .select("id,email,password_encrypted")
-    .eq("user_id", targetUserId)
-    .eq("provider", "gmail")
-    .maybeSingle();
-  if (!data) return null;
-  try {
-    const password = decryptPassword(data.password_encrypted as any);
-    return { accountId: data.id as string, email: data.email as string, password };
-  } catch {
-    // Stale ciphertext (encryption key changed/missing). Drop it so the user can reconnect.
-    await supabaseAdmin.from("email_accounts").delete().eq("id", data.id);
-    return null;
-  }
-}
-
+// Connect / disconnect become informational: the real connection is the
+// workspace-level Gmail connector (managed in Settings → Connectors). We keep
+// the same server-fn names so the UI doesn't have to change.
 export const connectGmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { password: string }) => z.object({ password: z.string().min(8) }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { userId, claims, supabase } = context;
-    const email = (claims as any)?.email as string | undefined;
-    if (!email) throw new Error("Email do usuário não disponível.");
-    const { testGmailCredentials, encryptPassword, gmailDefaults } = await import("./email.server");
-    const password = data.password.replace(/\s+/g, "");
+  .inputValidator((d: { password?: string }) => d ?? {})
+  .handler(async () => {
+    const { getProfile } = await import("./gmail-api.server");
     try {
-      await testGmailCredentials(email, password);
+      const p = await getProfile();
+      return { ok: true, email: p.emailAddress };
     } catch (e: any) {
-      const raw = String(e?.message ?? e ?? "");
-      let friendly = "Falha ao validar credenciais Gmail.";
-      if (/AUTHENTICATIONFAILED|Invalid credentials|Username and Password not accepted|BadCredentials|535/i.test(raw)) {
-        friendly = "Senha de app rejeitada pelo Gmail. Gere uma nova senha de app (16 caracteres) e tente de novo.";
-      } else if (/Timeout|ETIMEDOUT|ECONNRESET|ENOTFOUND|ECONNREFUSED|socket/i.test(raw)) {
-        friendly = "Não foi possível conectar aos servidores do Gmail (SMTP/IMAP). Tente novamente em instantes.";
-      } else if (/EMAIL_ENCRYPTION_KEY/i.test(raw)) {
-        friendly = "Chave de criptografia do servidor não configurada.";
-      }
-      throw new Error(`${friendly} (${raw.slice(0, 180)})`);
+      throw new Error(
+        e?.message ??
+          "Conector Gmail indisponível. Verifique a conexão nas configurações.",
+      );
     }
-    const enc = encryptPassword(password);
-    // bytea must be sent as PostgreSQL hex literal ("\x...") via PostgREST,
-    // otherwise a raw Buffer is JSON-serialized into garbage and decrypt fails later.
-    const encHex = "\\x" + Buffer.from(enc).toString("hex");
-    const defaults = gmailDefaults();
-    const payload = {
-      user_id: userId,
-      provider: "gmail",
-      email,
-      display_name: (claims as any)?.user_metadata?.full_name ?? null,
-      username: email,
-      password_encrypted: encHex as any,
-      ...defaults,
-    };
-    // delete then insert to avoid unique-constraint complications
-    await supabase.from("email_accounts").delete().eq("user_id", userId);
-    const { error } = await supabase.from("email_accounts").insert(payload as any);
-    if (error) throw new Error(error.message);
-    // Sanity check: try to load it back (decrypt) so we fail fast if something is off.
-    const verify = await loadAccount(userId);
-    if (!verify) throw new Error("Conta salva mas não pôde ser lida de volta. Tente novamente.");
-    return { ok: true, email };
   });
 
 export const getMyAccount = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { supabase, userId, claims } = context;
-    const { data } = await supabase
-      .from("email_accounts")
-      .select("email,updated_at")
-      .eq("user_id", userId)
-      .maybeSingle();
-    let connected = !!data;
-    if (connected) {
-      // Validate that the stored password can still be decrypted; otherwise loadAccount drops it.
-      const acc = await loadAccount(userId);
-      connected = !!acc;
+    const { claims } = context;
+    try {
+      const { getProfile } = await import("./gmail-api.server");
+      const p = await getProfile();
+      return {
+        connected: true,
+        email: p.emailAddress,
+        updatedAt: null as string | null,
+      };
+    } catch {
+      return {
+        connected: false,
+        email: (claims as any)?.email ?? null,
+        updatedAt: null as string | null,
+      };
     }
-    return {
-      connected,
-      email: data?.email ?? (claims as any)?.email ?? null,
-      updatedAt: data?.updated_at ?? null,
-    };
   });
 
 export const disconnectGmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { error } = await supabase.from("email_accounts").delete().eq("user_id", userId);
-    if (error) throw new Error(error.message);
+  .handler(async () => {
+    // The connector is workspace-managed; we can't programmatically unlink it
+    // from a server function. Returning ok so the UI shows the connect screen.
     return { ok: true };
   });
 
@@ -126,21 +76,21 @@ export const listMessagesFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
-    const acc = await loadAccount(data.targetUserId);
-    if (!acc) return { connected: false, messages: [] as any[], error: null as string | null };
-    const { listMessages } = await import("./email.server");
+    const { listMessages } = await import("./gmail-api.server");
     try {
-      const messages = await listMessages(acc.email, acc.password, data.folder, { search: data.search });
+      const messages = await listMessages(data.folder, { search: data.search });
       return { connected: true, messages, error: null as string | null };
     } catch (e: any) {
       const raw = String(e?.message ?? e ?? "");
-      let friendly = "Falha ao acessar a caixa no Gmail.";
-      if (/AUTHENTICATIONFAILED|Invalid credentials|Username and Password not accepted|BadCredentials/i.test(raw)) {
-        friendly = "Credenciais rejeitadas pelo Gmail. Gere uma nova senha de app e reconecte.";
-      } else if (/ETIMEDOUT|ECONNRESET|ENOTFOUND|ECONNREFUSED|timeout/i.test(raw)) {
-        friendly = "Não foi possível conectar ao Gmail (rede/IMAP). Tente novamente.";
-      } else if (/IMAP|imap\.gmail/i.test(raw)) {
-        friendly = "IMAP do Gmail indisponível ou desabilitado para esta conta.";
+      let friendly = "Falha ao acessar a caixa do Gmail.";
+      if (/LOVABLE_API_KEY|GOOGLE_MAIL_API_KEY|Conector Gmail/i.test(raw)) {
+        friendly =
+          "Conector Gmail não está conectado. Conecte uma conta Gmail nas configurações.";
+        return { connected: false, messages: [] as any[], error: friendly };
+      }
+      if (/401|403/.test(raw)) {
+        friendly =
+          "Permissão insuficiente no Gmail. Reconecte com permissões de leitura.";
       }
       return { connected: true, messages: [] as any[], error: `${friendly} (${raw.slice(0, 200)})` };
     }
@@ -148,20 +98,20 @@ export const listMessagesFn = createServerFn({ method: "POST" })
 
 export const fetchMessageFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; uid: number }) =>
+  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; uid: number; gmailId?: string }) =>
     z.object({
       targetUserId: z.string().uuid(),
       folder: folderSchema,
       uid: z.number().int().positive(),
+      gmailId: z.string().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
-    const acc = await loadAccount(data.targetUserId);
-    if (!acc) throw new Error("Conta não conectada.");
-    const { fetchMessage } = await import("./email.server");
-    return await fetchMessage(acc.email, acc.password, data.folder, data.uid);
+    if (!data.gmailId) throw new Error("ID da mensagem ausente.");
+    const { fetchMessage } = await import("./gmail-api.server");
+    return await fetchMessage(data.gmailId);
   });
 
 export const sendEmailFn = createServerFn({ method: "POST" })
@@ -186,14 +136,17 @@ export const sendEmailFn = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
-    const acc = await loadAccount(data.targetUserId);
-    if (!acc) throw new Error("Conta de email do usuário não conectada.");
-    const { sendMail } = await import("./email.server");
-    const res = await sendMail(acc.email, acc.password, {
-      to: data.to, cc: data.cc, bcc: data.bcc,
-      subject: data.subject, text: data.body, inReplyTo: data.inReplyTo,
+    const { getProfile, sendMail } = await import("./gmail-api.server");
+    const profile = await getProfile();
+    const res = await sendMail({
+      from: profile.emailAddress,
+      to: data.to,
+      cc: data.cc,
+      bcc: data.bcc,
+      subject: data.subject,
+      text: data.body,
+      inReplyTo: data.inReplyTo,
     });
-    // Audit when manager sends on behalf
     if (context.userId !== data.targetUserId) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.from("user_audit_log").insert({
@@ -212,15 +165,18 @@ export const sendEmailFn = createServerFn({ method: "POST" })
 
 export const markReadFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { targetUserId: string; uid: number }) =>
-    z.object({ targetUserId: z.string().uuid(), uid: z.number().int().positive() }).parse(d),
+  .inputValidator((d: { targetUserId: string; uid: number; gmailId?: string }) =>
+    z.object({
+      targetUserId: z.string().uuid(),
+      uid: z.number().int().positive(),
+      gmailId: z.string().optional(),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
-    const acc = await loadAccount(data.targetUserId);
-    if (!acc) return { ok: false };
-    const { markRead } = await import("./email.server");
-    await markRead(acc.email, acc.password, data.uid);
+    if (!data.gmailId) return { ok: false };
+    const { markRead } = await import("./gmail-api.server");
+    await markRead(data.gmailId);
     return { ok: true };
   });

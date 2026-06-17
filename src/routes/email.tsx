@@ -66,17 +66,36 @@ function EmailPage() {
     try {
       const r: any = await connect({ data: {} });
       if (!r?.authUrl) throw new Error("URL de autorização não retornada.");
-      const w = window.open(r.authUrl, "gmail-oauth", "width=520,height=680");
+      // Open in a NEW TAB (no window features) — popups opened from inside
+      // the Lovable preview iframe are blocked by Google's COOP headers
+      // (ERR_BLOCKED_BY_RESPONSE). Tabs work normally.
+      const w = window.open(r.authUrl, "_blank");
       if (!w) {
         toast.error("Pop-up bloqueado. Permita pop-ups e tente novamente.");
         return;
       }
-      const timer = setInterval(() => {
-        if (w.closed) {
+      toast.info("Abrimos uma nova aba para autorizar. Conclua o login no Google.");
+
+      // Poll account status until connected or 2 minutes pass.
+      const start = Date.now();
+      const timer = setInterval(async () => {
+        if (Date.now() - start > 120_000) {
           clearInterval(timer);
-          void reload();
+          return;
         }
-      }, 700);
+        try {
+          const acc = await getAcc();
+          if (acc?.connected) {
+            clearInterval(timer);
+            toast.success(`Gmail conectado: ${acc.email ?? ""}`);
+            setConnected(true);
+            setAccountEmail(acc.email ?? null);
+            try { w.close(); } catch {}
+          }
+        } catch {
+          // ignore transient errors during polling
+        }
+      }, 2000);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao conectar", { duration: 8000 });
     } finally {
@@ -84,6 +103,7 @@ function EmailPage() {
       setSubmitting(false);
     }
   };
+
 
 
   const handleDisconnect = async () => {

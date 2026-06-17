@@ -1,36 +1,24 @@
-## Implementar fluxo "Conectar Gmail" por usuário
+## Corrigir "accounts.google.com está bloqueado" no fluxo Conectar Gmail
 
-Hoje a tela `/email` usa o conector Gmail compartilhado do workspace (errado — sempre cai no `booking@adatours.com`). Vou trocar pelo OAuth próprio do Google, onde cada usuário conecta o Gmail dele.
+### Causa
 
-### Como vai funcionar
+O Google envia `Cross-Origin-Opener-Policy: same-origin` no `accounts.google.com`. Quando abrimos a URL de OAuth em **popup** (`window.open(url, "gmail-oauth", "width=520,height=680")`) a partir do iframe do preview do Lovable, o navegador recusa carregar a resposta e mostra `ERR_BLOCKED_BY_RESPONSE`.
 
-1. Usuário clica **Conectar Gmail** em `/email`.
-2. É redirecionado para a tela de consentimento do Google (ele escolhe a conta — ex. `diretorturismos@gmail.com`).
-3. Google volta para `/api/public/google/callback` com um código.
-4. O backend troca o código por `access_token` + `refresh_token` e salva em `email_accounts` com `user_id` = usuário logado.
-5. A tela `/email` passa a listar Gmail dele mesmo. Outros usuários conectados conectam o próprio Gmail e cada um vê só o seu.
+Popups com tamanho/posição abertos de dentro de um iframe cross-origin são tratados de forma mais restrita; **novas abas (sem features de janela) não sofrem esse bloqueio**.
 
-### Arquivos a criar/alterar
+### Correção
 
-- `src/lib/google-oauth.server.ts` (novo) — funções: `buildAuthUrl(state, redirectUri)`, `exchangeCode(code, redirectUri)`, `refreshAccessToken(refreshToken)`. Usa `GOOGLE_OAUTH_CLIENT_ID` e `GOOGLE_OAUTH_CLIENT_SECRET`.
-- `src/lib/gmail-api.server.ts` — reescrever para aceitar `userId`, buscar tokens em `email_accounts` via `supabaseAdmin`, renovar se expirou, chamar `https://gmail.googleapis.com/gmail/v1/...` direto com `Authorization: Bearer <access_token>` (sem mais conector compartilhado).
-- `src/lib/email.functions.ts` — `connectGmail` passa a retornar `{ authUrl }`; `getMyAccount` lê de `email_accounts` por `user_id`; `disconnectGmail` apaga linha; demais fns passam `context.userId` ao gmail-api.
-- `src/routes/email.tsx` — botão "Conectar Gmail" abre `authUrl` em nova janela; após retornar, recarrega status.
-- `src/routes/api/public/google.callback.ts` (novo) — recebe `?code&state`, troca código, descobre email via `gmail/v1/users/me/profile`, faz upsert em `email_accounts` (chave `user_id`), responde HTML que fecha a janela.
+Em `src/routes/email.tsx`, no `handleConnect`:
 
-### Escopos e Redirect URIs
+1. Trocar `window.open(r.authUrl, "gmail-oauth", "width=520,height=680")` por `window.open(r.authUrl, "_blank")` — sem features, o Chrome abre como aba normal e o Google permite o carregamento.
+2. Remover a dependência de `postMessage` do popup (a aba nova não fica filha do iframe, então `window.opener.postMessage` é nulo). Em vez disso, após abrir a aba, **fazer polling** de `getMyAccount` a cada 2 s por até 2 min; assim que retornar `connected: true`, mostrar toast de sucesso e recarregar o estado.
+3. Manter o listener de `message` como bônus (caso o navegador ainda permita), mas não depender dele.
 
-- Escopos: `openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.modify` + `access_type=offline&prompt=consent` (garante refresh_token).
-- Redirect URIs que precisam estar cadastrados no Google Cloud Console (já listei no tutorial):
-  - `https://bsstoursystem.lovable.app/api/public/google/callback`
-  - `https://id-preview--e04e61e2-142f-4f0a-97f1-8cfe086322f3.lovable.app/api/public/google/callback`
+Em `src/routes/api/public/google.callback.ts`:
 
-### Migração de banco
+- Manter a página de sucesso atual; o `window.close()` continua funcionando porque a aba foi aberta por `window.open`.
+- Texto: "Gmail conectado. Você já pode voltar à aba do app e fechar esta."
 
-A coluna `provider` provavelmente precisa marcar `'gmail_oauth'`. As colunas `access_token`, `refresh_token`, `token_expires_at`, `scope` já foram adicionadas. Vou aproveitar e apagar registros antigos `provider != 'gmail_oauth'` se houver, e garantir `UNIQUE (user_id)` para upsert por usuário.
+### Por que não usar redirect no iframe
 
-### Segurança
-
-- `state` da OAuth = `user_id` assinado com HMAC usando `LOVABLE_API_KEY` para impedir troca de identidade.
-- Tokens só lidos no servidor; nunca expostos ao browser.
-- `email_accounts` já tem RLS por `user_id`.
+Redirecionar o iframe inteiro para o Google funcionaria, mas ao voltar o callback cairia dentro do iframe e o Lovable preview poderia bloquear (mesma família de problema). Abrir em aba nova é o caminho compatível com o ambiente de preview e também com o site publicado.

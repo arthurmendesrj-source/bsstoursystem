@@ -617,14 +617,16 @@ function AuditLogSection({
   const load = async () => {
     setLoading(true);
     try {
-      const data = await callAdminUsers("list_audit", { limit: 100 });
-      setEntries((data?.entries ?? []) as AuditEntry[]);
+      const { data, error } = await supabase.rpc("list_user_audit_for_caller", { _limit: 100 });
+      if (error) throw error;
+      setEntries((data ?? []) as unknown as AuditEntry[]);
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => { load(); }, []);
 

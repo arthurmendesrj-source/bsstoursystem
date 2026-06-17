@@ -4358,6 +4358,28 @@ export type Database = {
         Args: { _tenant_id: string; _user_id: string }
         Returns: boolean
       }
+      list_user_audit_for_caller: {
+        Args: { _limit?: number }
+        Returns: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          error_message: string | null
+          id: string
+          success: boolean
+          target_email: string | null
+          target_user_id: string | null
+          tenant_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "user_audit_log"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       match_itineraries: {
         Args: {
           match_count?: number

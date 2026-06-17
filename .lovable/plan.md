@@ -1,35 +1,33 @@
-## Problema encontrado
+## Diagnóstico
 
-A página **Usuários → Log de auditoria** está mostrando ações de outras contas dentro do apartamento da `diretorturismos@gmail.com`.
+Os dados no banco já estão corretos:
+- 12 registros pertencem ao tenant **BSS Tour** (arthur)
+- 3 registros pertencem ao tenant **Diretor1** (diretorturismos)
 
-Causa: a tabela `user_audit_log` (que registra ações administrativas sobre usuários — convite, exclusão, mudança de papel etc.) **não tem coluna `tenant_id`** e a função `admin-users` (ação `list_audit`) consulta com a chave de serviço (que ignora as regras de isolamento), retornando registros de **todos os tenants**.
+A função `admin-users` foi atualizada para filtrar por tenant, mas o painel ainda mostra "15" no contador. Duas causas prováveis:
 
-Hoje existem 15 registros: 12 da conta do arthur (BSS Tour) e 3 do diretorturismos. Por isso ele vê histórico que não é dele.
+1. **A nova versão da edge function ainda não respondeu** no navegador (ela faz deploy automático mas pode levar alguns segundos; a tela pode estar com o resultado da chamada antiga em cache).
+2. **O navegador serviu o JSON antigo** (não há Cache-Control explícito).
 
-> Importante: o `activity_log` (ações de negócio: leads, cotações, reservas) **já está isolado corretamente** por `tenant_id`. O problema é apenas no `user_audit_log`.
+## Plano
 
-## Plano de correção
+### Passo 1 — Confirmar deploy e forçar atualização
+- Clicar no ícone de **atualizar (↻)** ao lado do contador "Log de auditoria" e/ou dar um **Ctrl+Shift+R** na página `/users`.
+- Resultado esperado para `diretorturismos@gmail.com`: contador cai para **3** (somente as ações executadas pela própria conta dele).
 
-### 1. Banco de dados (migração)
-- Adicionar coluna `tenant_id uuid` em `public.user_audit_log`.
-- **Backfill** dos 15 registros existentes:
-  - Resolver o `tenant_id` a partir do `actor_id` (via `tenant_members`).
-  - Os 12 registros do arthur → tenant BSS Tour.
-  - Os 3 registros do diretorturismos → tenant Diretor1.
-- Criar índice em `(tenant_id, created_at desc)`.
-- Atualizar/criar políticas RLS para que cada usuário só veja registros do próprio tenant (super_admin continua vendo tudo).
+### Passo 2 — Se ainda mostrar 15, reforçar do lado do servidor
+Caso o filtro do edge function não esteja sendo aplicado, adicionar uma proteção redundante:
 
-### 2. Edge function `admin-users`
-- No helper `audit(...)` (linha ~69): resolver o tenant do `actor_id` e gravar `tenant_id` em cada novo registro.
-- Na ação `list_audit` (linha ~106): filtrar `.eq('tenant_id', callerTenantId)`, exceto quando o chamador for super_admin (Desenvolvedor — você), que continua vendo tudo.
+- Criar uma função SQL `public.list_user_audit_for_caller(_limit int)` `SECURITY DEFINER` que:
+  - Identifica o tenant do `auth.uid()` chamador.
+  - Retorna apenas registros desse tenant (super_admin vê todos).
+- Alterar o front-end (`src/routes/users.tsx`, `callAdminUsers("list_audit", ...)`) para chamar essa RPC via `supabase.rpc(...)` em vez da edge function.
 
-### 3. Verificação
-- Logar com `diretorturismos@gmail.com` → o log deve aparecer **vazio** (ou só com ações feitas dentro da conta dele).
-- Logar com arthur (BSS Tour) → vê só as 12 ações dele.
-- Logar como super_admin → vê tudo (visão de desenvolvedor).
+Isso elimina qualquer dependência de cache/deploy da edge function.
 
-## O que NÃO muda
-- Nenhum dado de negócio é apagado.
-- Os 233 clientes e 638 fornecedores continuam exclusivos do BSS Tour.
-- A conta `diretorturismos@gmail.com` continua zerada de dados operacionais.
-- Novos cadastros pelo site continuam criando apartamento próprio e isolado.
+### Passo 3 — Verificação final
+- Logar com `diretorturismos@gmail.com` → contador = 3.
+- Logar com `arthurmendesrj@hotmail.com` (BSS Tour) → contador = 12.
+- Logar como Desenvolvedor (super_admin = arthur) → vê todos = 15.
+
+Quero começar pelo **Passo 1** (só recarregar). Se ainda aparecer 15, eu já parto direto para o Passo 2.

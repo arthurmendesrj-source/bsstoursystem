@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { getRequestHost, getRequestHeader } from "@tanstack/react-start/server";
 
 const folderSchema = z.enum(["inbox", "sent"]);
 
@@ -16,51 +17,64 @@ async function authorize(supabase: any, callerId: string, targetUserId: string) 
   return Boolean(isSub);
 }
 
-// Connect / disconnect become informational: the real connection is the
-// workspace-level Gmail connector (managed in Settings → Connectors). We keep
-// the same server-fn names so the UI doesn't have to change.
+function currentOrigin(): string {
+  try {
+    const proto = getRequestHeader("x-forwarded-proto") ?? "https";
+    const host = getRequestHost();
+    return `${proto}://${host}`;
+  } catch {
+    return "https://bsstoursystem.lovable.app";
+  }
+}
+
+// Initiate per-user OAuth. Returns the Google consent URL.
 export const connectGmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { password?: string }) => d ?? {})
-  .handler(async () => {
-    const { getProfile } = await import("./gmail-api.server");
-    try {
-      const p = await getProfile();
-      return { ok: true, email: p.emailAddress };
-    } catch (e: any) {
-      throw new Error(
-        e?.message ??
-          "Conector Gmail indisponível. Verifique a conexão nas configurações.",
-      );
-    }
+  .handler(async ({ context }) => {
+    const { buildAuthUrl, buildRedirectUri, signState } = await import(
+      "./google-oauth.server"
+    );
+    const origin = currentOrigin();
+    const redirectUri = buildRedirectUri(origin);
+    const state = signState(context.userId);
+    const authUrl = buildAuthUrl(state, redirectUri);
+    return { ok: true, authUrl };
   });
 
 export const getMyAccount = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { claims } = context;
-    try {
-      const { getProfile } = await import("./gmail-api.server");
-      const p = await getProfile();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("email_accounts")
+      .select("email, updated_at")
+      .eq("user_id", context.userId)
+      .eq("provider", "gmail_oauth")
+      .maybeSingle();
+    if (data?.email) {
       return {
         connected: true,
-        email: p.emailAddress,
-        updatedAt: null as string | null,
-      };
-    } catch {
-      return {
-        connected: false,
-        email: (claims as any)?.email ?? null,
-        updatedAt: null as string | null,
+        email: data.email as string,
+        updatedAt: (data.updated_at as string) ?? null,
       };
     }
+    return {
+      connected: false,
+      email: (context.claims as any)?.email ?? null,
+      updatedAt: null as string | null,
+    };
   });
 
 export const disconnectGmail = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    // The connector is workspace-managed; we can't programmatically unlink it
-    // from a server function. Returning ok so the UI shows the connect screen.
+  .handler(async ({ context }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await supabaseAdmin
+      .from("email_accounts")
+      .delete()
+      .eq("user_id", context.userId)
+      .eq("provider", "gmail_oauth");
     return { ok: true };
   });
 
@@ -78,19 +92,17 @@ export const listMessagesFn = createServerFn({ method: "POST" })
     if (!ok) throw new Response("Forbidden", { status: 403 });
     const { listMessages } = await import("./gmail-api.server");
     try {
-      const messages = await listMessages(data.folder, { search: data.search });
+      const messages = await listMessages(data.targetUserId, data.folder, { search: data.search });
       return { connected: true, messages, error: null as string | null };
     } catch (e: any) {
       const raw = String(e?.message ?? e ?? "");
       let friendly = "Falha ao acessar a caixa do Gmail.";
-      if (/LOVABLE_API_KEY|GOOGLE_MAIL_API_KEY|Conector Gmail/i.test(raw)) {
-        friendly =
-          "Conector Gmail não está conectado. Conecte uma conta Gmail nas configurações.";
+      if (/não conectado|GOOGLE_OAUTH|refresh_token/i.test(raw)) {
+        friendly = "Gmail não conectado. Clique em Conectar Gmail para autorizar a sua conta.";
         return { connected: false, messages: [] as any[], error: friendly };
       }
       if (/401|403/.test(raw)) {
-        friendly =
-          "Permissão insuficiente no Gmail. Reconecte com permissões de leitura.";
+        friendly = "Permissão insuficiente no Gmail. Desconecte e conecte novamente.";
       }
       return { connected: true, messages: [] as any[], error: `${friendly} (${raw.slice(0, 200)})` };
     }
@@ -111,7 +123,7 @@ export const fetchMessageFn = createServerFn({ method: "POST" })
     if (!ok) throw new Response("Forbidden", { status: 403 });
     if (!data.gmailId) throw new Error("ID da mensagem ausente.");
     const { fetchMessage } = await import("./gmail-api.server");
-    return await fetchMessage(data.gmailId);
+    return await fetchMessage(data.targetUserId, data.gmailId);
   });
 
 export const sendEmailFn = createServerFn({ method: "POST" })
@@ -137,8 +149,8 @@ export const sendEmailFn = createServerFn({ method: "POST" })
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
     const { getProfile, sendMail } = await import("./gmail-api.server");
-    const profile = await getProfile();
-    const res = await sendMail({
+    const profile = await getProfile(data.targetUserId);
+    const res = await sendMail(data.targetUserId, {
       from: profile.emailAddress,
       to: data.to,
       cc: data.cc,
@@ -177,6 +189,6 @@ export const markReadFn = createServerFn({ method: "POST" })
     if (!ok) throw new Response("Forbidden", { status: 403 });
     if (!data.gmailId) return { ok: false };
     const { markRead } = await import("./gmail-api.server");
-    await markRead(data.gmailId);
+    await markRead(data.targetUserId, data.gmailId);
     return { ok: true };
   });

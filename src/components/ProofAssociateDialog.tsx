@@ -34,21 +34,8 @@ export function ProofAssociateDialog({
 
   useEffect(() => {
     if (!open || tab !== "email") return;
-    let cancelled = false;
-    (async () => {
-      let query = supabase.from("emails")
-        .select("id,subject,from_name,from_email,snippet,received_at,body_text")
-        .order("received_at", { ascending: false })
-        .limit(50);
-      if (customerId) query = query.or(`customer_id.eq.${customerId},customer_id.is.null`);
-      const term = q.trim();
-      if (term) {
-        query = query.or(`subject.ilike.%${term}%,from_name.ilike.%${term}%,from_email.ilike.%${term}%,snippet.ilike.%${term}%`);
-      }
-      const { data } = await query;
-      if (!cancelled) setEmails((data ?? []) as typeof emails);
-    })();
-    return () => { cancelled = true; };
+    // Email feature is being rebuilt; no inbox available yet.
+    setEmails([]);
   }, [open, tab, q, customerId]);
 
   return (

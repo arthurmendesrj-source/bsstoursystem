@@ -36,6 +36,7 @@ import { Route as BibliaRouteImport } from './routes/biblia'
 import { Route as AssistantRouteImport } from './routes/assistant'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as ActivitiesRouteImport } from './routes/activities'
+import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as TTenantSlugRouteImport } from './routes/t.$tenantSlug'
 import { Route as SuppliersReferencesRouteImport } from './routes/suppliers.references'
@@ -201,6 +202,11 @@ const AlertsRoute = AlertsRouteImport.update({
 const ActivitiesRoute = ActivitiesRouteImport.update({
   id: '/activities',
   path: '/activities',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AcceptInviteRoute = AcceptInviteRouteImport.update({
+  id: '/accept-invite',
+  path: '/accept-invite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -369,6 +375,7 @@ const ApiPublicBillingAggregateUsageRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/assistant': typeof AssistantRoute
@@ -429,6 +436,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/assistant': typeof AssistantRoute
@@ -490,6 +498,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accept-invite': typeof AcceptInviteRoute
   '/activities': typeof ActivitiesRoute
   '/alerts': typeof AlertsRouteWithChildren
   '/assistant': typeof AssistantRoute
@@ -552,6 +561,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/accept-invite'
     | '/activities'
     | '/alerts'
     | '/assistant'
@@ -612,6 +622,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/accept-invite'
     | '/activities'
     | '/alerts'
     | '/assistant'
@@ -672,6 +683,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/accept-invite'
     | '/activities'
     | '/alerts'
     | '/assistant'
@@ -733,6 +745,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AcceptInviteRoute: typeof AcceptInviteRoute
   ActivitiesRoute: typeof ActivitiesRoute
   AlertsRoute: typeof AlertsRouteWithChildren
   AssistantRoute: typeof AssistantRoute
@@ -970,6 +983,13 @@ declare module '@tanstack/react-router' {
       path: '/activities'
       fullPath: '/activities'
       preLoaderRoute: typeof ActivitiesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accept-invite': {
+      id: '/accept-invite'
+      path: '/accept-invite'
+      fullPath: '/accept-invite'
+      preLoaderRoute: typeof AcceptInviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -1262,6 +1282,7 @@ const SuppliersRouteWithChildren = SuppliersRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AcceptInviteRoute: AcceptInviteRoute,
   ActivitiesRoute: ActivitiesRoute,
   AlertsRoute: AlertsRouteWithChildren,
   AssistantRoute: AssistantRoute,

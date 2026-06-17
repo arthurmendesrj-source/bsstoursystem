@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
           return json({ error: "Sem permissão" }, 403);
         }
       }
-      const redirectTo = `${APP_URL}/`;
+      const redirectTo = `${APP_URL}/accept-invite`;
       const { error } = await admin.auth.admin.inviteUserByEmail(u.user.email, { redirectTo });
       if (error) return json({ error: error.message }, 400);
       await audit({ action: "resend_invite", target_user_id: targetId, target_email: u.user.email });
@@ -183,7 +183,7 @@ Deno.serve(async (req) => {
         return json({ error: "Convidador sem tenant ativo. Acesse /licenca ou contate o suporte." }, 400);
       }
 
-      const redirectTo = `${APP_URL}/`;
+      const redirectTo = `${APP_URL}/accept-invite`;
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
         data: {
           ...(fullName ? { full_name: fullName } : {}),

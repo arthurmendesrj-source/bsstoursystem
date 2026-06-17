@@ -53,6 +53,15 @@ function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Se o usuário chegou aqui via link de convite (hash com type=invite), redireciona
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash || "";
+    if (hash.includes("type=invite") || hash.includes("type=signup")) {
+      window.location.replace(`/accept-invite${hash}`);
+    }
+  }, []);
+
   // Preventive: if getSession throws (corrupted token), clean and reload once.
   useEffect(() => {
     let cancelled = false;

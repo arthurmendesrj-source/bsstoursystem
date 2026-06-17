@@ -128,111 +128,107 @@ export function EmailMailbox({
         </div>
       </div>
 
-      <Tabs value={folder} onValueChange={(v) => { setFolder(v as Folder); setSelectedUid(null); }}>
-        <TabsList>
-          <TabsTrigger value="inbox"><InboxIcon className="h-4 w-4 mr-1" />Recebidos</TabsTrigger>
-          <TabsTrigger value="sent"><MailCheck className="h-4 w-4 mr-1" />Enviados</TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-1 md:grid-cols-[auto_380px_1fr] gap-3">
+        <MailboxSidebar
+          folder={folder}
+          onChange={(f) => { setFolder(f); setSelectedUid(null); }}
+        />
 
-        <TabsContent value={folder} forceMount>
-          <div className="grid grid-cols-1 md:grid-cols-[380px_1fr] gap-3">
-            <Card>
-              <CardContent className="p-0 max-h-[70vh] overflow-y-auto">
-                {loading && messages.length === 0 && (
-                  <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
-                )}
-                {!loading && messages.length === 0 && notConnected && (
-                  <div className="p-6 text-center text-sm text-amber-700">
-                    Sua conta não está conectada. Volte e informe a senha de app novamente.
-                  </div>
-                )}
-                {!loading && messages.length === 0 && !notConnected && fetchError && (
-                  <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
-                    {fetchError}
-                  </div>
-                )}
-                {!loading && messages.length === 0 && !notConnected && !fetchError && (
-                  <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
-                )}
-                <ul className="divide-y">
-                  {messages.map((m) => {
-                    const active = m.uid === selectedUid;
-                    const who = folder === "inbox" ? m.from : m.to;
-                    return (
-                      <li key={m.uid}>
-                        <button
-                          onClick={() => setSelectedUid(m.uid)}
-                          className={`w-full text-left px-3 py-2 hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-semibold" : ""}`}>
-                              {who || "—"}
-                            </span>
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {m.date ? new Date(m.date).toLocaleDateString() : ""}
-                            </span>
-                          </div>
-                          <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
-                            {m.subject || "(sem assunto)"}
-                          </div>
-                          {folder === "inbox" && m.unread && (
-                            <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4 max-h-[70vh] overflow-y-auto">
-                {!selected && (
-                  <div className="text-sm text-muted-foreground text-center py-12">
-                    Selecione uma mensagem
-                  </div>
-                )}
-                {selected && (
-                  <div className="space-y-3">
-                    <div>
-                      <h3 className="text-lg font-semibold">{selected.subject || "(sem assunto)"}</h3>
-                      <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
-                        <div><strong>De:</strong> {selected.from}</div>
-                        <div><strong>Para:</strong> {selected.to}</div>
-                        {selected.cc && <div><strong>Cc:</strong> {selected.cc}</div>}
-                        {selected.date && <div>{new Date(selected.date).toLocaleString()}</div>}
+        <Card>
+          <CardContent className="p-0 max-h-[70vh] overflow-y-auto">
+            {loading && messages.length === 0 && (
+              <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
+            )}
+            {!loading && messages.length === 0 && notConnected && (
+              <div className="p-6 text-center text-sm text-amber-700">
+                Sua conta não está conectada. Volte e informe a senha de app novamente.
+              </div>
+            )}
+            {!loading && messages.length === 0 && !notConnected && fetchError && (
+              <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
+                {fetchError}
+              </div>
+            )}
+            {!loading && messages.length === 0 && !notConnected && !fetchError && (
+              <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
+            )}
+            <ul className="divide-y">
+              {messages.map((m) => {
+                const active = m.uid === selectedUid;
+                const who = folder === "inbox" ? m.from : m.to;
+                return (
+                  <li key={m.uid}>
+                    <button
+                      onClick={() => setSelectedUid(m.uid)}
+                      className={`w-full text-left px-3 py-2 hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-semibold" : ""}`}>
+                          {who || "—"}
+                        </span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {m.date ? new Date(m.date).toLocaleDateString() : ""}
+                        </span>
                       </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setComposing({
-                        to: folder === "inbox" ? extractEmail(selected.from) : extractEmail(selected.to),
-                        subject: selected.subject?.startsWith("Re:") ? selected.subject : `Re: ${selected.subject ?? ""}`,
-                        body: `\n\n---\nEm ${selected.date ? new Date(selected.date).toLocaleString() : ""}, ${selected.from} escreveu:\n${quote(selected.text)}`,
-                        inReplyTo: selected.messageId ?? undefined,
-                      })}>
-                        <Reply className="h-4 w-4 mr-1" />Responder
-                      </Button>
-                    </div>
-                    <div className="border-t pt-3">
-                      {selected.html ? (
-                        <iframe
-                          title="email"
-                          sandbox=""
-                          srcDoc={selected.html}
-                          className="w-full min-h-[400px] border-0"
-                        />
-                      ) : (
-                        <pre className="whitespace-pre-wrap text-sm font-sans">{selected.text || "(sem conteúdo)"}</pre>
+                      <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
+                        {m.subject || "(sem assunto)"}
+                      </div>
+                      {folder === "inbox" && m.unread && (
+                        <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
                       )}
-                    </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 max-h-[70vh] overflow-y-auto">
+            {!selected && (
+              <div className="text-sm text-muted-foreground text-center py-12">
+                Selecione uma mensagem
+              </div>
+            )}
+            {selected && (
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{selected.subject || "(sem assunto)"}</h3>
+                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                    <div><strong>De:</strong> {selected.from}</div>
+                    <div><strong>Para:</strong> {selected.to}</div>
+                    {selected.cc && <div><strong>Cc:</strong> {selected.cc}</div>}
+                    {selected.date && <div>{new Date(selected.date).toLocaleString()}</div>}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setComposing({
+                    to: folder === "inbox" ? extractEmail(selected.from) : extractEmail(selected.to),
+                    subject: selected.subject?.startsWith("Re:") ? selected.subject : `Re: ${selected.subject ?? ""}`,
+                    body: `\n\n---\nEm ${selected.date ? new Date(selected.date).toLocaleString() : ""}, ${selected.from} escreveu:\n${quote(selected.text)}`,
+                    inReplyTo: selected.messageId ?? undefined,
+                  })}>
+                    <Reply className="h-4 w-4 mr-1" />Responder
+                  </Button>
+                </div>
+                <div className="border-t pt-3">
+                  {selected.html ? (
+                    <iframe
+                      title="email"
+                      sandbox=""
+                      srcDoc={selected.html}
+                      className="w-full min-h-[400px] border-0"
+                    />
+                  ) : (
+                    <pre className="whitespace-pre-wrap text-sm font-sans">{selected.text || "(sem conteúdo)"}</pre>
+                  )}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={composing != null} onOpenChange={(o) => !o && setComposing(null)}>
         <DialogContent className="max-w-2xl">

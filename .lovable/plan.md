@@ -1,43 +1,57 @@
-O erro atual é: o app está tentando ler a caixa do Gmail por IMAP, mas a função publicada não consegue manter essa conexão com `imap.gmail.com:993`, então a lista cai em `Timeout (IMAP connect) após 20000ms`.
+# Cada usuário usa o próprio Gmail (OAuth por usuário)
 
-Do I know what the issue is? Sim: não é mais só timeout de tela; é a abordagem IMAP/SMTP direta que está falhando no ambiente publicado. A correção mais estável é parar de usar IMAP para listar/abrir emails e usar a API HTTPS do Gmail.
+## Regra (vou gravar na memória do projeto)
 
-Plano de correção:
+> Cada usuário acessa apenas o Gmail da própria conta cadastrada no app. Nunca usar conector Gmail do workspace, nem email compartilhado, nem caixa de outro usuário.
 
-1. Trocar leitura da caixa para Gmail API
-   - Reimplementar listagem de recebidos/enviados usando endpoints HTTPS do Gmail.
-   - Buscar mensagens por `INBOX` e `SENT` em vez de abrir conexão IMAP.
-   - Manter a busca por assunto/remetente usando a query do Gmail.
+## O que estava errado
 
-2. Trocar abertura de mensagem
-   - Ao clicar em um email, carregar o conteúdo pela API do Gmail.
-   - Converter headers, remetente, destinatário, assunto, data, texto/html para o formato que a tela já usa.
+Eu estava usando o **conector Gmail do workspace** (`booking@adatours.com`), que é uma conexão única do builder — todos os usuários do app caíam nela. Isso viola a regra. Vou remover essa abordagem.
 
-3. Trocar marcação como lido
-   - Substituir `messageFlagsAdd` do IMAP por modificação de labels do Gmail, removendo `UNREAD` quando aplicável.
+## Solução: OAuth Google por usuário
 
-4. Envio de email
-   - Manter envio via Gmail API quando possível, já existe um padrão no projeto para enviar pelo Gmail por HTTPS.
-   - Se a tela de “Novo”/“Responder” ainda estiver usando SMTP direto, substituir por envio via Gmail API também.
+Cada usuário, ao entrar em **/email**, clica em "Conectar Gmail" → faz login no Google com a própria conta → autoriza os escopos → o app guarda o refresh token **dele** na tabela `email_accounts` (já existe). Daí em diante, toda leitura/envio é feita com o token desse usuário, no Gmail dele.
 
-5. Ajustar conexão da conta
-   - Remover a validação IMAP obrigatória da tela “Conectar Gmail”, porque ela é a parte que falha.
-   - Em vez disso, validar a conexão pela API do Gmail e exibir um aviso claro se a conta conectada no app não for a mesma caixa esperada.
+## O que precisa de você (uma vez)
 
-6. Melhorar mensagem na interface
-   - Se ainda faltar autorização ou a conta Gmail correta não estiver conectada, mostrar um estado claro na tela de Email com ação para reconectar, em vez de erro técnico de IMAP.
+Para o login Google funcionar com Gmail API, preciso de credenciais OAuth próprias suas no Google Cloud:
 
-Detalhes técnicos:
-- Arquivos principais: `src/lib/email.functions.ts`, `src/lib/email.server.ts`, `src/components/email/EmailMailbox.tsx`, `src/routes/email.tsx`.
-- A correção deve remover o caminho crítico baseado em `imapflow`/`nodemailer` para leitura da caixa.
-- A conta Gmail correta precisa estar autorizada com permissões de leitura, envio e modificação de mensagens.
+1. Acessar https://console.cloud.google.com/ → criar/escolher um projeto.
+2. **APIs & Services → Library** → ativar **Gmail API**.
+3. **OAuth consent screen** → configurar (External, nome do app, email de suporte). Adicionar os escopos:
+   - `https://www.googleapis.com/auth/gmail.readonly`
+   - `https://www.googleapis.com/auth/gmail.send`
+   - `https://www.googleapis.com/auth/gmail.modify`
+   - `email`, `profile`, `openid`
+4. **Credentials → Create OAuth Client ID → Web application**.
+5. Em **Authorized redirect URIs** adicionar:
+   - `https://bsstoursystem.lovable.app/api/public/google/callback`
+   - `https://id-preview--e04e61e2-142f-4f0a-97f1-8cfe086322f3.lovable.app/api/public/google/callback`
+6. Copiar **Client ID** e **Client Secret** — vou pedir como segredos (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`) no próximo passo.
 
-Depois da implementação, será necessário publicar novamente para testar no endereço `bsstoursystem.lovable.app`.
+## O que eu vou implementar
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
+1. **Remover conector Gmail do workspace** do projeto (desconectar `booking@adatours.com`). Não usar mais `connector-gateway.lovable.dev/google_mail`.
+2. **Server functions de OAuth por usuário** (`src/lib/google-oauth.functions.ts`):
+   - `startGoogleOAuth`: gera URL de autorização com `state` (id do usuário + nonce) e `access_type=offline`, `prompt=consent`.
+   - Rota pública `src/routes/api/public/google/callback.ts`: recebe o `code`, troca por `access_token`+`refresh_token`, busca o email do Google (`userinfo`), grava em `email_accounts` (campos `user_id`, `email`, `refresh_token`, `access_token`, `expires_at`, `provider='google'`), e redireciona para `/email?connected=1`.
+3. **Helper de chamada Gmail API por usuário** (`src/lib/gmail-user.server.ts`):
+   - Lê o `email_accounts` do `userId` autenticado.
+   - Se `access_token` expirou, faz refresh com `refresh_token` + Client ID/Secret e atualiza o registro.
+   - Chama `https://gmail.googleapis.com/gmail/v1/users/me/...` diretamente (sem gateway).
+4. **Reescrever `email.functions.ts`** para usar esse helper em `listMessagesFn`, `fetchMessageFn`, `markReadFn`, `sendEmailFn`, `getMyAccount`, `disconnectGmail`. Toda função exige `requireSupabaseAuth` e nunca acessa caixa de outro usuário (filtro por `user_id = context.userId`, garantido por RLS).
+5. **`connectGmail` server fn** vira apenas "retorne a URL de autorização"; o front (`src/routes/email.tsx`) faz `window.location.href = url` para iniciar o fluxo. Botão muda para "Conectar minha conta Google".
+6. **`disconnectGmail`** apaga só a linha de `email_accounts` do próprio usuário e (opcional) revoga o token no Google.
+7. **RLS de `email_accounts`**: confirmar que a policy é `user_id = auth.uid()` para SELECT/INSERT/UPDATE/DELETE (já tem 1 policy — vou checar e ajustar se faltar).
+8. Remover `src/lib/gmail-api.server.ts` (gateway do workspace) e qualquer referência a `GOOGLE_MAIL_API_KEY`/`LOVABLE_API_KEY` para Gmail.
 
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+## Arquivos afetados
+
+- criar: `src/lib/google-oauth.functions.ts`, `src/lib/gmail-user.server.ts`, `src/routes/api/public/google/callback.ts`
+- editar: `src/lib/email.functions.ts`, `src/routes/email.tsx`, `src/components/email/EmailMailbox.tsx`
+- remover: `src/lib/gmail-api.server.ts`, conexão do conector `google_mail` no projeto
+- migration (se necessário): ajustar policies/colunas de `email_accounts`
+
+## Próximos passos
+
+Confirme que vai criar as credenciais no Google Cloud (passos 1–6 acima). Assim que confirmar, eu desconecto o conector antigo, peço os dois segredos (`GOOGLE_OAUTH_CLIENT_ID` e `GOOGLE_OAUTH_CLIENT_SECRET`) e implemento tudo.

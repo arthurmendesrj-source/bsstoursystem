@@ -1,0 +1,188 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+const folderSchema = z.enum(["inbox", "sent"]);
+
+// Authorize: caller is the target OR caller manages target OR caller is admin
+async function authorize(supabase: any, callerId: string, targetUserId: string) {
+  if (callerId === targetUserId) return true;
+  const { data: isAdmin } = await supabase.rpc("is_admin", { _user_id: callerId });
+  if (isAdmin) return true;
+  const { data: isSub } = await supabase.rpc("is_subordinate_of", {
+    _target: targetUserId,
+    _manager: callerId,
+  });
+  return Boolean(isSub);
+}
+
+async function loadAccount(targetUserId: string): Promise<{ email: string; password: string; accountId: string } | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { decryptPassword } = await import("./email.server");
+  const { data } = await supabaseAdmin
+    .from("email_accounts")
+    .select("id,email,password_encrypted")
+    .eq("user_id", targetUserId)
+    .eq("provider", "gmail")
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    accountId: data.id as string,
+    email: data.email as string,
+    password: decryptPassword(data.password_encrypted as any),
+  };
+}
+
+export const connectGmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { password: string }) => z.object({ password: z.string().min(8) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId, claims, supabase } = context;
+    const email = (claims as any)?.email as string | undefined;
+    if (!email) throw new Error("Email do usuário não disponível.");
+    const { testGmailCredentials, encryptPassword, gmailDefaults } = await import("./email.server");
+    try {
+      await testGmailCredentials(email, data.password);
+    } catch (e: any) {
+      throw new Error("Falha ao validar credenciais Gmail: " + (e?.message ?? "erro desconhecido"));
+    }
+    const enc = encryptPassword(data.password);
+    const defaults = gmailDefaults();
+    // upsert via admin (RLS allows user_id = auth.uid() but we use authenticated client to honor RLS)
+    const payload = {
+      user_id: userId,
+      provider: "gmail",
+      email,
+      display_name: (claims as any)?.user_metadata?.full_name ?? null,
+      username: email,
+      password_encrypted: enc as any,
+      ...defaults,
+    };
+    // delete then insert to avoid unique-constraint complications
+    await supabase.from("email_accounts").delete().eq("user_id", userId);
+    const { error } = await supabase.from("email_accounts").insert(payload as any);
+    if (error) throw new Error(error.message);
+    return { ok: true, email };
+  });
+
+export const getMyAccount = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId, claims } = context;
+    const { data } = await supabase
+      .from("email_accounts")
+      .select("email,updated_at")
+      .eq("user_id", userId)
+      .maybeSingle();
+    return {
+      connected: !!data,
+      email: data?.email ?? (claims as any)?.email ?? null,
+      updatedAt: data?.updated_at ?? null,
+    };
+  });
+
+export const disconnectGmail = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase.from("email_accounts").delete().eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const listMessagesFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; search?: string }) =>
+    z.object({
+      targetUserId: z.string().uuid(),
+      folder: folderSchema,
+      search: z.string().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const ok = await authorize(context.supabase, context.userId, data.targetUserId);
+    if (!ok) throw new Response("Forbidden", { status: 403 });
+    const acc = await loadAccount(data.targetUserId);
+    if (!acc) return { connected: false, messages: [] as any[] };
+    const { listMessages } = await import("./email.server");
+    const messages = await listMessages(acc.email, acc.password, data.folder, { search: data.search });
+    return { connected: true, messages };
+  });
+
+export const fetchMessageFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; uid: number }) =>
+    z.object({
+      targetUserId: z.string().uuid(),
+      folder: folderSchema,
+      uid: z.number().int().positive(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const ok = await authorize(context.supabase, context.userId, data.targetUserId);
+    if (!ok) throw new Response("Forbidden", { status: 403 });
+    const acc = await loadAccount(data.targetUserId);
+    if (!acc) throw new Error("Conta não conectada.");
+    const { fetchMessage } = await import("./email.server");
+    return await fetchMessage(acc.email, acc.password, data.folder, data.uid);
+  });
+
+export const sendEmailFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: {
+    targetUserId: string;
+    to: string;
+    cc?: string;
+    bcc?: string;
+    subject: string;
+    body: string;
+    inReplyTo?: string;
+  }) => z.object({
+    targetUserId: z.string().uuid(),
+    to: z.string().min(3),
+    cc: z.string().optional(),
+    bcc: z.string().optional(),
+    subject: z.string().min(1).max(500),
+    body: z.string().max(200_000),
+    inReplyTo: z.string().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const ok = await authorize(context.supabase, context.userId, data.targetUserId);
+    if (!ok) throw new Response("Forbidden", { status: 403 });
+    const acc = await loadAccount(data.targetUserId);
+    if (!acc) throw new Error("Conta de email do usuário não conectada.");
+    const { sendMail } = await import("./email.server");
+    const res = await sendMail(acc.email, acc.password, {
+      to: data.to, cc: data.cc, bcc: data.bcc,
+      subject: data.subject, text: data.body, inReplyTo: data.inReplyTo,
+    });
+    // Audit when manager sends on behalf
+    if (context.userId !== data.targetUserId) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      await supabaseAdmin.from("user_audit_log").insert({
+        actor_user_id: context.userId,
+        target_user_id: data.targetUserId,
+        action: "email_sent_as_user",
+        details: {
+          to: data.to, cc: data.cc, subject: data.subject,
+          messageId: res.messageId, inReplyTo: data.inReplyTo ?? null,
+        },
+      } as any);
+    }
+    return { ok: true, messageId: res.messageId };
+  });
+
+export const markReadFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { targetUserId: string; uid: number }) =>
+    z.object({ targetUserId: z.string().uuid(), uid: z.number().int().positive() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const ok = await authorize(context.supabase, context.userId, data.targetUserId);
+    if (!ok) throw new Response("Forbidden", { status: 403 });
+    const acc = await loadAccount(data.targetUserId);
+    if (!acc) return { ok: false };
+    const { markRead } = await import("./email.server");
+    await markRead(acc.email, acc.password, data.uid);
+    return { ok: true };
+  });

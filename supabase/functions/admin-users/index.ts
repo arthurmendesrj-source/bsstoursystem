@@ -207,13 +207,7 @@ Deno.serve(async (req) => {
       const rolesToInsert: AppRole[] = requestedRoles.length > 0 ? requestedRoles : ["operador"];
       const rows = rolesToInsert.map((role) => ({ user_id: invited.user!.id, role }));
       await admin.from("user_roles").insert(rows);
-      // Garante que o e-mail do convite vire a caixa primária do usuário
-      await admin
-        .from("user_email_accounts")
-        .upsert(
-          { user_id: invited.user.id, email_address: email.toLowerCase(), is_primary: true },
-          { onConflict: "user_id,email_address" }
-        );
+      // (user_email_accounts foi removida; o e-mail primário fica em auth.users.email)
       // Vincula o convidado ao tenant do convidador
       await admin
         .from("tenant_members")

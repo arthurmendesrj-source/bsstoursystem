@@ -1,34 +1,40 @@
-## O que está acontecendo
+## Causa do erro "Database error saving new user"
 
-A função de convite (`admin-users`) está respondendo com status 400, mas o front-end mostra apenas a mensagem genérica do supabase-js: **"Edge Function returned a non-2xx status code"**. Isso acontece porque, quando há erro HTTP, o helper `callAdminUsers` em `src/routes/users.tsx` lê `error.message` (genérico) e ignora o corpo JSON com `{ error: "..." }` que a função devolve.
+A tabela `public.user_email_accounts` foi removida em uma migration anterior (`20260610203625_...`), mas duas coisas ainda tentam escrever nela:
 
-Sem ver a mensagem real, não dá para saber se é:
-- "Diretor não pode atribuir admin/diretor" (papel selecionado foi **Diretor**, e somente Admin pode convidar outro Diretor — esse é o suspeito principal pelo print);
-- "Falha no convite" vindo do Auth (ex.: rate-limit de e-mail, e-mail inválido);
-- "Convidador sem tenant ativo".
+1. **O trigger `handle_new_user`** (que roda automaticamente toda vez que o Supabase Auth cria um usuário), faz:
+   ```sql
+   INSERT INTO public.user_email_accounts (...)
+   ```
+   Como a tabela não existe mais, o trigger falha → o Auth aborta a criação do usuário convidado → você vê **"Database error saving new user"**.
+
+2. **A edge function `admin-users`** (linhas 211–216) faz um `upsert` na mesma tabela inexistente após o convite.
+
+Esses dois pontos são o que está bloqueando todo convite hoje, independente do papel escolhido.
 
 ## Plano
 
-### Passo 1 — Surface do erro real (1 arquivo)
+### Passo 1 — Migration para corrigir o trigger
 
-Em `src/routes/users.tsx`, na função `callAdminUsers`, ler o corpo da resposta quando `error` vier de `FunctionsHttpError`:
+Recriar `public.handle_new_user` removendo o bloco que insere em `public.user_email_accounts`. Tudo o mais (criação de profile, detecção de convite, criação de tenant para signup direto) permanece igual.
 
-- Tentar `await (error as any).context.json()` e usar `body.error` se existir;
-- Fallback para `await (error as any).context.text()`;
-- Se nada vier, manter `error.message`.
+### Passo 2 — Limpar a edge function
 
-Resultado: o toast vai mostrar exatamente o motivo (ex.: "Diretor não pode atribuir admin/diretor").
+Em `supabase/functions/admin-users/index.ts` (bloco da action `invite`), remover o `await admin.from("user_email_accounts").upsert(...)`. O convite passa a criar profile + roles + vínculo de tenant, sem tocar na tabela que não existe.
 
-### Passo 2 — Você reenvia o convite e me manda o novo texto do toast
+### Passo 3 — Teste
 
-Com a mensagem exata, eu corrijo a causa de verdade no próximo turno. Os caminhos mais prováveis:
+Você reenvia o convite para `boscobssteste1@gmail.com` como **Operador** (ou outro papel permitido). Esperado:
+- Toast "Convite enviado";
+- E-mail de convite enviado pelo Supabase Auth para o endereço;
+- Linha do convite aparece em "Convites pendentes";
+- Quando o convidado clicar no link e definir senha, ele entra no tenant **Diretor1** como `member`.
 
-- **Se for "Diretor não pode atribuir admin/diretor":** mudar o papel padrão do diálogo de "Diretor" para "Operador" (ou esconder a opção "Diretor" quando o convidador não é admin), evitando que um Diretor tente convidar outro Diretor.
-- **Se for erro de e-mail do Auth (rate limit / SMTP):** ajustar a estratégia de envio (reduzir tentativas, configurar remetente próprio, etc.).
-- **Se for "Convidador sem tenant ativo":** garantir vínculo do `diretorturismos@gmail.com` em `tenant_members` antes do convite.
+Se aparecer outro erro, agora o toast já mostra o motivo real (correção do turno anterior), e ajustamos.
 
 ## Detalhes técnicos
 
-- Nenhuma alteração de banco neste passo.
-- Apenas `src/routes/users.tsx` é tocado (~10 linhas dentro de `callAdminUsers`).
-- O edge function `admin-users` não muda agora; ele já devolve mensagem útil no JSON, só não estava sendo lida.
+- 1 nova migration SQL recriando a função `public.handle_new_user`.
+- 1 edição em `supabase/functions/admin-users/index.ts` (remoção do bloco `user_email_accounts`).
+- Nenhum schema novo, nenhuma RLS nova.
+- Não recriar a tabela `user_email_accounts`: ela foi intencionalmente removida no histórico e nenhuma feature ativa hoje depende dela; o vínculo "qual e-mail é desse usuário" já está em `auth.users.email`.

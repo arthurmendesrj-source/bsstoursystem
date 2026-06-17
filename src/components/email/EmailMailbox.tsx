@@ -107,10 +107,13 @@ export function EmailMailbox({
 
   useEffect(() => {
     if (selectedUid == null) { setSelected(null); return; }
+    const m = messages.find((x: any) => x.uid === selectedUid);
+    const gmailId = m?.gmailId;
+    if (!gmailId) { setSelected(null); return; }
     let cancel = false;
     (async () => {
       try {
-        const r = await fetchOne({ data: { targetUserId, folder, uid: selectedUid } });
+        const r = await fetchOne({ data: { targetUserId, folder, uid: selectedUid, gmailId } });
         if (!cancel) setSelected(r);
       } catch (e: any) {
         if (!cancel) toast.error(e?.message ?? "Falha ao abrir mensagem");
@@ -118,7 +121,7 @@ export function EmailMailbox({
     })();
     return () => { cancel = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedUid, folder, targetUserId]);
+  }, [selectedUid, folder, targetUserId, messages]);
 
   const handleSend = async () => {
     if (!composing) return;

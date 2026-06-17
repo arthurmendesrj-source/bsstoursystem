@@ -177,7 +177,7 @@ function UserDetailPage() {
         </TabsContent>
 
         <TabsContent value="emails">
-          <EmailsTable leadIds={leadIds} total={counts.emails} />
+          <EmailMailbox targetUserId={userId} targetEmail={null} managerMode managerName={name} />
         </TabsContent>
       </Tabs>
 

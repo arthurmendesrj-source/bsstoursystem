@@ -48,7 +48,16 @@ export const connectGmail = createServerFn({ method: "POST" })
     try {
       await testGmailCredentials(email, password);
     } catch (e: any) {
-      throw new Error("Falha ao validar credenciais Gmail: " + (e?.message ?? "erro desconhecido"));
+      const raw = String(e?.message ?? e ?? "");
+      let friendly = "Falha ao validar credenciais Gmail.";
+      if (/AUTHENTICATIONFAILED|Invalid credentials|Username and Password not accepted|BadCredentials|535/i.test(raw)) {
+        friendly = "Senha de app rejeitada pelo Gmail. Gere uma nova senha de app (16 caracteres) e tente de novo.";
+      } else if (/Timeout|ETIMEDOUT|ECONNRESET|ENOTFOUND|ECONNREFUSED|socket/i.test(raw)) {
+        friendly = "Não foi possível conectar aos servidores do Gmail (SMTP/IMAP). Tente novamente em instantes.";
+      } else if (/EMAIL_ENCRYPTION_KEY/i.test(raw)) {
+        friendly = "Chave de criptografia do servidor não configurada.";
+      }
+      throw new Error(`${friendly} (${raw.slice(0, 180)})`);
     }
     const enc = encryptPassword(password);
     // bytea must be sent as PostgreSQL hex literal ("\x...") via PostgREST,

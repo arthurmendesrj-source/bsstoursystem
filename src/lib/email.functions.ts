@@ -41,12 +41,13 @@ export const connectGmail = createServerFn({ method: "POST" })
     const email = (claims as any)?.email as string | undefined;
     if (!email) throw new Error("Email do usuário não disponível.");
     const { testGmailCredentials, encryptPassword, gmailDefaults } = await import("./email.server");
+    const password = data.password.replace(/\s+/g, "");
     try {
-      await testGmailCredentials(email, data.password);
+      await testGmailCredentials(email, password);
     } catch (e: any) {
       throw new Error("Falha ao validar credenciais Gmail: " + (e?.message ?? "erro desconhecido"));
     }
-    const enc = encryptPassword(data.password);
+    const enc = encryptPassword(password);
     const defaults = gmailDefaults();
     // upsert via admin (RLS allows user_id = auth.uid() but we use authenticated client to honor RLS)
     const payload = {

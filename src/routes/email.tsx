@@ -119,15 +119,16 @@ function EmailPage() {
           <CardHeader>
             <CardTitle>Conectar Gmail</CardTitle>
             <CardDescription>
-              A caixa de email é conectada via integração oficial do Google (Gmail API).
-              Peça ao administrador para conectar uma conta Gmail nas configurações
-              de Conectores do workspace.
+              Conecte sua conta do Gmail. Você será redirecionado para o Google
+              para autorizar o acesso. Cada usuário conecta a própria conta —
+              ninguém mais terá acesso à sua caixa.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button onClick={handleConnect} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Verificar conexão
+              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Conectar Gmail
             </Button>
+
           </CardContent>
         </Card>
       )}

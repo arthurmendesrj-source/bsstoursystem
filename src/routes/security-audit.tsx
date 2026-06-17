@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth } from "@/lib/auth";
 import { useI18n } from "@/lib/i18n";
 import { listSecurityDefinerFunctions, type SecurityDefinerFn } from "@/lib/security-audit.functions";
+import { checkRealtimeSecurity, type RealtimeSecurityReport } from "@/lib/realtime-security.functions";
 
 export const Route = createFileRoute("/security-audit")({
   component: () => (
@@ -31,12 +32,17 @@ function SecurityAuditPage() {
   const { t } = useI18n();
   const [rows, setRows] = useState<SecurityDefinerFn[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rt, setRt] = useState<RealtimeSecurityReport | null>(null);
+  const [rtError, setRtError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) return;
     listSecurityDefinerFunctions()
       .then(setRows)
       .catch((e) => setError(e?.message ?? String(e)));
+    checkRealtimeSecurity()
+      .then(setRt)
+      .catch((e) => setRtError(e?.message ?? String(e)));
   }, [isAdmin]);
 
   if (!isAdmin) {

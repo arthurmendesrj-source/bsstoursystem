@@ -40,13 +40,23 @@ export function decryptPassword(blob: Buffer | Uint8Array | string): string {
   return Buffer.concat([decipher.update(enc), decipher.final()]).toString("utf8");
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`Timeout (${label}) após ${ms}ms`)), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 export async function testGmailCredentials(email: string, appPassword: string) {
   // SMTP verify
   const transporter = nodemailer.createTransport({
     ...GMAIL_SMTP,
     auth: { user: email, pass: appPassword },
-  });
-  await transporter.verify();
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 15_000,
+  } as any);
+  await withTimeout(transporter.verify(), 15_000, "SMTP verify");
 
   // IMAP connect
   const client = new ImapFlow({
@@ -54,8 +64,11 @@ export async function testGmailCredentials(email: string, appPassword: string) {
     auth: { user: email, pass: appPassword },
     logger: false,
   });
-  await client.connect();
-  await client.logout();
+  try {
+    await withTimeout(client.connect(), 15_000, "IMAP connect");
+  } finally {
+    try { await client.logout(); } catch {}
+  }
 }
 
 export function gmailDefaults() {

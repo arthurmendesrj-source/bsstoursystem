@@ -26,11 +26,14 @@ async function loadAccount(targetUserId: string): Promise<{ email: string; passw
     .eq("provider", "gmail")
     .maybeSingle();
   if (!data) return null;
-  return {
-    accountId: data.id as string,
-    email: data.email as string,
-    password: decryptPassword(data.password_encrypted as any),
-  };
+  try {
+    const password = decryptPassword(data.password_encrypted as any);
+    return { accountId: data.id as string, email: data.email as string, password };
+  } catch {
+    // Stale ciphertext (encryption key changed/missing). Drop it so the user can reconnect.
+    await supabaseAdmin.from("email_accounts").delete().eq("id", data.id);
+    return null;
+  }
 }
 
 export const connectGmail = createServerFn({ method: "POST" })
@@ -75,8 +78,14 @@ export const getMyAccount = createServerFn({ method: "GET" })
       .select("email,updated_at")
       .eq("user_id", userId)
       .maybeSingle();
+    let connected = !!data;
+    if (connected) {
+      // Validate that the stored password can still be decrypted; otherwise loadAccount drops it.
+      const acc = await loadAccount(userId);
+      connected = !!acc;
+    }
     return {
-      connected: !!data,
+      connected,
       email: data?.email ?? (claims as any)?.email ?? null,
       updatedAt: data?.updated_at ?? null,
     };

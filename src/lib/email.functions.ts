@@ -51,21 +51,26 @@ export const connectGmail = createServerFn({ method: "POST" })
       throw new Error("Falha ao validar credenciais Gmail: " + (e?.message ?? "erro desconhecido"));
     }
     const enc = encryptPassword(password);
+    // bytea must be sent as PostgreSQL hex literal ("\x...") via PostgREST,
+    // otherwise a raw Buffer is JSON-serialized into garbage and decrypt fails later.
+    const encHex = "\\x" + Buffer.from(enc).toString("hex");
     const defaults = gmailDefaults();
-    // upsert via admin (RLS allows user_id = auth.uid() but we use authenticated client to honor RLS)
     const payload = {
       user_id: userId,
       provider: "gmail",
       email,
       display_name: (claims as any)?.user_metadata?.full_name ?? null,
       username: email,
-      password_encrypted: enc as any,
+      password_encrypted: encHex as any,
       ...defaults,
     };
     // delete then insert to avoid unique-constraint complications
     await supabase.from("email_accounts").delete().eq("user_id", userId);
     const { error } = await supabase.from("email_accounts").insert(payload as any);
     if (error) throw new Error(error.message);
+    // Sanity check: try to load it back (decrypt) so we fail fast if something is off.
+    const verify = await loadAccount(userId);
+    if (!verify) throw new Error("Conta salva mas não pôde ser lida de volta. Tente novamente.");
     return { ok: true, email };
   });
 

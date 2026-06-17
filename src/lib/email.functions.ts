@@ -160,9 +160,10 @@ export const sendEmailFn = createServerFn({ method: "POST" })
     if (context.userId !== data.targetUserId) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.from("user_audit_log").insert({
-        actor_user_id: context.userId,
+        actor_id: context.userId,
         target_user_id: data.targetUserId,
         action: "email_sent_as_user",
+        success: true,
         details: {
           to: data.to, cc: data.cc, subject: data.subject,
           messageId: res.messageId, inReplyTo: data.inReplyTo ?? null,

@@ -53,12 +53,20 @@ function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Se o usuário chegou aqui via link de convite (hash com type=invite), redireciona
+  // Se o usuário chegou aqui via link de convite, redireciona para /accept-invite
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hash = window.location.hash || "";
-    if (hash.includes("type=invite") || hash.includes("type=signup")) {
-      window.location.replace(`/accept-invite${hash}`);
+    const search = window.location.search || "";
+    const isInvite =
+      hash.includes("type=invite") ||
+      hash.includes("type=signup") ||
+      hash.includes("type=recovery") ||
+      /[?&]type=(invite|signup|recovery)\b/.test(search) ||
+      /[?&]token_hash=/.test(search) ||
+      /[?&]code=/.test(search);
+    if (isInvite) {
+      window.location.replace(`/accept-invite${search}${hash}`);
     }
   }, []);
 

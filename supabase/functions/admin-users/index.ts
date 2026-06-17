@@ -194,14 +194,10 @@ Deno.serve(async (req) => {
       });
       if (invErr || !invited.user) return json({ error: invErr?.message ?? "Falha no convite" }, 400);
 
-      // Garante que o convidado já entre autorizado (e-mail confirmado)
-      try {
-        await admin.auth.admin.updateUserById(invited.user.id, {
-          email_confirm: true,
-        } as unknown as Record<string, unknown>);
-      } catch (e) {
-        console.warn("email_confirm update failed", e);
-      }
+      // NÃO confirmar e-mail aqui: chamar updateUserById({email_confirm:true})
+      // logo após inviteUserByEmail invalida o token do convite (otp_expired).
+      // O e-mail é confirmado quando o usuário aceita o convite em /accept-invite.
+
 
       // Atribui papéis solicitados, ou 'operador' como padrão
       const rolesToInsert: AppRole[] = requestedRoles.length > 0 ? requestedRoles : ["operador"];

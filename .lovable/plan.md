@@ -1,29 +1,22 @@
-Vou ajustar o fluxo de convite para ficar exatamente assim:
+## Causa raiz do "otp_expired"
 
-1. **Link do convite sempre cai em uma tela própria**
-   - Manter `/accept-invite` como rota pública dedicada.
-   - Ela será a única tela para o convidado concluir o cadastro, sem passar pelo login.
-   - A tela mostrará e-mail, nome completo, senha e confirmação de senha.
+A URL retorna `error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`. Não é tempo — é que a edge function `admin-users`, logo após `inviteUserByEmail`, chama `admin.auth.admin.updateUserById(..., { email_confirm: true })`. Marcar o e-mail como confirmado **invalida o token do convite imediatamente**. Quando o usuário clica no link, o Supabase responde "expirado".
 
-2. **Processar corretamente o token do convite**
-   - Ao abrir o link `Accept Invitation`, a página `/accept-invite` vai detectar o token recebido no link.
-   - Se necessário, a página chamará o método correto do auth para trocar o token por sessão antes de mostrar o formulário.
-   - Isso evita o erro atual em que o usuário cai no login porque a sessão ainda não foi reconhecida.
+(Causa secundária possível: pré-fetch de antivírus do Gmail consumindo o link uma vez antes do usuário.)
 
-3. **Cadastrar senha do novo usuário**
-   - Ao enviar o formulário, chamar atualização do usuário para definir a nova senha e salvar o nome.
-   - Depois disso, redirecionar para o dashboard já logado.
+## Correções
 
-4. **Preservar vínculo com quem convidou**
-   - O convite continuará gravando o `tenant_id` do convidador nos metadados e já criando o vínculo em `tenant_members`.
-   - Vou conferir/ajustar para o convidado não criar uma empresa própria ao primeiro login; ele deve entrar na conta/empresa do convidador.
+1. **Remover `email_confirm: true` da ação `invite`** em `supabase/functions/admin-users/index.ts`. O e-mail é confirmado naturalmente quando o usuário aceita o convite.
+2. **Reimplantar** a edge function `admin-users`.
+3. **Melhorar a tela `/accept-invite`** para detectar erro no hash (`error_code=otp_expired`) e mostrar mensagem clara + botão "Reenviar convite" (na verdade, instrução para pedir reenvio ao admin).
+4. **Teste automatizado pós-deploy**: chamar a edge function `admin-users` action `invite` com um e-mail descartável e verificar o retorno (sem `email_confirm`); inspecionar logs.
+5. **Teste manual real** (necessário você): após o deploy, reenviar convite a `boscobssteste1@gmail.com` e clicar no link novo. Esperado: abrir `/accept-invite` com formulário de senha (sem `otp_expired`).
 
-5. **Corrigir convites antigos que ainda caiam em `/login`**
-   - Se um link antigo chegar no login com token de convite, redirecionar imediatamente para `/accept-invite` preservando o token.
+## Observação importante sobre teste end-to-end
 
-6. **Validação esperada**
-   - Admin/diretor envia convite.
-   - Convidado clica em `Accept Invitation`.
-   - Abre `/accept-invite`, não `/login`.
-   - Convidado cria senha.
-   - Entra no app vinculado à mesma conta/empresa de quem convidou.
+Não consigo clicar no link do e-mail real (não tenho acesso à caixa do Gmail do convidado). O que posso testar automaticamente:
+- Build e deploy ok da edge function.
+- Chamada à edge function `invite` retorna `{ok:true}` sem chamar `email_confirm`.
+- Tela `/accept-invite` renderiza corretamente os 3 estados (verificando, válido, inválido).
+
+O clique no link de convite real precisa ser feito por você — eu deixarei tudo pronto e validado até onde é possível sem acesso ao seu Gmail.

@@ -56,6 +56,22 @@ function AcceptInvitePage() {
         const qp = url.searchParams;
         const hp = parseHashParams(window.location.hash || "");
 
+        // 0) Supabase devolveu erro no hash (ex: otp_expired / access_denied)
+        const hashError = hp["error"] || qp.get("error");
+        const hashErrorCode = hp["error_code"] || qp.get("error_code");
+        const hashErrorDesc = hp["error_description"] || qp.get("error_description");
+        if (hashError || hashErrorCode) {
+          window.history.replaceState({}, "", window.location.pathname);
+          const friendly =
+            hashErrorCode === "otp_expired"
+              ? "Este link de convite expirou ou já foi utilizado. Peça ao administrador para reenviar o convite."
+              : (hashErrorDesc || hashError || "Convite inválido.");
+          setErrorMsg(friendly);
+          setStatus("invalid");
+          return;
+        }
+
+
         // 1) PKCE / token_hash flow (most common for Supabase invites)
         const tokenHash = qp.get("token_hash") || hp["token_hash"];
         const type = (qp.get("type") || hp["type"] || "invite") as
@@ -168,10 +184,10 @@ function AcceptInvitePage() {
         {status === "invalid" && (
           <div className="space-y-3 text-sm text-muted-foreground">
             <p>
-              Não foi possível validar este convite
-              {errorMsg ? `: ${errorMsg}` : "."}. O link pode ter expirado ou já
-              ter sido utilizado. Peça ao administrador para reenviar o convite.
+              {errorMsg ||
+                "Não foi possível validar este convite. O link pode ter expirado ou já ter sido utilizado. Peça ao administrador para reenviar."}
             </p>
+
             <Button variant="outline" onClick={() => navigate({ to: "/login" })}>
               Ir para o login
             </Button>

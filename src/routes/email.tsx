@@ -23,7 +23,6 @@ export const Route = createFileRoute("/email")({
 
 function EmailPage() {
   const { user } = useAuth();
-  const userEmail = user?.email ?? "";
   const userId = user?.id ?? "";
 
   const getAcc = useServerFn(getMyAccount);
@@ -33,7 +32,6 @@ function EmailPage() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
-  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const reload = async () => {

@@ -40,6 +40,39 @@ export function EmailMailbox({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [notConnected, setNotConnected] = useState(false);
 
+  const LIST_MIN = 240, LIST_MAX = 560, LIST_DEFAULT = 380, LIST_COLLAPSED = 44;
+  const [listCollapsed, setListCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("email:list:collapsed") === "1";
+  });
+  const [listWidth, setListWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return LIST_DEFAULT;
+    const v = Number(localStorage.getItem("email:list:width"));
+    return Number.isFinite(v) && v >= LIST_MIN && v <= LIST_MAX ? v : LIST_DEFAULT;
+  });
+  useEffect(() => { try { localStorage.setItem("email:list:collapsed", listCollapsed ? "1" : "0"); } catch {} }, [listCollapsed]);
+  useEffect(() => { try { localStorage.setItem("email:list:width", String(listWidth)); } catch {} }, [listWidth]);
+  const listDragging = useRef(false);
+  const onListResizeDown = useCallback((e: React.MouseEvent) => {
+    if (listCollapsed) return;
+    e.preventDefault();
+    listDragging.current = true;
+    const startX = e.clientX;
+    const startW = listWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (!listDragging.current) return;
+      const next = Math.min(LIST_MAX, Math.max(LIST_MIN, startW + (ev.clientX - startX)));
+      setListWidth(next);
+    };
+    const onUp = () => {
+      listDragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [listCollapsed, listWidth]);
+
   const refresh = async () => {
     setLoading(true);
     setFetchError(null);
@@ -128,30 +161,96 @@ export function EmailMailbox({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-[auto_380px_1fr] gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-[auto_auto_1fr] gap-3">
         <MailboxSidebar
           folder={folder}
           onChange={(f) => { setFolder(f); setSelectedUid(null); }}
         />
 
-        <Card>
-          <CardContent className="p-0 max-h-[70vh] overflow-y-auto">
-            {loading && messages.length === 0 && (
-              <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
-            )}
-            {!loading && messages.length === 0 && notConnected && (
-              <div className="p-6 text-center text-sm text-amber-700">
-                Sua conta não está conectada. Volte e informe a senha de app novamente.
+        <div className="relative hidden md:block" style={{ width: listCollapsed ? LIST_COLLAPSED : listWidth }}>
+          <Card className="h-full">
+            <CardContent className="p-0 max-h-[70vh] overflow-y-auto">
+              <div className={cn("flex items-center border-b sticky top-0 bg-background z-10", listCollapsed ? "justify-center px-1 py-2" : "justify-between px-3 py-2")}>
+                {!listCollapsed && (
+                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    {folder === "inbox" ? "Recebidos" : "Enviados"}
+                    {messages.length > 0 && <span className="ml-1 text-muted-foreground/70 normal-case">({messages.length})</span>}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setListCollapsed((c) => !c)}
+                  className="h-6 w-6 grid place-items-center rounded-md border border-border bg-background hover:bg-muted"
+                  aria-label={listCollapsed ? "Expandir lista" : "Recolher lista"}
+                  title={listCollapsed ? "Expandir lista" : "Recolher lista"}
+                >
+                  {listCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+                </button>
               </div>
-            )}
-            {!loading && messages.length === 0 && !notConnected && fetchError && (
-              <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
-                {fetchError}
-              </div>
-            )}
-            {!loading && messages.length === 0 && !notConnected && !fetchError && (
-              <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
-            )}
+              {!listCollapsed && (
+                <>
+                  {loading && messages.length === 0 && (
+                    <div className="p-6 text-center text-muted-foreground text-sm">Carregando…</div>
+                  )}
+                  {!loading && messages.length === 0 && notConnected && (
+                    <div className="p-6 text-center text-sm text-amber-700">
+                      Sua conta não está conectada. Volte e informe a senha de app novamente.
+                    </div>
+                  )}
+                  {!loading && messages.length === 0 && !notConnected && fetchError && (
+                    <div className="p-6 text-center text-sm text-destructive whitespace-pre-wrap">
+                      {fetchError}
+                    </div>
+                  )}
+                  {!loading && messages.length === 0 && !notConnected && !fetchError && (
+                    <div className="p-6 text-center text-muted-foreground text-sm">Sem mensagens</div>
+                  )}
+                  <ul className="divide-y">
+                    {messages.map((m) => {
+                      const active = m.uid === selectedUid;
+                      const who = folder === "inbox" ? m.from : m.to;
+                      return (
+                        <li key={m.uid}>
+                          <button
+                            onClick={() => setSelectedUid(m.uid)}
+                            className={`w-full text-left px-3 py-2 hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-semibold" : ""}`}>
+                                {who || "—"}
+                              </span>
+                              <span className="text-xs text-muted-foreground shrink-0">
+                                {m.date ? new Date(m.date).toLocaleDateString() : ""}
+                              </span>
+                            </div>
+                            <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
+                              {m.subject || "(sem assunto)"}
+                            </div>
+                            {folder === "inbox" && m.unread && (
+                              <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )}
+            </CardContent>
+          </Card>
+          {!listCollapsed && (
+            <div
+              onMouseDown={onListResizeDown}
+              className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 active:bg-primary/50"
+              aria-label="Redimensionar lista"
+              title="Arraste para redimensionar"
+            />
+          )}
+        </div>
+
+        {/* Mobile-only list (mantém comportamento simples) */}
+        <Card className="md:hidden">
+          <CardContent className="p-0 max-h-[60vh] overflow-y-auto">
             <ul className="divide-y">
               {messages.map((m) => {
                 const active = m.uid === selectedUid;
@@ -162,20 +261,8 @@ export function EmailMailbox({
                       onClick={() => setSelectedUid(m.uid)}
                       className={`w-full text-left px-3 py-2 hover:bg-muted/60 ${active ? "bg-muted" : ""}`}
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-semibold" : ""}`}>
-                          {who || "—"}
-                        </span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          {m.date ? new Date(m.date).toLocaleDateString() : ""}
-                        </span>
-                      </div>
-                      <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
-                        {m.subject || "(sem assunto)"}
-                      </div>
-                      {folder === "inbox" && m.unread && (
-                        <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
-                      )}
+                      <div className="text-sm truncate">{who || "—"}</div>
+                      <div className="text-sm text-muted-foreground truncate">{m.subject || "(sem assunto)"}</div>
                     </button>
                   </li>
                 );
@@ -183,6 +270,7 @@ export function EmailMailbox({
             </ul>
           </CardContent>
         </Card>
+
 
         <Card>
           <CardContent className="p-4 max-h-[70vh] overflow-y-auto">

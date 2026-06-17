@@ -52,12 +52,11 @@ function EmailPage() {
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, []);
 
   const handleConnect = async () => {
-    if (!password) { toast.error("Informe a senha de app"); return; }
     setSubmitting(true);
-    const safety = setTimeout(() => setSubmitting(false), 45_000);
+    const safety = setTimeout(() => setSubmitting(false), 30_000);
     try {
-      await connect({ data: { password } });
-      toast.success("Caixa conectada!");
+      const r: any = await connect({ data: { password } });
+      toast.success(`Caixa conectada: ${r?.email ?? ""}`);
       setPassword("");
       await reload();
     } catch (e: any) {

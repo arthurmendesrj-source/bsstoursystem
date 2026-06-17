@@ -40,6 +40,39 @@ export function EmailMailbox({
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [notConnected, setNotConnected] = useState(false);
 
+  const LIST_MIN = 240, LIST_MAX = 560, LIST_DEFAULT = 380, LIST_COLLAPSED = 44;
+  const [listCollapsed, setListCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("email:list:collapsed") === "1";
+  });
+  const [listWidth, setListWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return LIST_DEFAULT;
+    const v = Number(localStorage.getItem("email:list:width"));
+    return Number.isFinite(v) && v >= LIST_MIN && v <= LIST_MAX ? v : LIST_DEFAULT;
+  });
+  useEffect(() => { try { localStorage.setItem("email:list:collapsed", listCollapsed ? "1" : "0"); } catch {} }, [listCollapsed]);
+  useEffect(() => { try { localStorage.setItem("email:list:width", String(listWidth)); } catch {} }, [listWidth]);
+  const listDragging = useRef(false);
+  const onListResizeDown = useCallback((e: React.MouseEvent) => {
+    if (listCollapsed) return;
+    e.preventDefault();
+    listDragging.current = true;
+    const startX = e.clientX;
+    const startW = listWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (!listDragging.current) return;
+      const next = Math.min(LIST_MAX, Math.max(LIST_MIN, startW + (ev.clientX - startX)));
+      setListWidth(next);
+    };
+    const onUp = () => {
+      listDragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [listCollapsed, listWidth]);
+
   const refresh = async () => {
     setLoading(true);
     setFetchError(null);

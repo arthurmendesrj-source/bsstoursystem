@@ -4294,6 +4294,7 @@ export type Database = {
         Args: { _lead_id: string; _user_id: string }
         Returns: boolean
       }
+      check_realtime_security: { Args: never; Returns: Json }
       current_tenant_id: { Args: never; Returns: string }
       extract_initials: { Args: { _full_name: string }; Returns: string }
       generate_entity_code: {

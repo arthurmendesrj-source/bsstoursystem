@@ -47,13 +47,36 @@ function EmailPage() {
 
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, []);
 
+  // Listen for the OAuth popup signaling success.
+  useEffect(() => {
+    const onMsg = (ev: MessageEvent) => {
+      if (ev?.data?.type === "gmail-connected") {
+        toast.success(`Gmail conectado: ${ev.data.email ?? ""}`);
+        void reload();
+      }
+    };
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+    // eslint-disable-next-line
+  }, []);
+
   const handleConnect = async () => {
     setSubmitting(true);
-    const safety = setTimeout(() => setSubmitting(false), 30_000);
+    const safety = setTimeout(() => setSubmitting(false), 60_000);
     try {
       const r: any = await connect({ data: {} });
-      toast.success(`Caixa conectada: ${r?.email ?? ""}`);
-      await reload();
+      if (!r?.authUrl) throw new Error("URL de autorização não retornada.");
+      const w = window.open(r.authUrl, "gmail-oauth", "width=520,height=680");
+      if (!w) {
+        toast.error("Pop-up bloqueado. Permita pop-ups e tente novamente.");
+        return;
+      }
+      const timer = setInterval(() => {
+        if (w.closed) {
+          clearInterval(timer);
+          void reload();
+        }
+      }, 700);
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao conectar", { duration: 8000 });
     } finally {
@@ -61,6 +84,7 @@ function EmailPage() {
       setSubmitting(false);
     }
   };
+
 
   const handleDisconnect = async () => {
     if (!confirm("Desconectar sua caixa de email?")) return;

@@ -109,6 +109,17 @@ async function resolveFolderPath(client: ImapFlow, kind: FolderKind): Promise<st
   return "[Gmail]/Sent Mail";
 }
 
+function makeImap(email: string, appPassword: string) {
+  return new ImapFlow({
+    ...GMAIL_IMAP,
+    auth: { user: email, pass: appPassword },
+    logger: false,
+    connectionTimeout: 15_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 60_000,
+  } as any);
+}
+
 export async function listMessages(
   email: string,
   appPassword: string,
@@ -116,40 +127,42 @@ export async function listMessages(
   opts: { limit?: number; search?: string } = {},
 ): Promise<MessageSummary[]> {
   const limit = Math.min(opts.limit ?? 50, 100);
-  const client = new ImapFlow({ ...GMAIL_IMAP, auth: { user: email, pass: appPassword }, logger: false });
-  await client.connect();
+  const client = makeImap(email, appPassword);
+  await withTimeout(client.connect(), 20_000, "IMAP connect");
   try {
-    const path = await resolveFolderPath(client, kind);
-    const lock = await client.getMailboxLock(path);
+    const path = await withTimeout(resolveFolderPath(client, kind), 15_000, "IMAP list folders");
+    const lock = await withTimeout(client.getMailboxLock(path), 15_000, "IMAP lock mailbox");
     try {
-      const status = await client.status(path, { messages: true });
+      const status = await withTimeout(client.status(path, { messages: true }), 15_000, "IMAP status");
       const total = status.messages ?? 0;
       if (total === 0) return [];
       const from = Math.max(1, total - limit + 1);
       const range = `${from}:${total}`;
       const out: MessageSummary[] = [];
-      for await (const msg of client.fetch(range, {
-        uid: true,
-        envelope: true,
-        flags: true,
-        bodyStructure: false,
-        source: false,
-      })) {
-        const env = msg.envelope as any;
-        const fromAddr = env?.from?.[0];
-        const toAddr = env?.to?.[0];
-        out.push({
-          uid: msg.uid as number,
-          seq: msg.seq as number,
-          from: fromAddr ? `${fromAddr.name ?? ""} <${fromAddr.address ?? ""}>`.trim() : "",
-          to: toAddr ? `${toAddr.name ?? ""} <${toAddr.address ?? ""}>`.trim() : "",
-          subject: env?.subject ?? "",
-          date: env?.date ? new Date(env.date).toISOString() : null,
-          preview: "",
-          unread: !((msg.flags as Set<string> | undefined)?.has("\\Seen")),
-        });
-      }
-      // Apply simple search filter
+      const fetchLoop = (async () => {
+        for await (const msg of client.fetch(range, {
+          uid: true,
+          envelope: true,
+          flags: true,
+          bodyStructure: false,
+          source: false,
+        })) {
+          const env = msg.envelope as any;
+          const fromAddr = env?.from?.[0];
+          const toAddr = env?.to?.[0];
+          out.push({
+            uid: msg.uid as number,
+            seq: msg.seq as number,
+            from: fromAddr ? `${fromAddr.name ?? ""} <${fromAddr.address ?? ""}>`.trim() : "",
+            to: toAddr ? `${toAddr.name ?? ""} <${toAddr.address ?? ""}>`.trim() : "",
+            subject: env?.subject ?? "",
+            date: env?.date ? new Date(env.date).toISOString() : null,
+            preview: "",
+            unread: !((msg.flags as Set<string> | undefined)?.has("\\Seen")),
+          });
+        }
+      })();
+      await withTimeout(fetchLoop, 30_000, "IMAP fetch list");
       const q = (opts.search ?? "").trim().toLowerCase();
       const filtered = q
         ? out.filter(
@@ -164,7 +177,7 @@ export async function listMessages(
       lock.release();
     }
   } finally {
-    await client.logout().catch(() => {});
+    try { await withTimeout(client.logout(), 5_000, "IMAP logout"); } catch {}
   }
 }
 
@@ -186,16 +199,19 @@ export async function fetchMessage(
   kind: FolderKind,
   uid: number,
 ): Promise<MessageFull | null> {
-  const client = new ImapFlow({ ...GMAIL_IMAP, auth: { user: email, pass: appPassword }, logger: false });
-  await client.connect();
+  const client = makeImap(email, appPassword);
+  await withTimeout(client.connect(), 20_000, "IMAP connect");
   try {
-    const path = await resolveFolderPath(client, kind);
-    const lock = await client.getMailboxLock(path);
+    const path = await withTimeout(resolveFolderPath(client, kind), 15_000, "IMAP list folders");
+    const lock = await withTimeout(client.getMailboxLock(path), 15_000, "IMAP lock mailbox");
     try {
-      const msg = await client.fetchOne(String(uid), { uid: true, source: true, envelope: true }, { uid: true });
+      const msg = await withTimeout(
+        client.fetchOne(String(uid), { uid: true, source: true, envelope: true }, { uid: true }),
+        30_000,
+        "IMAP fetch message",
+      );
       if (!msg || !msg.source) return null;
       const parsed = await simpleParser(msg.source as Buffer);
-      // Mark seen on inbox open
       if (kind === "inbox") {
         try { await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true }); } catch {}
       }
@@ -214,7 +230,7 @@ export async function fetchMessage(
       lock.release();
     }
   } finally {
-    await client.logout().catch(() => {});
+    try { await withTimeout(client.logout(), 5_000, "IMAP logout"); } catch {}
   }
 }
 
@@ -226,32 +242,43 @@ export async function sendMail(
   const transporter = nodemailer.createTransport({
     ...GMAIL_SMTP,
     auth: { user: email, pass: appPassword },
-  });
-  const info = await transporter.sendMail({
-    from: email,
-    to: opts.to,
-    cc: opts.cc,
-    bcc: opts.bcc,
-    subject: opts.subject,
-    text: opts.text,
-    html: opts.html,
-    inReplyTo: opts.inReplyTo,
-    references: opts.inReplyTo,
-  });
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 30_000,
+  } as any);
+  const info = await withTimeout(
+    transporter.sendMail({
+      from: email,
+      to: opts.to,
+      cc: opts.cc,
+      bcc: opts.bcc,
+      subject: opts.subject,
+      text: opts.text,
+      html: opts.html,
+      inReplyTo: opts.inReplyTo,
+      references: opts.inReplyTo,
+    }),
+    30_000,
+    "SMTP send",
+  );
   return { messageId: info.messageId };
 }
 
 export async function markRead(email: string, appPassword: string, uid: number) {
-  const client = new ImapFlow({ ...GMAIL_IMAP, auth: { user: email, pass: appPassword }, logger: false });
-  await client.connect();
+  const client = makeImap(email, appPassword);
+  await withTimeout(client.connect(), 20_000, "IMAP connect");
   try {
-    const lock = await client.getMailboxLock("INBOX");
+    const lock = await withTimeout(client.getMailboxLock("INBOX"), 15_000, "IMAP lock mailbox");
     try {
-      await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+      await withTimeout(
+        client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true }),
+        15_000,
+        "IMAP mark read",
+      );
     } finally {
       lock.release();
     }
   } finally {
-    await client.logout().catch(() => {});
+    try { await withTimeout(client.logout(), 5_000, "IMAP logout"); } catch {}
   }
 }

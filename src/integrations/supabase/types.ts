@@ -1003,55 +1003,67 @@ export type Database = {
       }
       email_accounts: {
         Row: {
+          access_token: string | null
           created_at: string
           display_name: string | null
           email: string
           id: string
-          imap_host: string
-          imap_port: number
+          imap_host: string | null
+          imap_port: number | null
           imap_secure: boolean
-          password_encrypted: string
+          password_encrypted: string | null
           provider: string
-          smtp_host: string
-          smtp_port: number
+          refresh_token: string | null
+          scope: string | null
+          smtp_host: string | null
+          smtp_port: number | null
           smtp_secure: boolean
+          token_expires_at: string | null
           updated_at: string
           user_id: string
-          username: string
+          username: string | null
         }
         Insert: {
+          access_token?: string | null
           created_at?: string
           display_name?: string | null
           email: string
           id?: string
-          imap_host: string
-          imap_port: number
+          imap_host?: string | null
+          imap_port?: number | null
           imap_secure?: boolean
-          password_encrypted: string
+          password_encrypted?: string | null
           provider: string
-          smtp_host: string
-          smtp_port: number
+          refresh_token?: string | null
+          scope?: string | null
+          smtp_host?: string | null
+          smtp_port?: number | null
           smtp_secure?: boolean
+          token_expires_at?: string | null
           updated_at?: string
           user_id: string
-          username: string
+          username?: string | null
         }
         Update: {
+          access_token?: string | null
           created_at?: string
           display_name?: string | null
           email?: string
           id?: string
-          imap_host?: string
-          imap_port?: number
+          imap_host?: string | null
+          imap_port?: number | null
           imap_secure?: boolean
-          password_encrypted?: string
+          password_encrypted?: string | null
           provider?: string
-          smtp_host?: string
-          smtp_port?: number
+          refresh_token?: string | null
+          scope?: string | null
+          smtp_host?: string | null
+          smtp_port?: number | null
           smtp_secure?: boolean
+          token_expires_at?: string | null
           updated_at?: string
           user_id?: string
-          username?: string
+          username?: string | null
         }
         Relationships: []
       }

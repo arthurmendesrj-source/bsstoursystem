@@ -1,27 +1,28 @@
-## Problema identificado
+## O que vai mudar
 
-A tela mostrada não é o login do sistema: é o formulário de conexão do Gmail. Pelos requests, a conexão retorna sucesso, mas logo depois a página continua tratando a caixa como “não conectada”.
+Hoje as caixas (Recebidos / Enviados) aparecem como abas horizontais em cima da lista de mensagens. Vou transformar em uma **barra lateral vertical à esquerda do email**, com:
 
-O ponto mais provável no código é o salvamento da senha criptografada: `email_accounts.password_encrypted` é um campo binário no banco, mas o código está inserindo um `Buffer` diretamente. Isso pode salvar em formato incompatível; em seguida, a validação tenta descriptografar, falha, apaga o registro e a tela volta ao formulário.
+1. **Botão recolher / expandir** (chevron), igual ao menu principal do app.
+   - Expandido: mostra ícone + nome ("Recebidos", "Enviados").
+   - Recolhido: só o ícone (largura fixa estreita, ex.: 56px).
+   - Estado salvo em `localStorage` (`email:sidebar:collapsed`).
+2. **Largura editável** (arrastar para redimensionar).
+   - Alça de redimensionamento na borda direita da barra.
+   - Limites: mínimo 160px, máximo 360px.
+   - Largura salva em `localStorage` (`email:sidebar:width`).
+   - Quando recolhida, ignora a largura customizada e usa a largura fixa do modo ícone.
+3. Layout dentro do email vira: **[ Sidebar caixas ] [ Lista de mensagens ] [ Leitor ]**, mantendo a lista (380px) e o leitor já existentes.
 
-## Plano de correção
+Sem mudar nada do backend / IMAP / envio / leitura — é só layout.
 
-1. Ajustar a criptografia da senha de app para gravar o valor em formato compatível com o banco (`bytea` como string hexadecimal `\x...`), em vez de inserir `Buffer` diretamente.
-2. Manter a leitura/descriptografia compatível com registros válidos já existentes.
-3. Melhorar o retorno de `getMyAccount` para não parecer “login” quando a conta foi removida por credencial criptografada inválida; a UI deve mostrar uma mensagem clara pedindo para reconectar.
-4. Após conectar com a senha de app, forçar a tela `/email` a trocar imediatamente para a caixa de entrada quando `getMyAccount` retornar conectado.
-5. Validar pelo sinal certo: depois do clique em “Conectar”, o request de conta deve voltar como conectado e o componente `EmailMailbox` deve ser renderizado.
+## Onde mexo
 
-## Arquivos envolvidos
+- `src/components/email/EmailMailbox.tsx`
+  - Remover o `<Tabs>` horizontal de pastas (mantém `folder` como estado).
+  - Adicionar componente `MailboxSidebar` interno: lista vertical "Recebidos" / "Enviados" com ícones, botão chevron no topo (igual `AppShell`), alça de resize na borda direita.
+  - Trocar grid de `md:grid-cols-[380px_1fr]` para `md:grid-cols-[auto_380px_1fr]` (auto = a sidebar).
 
-- `src/lib/email.server.ts`
-- `src/lib/email.functions.ts`
-- `src/routes/email.tsx`
+## Fora de escopo
 
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- Renomear/adicionar/esconder caixas — só Recebidos e Enviados continuam, como hoje.
+- Mostrar Rascunhos / Spam / Lixeira do Gmail — pode ser pedido depois.

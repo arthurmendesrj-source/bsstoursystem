@@ -1,40 +1,29 @@
-## Problema
+Vou ajustar o fluxo de convite para ficar exatamente assim:
 
-Ao clicar em **Accept Invitation** no e-mail, o usuário é levado para `${APP_URL}/` com um token de convite no hash da URL. Como o app não tem uma página dedicada para tratar esse fluxo, o redirecionamento padrão (auth gate) joga o convidado direto em `/login`, onde ele não tem como criar senha — então o convite trava.
+1. **Link do convite sempre cai em uma tela própria**
+   - Manter `/accept-invite` como rota pública dedicada.
+   - Ela será a única tela para o convidado concluir o cadastro, sem passar pelo login.
+   - A tela mostrará e-mail, nome completo, senha e confirmação de senha.
 
-A função `admin-users` envia hoje:
-```
-redirectTo = `${APP_URL}/`
-```
-e não existe uma rota que detecte `type=invite` no hash e ofereça o formulário de cadastro de senha.
+2. **Processar corretamente o token do convite**
+   - Ao abrir o link `Accept Invitation`, a página `/accept-invite` vai detectar o token recebido no link.
+   - Se necessário, a página chamará o método correto do auth para trocar o token por sessão antes de mostrar o formulário.
+   - Isso evita o erro atual em que o usuário cai no login porque a sessão ainda não foi reconhecida.
 
-## Solução
+3. **Cadastrar senha do novo usuário**
+   - Ao enviar o formulário, chamar atualização do usuário para definir a nova senha e salvar o nome.
+   - Depois disso, redirecionar para o dashboard já logado.
 
-### 1. Nova rota pública `/accept-invite` (`src/routes/accept-invite.tsx`)
-- Mesmo padrão da rota `/reset-password` existente.
-- Em `useEffect`:
-  - chama `supabase.auth.getSession()` — o link de convite já cria sessão automaticamente via hash;
-  - escuta `onAuthStateChange` para `SIGNED_IN` / `USER_UPDATED`;
-  - se houver sessão, mostra formulário com **Nome completo** + **Nova senha** + **Confirmar senha**.
-- Ao submeter:
-  - `supabase.auth.updateUser({ password, data: { full_name } })`;
-  - toast de sucesso e `navigate({ to: "/dashboard" })` (já estará logado, com profile/role/tenant criados pela edge function no momento do convite).
-- Se não houver sessão (link expirado / já usado), mostra mensagem orientando a solicitar novo convite ao gestor.
-- Rota fora de `_authenticated/` (pública) para não disparar o gate de auth.
+4. **Preservar vínculo com quem convidou**
+   - O convite continuará gravando o `tenant_id` do convidador nos metadados e já criando o vínculo em `tenant_members`.
+   - Vou conferir/ajustar para o convidado não criar uma empresa própria ao primeiro login; ele deve entrar na conta/empresa do convidador.
 
-### 2. Atualizar `supabase/functions/admin-users/index.ts`
-- Trocar nas duas chamadas de `inviteUserByEmail`:
-  ```ts
-  const redirectTo = `${APP_URL}/accept-invite`;
-  ```
-  (linhas 152 e 186).
-- Sem outras mudanças na lógica de criação de profile/role/tenant.
+5. **Corrigir convites antigos que ainda caiam em `/login`**
+   - Se um link antigo chegar no login com token de convite, redirecionar imediatamente para `/accept-invite` preservando o token.
 
-### 3. Garantir que `/login` não engula o hash do convite
-- Adicionar no início de `LoginPage` um efeito que, se `window.location.hash` contiver `type=invite`, redireciona para `/accept-invite` preservando o hash. Isso cobre convites antigos já enviados com `redirectTo = /`.
-
-## Teste manual após implementação
-
-1. Reenviar convite para `boscobssteste1@gmail.com` como **Operador**.
-2. Abrir o e-mail → clicar em **Accept Invitation**.
-3. Esperado: cair em `/accept-invite`, definir nome + senha, ser redirecionado para `/dashboard` como membro do tenant `Diretor1` com role `operator`.
+6. **Validação esperada**
+   - Admin/diretor envia convite.
+   - Convidado clica em `Accept Invitation`.
+   - Abre `/accept-invite`, não `/login`.
+   - Convidado cria senha.
+   - Entra no app vinculado à mesma conta/empresa de quem convidou.

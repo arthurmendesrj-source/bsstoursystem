@@ -1,22 +1,42 @@
-## Causa raiz do "otp_expired"
+# Reativar IA no módulo Email
 
-A URL retorna `error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`. Não é tempo — é que a edge function `admin-users`, logo após `inviteUserByEmail`, chama `admin.auth.admin.updateUserById(..., { email_confirm: true })`. Marcar o e-mail como confirmado **invalida o token do convite imediatamente**. Quando o usuário clica no link, o Supabase responde "expirado".
+Reativar a IA do módulo `/email` com três funções, sempre executadas **sob demanda** (botão), usando Lovable AI (`google/gemini-3-flash-preview`) — mesmo padrão das outras funções do projeto (sem custo de chave para o usuário).
 
-(Causa secundária possível: pré-fetch de antivírus do Gmail consumindo o link uma vez antes do usuário.)
+## O que será entregue
 
-## Correções
+1. **Resumo automático do email aberto**
+   - Botão "Analisar com IA" no visualizador de email (`EmailMailbox.tsx`).
+   - A IA recebe assunto + corpo do email e retorna: resumo curto (2–4 linhas), idioma detectado, sentimento e prioridade sugerida (alta/normal/baixa).
+   - Resumo é cacheado por `gmail_id` para não regerar a cada clique.
 
-1. **Remover `email_confirm: true` da ação `invite`** em `supabase/functions/admin-users/index.ts`. O e-mail é confirmado naturalmente quando o usuário aceita o convite.
-2. **Reimplantar** a edge function `admin-users`.
-3. **Melhorar a tela `/accept-invite`** para detectar erro no hash (`error_code=otp_expired`) e mostrar mensagem clara + botão "Reenviar convite" (na verdade, instrução para pedir reenvio ao admin).
-4. **Teste automatizado pós-deploy**: chamar a edge function `admin-users` action `invite` com um e-mail descartável e verificar o retorno (sem `email_confirm`); inspecionar logs.
-5. **Teste manual real** (necessário você): após o deploy, reenviar convite a `boscobssteste1@gmail.com` e clicar no link novo. Esperado: abrir `/accept-invite` com formulário de senha (sem `otp_expired`).
+2. **Sugestão de Lead / Atividade**
+   - Logo abaixo do resumo, a IA sugere uma ação: **Criar Lead** ou **Criar Atividade** (ou "nenhuma ação").
+   - Preenche campos extraídos do email: nome do contato, telefone, email, destino, datas, nº pax, orçamento, observações.
+   - Dois botões: "Criar Lead com estes dados" (abre `/workspace` pré-preenchido) e "Criar Atividade" (cria task vinculada ao lead correspondente, se o email já bater com um lead existente por endereço).
+   - **Nada é gravado sem o operador confirmar** (mantém a regra histórica).
 
-## Observação importante sobre teste end-to-end
+3. **Triagem em lote da caixa**
+   - Botão "Triagem IA" no topo da lista de emails — processa os N emails visíveis (ex.: últimos 20 não lidos).
+   - Para cada um: gera resumo + categoria (lead novo / cliente existente / fornecedor / suporte / spam) + prioridade.
+   - Resultados aparecem como badges coloridas na lista; clicar abre o email com o resumo já pronto.
+   - Barra de progresso e botão de cancelar; processa serialmente para não estourar rate-limit (429).
 
-Não consigo clicar no link do e-mail real (não tenho acesso à caixa do Gmail do convidado). O que posso testar automaticamente:
-- Build e deploy ok da edge function.
-- Chamada à edge function `invite` retorna `{ok:true}` sem chamar `email_confirm`.
-- Tela `/accept-invite` renderiza corretamente os 3 estados (verificando, válido, inválido).
+## Detalhes técnicos
 
-O clique no link de convite real precisa ser feito por você — eu deixarei tudo pronto e validado até onde é possível sem acesso ao seu Gmail.
+- **Backend**: novo `src/lib/email-ai.functions.ts` com `createServerFn` protegido por `requireSupabaseAuth`:
+  - `analyzeEmail({ gmailId, targetUserId })` — busca o email via `gmail-api.server`, chama Lovable AI Gateway, retorna `{ summary, language, sentiment, priority, suggestion: { kind: 'lead'|'activity'|'none', fields } }`.
+  - `triageInbox({ targetUserId, gmailIds })` — itera serialmente chamando `analyzeEmail`, retorna array de resultados.
+- **Cache**: nova tabela `email_ai_cache(message_id text PK, user_id uuid, payload jsonb, created_at)` com RLS por `user_id` + GRANT padrão (authenticated/service_role). Evita custo repetido.
+- **Modelo**: `google/gemini-3-flash-preview` com `Output.object` (Zod) para garantir JSON estruturado.
+- **Tratamento de erro**: 429 → toast "limite atingido, tente novamente"; 402 → toast "créditos esgotados, recarregue em Settings → Workspace → Usage".
+- **Frontend**: alterações apenas em `src/components/email/EmailMailbox.tsx` (botões, painel lateral de IA, badges na lista, modal de progresso para triagem em lote).
+
+## Fora de escopo
+
+- Sem rascunho automático de resposta.
+- Sem execução automática ao receber/abrir email — tudo sob clique.
+- Sem alteração no `/workspace`, leads ou tasks além do pré-preenchimento via query params.
+
+## Teste
+
+Após implementar: abrir `/email`, abrir um email real → clicar "Analisar com IA" → verificar resumo + sugestão; clicar "Triagem IA" com 5 emails → verificar badges; recarregar e reabrir o mesmo email → resumo vem do cache (sem nova chamada).

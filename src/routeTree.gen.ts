@@ -63,6 +63,7 @@ import { Route as ApiPublicWhatsappWebhookRouteImport } from './routes/api/publi
 import { Route as ApiPublicHooksTaskDueRouteImport } from './routes/api/public/hooks/task-due'
 import { Route as ApiPublicHooksSlaEscalationsRouteImport } from './routes/api/public/hooks/sla-escalations'
 import { Route as ApiPublicHooksLeadEventsRouteImport } from './routes/api/public/hooks/lead-events'
+import { Route as ApiPublicGoogleCallbackRouteImport } from './routes/api/public/google.callback'
 import { Route as ApiPublicBillingWebhookRouteImport } from './routes/api/public/billing.webhook'
 import { Route as ApiPublicBillingRunCycleRouteImport } from './routes/api/public/billing/run-cycle'
 import { Route as ApiPublicBillingAggregateUsageRouteImport } from './routes/api/public/billing/aggregate-usage'
@@ -343,6 +344,11 @@ const ApiPublicHooksLeadEventsRoute =
     path: '/api/public/hooks/lead-events',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicGoogleCallbackRoute = ApiPublicGoogleCallbackRouteImport.update({
+  id: '/api/public/google/callback',
+  path: '/api/public/google/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicBillingWebhookRoute = ApiPublicBillingWebhookRouteImport.update({
   id: '/api/public/billing/webhook',
   path: '/api/public/billing/webhook',
@@ -415,6 +421,7 @@ export interface FileRoutesByFullPath {
   '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
   '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
+  '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -474,6 +481,7 @@ export interface FileRoutesByTo {
   '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
   '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
+  '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -534,6 +542,7 @@ export interface FileRoutesById {
   '/api/public/billing/aggregate-usage': typeof ApiPublicBillingAggregateUsageRoute
   '/api/public/billing/run-cycle': typeof ApiPublicBillingRunCycleRoute
   '/api/public/billing/webhook': typeof ApiPublicBillingWebhookRoute
+  '/api/public/google/callback': typeof ApiPublicGoogleCallbackRoute
   '/api/public/hooks/lead-events': typeof ApiPublicHooksLeadEventsRoute
   '/api/public/hooks/sla-escalations': typeof ApiPublicHooksSlaEscalationsRoute
   '/api/public/hooks/task-due': typeof ApiPublicHooksTaskDueRoute
@@ -595,6 +604,7 @@ export interface FileRouteTypes {
     | '/api/public/billing/aggregate-usage'
     | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
+    | '/api/public/google/callback'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -654,6 +664,7 @@ export interface FileRouteTypes {
     | '/api/public/billing/aggregate-usage'
     | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
+    | '/api/public/google/callback'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -713,6 +724,7 @@ export interface FileRouteTypes {
     | '/api/public/billing/aggregate-usage'
     | '/api/public/billing/run-cycle'
     | '/api/public/billing/webhook'
+    | '/api/public/google/callback'
     | '/api/public/hooks/lead-events'
     | '/api/public/hooks/sla-escalations'
     | '/api/public/hooks/task-due'
@@ -762,6 +774,7 @@ export interface RootRouteChildren {
   ApiPublicBillingAggregateUsageRoute: typeof ApiPublicBillingAggregateUsageRoute
   ApiPublicBillingRunCycleRoute: typeof ApiPublicBillingRunCycleRoute
   ApiPublicBillingWebhookRoute: typeof ApiPublicBillingWebhookRoute
+  ApiPublicGoogleCallbackRoute: typeof ApiPublicGoogleCallbackRoute
   ApiPublicHooksLeadEventsRoute: typeof ApiPublicHooksLeadEventsRoute
   ApiPublicHooksSlaEscalationsRoute: typeof ApiPublicHooksSlaEscalationsRoute
   ApiPublicHooksTaskDueRoute: typeof ApiPublicHooksTaskDueRoute
@@ -1148,6 +1161,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksLeadEventsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/google/callback': {
+      id: '/api/public/google/callback'
+      path: '/api/public/google/callback'
+      fullPath: '/api/public/google/callback'
+      preLoaderRoute: typeof ApiPublicGoogleCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/billing/webhook': {
       id: '/api/public/billing/webhook'
       path: '/api/public/billing/webhook'
@@ -1283,6 +1303,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicBillingAggregateUsageRoute: ApiPublicBillingAggregateUsageRoute,
   ApiPublicBillingRunCycleRoute: ApiPublicBillingRunCycleRoute,
   ApiPublicBillingWebhookRoute: ApiPublicBillingWebhookRoute,
+  ApiPublicGoogleCallbackRoute: ApiPublicGoogleCallbackRoute,
   ApiPublicHooksLeadEventsRoute: ApiPublicHooksLeadEventsRoute,
   ApiPublicHooksSlaEscalationsRoute: ApiPublicHooksSlaEscalationsRoute,
   ApiPublicHooksTaskDueRoute: ApiPublicHooksTaskDueRoute,

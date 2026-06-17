@@ -100,26 +100,14 @@ function EmailPage() {
           <CardHeader>
             <CardTitle>Conectar Gmail</CardTitle>
             <CardDescription>
-              Sua caixa <strong>{userEmail}</strong> será conectada usando uma <strong>senha de app</strong> do Google.
-              A senha é criptografada e usada apenas pelo servidor para acessar IMAP/SMTP.
+              A caixa de email é conectada via integração oficial do Google (Gmail API).
+              Peça ao administrador para conectar uma conta Gmail nas configurações
+              de Conectores do workspace.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <Label>Email</Label>
-              <Input value={userEmail} readOnly disabled />
-            </div>
-            <div>
-              <Label>Senha de app</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" />
-              <p className="text-xs text-muted-foreground mt-1">
-                <a className="underline" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">
-                  Como gerar uma senha de app no Google →
-                </a>
-              </p>
-            </div>
             <Button onClick={handleConnect} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Conectar
+              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Verificar conexão
             </Button>
           </CardContent>
         </Card>

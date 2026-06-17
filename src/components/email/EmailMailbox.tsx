@@ -273,3 +273,113 @@ function quote(text: string | null | undefined): string {
   if (!text) return "";
   return text.split("\n").map((l) => `> ${l}`).join("\n");
 }
+
+function MailboxSidebar({
+  folder,
+  onChange,
+}: {
+  folder: Folder;
+  onChange: (f: Folder) => void;
+}) {
+  const COLLAPSED_W = 56;
+  const MIN_W = 160;
+  const MAX_W = 360;
+  const DEFAULT_W = 200;
+
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("email:sidebar:collapsed") === "1";
+  });
+  const [width, setWidth] = useState<number>(() => {
+    if (typeof window === "undefined") return DEFAULT_W;
+    const v = Number(localStorage.getItem("email:sidebar:width"));
+    return Number.isFinite(v) && v >= MIN_W && v <= MAX_W ? v : DEFAULT_W;
+  });
+
+  useEffect(() => {
+    try { localStorage.setItem("email:sidebar:collapsed", collapsed ? "1" : "0"); } catch {}
+  }, [collapsed]);
+  useEffect(() => {
+    try { localStorage.setItem("email:sidebar:width", String(width)); } catch {}
+  }, [width]);
+
+  const dragging = useRef(false);
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (collapsed) return;
+    e.preventDefault();
+    dragging.current = true;
+    const startX = e.clientX;
+    const startW = width;
+    const onMove = (ev: MouseEvent) => {
+      if (!dragging.current) return;
+      const next = Math.min(MAX_W, Math.max(MIN_W, startW + (ev.clientX - startX)));
+      setWidth(next);
+    };
+    const onUp = () => {
+      dragging.current = false;
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, [collapsed, width]);
+
+  const items: { key: Folder; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    { key: "inbox", label: "Recebidos", icon: InboxIcon },
+    { key: "sent", label: "Enviados", icon: MailCheck },
+  ];
+
+  const itemClass = (active: boolean) => cn(
+    "flex items-center gap-2 rounded-md text-sm transition-colors w-full",
+    collapsed ? "justify-center px-2 py-2" : "px-3 py-2",
+    active ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+  );
+
+  return (
+    <div className="relative hidden md:block" style={{ width: collapsed ? COLLAPSED_W : width }}>
+      <Card className="h-full">
+        <CardContent className="p-2 max-h-[70vh] overflow-y-auto">
+          <div className={cn("flex items-center mb-2", collapsed ? "justify-center" : "justify-between px-1")}>
+            {!collapsed && <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Caixas</span>}
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              className="h-6 w-6 grid place-items-center rounded-md border border-border bg-background hover:bg-muted"
+              aria-label={collapsed ? "Expandir" : "Recolher"}
+              title={collapsed ? "Expandir" : "Recolher"}
+            >
+              {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+          <ul className="space-y-1">
+            {items.map((it) => {
+              const Icon = it.icon;
+              const active = folder === it.key;
+              return (
+                <li key={it.key}>
+                  <button
+                    type="button"
+                    onClick={() => onChange(it.key)}
+                    className={itemClass(active)}
+                    title={collapsed ? it.label : undefined}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {!collapsed && <span className="truncate">{it.label}</span>}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </CardContent>
+      </Card>
+      {!collapsed && (
+        <div
+          onMouseDown={onMouseDown}
+          className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/30 active:bg-primary/50"
+          aria-label="Redimensionar"
+          title="Arraste para redimensionar"
+        />
+      )}
+    </div>
+  );
+}

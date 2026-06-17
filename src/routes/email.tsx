@@ -5,8 +5,6 @@ import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Loader2, Mail, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -25,7 +23,6 @@ export const Route = createFileRoute("/email")({
 
 function EmailPage() {
   const { user } = useAuth();
-  const userEmail = user?.email ?? "";
   const userId = user?.id ?? "";
 
   const getAcc = useServerFn(getMyAccount);
@@ -35,7 +32,6 @@ function EmailPage() {
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
-  const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const reload = async () => {
@@ -52,13 +48,11 @@ function EmailPage() {
   useEffect(() => { void reload(); /* eslint-disable-next-line */ }, []);
 
   const handleConnect = async () => {
-    if (!password) { toast.error("Informe a senha de app"); return; }
     setSubmitting(true);
-    const safety = setTimeout(() => setSubmitting(false), 45_000);
+    const safety = setTimeout(() => setSubmitting(false), 30_000);
     try {
-      await connect({ data: { password } });
-      toast.success("Caixa conectada!");
-      setPassword("");
+      const r: any = await connect({ data: {} });
+      toast.success(`Caixa conectada: ${r?.email ?? ""}`);
       await reload();
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao conectar", { duration: 8000 });
@@ -101,26 +95,14 @@ function EmailPage() {
           <CardHeader>
             <CardTitle>Conectar Gmail</CardTitle>
             <CardDescription>
-              Sua caixa <strong>{userEmail}</strong> será conectada usando uma <strong>senha de app</strong> do Google.
-              A senha é criptografada e usada apenas pelo servidor para acessar IMAP/SMTP.
+              A caixa de email é conectada via integração oficial do Google (Gmail API).
+              Peça ao administrador para conectar uma conta Gmail nas configurações
+              de Conectores do workspace.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div>
-              <Label>Email</Label>
-              <Input value={userEmail} readOnly disabled />
-            </div>
-            <div>
-              <Label>Senha de app</Label>
-              <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="xxxx xxxx xxxx xxxx" />
-              <p className="text-xs text-muted-foreground mt-1">
-                <a className="underline" href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">
-                  Como gerar uma senha de app no Google →
-                </a>
-              </p>
-            </div>
             <Button onClick={handleConnect} disabled={submitting}>
-              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Conectar
+              {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null} Verificar conexão
             </Button>
           </CardContent>
         </Card>

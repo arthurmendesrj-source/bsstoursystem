@@ -1,27 +1,43 @@
-Do I know what the issue is? Sim.
+O erro atual é: o app está tentando ler a caixa do Gmail por IMAP, mas a função publicada não consegue manter essa conexão com `imap.gmail.com:993`, então a lista cai em `Timeout (IMAP connect) após 20000ms`.
 
-O problema não é mais a tela de conexão: a conta já conecta, mas a listagem de mensagens fica presa porque o carregamento da caixa (`listMessagesFn` → IMAP Gmail) pode ficar aguardando indefinidamente em `connect`, `status`, `list`, `lock` ou `fetch`. A interface também não tem timeout de segurança nessa atualização, então permanece em “Carregando…”.
+Do I know what the issue is? Sim: não é mais só timeout de tela; é a abordagem IMAP/SMTP direta que está falhando no ambiente publicado. A correção mais estável é parar de usar IMAP para listar/abrir emails e usar a API HTTPS do Gmail.
 
 Plano de correção:
 
-1. Adicionar timeout no carregamento dos emails
-   - Reutilizar o helper `withTimeout` também nas operações reais da caixa: conexão IMAP, listagem de pastas, status da pasta, lock da mailbox, fetch de mensagens, abertura de mensagem e marcação como lida.
-   - Configurar `connectionTimeout`, `greetingTimeout` e `socketTimeout` em todos os clientes IMAP, não apenas na validação inicial da senha.
+1. Trocar leitura da caixa para Gmail API
+   - Reimplementar listagem de recebidos/enviados usando endpoints HTTPS do Gmail.
+   - Buscar mensagens por `INBOX` e `SENT` em vez de abrir conexão IMAP.
+   - Manter a busca por assunto/remetente usando a query do Gmail.
 
-2. Evitar que a tela fique travada
-   - No componente `EmailMailbox`, adicionar um timeout de segurança para `refresh()`.
-   - Se o servidor demorar demais, parar o spinner e mostrar uma mensagem clara tipo “Não foi possível atualizar os emails agora. Tente novamente.”
-   - Impedir que uma resposta antiga sobrescreva uma atualização mais nova quando o usuário clica em atualizar várias vezes.
+2. Trocar abertura de mensagem
+   - Ao clicar em um email, carregar o conteúdo pela API do Gmail.
+   - Converter headers, remetente, destinatário, assunto, data, texto/html para o formato que a tela já usa.
 
-3. Melhorar a atualização manual
-   - Manter o botão de atualizar funcionando, mas garantir que ele sempre volte ao estado normal.
-   - Preservar a lista anterior quando uma atualização falhar, em vez de deixar a tela só em carregamento.
+3. Trocar marcação como lido
+   - Substituir `messageFlagsAdd` do IMAP por modificação de labels do Gmail, removendo `UNREAD` quando aplicável.
 
-4. Ajustar mensagens de erro
-   - Separar erros de senha/app password, IMAP desativado, timeout/rede Gmail e falha geral.
-   - Exibir erro dentro da lista e também via aviso curto quando necessário.
+4. Envio de email
+   - Manter envio via Gmail API quando possível, já existe um padrão no projeto para enviar pelo Gmail por HTTPS.
+   - Se a tela de “Novo”/“Responder” ainda estiver usando SMTP direto, substituir por envio via Gmail API também.
 
-5. Validar o fluxo
-   - Conferir que `/email` sai do estado “Carregando…”.
-   - Conferir que erro de Gmail/IMAP aparece na tela em vez de travar.
-   - Conferir que o botão de atualizar volta ao normal após sucesso ou falha.
+5. Ajustar conexão da conta
+   - Remover a validação IMAP obrigatória da tela “Conectar Gmail”, porque ela é a parte que falha.
+   - Em vez disso, validar a conexão pela API do Gmail e exibir um aviso claro se a conta conectada no app não for a mesma caixa esperada.
+
+6. Melhorar mensagem na interface
+   - Se ainda faltar autorização ou a conta Gmail correta não estiver conectada, mostrar um estado claro na tela de Email com ação para reconectar, em vez de erro técnico de IMAP.
+
+Detalhes técnicos:
+- Arquivos principais: `src/lib/email.functions.ts`, `src/lib/email.server.ts`, `src/components/email/EmailMailbox.tsx`, `src/routes/email.tsx`.
+- A correção deve remover o caminho crítico baseado em `imapflow`/`nodemailer` para leitura da caixa.
+- A conta Gmail correta precisa estar autorizada com permissões de leitura, envio e modificação de mensagens.
+
+Depois da implementação, será necessário publicar novamente para testar no endereço `bsstoursystem.lovable.app`.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>

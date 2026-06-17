@@ -1,16 +1,27 @@
-Vou ajustar o fluxo de e-mail para que uma conexão bem-sucedida realmente carregue os recebidos e mostre o motivo quando não carregar.
+## Problema identificado
 
-Plano:
-1. Atualizar a listagem de mensagens para retornar um status claro quando a conta está conectada, mas o Gmail/IMAP não devolve mensagens ou falha.
-2. Melhorar a tela da caixa para diferenciar:
-   - conta não conectada;
-   - conta conectada sem mensagens;
-   - erro ao acessar Gmail/IMAP;
-   - mensagens carregadas normalmente.
-3. Corrigir o estado da tela após “Caixa conectada!” para não voltar ao formulário quando a listagem falhar silenciosamente.
-4. Adicionar mensagens amigáveis em português orientando a reconectar ou verificar IMAP/senha de app quando necessário.
-5. Validar o resultado usando os sinais da própria tela/servidor, sem alterar banco de dados nem credenciais existentes.
+A tela mostrada não é o login do sistema: é o formulário de conexão do Gmail. Pelos requests, a conexão retorna sucesso, mas logo depois a página continua tratando a caixa como “não conectada”.
 
-Detalhe técnico:
-- As regras de acesso da tabela `email_accounts` parecem corretas para o próprio usuário.
-- O ponto provável é que `listMessagesFn` retorna lista vazia ou erro não tratado de IMAP, e o componente hoje exibe apenas “Sem mensagens”, sem informar o motivo.
+O ponto mais provável no código é o salvamento da senha criptografada: `email_accounts.password_encrypted` é um campo binário no banco, mas o código está inserindo um `Buffer` diretamente. Isso pode salvar em formato incompatível; em seguida, a validação tenta descriptografar, falha, apaga o registro e a tela volta ao formulário.
+
+## Plano de correção
+
+1. Ajustar a criptografia da senha de app para gravar o valor em formato compatível com o banco (`bytea` como string hexadecimal `\x...`), em vez de inserir `Buffer` diretamente.
+2. Manter a leitura/descriptografia compatível com registros válidos já existentes.
+3. Melhorar o retorno de `getMyAccount` para não parecer “login” quando a conta foi removida por credencial criptografada inválida; a UI deve mostrar uma mensagem clara pedindo para reconectar.
+4. Após conectar com a senha de app, forçar a tela `/email` a trocar imediatamente para a caixa de entrada quando `getMyAccount` retornar conectado.
+5. Validar pelo sinal certo: depois do clique em “Conectar”, o request de conta deve voltar como conectado e o componente `EmailMailbox` deve ser renderizado.
+
+## Arquivos envolvidos
+
+- `src/lib/email.server.ts`
+- `src/lib/email.functions.ts`
+- `src/routes/email.tsx`
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>

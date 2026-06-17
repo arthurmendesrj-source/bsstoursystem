@@ -5,8 +5,6 @@ import { AuthGate } from "@/components/AuthGate";
 import { AppShell } from "@/components/AppShell";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Loader2, Mail, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";

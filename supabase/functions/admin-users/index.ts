@@ -53,6 +53,23 @@ Deno.serve(async (req) => {
     const isDirector = callerRoleSet.has("diretor");
     if (!isAdmin && !isDirector) return json({ error: "Forbidden" }, 403);
 
+    // Resolve caller tenant (single active membership) and super_admin status
+    const { data: callerTenants } = await admin
+      .from("tenant_members")
+      .select("tenant_id")
+      .eq("user_id", callerId)
+      .eq("is_active", true);
+    const callerTenantId: string | null =
+      callerTenants && callerTenants.length === 1
+        ? (callerTenants[0].tenant_id as string)
+        : null;
+    const { data: superRow } = await admin
+      .from("super_admins")
+      .select("user_id")
+      .eq("user_id", callerId)
+      .maybeSingle();
+    const isSuperAdmin = !!superRow;
+
     const body = await req.json().catch(() => ({}));
     const action: string = body.action;
     const actorEmail = userData.user.email ?? null;
@@ -70,6 +87,7 @@ Deno.serve(async (req) => {
           action: entry.action,
           actor_id: callerId,
           actor_email: actorEmail,
+          tenant_id: callerTenantId,
           target_user_id: entry.target_user_id ?? null,
           target_email: entry.target_email ?? null,
           details: entry.details ?? {},
@@ -105,14 +123,20 @@ Deno.serve(async (req) => {
 
     if (action === "list_audit") {
       const limit = Math.min(Number(body.limit ?? 100), 500);
-      const { data, error } = await admin
+      let q = admin
         .from("user_audit_log")
         .select("*")
         .order("created_at", { ascending: false })
         .limit(limit);
+      if (!isSuperAdmin) {
+        if (!callerTenantId) return json({ entries: [] });
+        q = q.eq("tenant_id", callerTenantId);
+      }
+      const { data, error } = await q;
       if (error) return json({ error: error.message }, 500);
       return json({ entries: data ?? [] });
     }
+
 
     if (action === "resend_invite") {
       const targetId = String(body.user_id ?? "");

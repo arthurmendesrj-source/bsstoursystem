@@ -51,9 +51,8 @@ function EmailPage() {
     setSubmitting(true);
     const safety = setTimeout(() => setSubmitting(false), 30_000);
     try {
-      const r: any = await connect({ data: { password } });
+      const r: any = await connect({ data: {} });
       toast.success(`Caixa conectada: ${r?.email ?? ""}`);
-      setPassword("");
       await reload();
     } catch (e: any) {
       toast.error(e?.message ?? "Falha ao conectar", { duration: 8000 });

@@ -85,7 +85,7 @@ function successPage(email: string): string {
 <body style="font-family:system-ui;padding:32px;text-align:center;background:#0f172a;color:#e2e8f0">
 <h1 style="color:#10b981">✓ Gmail conectado</h1>
 <p>Conta <strong>${escapeHtml(email)}</strong> conectada com sucesso.</p>
-<p style="color:#94a3b8">Você já pode fechar esta janela.</p>
+<p style="color:#94a3b8">Você já pode voltar à aba do app e fechar esta.</p>
 <script>
   try { window.opener && window.opener.postMessage({ type: 'gmail-connected', email: ${JSON.stringify(email)} }, '*'); } catch(e){}
   setTimeout(function(){ try { window.close(); } catch(e){} }, 1500);

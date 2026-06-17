@@ -73,20 +73,33 @@ export function EmailMailbox({
     window.addEventListener("mouseup", onUp);
   }, [listCollapsed, listWidth]);
 
+  const refreshIdRef = useRef(0);
   const refresh = async () => {
+    const myId = ++refreshIdRef.current;
     setLoading(true);
     setFetchError(null);
+    const safety = setTimeout(() => {
+      if (refreshIdRef.current === myId) {
+        setLoading(false);
+        setFetchError("Tempo esgotado ao atualizar os emails. Verifique sua conexão e tente novamente.");
+        toast.error("Tempo esgotado ao atualizar os emails.");
+      }
+    }, 60_000);
     try {
       const r: any = await list({ data: { targetUserId, folder, search } });
+      if (refreshIdRef.current !== myId) return;
       setMessages(r.messages ?? []);
       setNotConnected(r.connected === false);
       setFetchError(r.error ?? null);
       if (r.error) toast.error(r.error);
     } catch (e: any) {
-      setFetchError(e?.message ?? "Falha ao listar mensagens");
-      toast.error(e?.message ?? "Falha ao listar mensagens");
+      if (refreshIdRef.current !== myId) return;
+      const msg = e?.message ?? "Falha ao listar mensagens";
+      setFetchError(msg);
+      toast.error(msg);
     } finally {
-      setLoading(false);
+      clearTimeout(safety);
+      if (refreshIdRef.current === myId) setLoading(false);
     }
   };
 

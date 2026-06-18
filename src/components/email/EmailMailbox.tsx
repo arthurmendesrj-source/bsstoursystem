@@ -30,6 +30,15 @@ export function EmailMailbox({
   const list = useServerFn(listMessagesFn);
   const fetchOne = useServerFn(fetchMessageFn);
   const send = useServerFn(sendEmailFn);
+  const analyze = useServerFn(analyzeEmailFn);
+  const triage = useServerFn(triageInboxFn);
+  const navigate = useNavigate();
+
+  const [aiResults, setAiResults] = useState<Record<string, EmailAiResult>>({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [triageRunning, setTriageRunning] = useState(false);
+  const [triageProgress, setTriageProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const triageCancelRef = useRef(false);
 
   const [folder, setFolder] = useState<Folder>("inbox");
   const [loading, setLoading] = useState(false);

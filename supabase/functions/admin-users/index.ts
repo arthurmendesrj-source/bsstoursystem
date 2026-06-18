@@ -183,6 +183,48 @@ Deno.serve(async (req) => {
         return json({ error: "Convidador sem tenant ativo. Acesse /licenca ou contate o suporte." }, 400);
       }
 
+      // Detecta usuário órfão (auth.users existe mas sem profile/login efetivo)
+      // e limpa antes de convidar, para que reenvios funcionem após exclusão parcial.
+      try {
+        const { data: existing } = await admin.auth.admin.listUsers({ perPage: 1000 });
+        const dup = existing?.users?.find(
+          (u) => (u.email ?? "").toLowerCase() === email,
+        );
+        if (dup) {
+          const { data: prof } = await admin
+            .from("profiles")
+            .select("user_id")
+            .eq("user_id", dup.id)
+            .maybeSingle();
+          const { data: actMember } = await admin
+            .from("tenant_members")
+            .select("user_id")
+            .eq("user_id", dup.id)
+            .eq("is_active", true)
+            .maybeSingle();
+          const hasLogin = !!(dup as unknown as { last_sign_in_at?: string }).last_sign_in_at;
+          const isOrphan = !prof && !hasLogin;
+          if (isOrphan) {
+            await cascadeCleanupUser(admin, dup.id);
+            const { error: delOrphanErr } = await admin.auth.admin.deleteUser(dup.id);
+            if (delOrphanErr) {
+              return json({
+                error:
+                  "E-mail já cadastrado e não foi possível limpar resíduo: " +
+                  delOrphanErr.message,
+              }, 409);
+            }
+          } else if (actMember || hasLogin) {
+            return json({
+              error:
+                "E-mail já cadastrado e ativo em outro acesso. Peça para o usuário entrar ou solicite exclusão antes de reconvidar.",
+            }, 409);
+          }
+        }
+      } catch (_) {
+        // segue tentativa; inviteUserByEmail retornará erro claro se persistir
+      }
+
       const redirectTo = `${APP_URL}/accept-invite`;
       const { data: invited, error: invErr } = await admin.auth.admin.inviteUserByEmail(email, {
         data: {

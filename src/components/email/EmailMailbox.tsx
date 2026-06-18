@@ -673,7 +673,7 @@ function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: stri
       className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
     >
       <option value={user.id}>{meName} (eu)</option>
-      {subordinates.map((s) => (
+      {subordinates.map((s: Subordinate) => (
         <option key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</option>
       ))}
     </select>

@@ -411,9 +411,10 @@ export function EmailMailbox({
                 {aiResults[selected.gmailId] && (
                   <AiResultPanel
                     result={aiResults[selected.gmailId]}
-                    onCreateLead={() => createLeadFromSuggestion(aiResults[selected.gmailId])}
+                    summary={aiResults[selected.gmailId].summary}
                   />
                 )}
+
                 <div className="border-t pt-3">
                   {selected.html ? (
                     <iframe

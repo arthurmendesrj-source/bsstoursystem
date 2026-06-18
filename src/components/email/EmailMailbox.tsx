@@ -33,6 +33,7 @@ export function EmailMailbox({
   managerName?: string;
 }) {
   const list = useServerFn(listMessagesFn);
+  const syncFn = useServerFn(syncFolderFn);
   const fetchOne = useServerFn(fetchMessageFn);
   const send = useServerFn(sendEmailFn);
   const analyze = useServerFn(analyzeEmailFn);

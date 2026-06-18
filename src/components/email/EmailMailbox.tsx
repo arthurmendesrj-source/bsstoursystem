@@ -201,24 +201,8 @@ export function EmailMailbox({
     }
   };
 
-  const createLeadFromSuggestion = (r: EmailAiResult) => {
-    const f = r.suggestion.fields;
-    const blob = [
-      f.contact_name && `Nome: ${f.contact_name}`,
-      f.contact_email && `Email: ${f.contact_email}`,
-      f.contact_phone && `Telefone: ${f.contact_phone}`,
-      f.destination && `Destino: ${f.destination}`,
-      f.travel_dates && `Datas: ${f.travel_dates}`,
-      f.pax && `Pax: ${f.pax}`,
-      f.budget && `Orçamento: ${f.budget}`,
-      f.notes && `Observações: ${f.notes}`,
-      "",
-      `Resumo IA: ${r.summary}`,
-    ].filter(Boolean).join("\n");
-    try { navigator.clipboard?.writeText(blob); } catch {}
-    toast.success("Dados copiados. Cole no novo Lead no Workspace.");
-    navigate({ to: "/workspace" });
-  };
+
+
 
   return (
     <div className="space-y-3">

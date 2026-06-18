@@ -243,6 +243,24 @@ export function EmailMailbox({
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={runTriage}
+            disabled={triageRunning || messages.length === 0}
+            title="Analisa os 20 primeiros emails com IA"
+          >
+            {triageRunning ? (
+              <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Triando {triageProgress.done}/{triageProgress.total}</>
+            ) : (
+              <><Sparkles className="h-4 w-4 mr-1" />Triagem IA</>
+            )}
+          </Button>
+          {triageRunning && (
+            <Button variant="ghost" size="sm" onClick={() => { triageCancelRef.current = true; }}>
+              Cancelar
+            </Button>
+          )}
           <Button size="sm" onClick={() => setComposing({ to: "", subject: "", body: "" })}>
             <Plus className="h-4 w-4 mr-1" /> Novo
           </Button>

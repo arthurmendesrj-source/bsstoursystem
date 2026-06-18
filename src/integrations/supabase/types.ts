@@ -1067,6 +1067,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_ai_cache: {
+        Row: {
+          created_at: string
+          message_id: string
+          payload: Json
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          message_id: string
+          payload: Json
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          message_id?: string
+          payload?: Json
+          user_id?: string
+        }
+        Relationships: []
+      }
       exchange_rates: {
         Row: {
           base_currency: Database["public"]["Enums"]["currency_code"]

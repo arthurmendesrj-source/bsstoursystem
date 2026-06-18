@@ -332,9 +332,21 @@ export function EmailMailbox({
                             <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
                               {m.subject || "(sem assunto)"}
                             </div>
-                            {folder === "inbox" && m.unread && (
-                              <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
-                            )}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {folder === "inbox" && m.unread && (
+                                <Badge variant="secondary" className="text-[10px]">Não lido</Badge>
+                              )}
+                              {aiResults[m.gmailId] && (
+                                <>
+                                  <Badge className={cn("text-[10px]", priorityClass(aiResults[m.gmailId].priority))}>
+                                    {aiResults[m.gmailId].priority}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {categoryLabel(aiResults[m.gmailId].category)}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
                           </button>
                         </li>
                       );

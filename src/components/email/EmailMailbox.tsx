@@ -601,3 +601,77 @@ function MailboxSidebar({
     </div>
   );
 }
+
+function priorityClass(p: "alta" | "normal" | "baixa"): string {
+  if (p === "alta") return "bg-red-600 text-white hover:bg-red-600";
+  if (p === "baixa") return "bg-slate-300 text-slate-900 hover:bg-slate-300";
+  return "bg-amber-500 text-white hover:bg-amber-500";
+}
+
+function categoryLabel(c: EmailAiResult["category"]): string {
+  switch (c) {
+    case "lead_novo": return "Lead novo";
+    case "cliente_existente": return "Cliente";
+    case "fornecedor": return "Fornecedor";
+    case "suporte": return "Suporte";
+    case "spam": return "Spam";
+    default: return "Outros";
+  }
+}
+
+function AiResultPanel({
+  result,
+  onCreateLead,
+}: {
+  result: EmailAiResult;
+  onCreateLead: () => void;
+}) {
+  const f = result.suggestion.fields;
+  const hasFields = Object.values(f).some(Boolean);
+  return (
+    <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-violet-900">
+        <Sparkles className="h-4 w-4" /> Análise da IA
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <Badge className={cn("text-[10px]", priorityClass(result.priority))}>Prioridade: {result.priority}</Badge>
+        <Badge variant="outline" className="text-[10px]">{categoryLabel(result.category)}</Badge>
+        <Badge variant="outline" className="text-[10px]">Sentimento: {result.sentiment}</Badge>
+        <Badge variant="outline" className="text-[10px]">Idioma: {result.language}</Badge>
+      </div>
+      <p className="text-sm whitespace-pre-wrap">{result.summary || "(sem resumo)"}</p>
+      {result.suggestion.kind !== "none" && (
+        <div className="rounded border bg-white/60 p-2 space-y-1.5">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Sugestão: {result.suggestion.kind === "lead" ? "Criar Lead" : "Criar Atividade"}
+          </div>
+          {result.suggestion.title && <div className="text-sm font-medium">{result.suggestion.title}</div>}
+          {hasFields && (
+            <ul className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5">
+              {f.contact_name && <li><strong>Nome:</strong> {f.contact_name}</li>}
+              {f.contact_email && <li><strong>Email:</strong> {f.contact_email}</li>}
+              {f.contact_phone && <li><strong>Telefone:</strong> {f.contact_phone}</li>}
+              {f.destination && <li><strong>Destino:</strong> {f.destination}</li>}
+              {f.travel_dates && <li><strong>Datas:</strong> {f.travel_dates}</li>}
+              {f.pax && <li><strong>Pax:</strong> {f.pax}</li>}
+              {f.budget && <li><strong>Orçamento:</strong> {f.budget}</li>}
+              {f.notes && <li className="sm:col-span-2"><strong>Obs.:</strong> {f.notes}</li>}
+            </ul>
+          )}
+          <div className="flex gap-2 pt-1">
+            {result.suggestion.kind === "lead" && (
+              <Button size="sm" onClick={onCreateLead}>
+                <Copy className="h-3.5 w-3.5 mr-1" />Copiar e criar Lead
+              </Button>
+            )}
+            {result.suggestion.kind === "activity" && (
+              <Button size="sm" variant="outline" onClick={onCreateLead}>
+                <Copy className="h-3.5 w-3.5 mr-1" />Copiar dados
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

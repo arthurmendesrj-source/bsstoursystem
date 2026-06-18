@@ -257,8 +257,9 @@ Deno.serve(async (req) => {
             .eq("user_id", dup.id)
             .eq("is_active", true)
             .maybeSingle();
-          const hasLogin = !!(dup as unknown as { last_sign_in_at?: string }).last_sign_in_at;
-          const isOrphan = !prof && !hasLogin;
+          // Órfão = sem profile E sem membership ativo. last_sign_in_at não é
+          // usado como bloqueio porque permanece preenchido após exclusões parciais.
+          const isOrphan = !prof && !actMember;
           if (isOrphan) {
             await cascadeCleanupUser(admin, dup.id);
             const { error: delOrphanErr } = await admin.auth.admin.deleteUser(dup.id);
@@ -269,7 +270,7 @@ Deno.serve(async (req) => {
                   delOrphanErr.message,
               }, 409);
             }
-          } else if (actMember || hasLogin) {
+          } else {
             return json({
               error:
                 "E-mail já cadastrado e ativo em outro acesso. Peça para o usuário entrar ou solicite exclusão antes de reconvidar.",

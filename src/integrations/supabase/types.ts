@@ -1088,6 +1088,129 @@ export type Database = {
         }
         Relationships: []
       }
+      email_sync_state: {
+        Row: {
+          created_at: string
+          folder: string
+          last_error: string | null
+          last_history_id: string | null
+          last_synced_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          folder: string
+          last_error?: string | null
+          last_history_id?: string | null
+          last_synced_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          folder?: string
+          last_error?: string | null
+          last_history_id?: string | null
+          last_synced_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      emails: {
+        Row: {
+          body_html: string | null
+          body_loaded: boolean
+          body_text: string | null
+          cc_emails: string[] | null
+          created_at: string
+          customer_id: string | null
+          folder: string
+          from_email: string | null
+          from_name: string | null
+          gmail_id: string
+          has_attachments: boolean
+          id: string
+          internal_date: string | null
+          is_unread: boolean
+          labels: string[] | null
+          lead_id: string | null
+          message_id: string | null
+          snippet: string | null
+          subject: string | null
+          thread_id: string | null
+          to_emails: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          body_html?: string | null
+          body_loaded?: boolean
+          body_text?: string | null
+          cc_emails?: string[] | null
+          created_at?: string
+          customer_id?: string | null
+          folder: string
+          from_email?: string | null
+          from_name?: string | null
+          gmail_id: string
+          has_attachments?: boolean
+          id?: string
+          internal_date?: string | null
+          is_unread?: boolean
+          labels?: string[] | null
+          lead_id?: string | null
+          message_id?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_emails?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          body_html?: string | null
+          body_loaded?: boolean
+          body_text?: string | null
+          cc_emails?: string[] | null
+          created_at?: string
+          customer_id?: string | null
+          folder?: string
+          from_email?: string | null
+          from_name?: string | null
+          gmail_id?: string
+          has_attachments?: boolean
+          id?: string
+          internal_date?: string | null
+          is_unread?: boolean
+          labels?: string[] | null
+          lead_id?: string | null
+          message_id?: string | null
+          snippet?: string | null
+          subject?: string | null
+          thread_id?: string | null
+          to_emails?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emails_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emails_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exchange_rates: {
         Row: {
           base_currency: Database["public"]["Enums"]["currency_code"]
@@ -4367,6 +4490,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_tenant_admin: {
+        Args: { _tenant_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_tenant_billing_blocked: {
         Args: { _tenant_id: string }
         Returns: boolean

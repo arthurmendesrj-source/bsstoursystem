@@ -13,6 +13,12 @@ import { PermissionFieldHighlighter } from "@/components/PermissionFieldHighligh
 import { GlobalButtonTooltips } from "@/components/GlobalButtonTooltips";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WorkspaceWindowsProvider } from "@/components/workspace/WorkspaceWindowsProvider";
+import { useEmailBackgroundSync } from "@/hooks/useEmailBackgroundSync";
+
+function EmailBackgroundSyncMount() {
+  useEmailBackgroundSync();
+  return null;
+}
 
 function NotFoundComponent() {
   return (
@@ -82,6 +88,7 @@ function RootComponent() {
                 <PermissionsProvider>
                   <TooltipProvider delayDuration={400}>
                     <WorkspaceWindowsProvider>
+                      <EmailBackgroundSyncMount />
                       <Outlet />
                       <PermissionFieldHighlighter />
                       <GlobalButtonTooltips />

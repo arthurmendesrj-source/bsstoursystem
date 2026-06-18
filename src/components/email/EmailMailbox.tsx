@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn } from "@/lib/email.functions";
+import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
+import { useNavigate } from "@tanstack/react-router";
 
 type Folder = "inbox" | "sent";
 

@@ -147,6 +147,53 @@ export function EmailMailbox({
 
   useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [folder, targetUserId]);
 
+  // Background auto-refresh: silently sync with Gmail every 60s while the tab is visible.
+  const bgSyncingRef = useRef(false);
+  const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (bgSyncingRef.current || loading || notConnected) return;
+      bgSyncingRef.current = true;
+      try {
+        const r: any = await syncFn({ data: { targetUserId, folder, search } });
+        if (cancelled) return;
+        if (r?.messages) setMessages(r.messages);
+        if (r?.connected === false) setNotConnected(true);
+        if (!r?.error) setLastSyncAt(Date.now());
+      } catch {
+        // silent
+      } finally {
+        bgSyncingRef.current = false;
+      }
+    };
+    const id = window.setInterval(tick, 60_000);
+    const onVis = () => { if (document.visibilityState === "visible") void tick(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folder, targetUserId, search, notConnected]);
+
+  // Update the "Atualizado há Xs" label every 15s.
+  const [, setTickNow] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => setTickNow((n) => n + 1), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const lastSyncLabel = useMemo(() => {
+    if (!lastSyncAt) return null;
+    const s = Math.max(0, Math.round((Date.now() - lastSyncAt) / 1000));
+    if (s < 60) return `Atualizado há ${s}s`;
+    const m = Math.round(s / 60);
+    return `Atualizado há ${m} min`;
+  }, [lastSyncAt]);
+
   useEffect(() => {
     if (selectedUid == null) { setSelected(null); return; }
     const m = messages.find((x: any) => x.uid === selectedUid);

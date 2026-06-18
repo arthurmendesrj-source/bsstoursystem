@@ -379,61 +379,47 @@ Deno.serve(async (req) => {
         await admin.from("tasks").update({ assigned_to: reassignTo }).eq("assigned_to", targetId);
         await admin.from("tasks").update({ created_by: reassignTo }).eq("created_by", targetId);
       } else {
-        // Cleanup user-owned data (cascade delete)
-        const { data: quotes } = await admin.from("quotes").select("id").eq("created_by", targetId);
-        const quoteIds = (quotes ?? []).map((q) => q.id);
-        if (quoteIds.length > 0) {
-          await admin.from("quote_items").delete().in("quote_id", quoteIds);
-          await admin.from("quote_flights").delete().in("quote_id", quoteIds);
-          await admin.from("quote_documents").delete().in("quote_id", quoteIds);
+        // Cleanup completo (inclui email_accounts, email_ai_cache, tenants etc.)
+        await cascadeCleanupUser(admin, targetId);
+      }
+
+      // Em modo "reassign" ainda precisamos limpar vínculos pessoais (papéis, profile, emails)
+      if (reassignTo) {
+        await admin.from("notification_logs").delete().eq("user_id", targetId);
+        await admin.from("notification_preferences").delete().eq("user_id", targetId);
+        await admin.from("push_subscriptions").delete().eq("user_id", targetId);
+        await admin.from("lead_alert_snoozes").delete().eq("user_id", targetId);
+        const { data: convs } = await admin.from("ai_conversations").select("id").eq("user_id", targetId);
+        const convIds = (convs ?? []).map((c) => c.id);
+        if (convIds.length > 0) {
+          await admin.from("ai_messages").delete().in("conversation_id", convIds);
+          await admin.from("ai_pending_actions").delete().in("conversation_id", convIds);
+          await admin.from("ai_generated_images").delete().in("conversation_id", convIds);
         }
-        await admin.from("quotes").delete().eq("created_by", targetId);
-        await admin.from("bookings").delete().eq("created_by", targetId);
-        await admin.from("leads").delete().eq("created_by", targetId);
-        await admin.from("leads").delete().eq("assigned_to", targetId);
-        await admin.from("customers").delete().eq("created_by", targetId);
-        await admin.from("interactions").delete().eq("created_by", targetId);
-        await admin.from("tasks").delete().eq("assigned_to", targetId);
-        await admin.from("tasks").delete().eq("created_by", targetId);
+        await admin.from("ai_conversations").delete().eq("user_id", targetId);
+        await admin.from("user_module_permissions").delete().eq("user_id", targetId);
+        await admin.from("user_field_permissions").delete().eq("user_id", targetId);
+        await admin.from("user_roles").delete().eq("user_id", targetId);
+        await admin.from("profiles").delete().eq("user_id", targetId);
+        await admin.from("email_accounts").delete().eq("user_id", targetId);
+        await admin.from("email_ai_cache").delete().eq("user_id", targetId);
+        await admin.from("usage_ai_events").delete().eq("user_id", targetId);
+        await admin.from("super_admins").delete().eq("user_id", targetId);
+        await admin.from("tenant_members").delete().eq("user_id", targetId);
+        await admin.from("tenants").update({ created_by: null }).eq("created_by", targetId);
       }
-
-      // 3) user-scoped auxiliary
-      await admin.from("notification_logs").delete().eq("user_id", targetId);
-      await admin.from("notification_preferences").delete().eq("user_id", targetId);
-      await admin.from("push_subscriptions").delete().eq("user_id", targetId);
-      await admin.from("lead_alert_snoozes").delete().eq("user_id", targetId);
-
-      // 4) ai conversations + messages (cascade msgs first)
-      const { data: convs } = await admin.from("ai_conversations").select("id").eq("user_id", targetId);
-      const convIds = (convs ?? []).map((c) => c.id);
-      if (convIds.length > 0) {
-        await admin.from("ai_messages").delete().in("conversation_id", convIds);
-        await admin.from("ai_pending_actions").delete().in("conversation_id", convIds);
-        await admin.from("ai_generated_images").delete().in("conversation_id", convIds);
-      }
-      await admin.from("ai_conversations").delete().eq("user_id", targetId);
-
-      // 5) permissions + role
-      await admin.from("user_module_permissions").delete().eq("user_id", targetId);
-      await admin.from("user_field_permissions").delete().eq("user_id", targetId);
-      await admin.from("user_roles").delete().eq("user_id", targetId);
-
-      // 6) profile
-      await admin.from("profiles").delete().eq("user_id", targetId);
-
-      // 6b) other FKs to auth.users that block deleteUser
-      await admin.from("email_message_links").delete().eq("created_by", targetId);
-      await admin.from("packages").delete().eq("created_by", targetId);
-      await admin.from("usage_ai_events").delete().eq("user_id", targetId);
-      await admin.from("super_admins").delete().eq("user_id", targetId);
-      await admin.from("tenant_members").delete().eq("user_id", targetId);
-      // Detach tenants owned by this user (keep tenant data; created_by is nullable)
-      await admin.from("tenants").update({ created_by: null }).eq("created_by", targetId);
 
       // 7) auth user
       const { error: delErr } = await admin.auth.admin.deleteUser(targetId);
-
       if (delErr) return json({ error: delErr.message }, 500);
+
+      // 8) confirma remoção do auth.users
+      const { data: stillThere } = await admin.auth.admin.getUserById(targetId);
+      if (stillThere?.user) {
+        return json({
+          error: "Exclusão parcial: usuário ainda existe em auth.users após cascata. Reveja FKs restantes.",
+        }, 500);
+      }
 
       await audit({
         action: "delete",

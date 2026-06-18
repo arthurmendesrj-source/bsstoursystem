@@ -147,7 +147,9 @@ export function EmailMailbox({
 
   useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [folder, targetUserId]);
 
-  // Background auto-refresh: silently sync with Gmail every 60s while the tab is visible.
+  // Background auto-refresh on the email screen: silently re-syncs the *current*
+  // folder/search every 30s so the list updates while the user is looking at it.
+  // (A global hook in __root also keeps the inbox cache fresh for any route.)
   const bgSyncingRef = useRef(false);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
   useEffect(() => {
@@ -169,7 +171,7 @@ export function EmailMailbox({
         bgSyncingRef.current = false;
       }
     };
-    const id = window.setInterval(tick, 60_000);
+    const id = window.setInterval(tick, 30_000);
     const onVis = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVis);
     return () => {
@@ -179,6 +181,7 @@ export function EmailMailbox({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folder, targetUserId, search, notConnected]);
+
 
   // Update the "Atualizado há Xs" label every 15s.
   const [, setTickNow] = useState(0);
@@ -306,7 +309,7 @@ export function EmailMailbox({
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
           {lastSyncLabel && (
-            <span className="text-xs text-muted-foreground hidden md:inline" title="Atualiza automaticamente a cada 1 min">
+            <span className="text-xs text-muted-foreground hidden md:inline" title="Atualiza automaticamente a cada 30s">
               {lastSyncLabel}
             </span>
           )}

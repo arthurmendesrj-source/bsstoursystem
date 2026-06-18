@@ -37,7 +37,8 @@ export function EmailMailbox({
   const send = useServerFn(sendEmailFn);
   const analyze = useServerFn(analyzeEmailFn);
   const triage = useServerFn(triageInboxFn);
-  const navigate = useNavigate();
+
+
 
   const [aiResults, setAiResults] = useState<Record<string, EmailAiResult>>({});
   const [aiLoading, setAiLoading] = useState(false);

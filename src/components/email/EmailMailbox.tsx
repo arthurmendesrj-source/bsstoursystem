@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn } from "@/lib/email.functions";
 import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
 import { useNavigate } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import { useSubordinates, type Subordinate } from "@/lib/hierarchy";
+import { notifyTaskAssigned } from "@/lib/tasks.functions";
+
 
 type Folder = "inbox" | "sent";
 

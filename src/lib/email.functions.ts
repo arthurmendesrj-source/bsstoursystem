@@ -75,6 +75,8 @@ export const disconnectGmail = createServerFn({ method: "POST" })
       .delete()
       .eq("user_id", context.userId)
       .eq("provider", "gmail_oauth");
+    await supabaseAdmin.from("emails").delete().eq("user_id", context.userId);
+    await supabaseAdmin.from("email_sync_state").delete().eq("user_id", context.userId);
     return { ok: true };
   });
 

@@ -213,6 +213,19 @@ export const sendEmailFn = createServerFn({ method: "POST" })
       text: data.body,
       inReplyTo: data.inReplyTo,
     });
+    // Persist sent message in local cache so it shows up in "Enviados" immediately.
+    try {
+      const { persistSentMessage } = await import("./email-sync.server");
+      await persistSentMessage(data.targetUserId, {
+        gmailId: res.messageId,
+        from: profile.emailAddress,
+        to: data.to,
+        cc: data.cc,
+        subject: data.subject,
+        text: data.body,
+        messageId: data.inReplyTo ?? null,
+      });
+    } catch {}
     if (context.userId !== data.targetUserId) {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       await supabaseAdmin.from("user_audit_log").insert({

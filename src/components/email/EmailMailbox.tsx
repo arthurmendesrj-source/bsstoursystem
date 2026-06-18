@@ -255,7 +255,7 @@ export function EmailMailbox({
             onKeyDown={(e) => { if (e.key === "Enter") refresh(); }}
             className="w-64"
           />
-          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={syncNow} disabled={loading} title="Sincronizar com o Gmail">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
           <Button

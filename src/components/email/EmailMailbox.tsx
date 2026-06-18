@@ -159,7 +159,67 @@ export function EmailMailbox({
     }
   };
 
-  return (
+  const runAnalyze = async (force = false) => {
+    if (!selected?.gmailId) return;
+    setAiLoading(true);
+    try {
+      const r: any = await analyze({ data: { targetUserId, gmailId: selected.gmailId, force } });
+      setAiResults((m) => ({ ...m, [selected.gmailId]: r.result }));
+      if (!r.cached) toast.success("Análise concluída.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha na análise");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const runTriage = async () => {
+    const ids = messages.slice(0, 20).map((m: any) => m.gmailId).filter(Boolean);
+    if (ids.length === 0) { toast.info("Sem mensagens para triagem."); return; }
+    triageCancelRef.current = false;
+    setTriageRunning(true);
+    setTriageProgress({ done: 0, total: ids.length });
+    try {
+      // Processa em chunks pequenos para mostrar progresso
+      const chunkSize = 3;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        if (triageCancelRef.current) break;
+        const chunk = ids.slice(i, i + chunkSize);
+        const r: any = await triage({ data: { targetUserId, gmailIds: chunk } });
+        const next: Record<string, EmailAiResult> = {};
+        for (const row of r.results ?? []) {
+          if (row.result) next[row.gmailId] = row.result;
+        }
+        setAiResults((m) => ({ ...m, ...next }));
+        setTriageProgress({ done: Math.min(i + chunkSize, ids.length), total: ids.length });
+      }
+      toast.success("Triagem concluída.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha na triagem");
+    } finally {
+      setTriageRunning(false);
+    }
+  };
+
+  const createLeadFromSuggestion = (r: EmailAiResult) => {
+    const f = r.suggestion.fields;
+    const blob = [
+      f.contact_name && `Nome: ${f.contact_name}`,
+      f.contact_email && `Email: ${f.contact_email}`,
+      f.contact_phone && `Telefone: ${f.contact_phone}`,
+      f.destination && `Destino: ${f.destination}`,
+      f.travel_dates && `Datas: ${f.travel_dates}`,
+      f.pax && `Pax: ${f.pax}`,
+      f.budget && `Orçamento: ${f.budget}`,
+      f.notes && `Observações: ${f.notes}`,
+      "",
+      `Resumo IA: ${r.summary}`,
+    ].filter(Boolean).join("\n");
+    try { navigator.clipboard?.writeText(blob); } catch {}
+    toast.success("Dados copiados. Cole no novo Lead no Workspace.");
+    navigate({ to: "/workspace" });
+  };
+
     <div className="space-y-3">
       {managerMode && (
         <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">

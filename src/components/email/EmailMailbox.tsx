@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn } from "@/lib/email.functions";
+import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
+import { useNavigate } from "@tanstack/react-router";
 
 type Folder = "inbox" | "sent";
 
@@ -28,6 +30,15 @@ export function EmailMailbox({
   const list = useServerFn(listMessagesFn);
   const fetchOne = useServerFn(fetchMessageFn);
   const send = useServerFn(sendEmailFn);
+  const analyze = useServerFn(analyzeEmailFn);
+  const triage = useServerFn(triageInboxFn);
+  const navigate = useNavigate();
+
+  const [aiResults, setAiResults] = useState<Record<string, EmailAiResult>>({});
+  const [aiLoading, setAiLoading] = useState(false);
+  const [triageRunning, setTriageRunning] = useState(false);
+  const [triageProgress, setTriageProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const triageCancelRef = useRef(false);
 
   const [folder, setFolder] = useState<Folder>("inbox");
   const [loading, setLoading] = useState(false);
@@ -148,6 +159,67 @@ export function EmailMailbox({
     }
   };
 
+  const runAnalyze = async (force = false) => {
+    if (!selected?.gmailId) return;
+    setAiLoading(true);
+    try {
+      const r: any = await analyze({ data: { targetUserId, gmailId: selected.gmailId, force } });
+      setAiResults((m) => ({ ...m, [selected.gmailId]: r.result }));
+      if (!r.cached) toast.success("Análise concluída.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha na análise");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const runTriage = async () => {
+    const ids = messages.slice(0, 20).map((m: any) => m.gmailId).filter(Boolean);
+    if (ids.length === 0) { toast.info("Sem mensagens para triagem."); return; }
+    triageCancelRef.current = false;
+    setTriageRunning(true);
+    setTriageProgress({ done: 0, total: ids.length });
+    try {
+      // Processa em chunks pequenos para mostrar progresso
+      const chunkSize = 3;
+      for (let i = 0; i < ids.length; i += chunkSize) {
+        if (triageCancelRef.current) break;
+        const chunk = ids.slice(i, i + chunkSize);
+        const r: any = await triage({ data: { targetUserId, gmailIds: chunk } });
+        const next: Record<string, EmailAiResult> = {};
+        for (const row of r.results ?? []) {
+          if (row.result) next[row.gmailId] = row.result;
+        }
+        setAiResults((m) => ({ ...m, ...next }));
+        setTriageProgress({ done: Math.min(i + chunkSize, ids.length), total: ids.length });
+      }
+      toast.success("Triagem concluída.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha na triagem");
+    } finally {
+      setTriageRunning(false);
+    }
+  };
+
+  const createLeadFromSuggestion = (r: EmailAiResult) => {
+    const f = r.suggestion.fields;
+    const blob = [
+      f.contact_name && `Nome: ${f.contact_name}`,
+      f.contact_email && `Email: ${f.contact_email}`,
+      f.contact_phone && `Telefone: ${f.contact_phone}`,
+      f.destination && `Destino: ${f.destination}`,
+      f.travel_dates && `Datas: ${f.travel_dates}`,
+      f.pax && `Pax: ${f.pax}`,
+      f.budget && `Orçamento: ${f.budget}`,
+      f.notes && `Observações: ${f.notes}`,
+      "",
+      `Resumo IA: ${r.summary}`,
+    ].filter(Boolean).join("\n");
+    try { navigator.clipboard?.writeText(blob); } catch {}
+    toast.success("Dados copiados. Cole no novo Lead no Workspace.");
+    navigate({ to: "/workspace" });
+  };
+
   return (
     <div className="space-y-3">
       {managerMode && (
@@ -171,6 +243,24 @@ export function EmailMailbox({
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={runTriage}
+            disabled={triageRunning || messages.length === 0}
+            title="Analisa os 20 primeiros emails com IA"
+          >
+            {triageRunning ? (
+              <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Triando {triageProgress.done}/{triageProgress.total}</>
+            ) : (
+              <><Sparkles className="h-4 w-4 mr-1" />Triagem IA</>
+            )}
+          </Button>
+          {triageRunning && (
+            <Button variant="ghost" size="sm" onClick={() => { triageCancelRef.current = true; }}>
+              Cancelar
+            </Button>
+          )}
           <Button size="sm" onClick={() => setComposing({ to: "", subject: "", body: "" })}>
             <Plus className="h-4 w-4 mr-1" /> Novo
           </Button>
@@ -242,9 +332,21 @@ export function EmailMailbox({
                             <div className={`text-sm truncate ${folder === "inbox" && m.unread ? "font-medium" : "text-muted-foreground"}`}>
                               {m.subject || "(sem assunto)"}
                             </div>
-                            {folder === "inbox" && m.unread && (
-                              <Badge variant="secondary" className="mt-1 text-[10px]">Não lido</Badge>
-                            )}
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {folder === "inbox" && m.unread && (
+                                <Badge variant="secondary" className="text-[10px]">Não lido</Badge>
+                              )}
+                              {aiResults[m.gmailId] && (
+                                <>
+                                  <Badge className={cn("text-[10px]", priorityClass(aiResults[m.gmailId].priority))}>
+                                    {aiResults[m.gmailId].priority}
+                                  </Badge>
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {categoryLabel(aiResults[m.gmailId].category)}
+                                  </Badge>
+                                </>
+                              )}
+                            </div>
                           </button>
                         </li>
                       );
@@ -306,7 +408,7 @@ export function EmailMailbox({
                     {selected.date && <div>{new Date(selected.date).toLocaleString()}</div>}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => setComposing({
                     to: folder === "inbox" ? extractEmail(selected.from) : extractEmail(selected.to),
                     subject: selected.subject?.startsWith("Re:") ? selected.subject : `Re: ${selected.subject ?? ""}`,
@@ -315,7 +417,19 @@ export function EmailMailbox({
                   })}>
                     <Reply className="h-4 w-4 mr-1" />Responder
                   </Button>
+                  <Button size="sm" variant="outline" onClick={() => runAnalyze(false)} disabled={aiLoading}>
+                    {aiLoading
+                      ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Analisando…</>
+                      : <><Sparkles className="h-4 w-4 mr-1" />{aiResults[selected.gmailId] ? "Re-analisar" : "Analisar com IA"}</>}
+                  </Button>
                 </div>
+
+                {aiResults[selected.gmailId] && (
+                  <AiResultPanel
+                    result={aiResults[selected.gmailId]}
+                    onCreateLead={() => createLeadFromSuggestion(aiResults[selected.gmailId])}
+                  />
+                )}
                 <div className="border-t pt-3">
                   {selected.html ? (
                     <iframe
@@ -483,6 +597,80 @@ function MailboxSidebar({
           aria-label="Redimensionar"
           title="Arraste para redimensionar"
         />
+      )}
+    </div>
+  );
+}
+
+function priorityClass(p: "alta" | "normal" | "baixa"): string {
+  if (p === "alta") return "bg-red-600 text-white hover:bg-red-600";
+  if (p === "baixa") return "bg-slate-300 text-slate-900 hover:bg-slate-300";
+  return "bg-amber-500 text-white hover:bg-amber-500";
+}
+
+function categoryLabel(c: EmailAiResult["category"]): string {
+  switch (c) {
+    case "lead_novo": return "Lead novo";
+    case "cliente_existente": return "Cliente";
+    case "fornecedor": return "Fornecedor";
+    case "suporte": return "Suporte";
+    case "spam": return "Spam";
+    default: return "Outros";
+  }
+}
+
+function AiResultPanel({
+  result,
+  onCreateLead,
+}: {
+  result: EmailAiResult;
+  onCreateLead: () => void;
+}) {
+  const f = result.suggestion.fields;
+  const hasFields = Object.values(f).some(Boolean);
+  return (
+    <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 space-y-2">
+      <div className="flex items-center gap-2 text-sm font-semibold text-violet-900">
+        <Sparkles className="h-4 w-4" /> Análise da IA
+      </div>
+      <div className="flex flex-wrap gap-1">
+        <Badge className={cn("text-[10px]", priorityClass(result.priority))}>Prioridade: {result.priority}</Badge>
+        <Badge variant="outline" className="text-[10px]">{categoryLabel(result.category)}</Badge>
+        <Badge variant="outline" className="text-[10px]">Sentimento: {result.sentiment}</Badge>
+        <Badge variant="outline" className="text-[10px]">Idioma: {result.language}</Badge>
+      </div>
+      <p className="text-sm whitespace-pre-wrap">{result.summary || "(sem resumo)"}</p>
+      {result.suggestion.kind !== "none" && (
+        <div className="rounded border bg-white/60 p-2 space-y-1.5">
+          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+            Sugestão: {result.suggestion.kind === "lead" ? "Criar Lead" : "Criar Atividade"}
+          </div>
+          {result.suggestion.title && <div className="text-sm font-medium">{result.suggestion.title}</div>}
+          {hasFields && (
+            <ul className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5">
+              {f.contact_name && <li><strong>Nome:</strong> {f.contact_name}</li>}
+              {f.contact_email && <li><strong>Email:</strong> {f.contact_email}</li>}
+              {f.contact_phone && <li><strong>Telefone:</strong> {f.contact_phone}</li>}
+              {f.destination && <li><strong>Destino:</strong> {f.destination}</li>}
+              {f.travel_dates && <li><strong>Datas:</strong> {f.travel_dates}</li>}
+              {f.pax && <li><strong>Pax:</strong> {f.pax}</li>}
+              {f.budget && <li><strong>Orçamento:</strong> {f.budget}</li>}
+              {f.notes && <li className="sm:col-span-2"><strong>Obs.:</strong> {f.notes}</li>}
+            </ul>
+          )}
+          <div className="flex gap-2 pt-1">
+            {result.suggestion.kind === "lead" && (
+              <Button size="sm" onClick={onCreateLead}>
+                <Copy className="h-3.5 w-3.5 mr-1" />Copiar e criar Lead
+              </Button>
+            )}
+            {result.suggestion.kind === "activity" && (
+              <Button size="sm" variant="outline" onClick={onCreateLead}>
+                <Copy className="h-3.5 w-3.5 mr-1" />Copiar dados
+              </Button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

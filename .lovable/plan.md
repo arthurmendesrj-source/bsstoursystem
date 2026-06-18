@@ -1,42 +1,38 @@
-# Reativar IA no módulo Email
+## Restaurar criação completa de Lead / Atividade no painel "Analisar com IA"
 
-Reativar a IA do módulo `/email` com três funções, sempre executadas **sob demanda** (botão), usando Lovable AI (`google/gemini-3-flash-preview`) — mesmo padrão das outras funções do projeto (sem custo de chave para o usuário).
+Hoje o botão "Analisar com IA" só mostra resumo e um botão único "Copiar e criar Lead" que copia dados e redireciona ao `/workspace`. Vou reativar o fluxo completo: criar Lead OU Atividade direto do painel, com seleção de responsável respeitando a hierarquia.
 
-## O que será entregue
+### Mudanças
 
-1. **Resumo automático do email aberto**
-   - Botão "Analisar com IA" no visualizador de email (`EmailMailbox.tsx`).
-   - A IA recebe assunto + corpo do email e retorna: resumo curto (2–4 linhas), idioma detectado, sentimento e prioridade sugerida (alta/normal/baixa).
-   - Resumo é cacheado por `gmail_id` para não regerar a cada clique.
+**1. `src/components/email/EmailMailbox.tsx` — painel de resultado da IA**
 
-2. **Sugestão de Lead / Atividade**
-   - Logo abaixo do resumo, a IA sugere uma ação: **Criar Lead** ou **Criar Atividade** (ou "nenhuma ação").
-   - Preenche campos extraídos do email: nome do contato, telefone, email, destino, datas, nº pax, orçamento, observações.
-   - Dois botões: "Criar Lead com estes dados" (abre `/workspace` pré-preenchido) e "Criar Atividade" (cria task vinculada ao lead correspondente, se o email já bater com um lead existente por endereço).
-   - **Nada é gravado sem o operador confirmar** (mantém a regra histórica).
+Substituir o botão único atual por dois blocos de ação, exibidos conforme a sugestão da IA (e ambos sempre disponíveis manualmente):
 
-3. **Triagem em lote da caixa**
-   - Botão "Triagem IA" no topo da lista de emails — processa os N emails visíveis (ex.: últimos 20 não lidos).
-   - Para cada um: gera resumo + categoria (lead novo / cliente existente / fornecedor / suporte / spam) + prioridade.
-   - Resultados aparecem como badges coloridas na lista; clicar abre o email com o resumo já pronto.
-   - Barra de progresso e botão de cancelar; processa serialmente para não estourar rate-limit (429).
+- **Criar Lead** — formulário compacto inline:
+  - Nome, e-mail, telefone, destino, datas, pax, orçamento, observações (pré-preenchidos da extração).
+  - Select **"Responsável"**: usuário atual + lista de subordinados (via `useSubordinates()`); operador comum só vê a si mesmo.
+  - Botão "Criar Lead" → `supabase.from("leads").insert({...})` com `created_by = user.id`, `assigned_to = selecionado`. Toast + link "Abrir lead" que navega para `/leads/$id`.
 
-## Detalhes técnicos
+- **Criar Atividade** — formulário compacto inline:
+  - Título (default = `suggestion.title`), descrição (= resumo + extras), data/hora, prioridade (alta/média/baixa derivada de `priority`), categoria (default `suporte`).
+  - Select **"Responsável"** igual ao acima.
+  - Opcional: associar a um Lead existente (busca rápida por nome — reusa pattern de `activities.tsx`).
+  - Botão "Criar Atividade" → `supabase.from("tasks").insert({...})`. Se `assigned_to` ≠ usuário atual, dispara `notifyTaskAssigned` (mesmo pattern de `activities.tsx`). Toast de confirmação.
 
-- **Backend**: novo `src/lib/email-ai.functions.ts` com `createServerFn` protegido por `requireSupabaseAuth`:
-  - `analyzeEmail({ gmailId, targetUserId })` — busca o email via `gmail-api.server`, chama Lovable AI Gateway, retorna `{ summary, language, sentiment, priority, suggestion: { kind: 'lead'|'activity'|'none', fields } }`.
-  - `triageInbox({ targetUserId, gmailIds })` — itera serialmente chamando `analyzeEmail`, retorna array de resultados.
-- **Cache**: nova tabela `email_ai_cache(message_id text PK, user_id uuid, payload jsonb, created_at)` com RLS por `user_id` + GRANT padrão (authenticated/service_role). Evita custo repetido.
-- **Modelo**: `google/gemini-3-flash-preview` com `Output.object` (Zod) para garantir JSON estruturado.
-- **Tratamento de erro**: 429 → toast "limite atingido, tente novamente"; 402 → toast "créditos esgotados, recarregue em Settings → Workspace → Usage".
-- **Frontend**: alterações apenas em `src/components/email/EmailMailbox.tsx` (botões, painel lateral de IA, badges na lista, modal de progresso para triagem em lote).
+Manter os badges de prioridade/categoria e o botão "Reanalisar" (`force: true`) já existentes.
 
-## Fora de escopo
+**2. Hook de hierarquia**
 
-- Sem rascunho automático de resposta.
-- Sem execução automática ao receber/abrir email — tudo sob clique.
-- Sem alteração no `/workspace`, leads ou tasks além do pré-preenchimento via query params.
+Reutilizar `useSubordinates()` de `src/lib/hierarchy.ts` (já existe e funciona). O select de responsável mostra: o próprio usuário no topo + cada subordinado com `(role)` ao lado do nome. Admin/Diretor vê todos.
 
-## Teste
+**3. Sem mudanças de backend / schema**
 
-Após implementar: abrir `/email`, abrir um email real → clicar "Analisar com IA" → verificar resumo + sugestão; clicar "Triagem IA" com 5 emails → verificar badges; recarregar e reabrir o mesmo email → resumo vem do cache (sem nova chamada).
+- Sem migrations.
+- `email-ai.functions.ts`, `email_ai_cache`, `analyzeEmailFn`, `triageInboxFn`: ficam como estão (já retornam `suggestion.kind` + `fields`).
+- Inserts vão pela RLS normal de `leads` / `tasks` (mesmo caminho de `/leads` e `/activities`).
+
+### Fora de escopo
+
+- Não recriar tabela `emails` nem auto-vincular mensagens a lead/task no banco (esse vínculo foi removido no rebuild do módulo de e-mail e não foi pedido agora).
+- Não mexer em `/workspace`, `/leads`, `/activities`.
+- Sem rascunho automático de resposta nem execução automática ao abrir/sincronizar (já decidimos: só sob demanda).

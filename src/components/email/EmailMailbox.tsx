@@ -8,11 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles, Copy } from "lucide-react";
+import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn } from "@/lib/email.functions";
 import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
 import { useNavigate } from "@tanstack/react-router";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import { useSubordinates, type Subordinate } from "@/lib/hierarchy";
+import { notifyTaskAssigned } from "@/lib/tasks.functions";
+
 
 type Folder = "inbox" | "sent";
 
@@ -32,7 +37,8 @@ export function EmailMailbox({
   const send = useServerFn(sendEmailFn);
   const analyze = useServerFn(analyzeEmailFn);
   const triage = useServerFn(triageInboxFn);
-  const navigate = useNavigate();
+
+
 
   const [aiResults, setAiResults] = useState<Record<string, EmailAiResult>>({});
   const [aiLoading, setAiLoading] = useState(false);
@@ -201,24 +207,8 @@ export function EmailMailbox({
     }
   };
 
-  const createLeadFromSuggestion = (r: EmailAiResult) => {
-    const f = r.suggestion.fields;
-    const blob = [
-      f.contact_name && `Nome: ${f.contact_name}`,
-      f.contact_email && `Email: ${f.contact_email}`,
-      f.contact_phone && `Telefone: ${f.contact_phone}`,
-      f.destination && `Destino: ${f.destination}`,
-      f.travel_dates && `Datas: ${f.travel_dates}`,
-      f.pax && `Pax: ${f.pax}`,
-      f.budget && `Orçamento: ${f.budget}`,
-      f.notes && `Observações: ${f.notes}`,
-      "",
-      `Resumo IA: ${r.summary}`,
-    ].filter(Boolean).join("\n");
-    try { navigator.clipboard?.writeText(blob); } catch {}
-    toast.success("Dados copiados. Cole no novo Lead no Workspace.");
-    navigate({ to: "/workspace" });
-  };
+
+
 
   return (
     <div className="space-y-3">
@@ -427,9 +417,10 @@ export function EmailMailbox({
                 {aiResults[selected.gmailId] && (
                   <AiResultPanel
                     result={aiResults[selected.gmailId]}
-                    onCreateLead={() => createLeadFromSuggestion(aiResults[selected.gmailId])}
+                    summary={aiResults[selected.gmailId].summary}
                   />
                 )}
+
                 <div className="border-t pt-3">
                   {selected.html ? (
                     <iframe
@@ -621,13 +612,15 @@ function categoryLabel(c: EmailAiResult["category"]): string {
 
 function AiResultPanel({
   result,
-  onCreateLead,
 }: {
   result: EmailAiResult;
-  onCreateLead: () => void;
+  summary?: string;
 }) {
   const f = result.suggestion.fields;
   const hasFields = Object.values(f).some(Boolean);
+  const [mode, setMode] = useState<"none" | "lead" | "activity">(
+    result.suggestion.kind === "lead" || result.suggestion.kind === "activity" ? result.suggestion.kind : "none",
+  );
   return (
     <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 space-y-2">
       <div className="flex items-center gap-2 text-sm font-semibold text-violet-900">
@@ -640,38 +633,179 @@ function AiResultPanel({
         <Badge variant="outline" className="text-[10px]">Idioma: {result.language}</Badge>
       </div>
       <p className="text-sm whitespace-pre-wrap">{result.summary || "(sem resumo)"}</p>
-      {result.suggestion.kind !== "none" && (
-        <div className="rounded border bg-white/60 p-2 space-y-1.5">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-            Sugestão: {result.suggestion.kind === "lead" ? "Criar Lead" : "Criar Atividade"}
-          </div>
-          {result.suggestion.title && <div className="text-sm font-medium">{result.suggestion.title}</div>}
-          {hasFields && (
-            <ul className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5">
-              {f.contact_name && <li><strong>Nome:</strong> {f.contact_name}</li>}
-              {f.contact_email && <li><strong>Email:</strong> {f.contact_email}</li>}
-              {f.contact_phone && <li><strong>Telefone:</strong> {f.contact_phone}</li>}
-              {f.destination && <li><strong>Destino:</strong> {f.destination}</li>}
-              {f.travel_dates && <li><strong>Datas:</strong> {f.travel_dates}</li>}
-              {f.pax && <li><strong>Pax:</strong> {f.pax}</li>}
-              {f.budget && <li><strong>Orçamento:</strong> {f.budget}</li>}
-              {f.notes && <li className="sm:col-span-2"><strong>Obs.:</strong> {f.notes}</li>}
-            </ul>
-          )}
-          <div className="flex gap-2 pt-1">
-            {result.suggestion.kind === "lead" && (
-              <Button size="sm" onClick={onCreateLead}>
-                <Copy className="h-3.5 w-3.5 mr-1" />Copiar e criar Lead
-              </Button>
-            )}
-            {result.suggestion.kind === "activity" && (
-              <Button size="sm" variant="outline" onClick={onCreateLead}>
-                <Copy className="h-3.5 w-3.5 mr-1" />Copiar dados
-              </Button>
-            )}
-          </div>
-        </div>
+
+      {hasFields && (
+        <ul className="text-xs grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-0.5 rounded border bg-white/60 p-2">
+          {f.contact_name && <li><strong>Nome:</strong> {f.contact_name}</li>}
+          {f.contact_email && <li><strong>Email:</strong> {f.contact_email}</li>}
+          {f.contact_phone && <li><strong>Telefone:</strong> {f.contact_phone}</li>}
+          {f.destination && <li><strong>Destino:</strong> {f.destination}</li>}
+          {f.travel_dates && <li><strong>Datas:</strong> {f.travel_dates}</li>}
+          {f.pax && <li><strong>Pax:</strong> {f.pax}</li>}
+          {f.budget && <li><strong>Orçamento:</strong> {f.budget}</li>}
+          {f.notes && <li className="sm:col-span-2"><strong>Obs.:</strong> {f.notes}</li>}
+        </ul>
       )}
+
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant={mode === "lead" ? "default" : "outline"} onClick={() => setMode(mode === "lead" ? "none" : "lead")}>
+          Criar Lead
+        </Button>
+        <Button size="sm" variant={mode === "activity" ? "default" : "outline"} onClick={() => setMode(mode === "activity" ? "none" : "activity")}>
+          Criar Atividade
+        </Button>
+      </div>
+
+      {mode === "lead" && <CreateLeadForm result={result} onDone={() => setMode("none")} />}
+      {mode === "activity" && <CreateActivityForm result={result} onDone={() => setMode("none")} />}
     </div>
   );
 }
+
+function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { user } = useAuth();
+  const { subordinates } = useSubordinates();
+  const meName = (user?.user_metadata as any)?.full_name || user?.email || "Eu";
+  if (!user) return null;
+  return (
+    <select
+      value={value || user.id}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+    >
+      <option value={user.id}>{meName} (eu)</option>
+      {subordinates.map((s: Subordinate) => (
+        <option key={s.user_id} value={s.user_id}>{s.full_name} ({s.role})</option>
+      ))}
+    </select>
+  );
+}
+
+function CreateLeadForm({ result, onDone }: { result: EmailAiResult; onDone: () => void }) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const f = result.suggestion.fields;
+  const [form, setForm] = useState({
+    name: f.contact_name || "",
+    email: f.contact_email || "",
+    phone: f.contact_phone || "",
+    destination: f.destination || "",
+    estimated_value: f.budget?.replace(/[^\d.]/g, "") || "",
+    notes: [f.travel_dates && `Datas: ${f.travel_dates}`, f.pax && `Pax: ${f.pax}`, f.notes].filter(Boolean).join("\n") + (result.summary ? `\n\nResumo IA: ${result.summary}` : ""),
+  });
+  const [assignedTo, setAssignedTo] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!user) return;
+    if (!form.name.trim()) { toast.error("Informe o nome"); return; }
+    setSaving(true);
+    const { data, error } = await supabase.from("leads").insert({
+      name: form.name.slice(0, 200),
+      email: form.email || null,
+      phone: form.phone || null,
+      destination: form.destination || null,
+      estimated_value: form.estimated_value ? Number(form.estimated_value) : null,
+      notes: form.notes || null,
+      status: "novo" as const,
+      created_by: user.id,
+      assigned_to: assignedTo || user.id,
+    }).select("id").maybeSingle();
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Lead criado.", {
+      action: data?.id ? { label: "Abrir", onClick: () => navigate({ to: "/leads/$leadId", params: { leadId: data.id } }) } : undefined,
+    });
+    onDone();
+  };
+
+  return (
+    <div className="rounded border bg-white/80 p-3 space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div><Label className="text-xs">Nome*</Label><Input className="h-9" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
+        <div><Label className="text-xs">Email</Label><Input className="h-9" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+        <div><Label className="text-xs">Telefone</Label><Input className="h-9" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></div>
+        <div><Label className="text-xs">Destino</Label><Input className="h-9" value={form.destination} onChange={(e) => setForm({ ...form, destination: e.target.value })} /></div>
+        <div><Label className="text-xs">Valor estimado</Label><Input className="h-9" value={form.estimated_value} onChange={(e) => setForm({ ...form, estimated_value: e.target.value })} /></div>
+        <div><Label className="text-xs">Responsável</Label><AssigneeSelect value={assignedTo} onChange={setAssignedTo} /></div>
+      </div>
+      <div><Label className="text-xs">Observações</Label><Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onDone}>Cancelar</Button>
+        <Button size="sm" onClick={submit} disabled={saving}>
+          {saving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}Criar Lead
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone: () => void }) {
+  const { user } = useAuth();
+  const f = result.suggestion.fields;
+  const defaultPrio: "alta" | "media" | "baixa" = result.priority === "alta" ? "alta" : result.priority === "baixa" ? "baixa" : "media";
+  const [form, setForm] = useState({
+    title: result.suggestion.title || (f.contact_name ? `Atender ${f.contact_name}` : "Atividade do email"),
+    description: [
+      f.contact_name && `Contato: ${f.contact_name}`,
+      f.contact_email && `Email: ${f.contact_email}`,
+      f.contact_phone && `Telefone: ${f.contact_phone}`,
+      f.notes,
+      result.summary && `\nResumo IA: ${result.summary}`,
+    ].filter(Boolean).join("\n"),
+    due_date: "",
+    priority: defaultPrio,
+  });
+  const [assignedTo, setAssignedTo] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!user) return;
+    if (!form.title.trim()) { toast.error("Informe o título"); return; }
+    setSaving(true);
+    const target = assignedTo || user.id;
+    const { data, error } = await supabase.from("tasks").insert({
+      title: form.title.slice(0, 200),
+      description: form.description || null,
+      due_date: form.due_date ? new Date(form.due_date).toISOString() : null,
+      priority: form.priority,
+      category: "suporte",
+      source: "email_ai",
+      created_by: user.id,
+      assigned_to: target,
+    }).select("id").maybeSingle();
+    setSaving(false);
+    if (error) { toast.error(error.message); return; }
+    if (data?.id && target !== user.id) {
+      notifyTaskAssigned({ data: { taskId: data.id } }).catch(() => undefined);
+    }
+    toast.success("Atividade criada.");
+    onDone();
+  };
+
+  return (
+    <div className="rounded border bg-white/80 p-3 space-y-2">
+      <div><Label className="text-xs">Título*</Label><Input className="h-9" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div><Label className="text-xs">Vencimento</Label><Input type="datetime-local" className="h-9" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
+        <div>
+          <Label className="text-xs">Prioridade</Label>
+          <select className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as any })}>
+            <option value="alta">Alta</option>
+            <option value="media">Média</option>
+            <option value="baixa">Baixa</option>
+          </select>
+        </div>
+        <div><Label className="text-xs">Responsável</Label><AssigneeSelect value={assignedTo} onChange={setAssignedTo} /></div>
+      </div>
+      <div><Label className="text-xs">Descrição</Label><Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onDone}>Cancelar</Button>
+        <Button size="sm" onClick={submit} disabled={saving}>
+          {saving && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}Criar Atividade
+        </Button>
+      </div>
+    </div>
+  );
+}
+

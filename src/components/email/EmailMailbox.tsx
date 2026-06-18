@@ -305,6 +305,11 @@ export function EmailMailbox({
           <Button variant="outline" size="sm" onClick={syncNow} disabled={loading} title="Sincronizar com o Gmail">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
+          {lastSyncLabel && (
+            <span className="text-xs text-muted-foreground hidden md:inline" title="Atualiza automaticamente a cada 1 min">
+              {lastSyncLabel}
+            </span>
+          )}
           <Button
             variant="outline"
             size="sm"

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { toast } from "sonner";
 import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { listMessagesFn, fetchMessageFn, sendEmailFn } from "@/lib/email.functions";
+import { listMessagesFn, fetchMessageFn, sendEmailFn, syncFolderFn } from "@/lib/email.functions";
 import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,6 +33,7 @@ export function EmailMailbox({
   managerName?: string;
 }) {
   const list = useServerFn(listMessagesFn);
+  const syncFn = useServerFn(syncFolderFn);
   const fetchOne = useServerFn(fetchMessageFn);
   const send = useServerFn(sendEmailFn);
   const analyze = useServerFn(analyzeEmailFn);
@@ -91,17 +92,11 @@ export function EmailMailbox({
   }, [listCollapsed, listWidth]);
 
   const refreshIdRef = useRef(0);
+  // Just reads the cache (instant). Used on mount and when switching folders/searching.
   const refresh = async () => {
     const myId = ++refreshIdRef.current;
     setLoading(true);
     setFetchError(null);
-    const safety = setTimeout(() => {
-      if (refreshIdRef.current === myId) {
-        setLoading(false);
-        setFetchError("Tempo esgotado ao atualizar os emails. Verifique sua conexão e tente novamente.");
-        toast.error("Tempo esgotado ao atualizar os emails.");
-      }
-    }, 60_000);
     try {
       const r: any = await list({ data: { targetUserId, folder, search } });
       if (refreshIdRef.current !== myId) return;
@@ -112,6 +107,36 @@ export function EmailMailbox({
     } catch (e: any) {
       if (refreshIdRef.current !== myId) return;
       const msg = e?.message ?? "Falha ao listar mensagens";
+      setFetchError(msg);
+      toast.error(msg);
+    } finally {
+      if (refreshIdRef.current === myId) setLoading(false);
+    }
+  };
+
+  // Forces a sync with Gmail then re-reads the cache.
+  const syncNow = async () => {
+    const myId = ++refreshIdRef.current;
+    setLoading(true);
+    setFetchError(null);
+    const safety = setTimeout(() => {
+      if (refreshIdRef.current === myId) {
+        setLoading(false);
+        setFetchError("Tempo esgotado ao sincronizar. Tente novamente.");
+        toast.error("Tempo esgotado ao sincronizar.");
+      }
+    }, 60_000);
+    try {
+      const r: any = await syncFn({ data: { targetUserId, folder, search } });
+      if (refreshIdRef.current !== myId) return;
+      setMessages(r.messages ?? []);
+      setNotConnected(r.connected === false);
+      setFetchError(r.error ?? null);
+      if (r.error) toast.error(r.error);
+      else toast.success("Caixa atualizada.");
+    } catch (e: any) {
+      if (refreshIdRef.current !== myId) return;
+      const msg = e?.message ?? "Falha ao sincronizar";
       setFetchError(msg);
       toast.error(msg);
     } finally {
@@ -230,7 +255,7 @@ export function EmailMailbox({
             onKeyDown={(e) => { if (e.key === "Enter") refresh(); }}
             className="w-64"
           />
-          <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={syncNow} disabled={loading} title="Sincronizar com o Gmail">
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
           </Button>
           <Button

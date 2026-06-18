@@ -408,7 +408,7 @@ export function EmailMailbox({
                     {selected.date && <div>{new Date(selected.date).toLocaleString()}</div>}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="outline" onClick={() => setComposing({
                     to: folder === "inbox" ? extractEmail(selected.from) : extractEmail(selected.to),
                     subject: selected.subject?.startsWith("Re:") ? selected.subject : `Re: ${selected.subject ?? ""}`,
@@ -417,7 +417,19 @@ export function EmailMailbox({
                   })}>
                     <Reply className="h-4 w-4 mr-1" />Responder
                   </Button>
+                  <Button size="sm" variant="outline" onClick={() => runAnalyze(false)} disabled={aiLoading}>
+                    {aiLoading
+                      ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Analisando…</>
+                      : <><Sparkles className="h-4 w-4 mr-1" />{aiResults[selected.gmailId] ? "Re-analisar" : "Analisar com IA"}</>}
+                  </Button>
                 </div>
+
+                {aiResults[selected.gmailId] && (
+                  <AiResultPanel
+                    result={aiResults[selected.gmailId]}
+                    onCreateLead={() => createLeadFromSuggestion(aiResults[selected.gmailId])}
+                  />
+                )}
                 <div className="border-t pt-3">
                   {selected.html ? (
                     <iframe

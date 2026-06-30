@@ -116,36 +116,14 @@ function LeadWorkspace() {
     setQuotes((quotesRes.data as Quote[]) ?? []);
     setBookings((bookingsRes.data as Booking[]) ?? []);
 
-    // Also fetch emails by address match (from_email or to_emails contains lead.email)
+    // Only emails explicitly linked to this lead (via source_email/lead_id at
+    // creation time). We do NOT match by sender/recipient address to avoid
+    // replicating the inbox into the lead view.
     const linked = ((linkedEmailsRes.data as any[]) ?? []);
-    let combined: any[] = linked;
-    const leadEmail = (leadData?.email || "").trim().toLowerCase();
-    if (leadEmail && user?.id) {
-      const { data: matchData } = await supabase
-        .from("emails")
-        .select("id,subject,from_name,from_email,to_emails,snippet,body_text,body_html,internal_date,is_unread,lead_id")
-        .eq("user_id", user.id)
-        .or(`from_email.ilike.${leadEmail},to_emails.cs.{${leadEmail}}`)
-        .order("internal_date", { ascending: false })
-        .limit(100);
-      const byId = new Map<string, any>();
-      for (const r of linked) byId.set(r.id, r);
-      for (const r of (matchData ?? [])) if (!byId.has(r.id)) byId.set(r.id, r);
-      combined = Array.from(byId.values()).sort((a, b) => {
-        const da = a.internal_date ? new Date(a.internal_date).getTime() : 0;
-        const db = b.internal_date ? new Date(b.internal_date).getTime() : 0;
-        return db - da;
-      }).slice(0, 100);
-
-      // Best-effort backfill of lead_id on matched-but-unlinked rows.
-      const toBackfill = combined.filter((r) => !r.lead_id).map((r) => r.id);
-      if (toBackfill.length > 0) {
-        void supabase.from("emails").update({ lead_id: leadId }).in("id", toBackfill);
-      }
-    }
-    setEmails(combined.map((e) => ({ ...e, received_at: e.internal_date })) as Email[]);
+    setEmails(linked.map((e) => ({ ...e, received_at: e.internal_date })) as Email[]);
     if (!opts?.silent) setLoading(false);
   };
+
 
   useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
 

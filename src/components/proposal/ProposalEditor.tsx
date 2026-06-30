@@ -1209,3 +1209,26 @@ function ItemTable({
     </div>
   );
 }
+
+function FlightTotalCell({ flightId, value, onSaved }: { flightId: string; value: number | null; onSaved: (v: number | null) => void }) {
+  const [val, setVal] = useState<string>(value != null ? String(value) : "");
+  useEffect(() => { setVal(value != null ? String(value) : ""); }, [value]);
+  const save = async () => {
+    const next = val === "" ? null : Number(val);
+    if (next === value) return;
+    const { error } = await supabase.from("quote_flights").update({ total: next }).eq("id", flightId);
+    if (error) { toast.error(error.message); return; }
+    onSaved(next);
+  };
+  return (
+    <Input
+      type="number"
+      step="0.01"
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      className="h-8 text-right"
+    />
+  );
+}

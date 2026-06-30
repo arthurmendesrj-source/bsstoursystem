@@ -503,6 +503,7 @@ export function EmailMailbox({
                   <AiResultPanel
                     result={aiResults[selected.gmailId]}
                     summary={aiResults[selected.gmailId].summary}
+                    email={selected}
                   />
                 )}
 

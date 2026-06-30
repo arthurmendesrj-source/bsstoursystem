@@ -88,7 +88,7 @@ export function LeadEmailsTab({ leadId }: { leadId: string }) {
                   </div>
                   <div className="truncate text-xs text-muted-foreground">
                     {e.from_name || e.from_email || "—"} ·{" "}
-                    {formatDate(e.date)}
+                    {formatDate(e.internal_date)}
                   </div>
                 </div>
               </div>
@@ -108,7 +108,7 @@ export function LeadEmailsTab({ leadId }: { leadId: string }) {
                   )}
                   <div>
                     <span className="font-medium text-foreground">Data:</span>{" "}
-                    {formatDate(e.date)}
+                    {formatDate(e.internal_date)}
                   </div>
                 </div>
                 {e.body_html ? (

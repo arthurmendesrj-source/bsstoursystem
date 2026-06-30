@@ -112,6 +112,25 @@ export function EmailMailbox({
     }
   };
 
+  // Reload persisted AI triage results whenever the visible messages change,
+  // so badges/summaries survive navigation and page reloads.
+  useEffect(() => {
+    const ids = (messages ?? []).map((m: any) => m?.gmailId).filter((x: any): x is string => !!x);
+    if (!targetUserId || ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r: any = await getCachedAi({ data: { targetUserId, gmailIds: ids } });
+        if (cancelled || !r?.results) return;
+        setAiResults((prev) => ({ ...r.results, ...prev }));
+      } catch {
+        // silent — cache hydration is best-effort
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetUserId, messages]);
+
   // Forces a sync with Gmail then re-reads the cache.
   const syncNow = async () => {
     const myId = ++refreshIdRef.current;

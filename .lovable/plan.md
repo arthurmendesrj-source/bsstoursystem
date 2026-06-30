@@ -1,17 +1,6 @@
-Liberar todas as permissões do módulo `activities` para todos os papéis da hierarquia (supervisor, coordenador, operador, além dos já liberados admin/diretor/gerente).
+Remover o botao "Criar Invoice" do ProposalEditor.
 
-## Mudança
-
-Atualizar `role_module_permissions` no módulo `activities`:
-- `can_view = true`
-- `can_create = true`
-- `can_edit = true`
-- `can_delete = true`
-- `can_approve = true`
-- `can_export = true`
-
-Para todos os papéis da hierarquia.
-
-## Resultado
-
-Qualquer usuário, independente do nível, poderá visualizar, criar, editar, excluir, aprovar e exportar atividades na janela de Atividades.
+Mudancas:
+- Remover o botao com texto "Criar Invoice" (linha 708-710) do grupo de acoes da proposta.
+- Remover a funcao `createInvoiceOnly` (linha 603-644) que ficara sem uso.
+- Manter o fluxo original: Aprovar Proposta → Converter para Reserva (que ja cria o invoice automaticamente).

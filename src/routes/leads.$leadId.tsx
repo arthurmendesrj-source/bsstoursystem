@@ -463,20 +463,25 @@ function LeadWorkspace() {
                 {emails.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground text-sm">{t("noEmailsYet")}</div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {emails.map((em) => (
                       <div key={em.id} className={cn("p-3 rounded-md border", em.is_unread && "bg-primary/5 border-primary/30")}>
                         <div className="flex items-baseline justify-between gap-2">
                           <div className="font-medium text-sm truncate">{em.from_name ?? em.from_email}</div>
-                          <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM HH:mm") : ""}</div>
+                          <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM/yyyy HH:mm") : ""}</div>
                         </div>
                         <div className="text-sm font-semibold truncate">{em.subject ?? "(sem assunto)"}</div>
-                        {em.snippet && <div className="text-xs text-muted-foreground line-clamp-2 mt-1">{em.snippet}</div>}
+                        {em.body_html ? (
+                          <iframe title={`email-${em.id}`} sandbox="" srcDoc={em.body_html} className="w-full min-h-[280px] border-0 mt-2 rounded bg-white" />
+                        ) : (
+                          <pre className="whitespace-pre-wrap text-sm font-sans mt-2 max-h-[400px] overflow-auto">{em.body_text || em.snippet || "(sem conteúdo)"}</pre>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </TabsContent>
+
 
               <TabsContent value="proposals" className="mt-4">
                 {quotes.length === 0 ? (

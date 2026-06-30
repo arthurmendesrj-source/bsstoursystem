@@ -241,3 +241,30 @@ export const triageInboxFn = createServerFn({ method: "POST" })
 
     return { results: out };
   });
+
+export const getCachedAiResultsFn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { targetUserId: string; gmailIds: string[] }) =>
+    z.object({
+      targetUserId: z.string().uuid(),
+      gmailIds: z.array(z.string().min(1)).max(500),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const ok = await authorize(context.supabase, context.userId, data.targetUserId);
+    if (!ok) throw new Error("Acesso negado");
+    if (data.gmailIds.length === 0) return { results: {} as Record<string, EmailAiResult> };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: rows } = await supabaseAdmin
+      .from("email_ai_cache")
+      .select("message_id,payload")
+      .eq("user_id", data.targetUserId)
+      .in("message_id", data.gmailIds);
+
+    const map: Record<string, EmailAiResult> = {};
+    for (const r of rows ?? []) {
+      map[(r as any).message_id as string] = (r as any).payload as EmailAiResult;
+    }
+    return { results: map };
+  });

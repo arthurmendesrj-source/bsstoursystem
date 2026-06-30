@@ -1615,6 +1615,11 @@ export type Database = {
           notes: string | null
           phone: string | null
           source: string | null
+          source_email_from: string | null
+          source_email_id: string | null
+          source_email_received_at: string | null
+          source_email_snippet: string | null
+          source_email_subject: string | null
           status: Database["public"]["Enums"]["lead_status"]
           tenant_id: string
           updated_at: string
@@ -1643,6 +1648,11 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           source?: string | null
+          source_email_from?: string | null
+          source_email_id?: string | null
+          source_email_received_at?: string | null
+          source_email_snippet?: string | null
+          source_email_subject?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           tenant_id?: string
           updated_at?: string
@@ -1671,6 +1681,11 @@ export type Database = {
           notes?: string | null
           phone?: string | null
           source?: string | null
+          source_email_from?: string | null
+          source_email_id?: string | null
+          source_email_received_at?: string | null
+          source_email_snippet?: string | null
+          source_email_subject?: string | null
           status?: Database["public"]["Enums"]["lead_status"]
           tenant_id?: string
           updated_at?: string
@@ -1681,6 +1696,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_source_email_id_fkey"
+            columns: ["source_email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
             referencedColumns: ["id"]
           },
           {
@@ -3497,6 +3519,11 @@ export type Database = {
           notified_overdue_at: string | null
           priority: string
           source: string
+          source_email_from: string | null
+          source_email_id: string | null
+          source_email_received_at: string | null
+          source_email_snippet: string | null
+          source_email_subject: string | null
           started_at: string | null
           supplier_id: string | null
           tenant_id: string
@@ -3521,6 +3548,11 @@ export type Database = {
           notified_overdue_at?: string | null
           priority?: string
           source?: string
+          source_email_from?: string | null
+          source_email_id?: string | null
+          source_email_received_at?: string | null
+          source_email_snippet?: string | null
+          source_email_subject?: string | null
           started_at?: string | null
           supplier_id?: string | null
           tenant_id?: string
@@ -3545,6 +3577,11 @@ export type Database = {
           notified_overdue_at?: string | null
           priority?: string
           source?: string
+          source_email_from?: string | null
+          source_email_id?: string | null
+          source_email_received_at?: string | null
+          source_email_snippet?: string | null
+          source_email_subject?: string | null
           started_at?: string | null
           supplier_id?: string | null
           tenant_id?: string
@@ -3565,6 +3602,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_email_id_fkey"
+            columns: ["source_email_id"]
+            isOneToOne: false
+            referencedRelation: "emails"
             referencedColumns: ["id"]
           },
           {

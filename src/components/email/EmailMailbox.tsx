@@ -503,6 +503,7 @@ export function EmailMailbox({
                   <AiResultPanel
                     result={aiResults[selected.gmailId]}
                     summary={aiResults[selected.gmailId].summary}
+                    email={selected}
                   />
                 )}
 
@@ -697,9 +698,11 @@ function categoryLabel(c: EmailAiResult["category"]): string {
 
 function AiResultPanel({
   result,
+  email,
 }: {
   result: EmailAiResult;
   summary?: string;
+  email?: any;
 }) {
   const f = result.suggestion.fields;
   const hasFields = Object.values(f).some(Boolean);
@@ -741,11 +744,12 @@ function AiResultPanel({
         </Button>
       </div>
 
-      {mode === "lead" && <CreateLeadForm result={result} onDone={() => setMode("none")} />}
-      {mode === "activity" && <CreateActivityForm result={result} onDone={() => setMode("none")} />}
+      {mode === "lead" && <CreateLeadForm result={result} email={email} onDone={() => setMode("none")} />}
+      {mode === "activity" && <CreateActivityForm result={result} email={email} onDone={() => setMode("none")} />}
     </div>
   );
 }
+
 
 function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { user } = useAuth();
@@ -766,7 +770,24 @@ function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-function CreateLeadForm({ result, onDone }: { result: EmailAiResult; onDone: () => void }) {
+async function resolveEmailRowId(userId: string, gmailId?: string | null): Promise<string | null> {
+  if (!gmailId) return null;
+  const { data } = await supabase.from("emails").select("id").eq("user_id", userId).eq("gmail_id", gmailId).maybeSingle();
+  return data?.id ?? null;
+}
+
+function emailSnapshot(email: any | undefined) {
+  if (!email) return { source_email_subject: null, source_email_from: null, source_email_snippet: null, source_email_received_at: null };
+  const snippet = (email.text || email.snippet || "").toString().replace(/\s+/g, " ").trim().slice(0, 2000);
+  return {
+    source_email_subject: email.subject ?? null,
+    source_email_from: email.from ?? null,
+    source_email_snippet: snippet || null,
+    source_email_received_at: email.date ? new Date(email.date).toISOString() : null,
+  };
+}
+
+function CreateLeadForm({ result, email, onDone }: { result: EmailAiResult; email?: any; onDone: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const f = result.suggestion.fields;
@@ -785,6 +806,8 @@ function CreateLeadForm({ result, onDone }: { result: EmailAiResult; onDone: () 
     if (!user) return;
     if (!form.name.trim()) { toast.error("Informe o nome"); return; }
     setSaving(true);
+    const sourceEmailId = await resolveEmailRowId(user.id, email?.gmailId);
+    const snap = emailSnapshot(email);
     const { data, error } = await supabase.from("leads").insert({
       name: form.name.slice(0, 200),
       email: form.email || null,
@@ -795,10 +818,15 @@ function CreateLeadForm({ result, onDone }: { result: EmailAiResult; onDone: () 
       status: "novo" as const,
       created_by: user.id,
       assigned_to: assignedTo || user.id,
+      source_email_id: sourceEmailId,
+      ...snap,
     }).select("id").maybeSingle();
+    if (!error && data?.id && sourceEmailId) {
+      await supabase.from("emails").update({ lead_id: data.id }).eq("id", sourceEmailId);
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Lead criado.", {
+    toast.success("Lead criado com email anexado.", {
       action: data?.id ? { label: "Abrir", onClick: () => navigate({ to: "/leads/$leadId", params: { leadId: data.id } }) } : undefined,
     });
     onDone();
@@ -825,7 +853,7 @@ function CreateLeadForm({ result, onDone }: { result: EmailAiResult; onDone: () 
   );
 }
 
-function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone: () => void }) {
+function CreateActivityForm({ result, email, onDone }: { result: EmailAiResult; email?: any; onDone: () => void }) {
   const { user } = useAuth();
   const f = result.suggestion.fields;
   const defaultPrio: "alta" | "media" | "baixa" = result.priority === "alta" ? "alta" : result.priority === "baixa" ? "baixa" : "media";
@@ -849,6 +877,8 @@ function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone:
     if (!form.title.trim()) { toast.error("Informe o título"); return; }
     setSaving(true);
     const target = assignedTo || user.id;
+    const sourceEmailId = await resolveEmailRowId(user.id, email?.gmailId);
+    const snap = emailSnapshot(email);
     const { data, error } = await supabase.from("tasks").insert({
       title: form.title.slice(0, 200),
       description: form.description || null,
@@ -858,13 +888,15 @@ function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone:
       source: "email_ai",
       created_by: user.id,
       assigned_to: target,
+      source_email_id: sourceEmailId,
+      ...snap,
     }).select("id").maybeSingle();
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     if (data?.id && target !== user.id) {
       notifyTaskAssigned({ data: { taskId: data.id } }).catch(() => undefined);
     }
-    toast.success("Atividade criada.");
+    toast.success("Atividade criada com email anexado.");
     onDone();
   };
 

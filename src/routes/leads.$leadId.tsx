@@ -67,7 +67,7 @@ type Lead = {
 
 type Task = { id: string; title: string; description: string | null; due_date: string | null; completed: boolean };
 type Interaction = { id: string; type: string; subject: string | null; content: string | null; occurred_at: string };
-type Email = { id: string; subject: string | null; from_name: string | null; from_email: string | null; snippet: string | null; received_at: string | null; is_unread: boolean };
+type Email = { id: string; subject: string | null; from_name: string | null; from_email: string | null; snippet: string | null; body_text: string | null; body_html: string | null; received_at: string | null; is_unread: boolean };
 type Quote = { id: string; status: string; total_amount: number; currency: string; valid_until: string | null; created_at: string };
 type Booking = { id: string; status: string; total_amount: number; currency: string; departure_date: string | null; return_date: string | null };
 
@@ -105,14 +105,14 @@ function LeadWorkspace() {
       supabase.from("leads").select("*").eq("id", leadId).maybeSingle(),
       supabase.from("tasks").select("id,title,description,due_date,completed").eq("lead_id", leadId).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", leadId).order("occurred_at", { ascending: false }),
-      Promise.resolve({ data: [] as any[] }),
+      supabase.from("emails").select("id,subject,from_name,from_email,snippet,body_text,body_html,internal_date,is_unread").eq("lead_id", leadId).order("internal_date", { ascending: false }),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", leadId).order("created_at", { ascending: false }),
       supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", leadId).order("created_at", { ascending: false }),
     ]);
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
-    setEmails((emailsRes.data as Email[]) ?? []);
+    setEmails(((emailsRes.data as any[]) ?? []).map((e) => ({ ...e, received_at: e.internal_date })) as Email[]);
     setQuotes((quotesRes.data as Quote[]) ?? []);
     setBookings((bookingsRes.data as Booking[]) ?? []);
     setLoading(false);
@@ -463,20 +463,25 @@ function LeadWorkspace() {
                 {emails.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground text-sm">{t("noEmailsYet")}</div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {emails.map((em) => (
                       <div key={em.id} className={cn("p-3 rounded-md border", em.is_unread && "bg-primary/5 border-primary/30")}>
                         <div className="flex items-baseline justify-between gap-2">
                           <div className="font-medium text-sm truncate">{em.from_name ?? em.from_email}</div>
-                          <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM HH:mm") : ""}</div>
+                          <div className="text-xs text-muted-foreground shrink-0">{em.received_at ? format(new Date(em.received_at), "dd/MM/yyyy HH:mm") : ""}</div>
                         </div>
                         <div className="text-sm font-semibold truncate">{em.subject ?? "(sem assunto)"}</div>
-                        {em.snippet && <div className="text-xs text-muted-foreground line-clamp-2 mt-1">{em.snippet}</div>}
+                        {em.body_html ? (
+                          <iframe title={`email-${em.id}`} sandbox="" srcDoc={em.body_html} className="w-full min-h-[280px] border-0 mt-2 rounded bg-white" />
+                        ) : (
+                          <pre className="whitespace-pre-wrap text-sm font-sans mt-2 max-h-[400px] overflow-auto">{em.body_text || em.snippet || "(sem conteúdo)"}</pre>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </TabsContent>
+
 
               <TabsContent value="proposals" className="mt-4">
                 {quotes.length === 0 ? (

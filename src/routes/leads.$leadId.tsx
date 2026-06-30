@@ -99,26 +99,69 @@ function LeadWorkspace() {
   const [quickContent, setQuickContent] = useState("");
   const [quickSaving, setQuickSaving] = useState(false);
 
-  const loadAll = async () => {
-    setLoading(true);
-    const [leadRes, tasksRes, intRes, emailsRes, quotesRes, bookingsRes] = await Promise.all([
+  const loadAll = async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    const [leadRes, tasksRes, intRes, linkedEmailsRes, quotesRes, bookingsRes] = await Promise.all([
       supabase.from("leads").select("*").eq("id", leadId).maybeSingle(),
       supabase.from("tasks").select("id,title,description,due_date,completed").eq("lead_id", leadId).order("due_date", { ascending: true, nullsFirst: false }),
       supabase.from("interactions").select("id,type,subject,content,occurred_at").eq("lead_id", leadId).order("occurred_at", { ascending: false }),
-      supabase.from("emails").select("id,subject,from_name,from_email,snippet,body_text,body_html,internal_date,is_unread").eq("lead_id", leadId).order("internal_date", { ascending: false }),
+      supabase.from("emails").select("id,subject,from_name,from_email,to_emails,snippet,body_text,body_html,internal_date,is_unread,lead_id").eq("lead_id", leadId).order("internal_date", { ascending: false }).limit(100),
       supabase.from("quotes").select("id,status,total_amount,currency,valid_until,created_at").eq("lead_id", leadId).order("created_at", { ascending: false }),
       supabase.from("bookings").select("id,status,total_amount,currency,departure_date,return_date").eq("lead_id", leadId).order("created_at", { ascending: false }),
     ]);
-    setLead((leadRes.data as Lead | null) ?? null);
+    const leadData = (leadRes.data as Lead | null) ?? null;
+    setLead(leadData);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
-    setEmails(((emailsRes.data as any[]) ?? []).map((e) => ({ ...e, received_at: e.internal_date })) as Email[]);
     setQuotes((quotesRes.data as Quote[]) ?? []);
     setBookings((bookingsRes.data as Booking[]) ?? []);
-    setLoading(false);
+
+    // Also fetch emails by address match (from_email or to_emails contains lead.email)
+    const linked = ((linkedEmailsRes.data as any[]) ?? []);
+    let combined: any[] = linked;
+    const leadEmail = (leadData?.email || "").trim().toLowerCase();
+    if (leadEmail && user?.id) {
+      const { data: matchData } = await supabase
+        .from("emails")
+        .select("id,subject,from_name,from_email,to_emails,snippet,body_text,body_html,internal_date,is_unread,lead_id")
+        .eq("user_id", user.id)
+        .or(`from_email.ilike.${leadEmail},to_emails.cs.{${leadEmail}}`)
+        .order("internal_date", { ascending: false })
+        .limit(100);
+      const byId = new Map<string, any>();
+      for (const r of linked) byId.set(r.id, r);
+      for (const r of (matchData ?? [])) if (!byId.has(r.id)) byId.set(r.id, r);
+      combined = Array.from(byId.values()).sort((a, b) => {
+        const da = a.internal_date ? new Date(a.internal_date).getTime() : 0;
+        const db = b.internal_date ? new Date(b.internal_date).getTime() : 0;
+        return db - da;
+      }).slice(0, 100);
+
+      // Best-effort backfill of lead_id on matched-but-unlinked rows.
+      const toBackfill = combined.filter((r) => !r.lead_id).map((r) => r.id);
+      if (toBackfill.length > 0) {
+        void supabase.from("emails").update({ lead_id: leadId }).in("id", toBackfill);
+      }
+    }
+    setEmails(combined.map((e) => ({ ...e, received_at: e.internal_date })) as Email[]);
+    if (!opts?.silent) setLoading(false);
   };
 
   useEffect(() => { loadAll(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [leadId]);
+
+  // Auto-refresh every 30s while the tab is visible — keeps the Email tab in
+  // sync with the global background Gmail sync that updates public.emails.
+  useEffect(() => {
+    const tick = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      void loadAll({ silent: true });
+    };
+    const id = window.setInterval(tick, 30_000);
+    const onVis = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { window.clearInterval(id); document.removeEventListener("visibilitychange", onVis); };
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [leadId, user?.id]);
 
   // Auto-open quick contact dialog with suggested template when arriving via /alerts deep link
   const [autoTriggered, setAutoTriggered] = useState(false);

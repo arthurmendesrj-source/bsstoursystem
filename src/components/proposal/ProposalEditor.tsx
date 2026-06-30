@@ -663,9 +663,6 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
               <Button variant="outline" size="sm" onClick={() => setGenOpen(true)}>
                 <FileText className="h-4 w-4 mr-1" /> Gerar Documento
               </Button>
-              <Button variant="outline" size="sm" onClick={createInvoiceOnly}>
-                <Receipt className="h-4 w-4 mr-1" /> Criar Invoice
-              </Button>
               <QuoteSpreadsheetButton
                 lead={{
                   leadId,

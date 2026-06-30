@@ -770,7 +770,24 @@ function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-function CreateLeadForm({ result, onDone }: { result: EmailAiResult; onDone: () => void }) {
+async function resolveEmailRowId(userId: string, gmailId?: string | null): Promise<string | null> {
+  if (!gmailId) return null;
+  const { data } = await supabase.from("emails").select("id").eq("user_id", userId).eq("gmail_id", gmailId).maybeSingle();
+  return data?.id ?? null;
+}
+
+function emailSnapshot(email: any | undefined) {
+  if (!email) return { source_email_subject: null, source_email_from: null, source_email_snippet: null, source_email_received_at: null };
+  const snippet = (email.text || email.snippet || "").toString().replace(/\s+/g, " ").trim().slice(0, 2000);
+  return {
+    source_email_subject: email.subject ?? null,
+    source_email_from: email.from ?? null,
+    source_email_snippet: snippet || null,
+    source_email_received_at: email.date ? new Date(email.date).toISOString() : null,
+  };
+}
+
+function CreateLeadForm({ result, email, onDone }: { result: EmailAiResult; email?: any; onDone: () => void }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const f = result.suggestion.fields;

@@ -853,7 +853,7 @@ function CreateLeadForm({ result, email, onDone }: { result: EmailAiResult; emai
   );
 }
 
-function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone: () => void }) {
+function CreateActivityForm({ result, email, onDone }: { result: EmailAiResult; email?: any; onDone: () => void }) {
   const { user } = useAuth();
   const f = result.suggestion.fields;
   const defaultPrio: "alta" | "media" | "baixa" = result.priority === "alta" ? "alta" : result.priority === "baixa" ? "baixa" : "media";
@@ -877,6 +877,8 @@ function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone:
     if (!form.title.trim()) { toast.error("Informe o título"); return; }
     setSaving(true);
     const target = assignedTo || user.id;
+    const sourceEmailId = await resolveEmailRowId(user.id, email?.gmailId);
+    const snap = emailSnapshot(email);
     const { data, error } = await supabase.from("tasks").insert({
       title: form.title.slice(0, 200),
       description: form.description || null,
@@ -886,13 +888,15 @@ function CreateActivityForm({ result, onDone }: { result: EmailAiResult; onDone:
       source: "email_ai",
       created_by: user.id,
       assigned_to: target,
+      source_email_id: sourceEmailId,
+      ...snap,
     }).select("id").maybeSingle();
     setSaving(false);
     if (error) { toast.error(error.message); return; }
     if (data?.id && target !== user.id) {
       notifyTaskAssigned({ data: { taskId: data.id } }).catch(() => undefined);
     }
-    toast.success("Atividade criada.");
+    toast.success("Atividade criada com email anexado.");
     onDone();
   };
 

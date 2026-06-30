@@ -1,18 +1,35 @@
-Plano para corrigir o erro da caixa de email vazia:
+## Objetivo
+Quando criar Lead ou Atividade a partir de um email, o conteúdo do email fica anexado ao registro — visível direto na tela do Lead/Atividade, sem precisar voltar à caixa de entrada.
 
-1. Ajustar a interface da caixa de email
-- A lista de mensagens está salva como “recolhida” no navegador, por isso aparece só uma coluna fina com seta e nenhum email visível.
-- Vou alterar para a lista abrir expandida por padrão e não ficar presa em estado recolhido salvo anteriormente.
+Emails sincronizados já ficam salvos no banco (`public.emails`), então o trabalho aqui é só **vincular** o email ao Lead/Tarefa criada e **renderizar** esse email no detalhe.
 
-2. Melhorar o estado visual quando houver emails
-- Quando existirem mensagens, mostrar a contagem/lista de forma clara.
-- Se a lista estiver recolhida, exibir pelo menos um indicador visível de que há mensagens e um controle claro para expandir.
+## Mudanças
 
-3. Preservar o cache e a sincronização atuais
-- Não vou trocar a conta Gmail nem mexer na regra de isolamento por usuário.
-- Não vou apagar emails.
-- O banco já mostra 50 recebidos e 50 enviados para booking@adatours.com; a correção será focada em exibir corretamente o que já está salvo.
+### 1. Banco (migração)
+Adicionar em `public.leads` e `public.tasks`:
+- `source_email_id uuid` → FK para `public.emails(id)` ON DELETE SET NULL
+- `source_email_subject text`
+- `source_email_from text`
+- `source_email_snippet text` (até ~2000 chars do corpo/snippet)
+- `source_email_received_at timestamptz`
 
-4. Validar depois da implementação
-- Verificar no preview se a caixa abre com os emails visíveis.
-- Confirmar que o botão atualizar continua sincronizando e que a seleção de mensagem funciona.
+Índices em `source_email_id`. Sem mudar RLS existente.
+
+### 2. Criação a partir do email (`src/components/email/EmailMailbox.tsx`)
+- `CreateLeadForm` e `CreateActivityForm` passam a receber o `EmailRow` selecionado como prop.
+- No `insert`, gravar os 5 campos acima a partir do email (subject, from, snippet truncado, received_at e id).
+- Manter a inclusão atual no `notes`/`description` do resumo da IA.
+
+### 3. Detalhe do Lead (`src/routes/leads.$leadId.tsx`)
+- Quando `source_email_id` existir, exibir card "Email de origem" com: assunto, remetente, data, snippet (com `whitespace-pre-wrap`) e botão "Abrir na caixa de entrada" (link para `/email?id={source_email_id}`).
+- Se o registro em `emails` ainda existir, fazer um `select` leve (subject, from_address, snippet, body_text, received_at) para mostrar conteúdo mais completo; senão, usar os campos snapshot salvos no próprio lead.
+
+### 4. Detalhe da Atividade
+- Hoje as tarefas abrem em modal/edição em `src/routes/activities.tsx`. Adicionar o mesmo card "Email de origem" no painel/modal de detalhe da tarefa.
+
+### 5. Deep link `/email?id=...`
+- Em `src/routes/email.tsx` (ou `EmailMailbox`), ler `search.id` e pré-selecionar a mensagem correspondente quando presente.
+
+## Fora de escopo
+- Não muda sincronização nem cache de emails (já persistente).
+- Não cria relação N:N email↔lead; um lead/atividade aponta para um único email de origem (o caso atual).

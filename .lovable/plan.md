@@ -1,20 +1,23 @@
 ## Objetivo
-Permitir que o campo **Total** dos diálogos de Hotel, Voo e Serviço seja sempre editável manualmente, sem depender da permissão "editar custo".
+Permitir digitar o **Total** direto na linha da tabela de Hotéis, Serviços e Voos da proposta, sem precisar abrir o diálogo de edição.
 
 ## Mudanças
 
-### `src/components/proposal/HotelDialog.tsx`
-- Remover o gate `canEditCost`/`canViewCost` no campo Total.
-- O bloco do Total deixa de ser condicional: sempre renderizado e sempre editável (`disabled` removido).
-- Manter `usePermissions` apenas se ainda for usado em outro ponto; caso contrário, remover o import.
+### `src/components/proposal/ProposalEditor.tsx` — tabela de Hotéis e Serviços (`ItemTable`)
+- Substituir a célula somente-leitura da coluna **Subtotal** (linhas ~1161) por um `<Input type="number" step="0.01">` editável.
+- Ao alterar o valor:
+  - Hotel: `unit_cost = novoTotal / max(noites, 1)`, atualiza também `unit_price`.
+  - Serviço: `unit_cost = novoTotal / max(quantity, 1)`, atualiza `unit_price`.
+  - Markup é mantido em 0 nesse caminho para que `subtotal == total digitado` (consistente com o diálogo, que já grava com markup default e usa `total/denominador`).
+- Manter `disabled={readOnly}`. Sem novo gate de permissão — segue a regra recém-aprovada de Total sempre editável.
+- O cálculo exibido continua via `lineSubtotal`, mas refletirá exatamente o valor digitado.
 
-### `src/components/proposal/ServiceDialog.tsx`
-- Mesma mudança: Total sempre visível e editável, sem `canViewCost`/`canEditCost`.
-
-### `src/components/proposal/FlightDialog.tsx`
-- O Total já é editável; nenhuma mudança necessária (confirmar).
+### `src/components/proposal/ProposalEditor.tsx` — tabela de Voos
+- Trocar a célula da coluna **Total** (linha ~892) por um `<Input type="number" step="0.01">`.
+- Onchange faz `update` direto em `quote_flights.total` via supabase e atualiza o estado local de `flights`. Debounce simples no blur (salvar `onBlur` + Enter) para não disparar update a cada tecla.
+- Sem alterar pax/horários.
 
 ## Comportamento
-- Qualquer usuário com acesso ao diálogo pode digitar o valor em **Total**.
-- O cálculo de `unit_cost` continua sendo `total / noites` (hotel) ou `total / pax` (serviço), preservando os totais já existentes da proposta.
-- Nenhuma alteração de schema, RLS ou de permissões do sistema — somente UI nos dois diálogos.
+- Usuário clica na célula Total, digita o valor, sai do campo (blur) → salva.
+- Diálogo de edição continua disponível para os demais campos.
+- Nenhuma mudança em schema, RLS ou permissões.

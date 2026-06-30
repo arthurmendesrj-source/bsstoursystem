@@ -1158,7 +1158,24 @@ function ItemTable({
                       className="h-8 text-right"
                     />
                   </td>
-                  <td className="p-2 text-right font-medium tabular-nums">{sub.toFixed(2)}</td>
+                  <td className="p-2">
+                    {readOnly ? (
+                      <span className="block text-right font-medium tabular-nums">{sub.toFixed(2)}</span>
+                    ) : (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={Number(sub.toFixed(2))}
+                        onChange={(e) => {
+                          const totalNum = Number(e.target.value) || 0;
+                          const denom = Math.max(1, Number(it.quantity) || 1);
+                          const uc = +(totalNum / denom).toFixed(2);
+                          onChange(i, { unit_cost: uc, unit_price: uc, markup_pct: 0 });
+                        }}
+                        className="h-8 text-right font-medium"
+                      />
+                    )}
+                  </td>
                   {(!readOnly || (showNotes && quoteId)) && (
                     <td className="p-2 text-right whitespace-nowrap">
                       {showNotes && quoteId && !it.id.startsWith("new-") && (

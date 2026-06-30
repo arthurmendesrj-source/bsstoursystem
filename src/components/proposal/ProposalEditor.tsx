@@ -320,7 +320,7 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
       status: "pending",
     }]);
     if (error) { toast.error(error.message); return; }
-    toast.success("Ação enfileirada no Inbox IA");
+    toast.success("Ação enfileirada na Triagem Email");
   };
 
   const proposeSendProposal = async () => {

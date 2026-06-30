@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { EmailMailbox } from "@/components/email/EmailMailbox";
 import { getMyAccount } from "@/lib/email.functions";
 
-export const Route = createFileRoute("/inbox-ia/email")({
+export const Route = createFileRoute("/inbox-ia_/email")({
   component: () => (
     <AuthGate>
       <AppShell>

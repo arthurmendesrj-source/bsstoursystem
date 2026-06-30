@@ -1134,7 +1134,6 @@ const TOOL_ROUTES: Record<string, string> = {
   "dashboard": "/dashboard",
   "funnel": "/funnel",
   "packages": "/packages",
-  "inbox-ia": "/inbox-ia",
   "inbox-ia-email": "/inbox-ia/email",
   "email": "/email",
   "activities": "/activities",

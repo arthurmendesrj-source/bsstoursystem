@@ -49,6 +49,7 @@ import { Route as SettingsSlaRouteImport } from './routes/settings_.sla'
 import { Route as SettingsPermissionsRouteImport } from './routes/settings_.permissions'
 import { Route as PermissionsAuditFinancialRouteImport } from './routes/permissions-audit.financial'
 import { Route as LeadsLeadIdRouteImport } from './routes/leads.$leadId'
+import { Route as InboxIaEmailRouteImport } from './routes/inbox-ia_.email'
 import { Route as GerencialUserIdRouteImport } from './routes/gerencial.$userId'
 import { Route as BookingsBookingIdRouteImport } from './routes/bookings_.$bookingId'
 import { Route as AlertsSlaRouteImport } from './routes/alerts.sla'
@@ -271,6 +272,11 @@ const LeadsLeadIdRoute = LeadsLeadIdRouteImport.update({
   path: '/$leadId',
   getParentRoute: () => LeadsRoute,
 } as any)
+const InboxIaEmailRoute = InboxIaEmailRouteImport.update({
+  id: '/inbox-ia_/email',
+  path: '/inbox-ia/email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GerencialUserIdRoute = GerencialUserIdRouteImport.update({
   id: '/$userId',
   path: '/$userId',
@@ -411,6 +417,7 @@ export interface FileRoutesByFullPath {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/gerencial/$userId': typeof GerencialUserIdRoute
+  '/inbox-ia/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
@@ -472,6 +479,7 @@ export interface FileRoutesByTo {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings/$bookingId': typeof BookingsBookingIdRoute
   '/gerencial/$userId': typeof GerencialUserIdRoute
+  '/inbox-ia/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings/permissions': typeof SettingsPermissionsRoute
@@ -534,6 +542,7 @@ export interface FileRoutesById {
   '/alerts/sla': typeof AlertsSlaRoute
   '/bookings_/$bookingId': typeof BookingsBookingIdRoute
   '/gerencial/$userId': typeof GerencialUserIdRoute
+  '/inbox-ia_/email': typeof InboxIaEmailRoute
   '/leads/$leadId': typeof LeadsLeadIdRoute
   '/permissions-audit/financial': typeof PermissionsAuditFinancialRoute
   '/settings_/permissions': typeof SettingsPermissionsRoute
@@ -597,6 +606,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/gerencial/$userId'
+    | '/inbox-ia/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
     | '/settings/permissions'
@@ -658,6 +668,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings/$bookingId'
     | '/gerencial/$userId'
+    | '/inbox-ia/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
     | '/settings/permissions'
@@ -719,6 +730,7 @@ export interface FileRouteTypes {
     | '/alerts/sla'
     | '/bookings_/$bookingId'
     | '/gerencial/$userId'
+    | '/inbox-ia_/email'
     | '/leads/$leadId'
     | '/permissions-audit/financial'
     | '/settings_/permissions'
@@ -776,6 +788,7 @@ export interface RootRouteChildren {
   AdminPlansRoute: typeof AdminPlansRoute
   AdminTenantsRoute: typeof AdminTenantsRoute
   BookingsBookingIdRoute: typeof BookingsBookingIdRoute
+  InboxIaEmailRoute: typeof InboxIaEmailRoute
   SettingsPermissionsRoute: typeof SettingsPermissionsRoute
   SettingsSlaRoute: typeof SettingsSlaRoute
   SettingsTemplatesRoute: typeof SettingsTemplatesRoute
@@ -1076,6 +1089,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LeadsLeadIdRouteImport
       parentRoute: typeof LeadsRoute
     }
+    '/inbox-ia_/email': {
+      id: '/inbox-ia_/email'
+      path: '/inbox-ia/email'
+      fullPath: '/inbox-ia/email'
+      preLoaderRoute: typeof InboxIaEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/gerencial/$userId': {
       id: '/gerencial/$userId'
       path: '/$userId'
@@ -1313,6 +1333,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminPlansRoute: AdminPlansRoute,
   AdminTenantsRoute: AdminTenantsRoute,
   BookingsBookingIdRoute: BookingsBookingIdRoute,
+  InboxIaEmailRoute: InboxIaEmailRoute,
   SettingsPermissionsRoute: SettingsPermissionsRoute,
   SettingsSlaRoute: SettingsSlaRoute,
   SettingsTemplatesRoute: SettingsTemplatesRoute,

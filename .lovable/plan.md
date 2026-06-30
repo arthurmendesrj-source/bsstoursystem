@@ -1,23 +1,27 @@
 ## Objetivo
-Permitir digitar o **Total** direto na linha da tabela de Hotéis, Serviços e Voos da proposta, sem precisar abrir o diálogo de edição.
+Adicionar botão **Criar Invoice** no editor de propostas, sempre visível, que cria apenas o registro de invoice (sem booking) vinculado à proposta atual e disponível na aba Invoice.
 
 ## Mudanças
 
-### `src/components/proposal/ProposalEditor.tsx` — tabela de Hotéis e Serviços (`ItemTable`)
-- Substituir a célula somente-leitura da coluna **Subtotal** (linhas ~1161) por um `<Input type="number" step="0.01">` editável.
-- Ao alterar o valor:
-  - Hotel: `unit_cost = novoTotal / max(noites, 1)`, atualiza também `unit_price`.
-  - Serviço: `unit_cost = novoTotal / max(quantity, 1)`, atualiza `unit_price`.
-  - Markup é mantido em 0 nesse caminho para que `subtotal == total digitado` (consistente com o diálogo, que já grava com markup default e usa `total/denominador`).
-- Manter `disabled={readOnly}`. Sem novo gate de permissão — segue a regra recém-aprovada de Total sempre editável.
-- O cálculo exibido continua via `lineSubtotal`, mas refletirá exatamente o valor digitado.
-
-### `src/components/proposal/ProposalEditor.tsx` — tabela de Voos
-- Trocar a célula da coluna **Total** (linha ~892) por um `<Input type="number" step="0.01">`.
-- Onchange faz `update` direto em `quote_flights.total` via supabase e atualiza o estado local de `flights`. Debounce simples no blur (salvar `onBlur` + Enter) para não disparar update a cada tecla.
-- Sem alterar pax/horários.
+### `src/components/proposal/ProposalEditor.tsx`
+- Nova função `createInvoiceOnly()`:
+  - Valida permissão (`canCreateBooking` ou `canEdit` — usar a mesma gate de "Converter para reserva").
+  - Calcula `invoiceNumber = leadCode ? "IN"+leadCode : "IN"+quote.id.slice(0,8)`.
+  - Se já existir invoice com esse número, faz `update` (atualiza `quote_id`, `customer_id`, `currency`, `subtotal`, `total`) e avisa "Invoice já existia, atualizado".
+  - Caso contrário, `insert` em `public.invoices` com: `number`, `quote_id`, `customer_id`, `currency`, `subtotal = total = quote.total_amount`, `status='draft'`, `created_by=uid`, `issued_at=now`. `booking_id` fica `null`.
+  - Toast de sucesso e `onSaved?.()`.
+- Novo botão na barra de ações (próximo a "Gerar Documento"), visível em `mode === "proposal"` sempre (qualquer status):
+  ```
+  <Button size="sm" variant="outline" onClick={createInvoiceOnly}>
+    <Receipt className="h-4 w-4 mr-1" /> Criar Invoice
+  </Button>
+  ```
+- Mantém os botões existentes ("Propor invoice", "Converter para reserva") inalterados.
 
 ## Comportamento
-- Usuário clica na célula Total, digita o valor, sai do campo (blur) → salva.
-- Diálogo de edição continua disponível para os demais campos.
-- Nenhuma mudança em schema, RLS ou permissões.
+- Clicar em **Criar Invoice** → cria o invoice imediatamente (status draft) e ele aparece na aba Invoice da proposta/lead, mesmo sem reserva.
+- Idempotente: clicar de novo apenas atualiza o invoice existente com o mesmo número.
+
+## Não muda
+- Schema do banco, RLS, permissões.
+- Fluxo de "Converter para reserva" continua criando booking + invoice.

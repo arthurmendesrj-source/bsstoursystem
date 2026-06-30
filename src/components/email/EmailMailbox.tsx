@@ -698,9 +698,11 @@ function categoryLabel(c: EmailAiResult["category"]): string {
 
 function AiResultPanel({
   result,
+  email,
 }: {
   result: EmailAiResult;
   summary?: string;
+  email?: any;
 }) {
   const f = result.suggestion.fields;
   const hasFields = Object.values(f).some(Boolean);
@@ -742,11 +744,12 @@ function AiResultPanel({
         </Button>
       </div>
 
-      {mode === "lead" && <CreateLeadForm result={result} onDone={() => setMode("none")} />}
-      {mode === "activity" && <CreateActivityForm result={result} onDone={() => setMode("none")} />}
+      {mode === "lead" && <CreateLeadForm result={result} email={email} onDone={() => setMode("none")} />}
+      {mode === "activity" && <CreateActivityForm result={result} email={email} onDone={() => setMode("none")} />}
     </div>
   );
 }
+
 
 function AssigneeSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { user } = useAuth();

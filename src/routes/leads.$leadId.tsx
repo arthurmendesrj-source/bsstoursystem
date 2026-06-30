@@ -112,7 +112,7 @@ function LeadWorkspace() {
     setLead((leadRes.data as Lead | null) ?? null);
     setTasks((tasksRes.data as Task[]) ?? []);
     setInteractions((intRes.data as Interaction[]) ?? []);
-    setEmails((emailsRes.data as Email[]) ?? []);
+    setEmails(((emailsRes.data as any[]) ?? []).map((e) => ({ ...e, received_at: e.internal_date })) as Email[]);
     setQuotes((quotesRes.data as Quote[]) ?? []);
     setBookings((bookingsRes.data as Booking[]) ?? []);
     setLoading(false);

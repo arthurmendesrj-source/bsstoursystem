@@ -70,7 +70,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       "/dashboard": "dashboard",
       "/funnel": "funnel",
       "/packages": "packages",
-      "/inbox-ia": "inbox-ia",
       "/inbox-ia/email": "inbox-ia-email",
       "/email": "email",
       "/activities": "activities",
@@ -122,7 +121,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const items = [
-    { to: "/inbox-ia", label: "Inbox IA", icon: Sparkles },
     { to: "/inbox-ia/email", label: "Triagem Email", icon: Sparkles },
     { to: "/email", label: t("email"), icon: Mail },
     { to: "/whatsapp", label: "WhatsApp", icon: MessageSquare },

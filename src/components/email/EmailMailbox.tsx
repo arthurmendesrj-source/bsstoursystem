@@ -806,6 +806,8 @@ function CreateLeadForm({ result, email, onDone }: { result: EmailAiResult; emai
     if (!user) return;
     if (!form.name.trim()) { toast.error("Informe o nome"); return; }
     setSaving(true);
+    const sourceEmailId = await resolveEmailRowId(user.id, email?.gmailId);
+    const snap = emailSnapshot(email);
     const { data, error } = await supabase.from("leads").insert({
       name: form.name.slice(0, 200),
       email: form.email || null,
@@ -816,10 +818,15 @@ function CreateLeadForm({ result, email, onDone }: { result: EmailAiResult; emai
       status: "novo" as const,
       created_by: user.id,
       assigned_to: assignedTo || user.id,
+      source_email_id: sourceEmailId,
+      ...snap,
     }).select("id").maybeSingle();
+    if (!error && data?.id && sourceEmailId) {
+      await supabase.from("emails").update({ lead_id: data.id }).eq("id", sourceEmailId);
+    }
     setSaving(false);
     if (error) { toast.error(error.message); return; }
-    toast.success("Lead criado.", {
+    toast.success("Lead criado com email anexado.", {
       action: data?.id ? { label: "Abrir", onClick: () => navigate({ to: "/leads/$leadId", params: { leadId: data.id } }) } : undefined,
     });
     onDone();

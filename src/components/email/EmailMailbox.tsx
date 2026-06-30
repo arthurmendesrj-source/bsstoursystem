@@ -38,6 +38,7 @@ export function EmailMailbox({
   const send = useServerFn(sendEmailFn);
   const analyze = useServerFn(analyzeEmailFn);
   const triage = useServerFn(triageInboxFn);
+  const getCachedAi = useServerFn(getCachedAiResultsFn);
 
 
 

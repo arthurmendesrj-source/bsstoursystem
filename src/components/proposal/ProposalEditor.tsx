@@ -600,6 +600,49 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
     onSaved?.();
   };
 
+  const createInvoiceOnly = async () => {
+    if (!quote) return;
+    if (!canEdit) { toast.error("Sem permissão"); return; }
+    const { data: userRes } = await supabase.auth.getUser();
+    const uid = userRes.user?.id;
+    if (!uid) return toast.error("auth");
+    const invoiceNumber = leadCode ? `IN${leadCode}` : `IN${quote.id.slice(0, 8).toUpperCase()}`;
+    const { data: existingInv } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("number", invoiceNumber)
+      .maybeSingle();
+    if (existingInv) {
+      const { error } = await supabase
+        .from("invoices")
+        .update({
+          quote_id: quote.id,
+          customer_id: customerId,
+          currency: quote.currency,
+          subtotal: quote.total_amount,
+          total: quote.total_amount,
+        })
+        .eq("id", existingInv.id);
+      if (error) return toast.error(error.message);
+      toast.success("Invoice atualizado");
+    } else {
+      const { error } = await supabase.from("invoices").insert({
+        number: invoiceNumber,
+        quote_id: quote.id,
+        customer_id: customerId,
+        currency: quote.currency,
+        subtotal: quote.total_amount,
+        total: quote.total_amount,
+        status: "draft",
+        created_by: uid,
+        issued_at: new Date().toISOString(),
+      });
+      if (error) return toast.error(error.message);
+      toast.success("Invoice criado");
+    }
+    onSaved?.();
+  };
+
   if (loading || !quote) {
     return <div className="p-6 text-sm text-muted-foreground">{t("loading")}</div>;
   }

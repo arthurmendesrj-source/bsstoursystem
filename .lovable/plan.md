@@ -1,36 +1,25 @@
-## Problema
+## Objetivo
 
-Na aba **Email** da tela de atendimento (`/leads/$leadId`), a consulta filtra apenas por `emails.lead_id = leadId`. No banco, todos os emails sincronizados estão com `lead_id = NULL` (só ficaria preenchido nos casos em que o usuário cria o Lead pelo botão da IA). Resultado: a aba aparece vazia mesmo quando há emails do mesmo contato na caixa.
+Na tela de **Atendimento** (detalhe do lead), a aba **Email** deve mostrar **apenas o email de origem** que gerou o lead/atividade — não replicar a caixa de entrada por endereço.
 
-Exemplo: lead `Egor Bad'in` (`office@dolcetravel.ru`) → 2 emails existem na caixa com esse remetente, nenhum aparece.
+## Regra (a partir de agora)
 
-## Solução
+- Ao criar Lead ou Atividade a partir de um email → salvar o vínculo **somente daquele email específico** (via `source_email_id` / `lead_id` no registro do email). ✅ Já é o comportamento atual da criação.
+- Na aba Email do lead → listar **somente** os emails com `lead_id = <lead atual>`. Sem busca por `from_email` / `to_emails`, sem backfill automático.
+- Novos emails que chegarem do mesmo remetente **não** entram automaticamente no lead. Só entram se o usuário criar manualmente outra atividade/lead a partir deles (decisão futura: botão "vincular a este lead" — fora deste escopo).
+- Leads já existentes (os 3 criados antes desta regra): **ignorados**, sem migração nem limpeza.
 
-Mostrar na aba Email todo email do usuário cujo remetente/destinatário bata com o email do lead (além dos já vinculados explicitamente). Fazer *backfill* gravando `lead_id` para acelerar consultas futuras. Atualizar automaticamente sempre que o sync em background trouxer emails novos.
+## Mudanças técnicas
 
-### Mudanças
+**`src/routes/leads.$leadId.tsx`** — aba Email:
+1. Remover a query secundária que busca emails por `from_email` / `to_emails` contendo o endereço do lead.
+2. Remover o **backfill** que escrevia `lead_id` em emails encontrados por endereço.
+3. Manter apenas: `select ... from emails where lead_id = $leadId order by date desc`.
+4. Manter o auto-refresh de 30s (só re-executa a query estrita).
 
-**1. `src/routes/leads.$leadId.tsx` — função `loadAll` (aba Email)**
+Nada muda em `EmailMailbox.tsx`, no fluxo de criar Lead/Atividade, nem no schema — o vínculo já é salvo corretamente.
 
-Substituir a consulta única por duas em paralelo:
-- a) `emails` com `lead_id = leadId` (vínculos explícitos da IA).
-- b) `emails` com `user_id = auth.uid()` filtrando por `from_email ILIKE lead.email` OU `lead.email = ANY(to_emails)` — só roda se `lead.email` existir.
+## Resultado
 
-Unir/deduplicar por `id`, ordenar por `internal_date desc`, limitar a 100.
-
-Após carregar, disparar `update` em lote (best-effort, sem bloquear UI) gravando `lead_id = leadId` nas linhas do grupo (b) que ainda estavam sem `lead_id`.
-
-**2. Auto-atualização**
-
-Adicionar `useEffect` que escuta `document.visibilitychange` + `setInterval(30s)` chamando `loadAll` enquanto a aba está visível. Mantém a aba sincronizada com o cache que o `useEmailBackgroundSync` global já preenche a cada 30s.
-
-**3. Sem mudanças de schema**
-
-Colunas `lead_id`, `from_email`, `to_emails`, `user_id` já existem; índice `idx_emails_lead` já existe. RLS de `emails` já permite o usuário ler/atualizar seus próprios emails.
-
-### Como testar
-
-- Abrir lead `Egor Bad'in` → aba Email lista os 2 emails de `office@dolcetravel.ru`.
-- Recarregar → vêm direto pelo `lead_id` (backfill aplicado).
-- Enviar um email novo para esse contato e aguardar até 30s → aparece sem refresh manual.
-- Criar lead novo pela IA a partir de um email → email-fonte aparece imediatamente.
+- Leads novos: aba Email mostra exatamente o(s) email(s) que o usuário escolheu vincular.
+- Leads antigos (os 3): podem aparecer vazios ou com o que já foi vinculado — sem ação.

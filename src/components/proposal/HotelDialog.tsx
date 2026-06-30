@@ -13,7 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { usePermissions } from "@/lib/permissions";
+
 
 const MEAL_PLANS = ["Room only", "Bed&Breakfast", "Half board", "Full board", "All inclusive"];
 const CATEGORIES = ["3★", "4★", "5★", "Boutique", "Other"];
@@ -45,9 +45,6 @@ type Props = {
 
 export function HotelDialog({ open, onOpenChange, quoteId, defaultMarkupPct = 0, initial, defaultCheckIn, onSaved }: Props) {
   const { user } = useAuth();
-  const { canField } = usePermissions();
-  const canEditCost = canField("quotes", "unit_cost", "edit");
-  const canViewCost = canField("quotes", "unit_cost", "view");
   const today = format(new Date(), "yyyy-MM-dd");
   const [checkIn, setCheckIn] = useState<string>(today);
   const [checkOut, setCheckOut] = useState<string>(today);

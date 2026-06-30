@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn, syncFolderFn } from "@/lib/email.functions";
-import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
+import { analyzeEmailFn, triageInboxFn, getCachedAiResultsFn, type EmailAiResult } from "@/lib/email-ai.functions";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -38,6 +38,7 @@ export function EmailMailbox({
   const send = useServerFn(sendEmailFn);
   const analyze = useServerFn(analyzeEmailFn);
   const triage = useServerFn(triageInboxFn);
+  const getCachedAi = useServerFn(getCachedAiResultsFn);
 
 
 
@@ -110,6 +111,25 @@ export function EmailMailbox({
       if (refreshIdRef.current === myId) setLoading(false);
     }
   };
+
+  // Reload persisted AI triage results whenever the visible messages change,
+  // so badges/summaries survive navigation and page reloads.
+  useEffect(() => {
+    const ids = (messages ?? []).map((m: any) => m?.gmailId).filter((x: any): x is string => !!x);
+    if (!targetUserId || ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r: any = await getCachedAi({ data: { targetUserId, gmailIds: ids } });
+        if (cancelled || !r?.results) return;
+        setAiResults((prev) => ({ ...r.results, ...prev }));
+      } catch {
+        // silent — cache hydration is best-effort
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetUserId, messages]);
 
   // Forces a sync with Gmail then re-reads the cache.
   const syncNow = async () => {

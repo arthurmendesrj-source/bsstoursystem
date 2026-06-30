@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { AuthGate } from "@/components/AuthGate";
+import { LeadEmailsTab } from "@/components/lead/LeadEmailsTab";
 import { AppShell } from "@/components/AppShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -299,7 +300,7 @@ function WorkspacePage() {
     let content: React.ReactNode = null;
     if (key === "email") {
       title = t("intEmail");
-      content = <div className="p-4 text-sm text-muted-foreground">Email agora vive em /email.</div>;
+      content = <div className="p-4"><LeadEmailsTab leadId={lead.id} /></div>;
     } else if (key === "activities") {
       title = t("activities");
       content = <div className="p-4"><ActivitiesTab leadId={lead.id} tasks={tasks} onChanged={() => loadLead(lead.id)} /></div>;
@@ -727,7 +728,7 @@ function WorkspacePage() {
                   {!hasLead || !lead ? (
                     <EmptyTab text={t("selectLeadToView")} />
                   ) : (
-                    <div className="p-4 text-sm text-muted-foreground">Email agora vive em <a className="underline" href="/email">/email</a>.</div>
+                    <LeadEmailsTab leadId={lead.id} />
                   )}
                 </AccordionContent>
               </AccordionItem>

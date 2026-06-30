@@ -889,7 +889,13 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
                     <td className="px-3 py-2">{f.departure_time?.slice(0, 5)}</td>
                     <td className="px-3 py-2">{f.arrival_time?.slice(0, 5) ?? "—"}</td>
                     <td className="px-3 py-2 text-right">{f.pax}</td>
-                    <td className="px-3 py-2 text-right">{f.total != null ? fmt(Number(f.total), ccy) : "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <FlightTotalCell
+                        flightId={f.id!}
+                        value={f.total != null ? Number(f.total) : null}
+                        onSaved={(v) => setFlights((prev) => prev.map((x) => x.id === f.id ? { ...x, total: v } : x))}
+                      />
+                    </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {mode === "invoice" && f.id && (
                         <ItemNoteButton quoteId={quoteId} targetKind="flight" targetId={f.id} />
@@ -1158,7 +1164,24 @@ function ItemTable({
                       className="h-8 text-right"
                     />
                   </td>
-                  <td className="p-2 text-right font-medium tabular-nums">{sub.toFixed(2)}</td>
+                  <td className="p-2">
+                    {readOnly ? (
+                      <span className="block text-right font-medium tabular-nums">{sub.toFixed(2)}</span>
+                    ) : (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={Number(sub.toFixed(2))}
+                        onChange={(e) => {
+                          const totalNum = Number(e.target.value) || 0;
+                          const denom = Math.max(1, Number(it.quantity) || 1);
+                          const uc = +(totalNum / denom).toFixed(2);
+                          onChange(i, { unit_cost: uc, unit_price: uc, markup_pct: 0 });
+                        }}
+                        className="h-8 text-right font-medium"
+                      />
+                    )}
+                  </td>
                   {(!readOnly || (showNotes && quoteId)) && (
                     <td className="p-2 text-right whitespace-nowrap">
                       {showNotes && quoteId && !it.id.startsWith("new-") && (
@@ -1184,5 +1207,28 @@ function ItemTable({
         </div>
       )}
     </div>
+  );
+}
+
+function FlightTotalCell({ flightId, value, onSaved }: { flightId: string; value: number | null; onSaved: (v: number | null) => void }) {
+  const [val, setVal] = useState<string>(value != null ? String(value) : "");
+  useEffect(() => { setVal(value != null ? String(value) : ""); }, [value]);
+  const save = async () => {
+    const next = val === "" ? null : Number(val);
+    if (next === value) return;
+    const { error } = await supabase.from("quote_flights").update({ total: next }).eq("id", flightId);
+    if (error) { toast.error(error.message); return; }
+    onSaved(next);
+  };
+  return (
+    <Input
+      type="number"
+      step="0.01"
+      value={val}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      className="h-8 text-right"
+    />
   );
 }

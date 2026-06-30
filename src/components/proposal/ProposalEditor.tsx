@@ -889,7 +889,13 @@ export function ProposalEditor({ quoteId, leadId, leadCode, customerId, mode, on
                     <td className="px-3 py-2">{f.departure_time?.slice(0, 5)}</td>
                     <td className="px-3 py-2">{f.arrival_time?.slice(0, 5) ?? "—"}</td>
                     <td className="px-3 py-2 text-right">{f.pax}</td>
-                    <td className="px-3 py-2 text-right">{f.total != null ? fmt(Number(f.total), ccy) : "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <FlightTotalCell
+                        flightId={f.id!}
+                        value={f.total != null ? Number(f.total) : null}
+                        onSaved={(v) => setFlights((prev) => prev.map((x) => x.id === f.id ? { ...x, total: v } : x))}
+                      />
+                    </td>
                     <td className="px-3 py-2 text-right whitespace-nowrap">
                       {mode === "invoice" && f.id && (
                         <ItemNoteButton quoteId={quoteId} targetKind="flight" targetId={f.id} />

@@ -14,7 +14,7 @@ type EmailRow = {
   from_email: string | null;
   from_name: string | null;
   to_emails: string[] | null;
-  date: string | null;
+  internal_date: string | null;
   body_text: string | null;
   body_html: string | null;
 };
@@ -39,12 +39,12 @@ export function LeadEmailsTab({ leadId }: { leadId: string }) {
       const { data } = await supabase
         .from("emails")
         .select(
-          "id,subject,from_email,from_name,to_emails,date,body_text,body_html",
+          "id,subject,from_email,from_name,to_emails,internal_date,body_text,body_html",
         )
         .eq("lead_id", leadId)
-        .order("date", { ascending: false });
+        .order("internal_date", { ascending: false });
       if (cancelled) return;
-      setEmails((data ?? []) as EmailRow[]);
+      setEmails(((data ?? []) as unknown) as EmailRow[]);
       setLoading(false);
     };
 

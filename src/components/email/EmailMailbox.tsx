@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { Loader2, Mail, RefreshCw, Send, Plus, Reply, Inbox as InboxIcon, MailCheck, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { listMessagesFn, fetchMessageFn, sendEmailFn, syncFolderFn } from "@/lib/email.functions";
-import { analyzeEmailFn, triageInboxFn, type EmailAiResult } from "@/lib/email-ai.functions";
+import { analyzeEmailFn, triageInboxFn, getCachedAiResultsFn, type EmailAiResult } from "@/lib/email-ai.functions";
 import { useNavigate } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";

@@ -1,25 +1,31 @@
+## Problema
+
+A tela **Atendimento** (`/workspace?lead=...`) tem a aba **E-mail**, mas hoje ela só exibe o placeholder *"Email agora vive em /email."* — por isso o email vinculado ao lead (mesmo recém-criado) não aparece, e você precisa sair pra outra tela.
+
 ## Objetivo
 
-Na tela de **Atendimento** (detalhe do lead), a aba **Email** deve mostrar **apenas o email de origem** que gerou o lead/atividade — não replicar a caixa de entrada por endereço.
+Manter tudo dentro do Atendimento: a aba E-mail do lead mostra o(s) email(s) vinculados ao lead atual, sem trocar de tela.
 
-## Regra (a partir de agora)
+## Correção
 
-- Ao criar Lead ou Atividade a partir de um email → salvar o vínculo **somente daquele email específico** (via `source_email_id` / `lead_id` no registro do email). ✅ Já é o comportamento atual da criação.
-- Na aba Email do lead → listar **somente** os emails com `lead_id = <lead atual>`. Sem busca por `from_email` / `to_emails`, sem backfill automático.
-- Novos emails que chegarem do mesmo remetente **não** entram automaticamente no lead. Só entram se o usuário criar manualmente outra atividade/lead a partir deles (decisão futura: botão "vincular a este lead" — fora deste escopo).
-- Leads já existentes (os 3 criados antes desta regra): **ignorados**, sem migração nem limpeza.
+Em `src/routes/workspace.tsx`, substituir as **duas** ocorrências do placeholder (no accordion principal, ~linha 730, e na janela flutuante via `openSection("email")`, ~linha 302) por uma lista real dos emails vinculados.
 
-## Mudanças técnicas
+### Regra (igual à já aplicada em `/leads/$leadId`)
+- Buscar apenas `emails` onde `lead_id = <lead atual>` (sem busca por endereço, sem backfill).
+- Ordenar por `date desc`.
+- Auto-refresh a cada 30s enquanto o componente estiver montado (acompanha o sync global de inbox).
+- Renderizar: remetente, assunto, data; expandir para ver o corpo (HTML em iframe sandboxed, fallback texto).
+- Estado vazio: "Nenhum email vinculado a este lead ainda."
 
-**`src/routes/leads.$leadId.tsx`** — aba Email:
-1. Remover a query secundária que busca emails por `from_email` / `to_emails` contendo o endereço do lead.
-2. Remover o **backfill** que escrevia `lead_id` em emails encontrados por endereço.
-3. Manter apenas: `select ... from emails where lead_id = $leadId order by date desc`.
-4. Manter o auto-refresh de 30s (só re-executa a query estrita).
+### Implementação técnica
+1. Criar `src/components/lead/LeadEmailsTab.tsx` (componente client) que:
+   - recebe `leadId: string`;
+   - usa `supabase.from('emails').select('id,subject,from_email,from_name,to_emails,date,body_text,body_html').eq('lead_id', leadId).order('date', { ascending: false })`;
+   - `useEffect` com `setInterval(30_000)` + cleanup para refresh;
+   - UI simples com `Accordion`/`Collapsible` por email.
+2. Em `src/routes/workspace.tsx`:
+   - importar `LeadEmailsTab`;
+   - trocar o placeholder do accordion (linha ~730) por `<LeadEmailsTab leadId={lead.id} />`;
+   - trocar o `content` do `openSection("email")` (linha ~302) por `<div className="p-4"><LeadEmailsTab leadId={lead.id} /></div>`.
 
-Nada muda em `EmailMailbox.tsx`, no fluxo de criar Lead/Atividade, nem no schema — o vínculo já é salvo corretamente.
-
-## Resultado
-
-- Leads novos: aba Email mostra exatamente o(s) email(s) que o usuário escolheu vincular.
-- Leads antigos (os 3): podem aparecer vazios ou com o que já foi vinculado — sem ação.
+Nada mais muda. A criação de Lead/Atividade a partir de email já grava `lead_id` no registro do email, então o lead recém-criado a partir do email passa a exibi-lo imediatamente no Atendimento.

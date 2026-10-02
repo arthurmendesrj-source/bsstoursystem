@@ -34,7 +34,7 @@ export function useEmailBackgroundSync() {
 
     // Initial tick shortly after mount.
     const initial = window.setTimeout(() => { void tick(); }, 2_000);
-    const id = window.setInterval(tick, 30_000);
+    const id = window.setInterval(tick, 15_000);
     const onVis = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVis);
 

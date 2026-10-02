@@ -215,6 +215,7 @@ export function EmailMailbox({
     document.addEventListener("visibilitychange", onVis);
     return () => {
       cancelled = true;
+      window.clearTimeout(first);
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };

@@ -117,7 +117,7 @@ export const Route = createFileRoute("/api/assistant/chat")({
           .eq("id", conversationId)
           .maybeSingle();
         if (!conv) return new Response("conversation not found", { status: 404 });
-        const model = conv.model || "google/gemini-2.5-flash";
+        // Model is fixed to Claude (see src/lib/claude.server.ts)
 
         // Persist user message
         await supabase.from("ai_messages").insert({

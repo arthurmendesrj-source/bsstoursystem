@@ -208,6 +208,8 @@ function PendingActionCard({ action, onApprove, onReject }: { action: PendingAct
     propose_update_lead: "Atualizar Lead",
     propose_create_interaction: "Registrar Interação",
     propose_create_activity: "Criar Atividade Operacional",
+    propose_create_task: "Criar Tarefa",
+    propose_update_task: "Atualizar Tarefa",
   };
   return (
     <Card className="p-3 border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">

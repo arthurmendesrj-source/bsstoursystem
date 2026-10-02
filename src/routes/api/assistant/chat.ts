@@ -20,6 +20,8 @@ const PROPOSE_TOOLS = new Set([
   "propose_update_lead",
   "propose_create_interaction",
   "propose_create_activity",
+  "propose_create_task",
+  "propose_update_task",
 ]);
 
 async function authenticate(request: Request) {

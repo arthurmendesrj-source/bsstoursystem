@@ -137,6 +137,35 @@ async function executeAction(actionType: string, payload: any, supabase: any, us
       if (error) throw error;
       return { activity: data };
     }
+    case "propose_create_task": {
+      const { data, error } = await supabase
+        .from("tasks")
+        .insert({
+          title: payload.title,
+          description: payload.description,
+          due_date: payload.due_date,
+          priority: payload.priority ?? "media",
+          category: payload.category ?? "atendimento",
+          lead_id: payload.lead_id,
+          customer_id: payload.customer_id,
+          assigned_to: payload.assigned_to ?? userId,
+          created_by: userId,
+          source: "ia_assistente",
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return { task: data };
+    }
+    case "propose_update_task": {
+      const allowed = ["completed", "due_date", "priority", "title", "description", "assigned_to"];
+      const fields: Record<string, unknown> = {};
+      for (const k of allowed) if (k in (payload.fields ?? {})) fields[k] = payload.fields[k];
+      if (fields.completed === true) fields.completed_at = new Date().toISOString();
+      const { data, error } = await supabase.from("tasks").update(fields).eq("id", payload.id).select().single();
+      if (error) throw error;
+      return { task: data };
+    }
     default:
       throw new Error(`Ação desconhecida: ${actionType}`);
   }

@@ -171,10 +171,7 @@ export function EmailMailbox({
     setLoadingOlder(true);
     const nextLimit = viewLimit + 100;
     try {
-      // If there are already more saved emails than shown, just show them; otherwise pull older ones from Gmail.
-      const needGmail = messages.length < viewLimit;
       const r: any = await syncFn({ data: { targetUserId, folder, search, limit: nextLimit, older: true } });
-      void needGmail;
       setViewLimit(nextLimit);
       setMessages(r.messages ?? []);
       if (r.error) toast.error(r.error);

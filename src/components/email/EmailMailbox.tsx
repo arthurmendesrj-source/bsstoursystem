@@ -52,6 +52,8 @@ export function EmailMailbox({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
+  const [viewLimit, setViewLimit] = useState(100);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [selectedUid, setSelectedUid] = useState<number | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [composing, setComposing] = useState<null | { to: string; subject: string; body: string; inReplyTo?: string }>(null);
@@ -96,7 +98,7 @@ export function EmailMailbox({
     setLoading(true);
     setFetchError(null);
     try {
-      const r: any = await list({ data: { targetUserId, folder, search } });
+      const r: any = await list({ data: { targetUserId, folder, search, limit: viewLimit } });
       if (refreshIdRef.current !== myId) return;
       setMessages(r.messages ?? []);
       setNotConnected(r.connected === false);
@@ -144,7 +146,7 @@ export function EmailMailbox({
       }
     }, 60_000);
     try {
-      const r: any = await syncFn({ data: { targetUserId, folder, search } });
+      const r: any = await syncFn({ data: { targetUserId, folder, search, limit: viewLimit } });
       if (refreshIdRef.current !== myId) return;
       setMessages(r.messages ?? []);
       setNotConnected(r.connected === false);
@@ -162,7 +164,25 @@ export function EmailMailbox({
     }
   };
 
+  useEffect(() => { setViewLimit(100); }, [folder, targetUserId]);
   useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [folder, targetUserId]);
+
+  const loadOlder = async () => {
+    setLoadingOlder(true);
+    const nextLimit = viewLimit + 100;
+    try {
+      const r: any = await syncFn({ data: { targetUserId, folder, search, limit: nextLimit, older: true } });
+      setViewLimit(nextLimit);
+      setMessages(r.messages ?? []);
+      if (r.error) toast.error(r.error);
+      else if ((r.messages?.length ?? 0) <= messages.length) toast.info("Não há e-mails mais antigos.");
+      else toast.success(`${(r.messages.length - messages.length)} e-mails antigos carregados.`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao carregar e-mails antigos");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   // Background auto-refresh on the email screen: silently re-syncs the *current*
   // folder/search every 30s so the list updates while the user is looking at it.
@@ -177,7 +197,7 @@ export function EmailMailbox({
       if (bgSyncingRef.current || loading || notConnected) return;
       bgSyncingRef.current = true;
       try {
-        const r: any = await syncFn({ data: { targetUserId, folder, search } });
+        const r: any = await syncFn({ data: { targetUserId, folder, search, limit: viewLimit } });
         if (cancelled) return;
         if (r?.messages) setMessages(r.messages);
         if (r?.connected === false) setNotConnected(true);
@@ -197,7 +217,7 @@ export function EmailMailbox({
       document.removeEventListener("visibilitychange", onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder, targetUserId, search, notConnected]);
+  }, [folder, targetUserId, search, notConnected, viewLimit]);
 
 
   // Update the "Atualizado há Xs" label every 15s.
@@ -439,6 +459,15 @@ export function EmailMailbox({
                       );
                     })}
                   </ul>
+                  {messages.length > 0 && !notConnected && (
+                    <div className="p-3 border-t">
+                      <Button variant="outline" size="sm" className="w-full" onClick={loadOlder} disabled={loadingOlder}>
+                        {loadingOlder ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                        Carregar mais 100 e-mails antigos
+                      </Button>
+                      <p className="text-[11px] text-muted-foreground text-center mt-1">{messages.length} e-mails exibidos</p>
+                    </div>
+                  )}
                 </>
               )}
               {listCollapsed && messages.length > 0 && (

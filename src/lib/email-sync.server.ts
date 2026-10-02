@@ -34,7 +34,7 @@ export type CachedEmail = {
 
 export async function readCachedList(userId: string, folder: FolderKind, opts: { search?: string; limit?: number } = {}): Promise<CachedEmail[]> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const limit = Math.min(opts.limit ?? 50, 200);
+  const limit = Math.min(opts.limit ?? 100, 5000);
   let q = supabaseAdmin
     .from("emails")
     .select("gmail_id, thread_id, from_email, from_name, to_emails, subject, snippet, internal_date, is_unread")
@@ -76,10 +76,28 @@ export async function readCachedList(userId: string, folder: FolderKind, opts: {
   });
 }
 
-/** Sync latest 50 messages from Gmail for a given folder into the DB. */
-export async function syncFolder(userId: string, folder: FolderKind): Promise<{ synced: number }> {
+/** Pull the next 100 messages older than the oldest cached one and persist them. */
+export async function syncOlder(userId: string, folder: FolderKind): Promise<{ synced: number }> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const summaries = await listMessages(userId, folder, { limit: 50 });
+  const { data } = await supabaseAdmin
+    .from("emails")
+    .select("internal_date")
+    .eq("user_id", userId)
+    .eq("folder", folder)
+    .not("internal_date", "is", null)
+    .order("internal_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const oldest = (data as any)?.internal_date as string | undefined;
+  if (!oldest) return syncFolder(userId, folder);
+  const epoch = Math.floor(new Date(oldest).getTime() / 1000);
+  return syncFolder(userId, folder, { query: `before:${epoch}` });
+}
+
+/** Sync latest 100 messages from Gmail for a given folder into the DB. */
+export async function syncFolder(userId: string, folder: FolderKind, opts: { query?: string } = {}): Promise<{ synced: number }> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const summaries = await listMessages(userId, folder, { limit: 100, search: opts.query });
   if (summaries.length === 0) {
     await supabaseAdmin.from("email_sync_state").upsert({
       user_id: userId,

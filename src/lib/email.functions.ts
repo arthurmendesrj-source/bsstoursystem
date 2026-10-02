@@ -84,11 +84,12 @@ export const disconnectGmail = createServerFn({ method: "POST" })
 // this user/folder, runs an initial sync. Use syncFolderFn to refresh.
 export const listMessagesFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; search?: string }) =>
+  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; search?: string; limit?: number }) =>
     z.object({
       targetUserId: z.string().uuid(),
       folder: folderSchema,
       search: z.string().optional(),
+      limit: z.number().int().min(1).max(5000).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
@@ -139,29 +140,35 @@ export const listMessagesFn = createServerFn({ method: "POST" })
 // Force a sync from Gmail into the DB and return the refreshed cached list.
 export const syncFolderFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; search?: string }) =>
+  .inputValidator((d: { targetUserId: string; folder: "inbox" | "sent"; search?: string; limit?: number; older?: boolean }) =>
     z.object({
       targetUserId: z.string().uuid(),
       folder: folderSchema,
       search: z.string().optional(),
+      limit: z.number().int().min(1).max(5000).optional(),
+      older: z.boolean().optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const ok = await authorize(context.supabase, context.userId, data.targetUserId);
     if (!ok) throw new Response("Forbidden", { status: 403 });
-    const { readCachedList, syncFolder } = await import("./email-sync.server");
+    const { readCachedList, syncFolder, syncOlder } = await import("./email-sync.server");
     let error: string | null = null;
+    let synced = 0;
     try {
-      await syncFolder(data.targetUserId, data.folder);
+      const r = data.older
+        ? await syncOlder(data.targetUserId, data.folder)
+        : await syncFolder(data.targetUserId, data.folder);
+      synced = r.synced;
     } catch (e: any) {
       const raw = String(e?.message ?? e ?? "");
       if (/não conectado|GOOGLE_OAUTH|refresh_token/i.test(raw)) {
-        return { connected: false, messages: [] as any[], error: "Gmail não conectado." };
+        return { connected: false, messages: [] as any[], error: "Gmail não conectado.", synced };
       }
       error = `Falha ao atualizar do Gmail. (${raw.slice(0, 200)})`;
     }
-    const messages = await readCachedList(data.targetUserId, data.folder, { search: data.search });
-    return { connected: true, messages, error };
+    const messages = await readCachedList(data.targetUserId, data.folder, { search: data.search, limit: data.limit });
+    return { connected: true, messages, error, synced };
   });
 
 export const fetchMessageFn = createServerFn({ method: "POST" })

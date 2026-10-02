@@ -58,11 +58,16 @@ function LoginPage() {
     if (typeof window === "undefined") return;
     const hash = window.location.hash || "";
     const search = window.location.search || "";
+    const isRecovery =
+      hash.includes("type=recovery") || /[?&]type=recovery\b/.test(search);
+    if (isRecovery) {
+      window.location.replace(`/reset-password${search}${hash}`);
+      return;
+    }
     const isInvite =
       hash.includes("type=invite") ||
       hash.includes("type=signup") ||
-      hash.includes("type=recovery") ||
-      /[?&]type=(invite|signup|recovery)\b/.test(search) ||
+      /[?&]type=(invite|signup)\b/.test(search) ||
       /[?&]token_hash=/.test(search) ||
       /[?&]code=/.test(search);
     if (isInvite) {

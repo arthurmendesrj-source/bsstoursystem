@@ -164,7 +164,6 @@ export function EmailMailbox({
     }
   };
 
-  useEffect(() => { setViewLimit(100); }, [folder, targetUserId]);
   useEffect(() => { void refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [folder, targetUserId]);
 
   const loadOlder = async () => {
@@ -189,12 +188,14 @@ export function EmailMailbox({
   // (A global hook in __root also keeps the inbox cache fresh for any route.)
   const bgSyncingRef = useRef(false);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
   useEffect(() => {
     let cancelled = false;
     const tick = async () => {
       if (cancelled) return;
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      if (bgSyncingRef.current || loading || notConnected) return;
+      if (bgSyncingRef.current || loadingRef.current || notConnected) return;
       bgSyncingRef.current = true;
       try {
         const r: any = await syncFn({ data: { targetUserId, folder, search, limit: viewLimit } });
@@ -208,7 +209,8 @@ export function EmailMailbox({
         bgSyncingRef.current = false;
       }
     };
-    const id = window.setInterval(tick, 30_000);
+    const first = window.setTimeout(() => { void tick(); }, 3_000);
+    const id = window.setInterval(tick, 15_000);
     const onVis = () => { if (document.visibilityState === "visible") void tick(); };
     document.addEventListener("visibilitychange", onVis);
     return () => {

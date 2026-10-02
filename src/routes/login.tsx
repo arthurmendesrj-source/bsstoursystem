@@ -173,25 +173,13 @@ function LoginPage() {
             <button
               type="button"
               className="mt-2 w-full text-sm text-primary hover:underline"
-              onClick={async () => {
-                if (!email) {
-                  toast.error("Digite seu e-mail acima primeiro");
-                  return;
-                }
-                const origin = window.location.origin;
-                const isLocal = /localhost|127\.0\.0\.1/.test(origin);
-                const isPublished = origin === "https://bsstoursystem.lovable.app";
-                const base = isLocal || isPublished ? origin : "https://bsstoursystem.lovable.app";
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${base}/reset-password`,
-                });
-                if (error) toast.error(error.message);
-                else toast.success("Enviamos um link de recuperação para seu e-mail.");
-              }}
+              onClick={() => setResetOpen(true)}
             >
               Esqueci minha senha
             </button>
           )}
+          <ResetDialog open={resetOpen} onOpenChange={setResetOpen} initialEmail={email} onDone={(em) => { setEmail(em); setPassword(""); }} />
+        </Card>
         </Card>
       </div>
     </div>

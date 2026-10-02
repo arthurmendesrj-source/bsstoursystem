@@ -52,6 +52,8 @@ export function EmailMailbox({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
+  const [viewLimit, setViewLimit] = useState(100);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [selectedUid, setSelectedUid] = useState<number | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
   const [composing, setComposing] = useState<null | { to: string; subject: string; body: string; inReplyTo?: string }>(null);
@@ -96,7 +98,7 @@ export function EmailMailbox({
     setLoading(true);
     setFetchError(null);
     try {
-      const r: any = await list({ data: { targetUserId, folder, search } });
+      const r: any = await list({ data: { targetUserId, folder, search, limit: viewLimit } });
       if (refreshIdRef.current !== myId) return;
       setMessages(r.messages ?? []);
       setNotConnected(r.connected === false);
@@ -144,7 +146,7 @@ export function EmailMailbox({
       }
     }, 60_000);
     try {
-      const r: any = await syncFn({ data: { targetUserId, folder, search } });
+      const r: any = await syncFn({ data: { targetUserId, folder, search, limit: viewLimit } });
       if (refreshIdRef.current !== myId) return;
       setMessages(r.messages ?? []);
       setNotConnected(r.connected === false);
@@ -177,7 +179,7 @@ export function EmailMailbox({
       if (bgSyncingRef.current || loading || notConnected) return;
       bgSyncingRef.current = true;
       try {
-        const r: any = await syncFn({ data: { targetUserId, folder, search } });
+        const r: any = await syncFn({ data: { targetUserId, folder, search, limit: viewLimit } });
         if (cancelled) return;
         if (r?.messages) setMessages(r.messages);
         if (r?.connected === false) setNotConnected(true);
@@ -197,7 +199,7 @@ export function EmailMailbox({
       document.removeEventListener("visibilitychange", onVis);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder, targetUserId, search, notConnected]);
+  }, [folder, targetUserId, search, notConnected, viewLimit]);
 
 
   // Update the "Atualizado há Xs" label every 15s.

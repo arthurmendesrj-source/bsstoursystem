@@ -10,6 +10,9 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { LoginErrorBoundary, clearSupabaseLocalSession } from "@/components/LoginErrorBoundary";
+import { useServerFn } from "@tanstack/react-start";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { requestPasswordResetCode, confirmPasswordResetCode } from "@/lib/password-reset.functions";
 
 const RECOVERY_FLAG = "login-recovery-attempted";
 
@@ -52,6 +55,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
 
   // Se o usuário chegou aqui via link de convite, redireciona para /accept-invite
   useEffect(() => {
@@ -173,27 +177,135 @@ function LoginPage() {
             <button
               type="button"
               className="mt-2 w-full text-sm text-primary hover:underline"
-              onClick={async () => {
-                if (!email) {
-                  toast.error("Digite seu e-mail acima primeiro");
-                  return;
-                }
-                const origin = window.location.origin;
-                const isLocal = /localhost|127\.0\.0\.1/.test(origin);
-                const isPublished = origin === "https://bsstoursystem.lovable.app";
-                const base = isLocal || isPublished ? origin : "https://bsstoursystem.lovable.app";
-                const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${base}/reset-password`,
-                });
-                if (error) toast.error(error.message);
-                else toast.success("Enviamos um link de recuperação para seu e-mail.");
-              }}
+              onClick={() => setResetOpen(true)}
             >
               Esqueci minha senha
             </button>
           )}
+          <ResetDialog open={resetOpen} onOpenChange={setResetOpen} initialEmail={email} onDone={(em) => { setEmail(em); setPassword(""); }} />
         </Card>
       </div>
     </div>
+  );
+}
+
+function ResetDialog({
+  open,
+  onOpenChange,
+  initialEmail,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  initialEmail: string;
+  onDone: (email: string) => void;
+}) {
+  const requestFn = useServerFn(requestPasswordResetCode);
+  const confirmFn = useServerFn(confirmPasswordResetCode);
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [em, setEm] = useState("");
+  const [code, setCode] = useState("");
+  const [pw, setPw] = useState("");
+  const [pw2, setPw2] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setStep("email");
+      setEm(initialEmail);
+      setCode("");
+      setPw("");
+      setPw2("");
+    }
+  }, [open, initialEmail]);
+
+  const sendCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await requestFn({ data: { email: em } });
+      toast.success("Se o e-mail estiver cadastrado, você receberá um código de 6 dígitos.");
+      setStep("code");
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao enviar código");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pw.length < 8) return toast.error("A senha deve ter pelo menos 8 caracteres");
+    if (pw !== pw2) return toast.error("As senhas não conferem");
+    setBusy(true);
+    try {
+      const res = await confirmFn({ data: { email: em, code, password: pw } });
+      if (!res.ok) {
+        toast.error(res.error);
+      } else {
+        toast.success("Senha redefinida! Faça login com a nova senha.");
+        onDone(em);
+        onOpenChange(false);
+      }
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao redefinir senha");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Recuperar senha</DialogTitle>
+          <DialogDescription>
+            {step === "email"
+              ? "Informe seu e-mail para receber um código de 6 dígitos."
+              : `Digite o código enviado para ${em} e escolha a nova senha.`}
+          </DialogDescription>
+        </DialogHeader>
+        {step === "email" ? (
+          <form onSubmit={sendCode} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-email">E-mail</Label>
+              <Input id="reset-email" type="email" value={em} onChange={(e) => setEm(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? "Enviando..." : "Enviar código"}
+            </Button>
+          </form>
+        ) : (
+          <form onSubmit={confirm} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="reset-code">Código</Label>
+              <Input
+                id="reset-code"
+                inputMode="numeric"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                className="text-center text-lg tracking-[0.5em]"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-pw">Nova senha</Label>
+              <Input id="reset-pw" type="password" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={8} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reset-pw2">Confirmar nova senha</Label>
+              <Input id="reset-pw2" type="password" value={pw2} onChange={(e) => setPw2(e.target.value)} required minLength={8} />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy || code.length !== 6}>
+              {busy ? "Salvando..." : "Redefinir senha"}
+            </Button>
+            <button type="button" className="w-full text-sm text-muted-foreground hover:text-foreground" onClick={() => setStep("email")}>
+              Reenviar código
+            </button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

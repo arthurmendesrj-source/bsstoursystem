@@ -208,6 +208,11 @@ export async function markRead(userId: string, gmailId: string): Promise<void> {
   });
 }
 
+function encodeHeader(v: string): string {
+  if (/^[\x00-\x7F]*$/.test(v)) return v;
+  return `=?UTF-8?B?${Buffer.from(v, "utf8").toString("base64")}?=`;
+}
+
 function buildMime(opts: {
   from: string;
   to: string;
@@ -223,7 +228,7 @@ function buildMime(opts: {
     `To: ${opts.to}`,
     opts.cc ? `Cc: ${opts.cc}` : "",
     opts.bcc ? `Bcc: ${opts.bcc}` : "",
-    `Subject: ${opts.subject}`,
+    `Subject: ${encodeHeader(opts.subject)}`,
     "MIME-Version: 1.0",
     opts.inReplyTo ? `In-Reply-To: ${opts.inReplyTo}` : "",
     opts.inReplyTo ? `References: ${opts.inReplyTo}` : "",
@@ -249,7 +254,7 @@ function buildMime(opts: {
       "",
     );
   } else {
-    lines.push('Content-Type: text/plain; charset="UTF-8"', "", opts.text);
+    lines.push('Content-Type: text/plain; charset="UTF-8"', "Content-Transfer-Encoding: base64", "", Buffer.from(opts.text, "utf8").toString("base64"));
   }
   return lines.join("\r\n");
 }

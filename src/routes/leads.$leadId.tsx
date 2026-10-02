@@ -26,7 +26,7 @@ import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { computeLeadSla } from "@/lib/leadSla";
 
 export const Route = createFileRoute("/leads/$leadId")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { quickContact?: string } => ({
     quickContact: typeof search.quickContact === "string" ? (search.quickContact as string) : undefined,
   }),
   component: () => (

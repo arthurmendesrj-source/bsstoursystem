@@ -58,11 +58,16 @@ function LoginPage() {
     if (typeof window === "undefined") return;
     const hash = window.location.hash || "";
     const search = window.location.search || "";
+    const isRecovery =
+      hash.includes("type=recovery") || /[?&]type=recovery\b/.test(search);
+    if (isRecovery) {
+      window.location.replace(`/reset-password${search}${hash}`);
+      return;
+    }
     const isInvite =
       hash.includes("type=invite") ||
       hash.includes("type=signup") ||
-      hash.includes("type=recovery") ||
-      /[?&]type=(invite|signup|recovery)\b/.test(search) ||
+      /[?&]type=(invite|signup)\b/.test(search) ||
       /[?&]token_hash=/.test(search) ||
       /[?&]code=/.test(search);
     if (isInvite) {
@@ -173,8 +178,12 @@ function LoginPage() {
                   toast.error("Digite seu e-mail acima primeiro");
                   return;
                 }
+                const origin = window.location.origin;
+                const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+                const isPublished = origin === "https://bsstoursystem.lovable.app";
+                const base = isLocal || isPublished ? origin : "https://bsstoursystem.lovable.app";
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${window.location.origin}/reset-password`,
+                  redirectTo: `${base}/reset-password`,
                 });
                 if (error) toast.error(error.message);
                 else toast.success("Enviamos um link de recuperação para seu e-mail.");

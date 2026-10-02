@@ -178,8 +178,12 @@ function LoginPage() {
                   toast.error("Digite seu e-mail acima primeiro");
                   return;
                 }
+                const origin = window.location.origin;
+                const isLocal = /localhost|127\.0\.0\.1/.test(origin);
+                const isPublished = origin === "https://bsstoursystem.lovable.app";
+                const base = isLocal || isPublished ? origin : "https://bsstoursystem.lovable.app";
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                  redirectTo: `${window.location.origin}/reset-password`,
+                  redirectTo: `${base}/reset-password`,
                 });
                 if (error) toast.error(error.message);
                 else toast.success("Enviamos um link de recuperação para seu e-mail.");

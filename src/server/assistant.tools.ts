@@ -213,6 +213,83 @@ export const ASSISTANT_TOOLS: AiTool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "search_activities",
+      description: "Busca atividades operacionais (Bíblia operacional): transfers, tours, hotéis, por período, reserva, cidade, status ou texto (passageiro/invoice).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          date_from: { type: "string", description: "YYYY-MM-DD" },
+          date_to: { type: "string", description: "YYYY-MM-DD" },
+          booking_id: { type: "string" },
+          city: { type: "string" },
+          status: { type: "string" },
+          limit: { type: "number", default: 30 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_tasks",
+      description: "Busca tarefas (pendentes, atrasadas, do usuário, de um lead).",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          assigned_to_me: { type: "boolean" },
+          completed: { type: "boolean" },
+          overdue: { type: "boolean" },
+          lead_id: { type: "string" },
+          limit: { type: "number", default: 30 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "propose_create_task",
+      description: "Propõe criar uma tarefa/follow-up (requer aprovação).",
+      parameters: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          due_date: { type: "string", description: "ISO 8601" },
+          priority: { type: "string", description: "baixa, media, alta, urgente" },
+          category: { type: "string", description: "atendimento, operacional, financeiro, outro" },
+          lead_id: { type: "string" },
+          customer_id: { type: "string" },
+          assigned_to: { type: "string", description: "id do usuário responsável (padrão: usuário atual)" },
+        },
+        required: ["title"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "propose_update_task",
+      description: "Propõe concluir, reagendar ou alterar uma tarefa existente (requer aprovação).",
+      parameters: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          fields: { type: "object", description: "completed, due_date, priority, title, description, assigned_to", additionalProperties: true },
+        },
+        required: ["id", "fields"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 // ===== Handlers =====
@@ -321,6 +398,37 @@ export async function executeReadTool(name: string, args: any, ctx: Ctx): Promis
         bookings_total: bookings?.length ?? 0,
         bookings_revenue: revenue,
       };
+    }
+    case "search_activities": {
+      let q = supabase
+        .from("operations_activities")
+        .select("id, kind, status, description, activity_date, activity_time, city, hotel, supplier, driver, guide, pax_name, pax_count, booking_id, invoice_code, notes")
+        .order("activity_date", { ascending: true })
+        .limit(args.limit ?? 30);
+      if (args.date_from) q = q.gte("activity_date", args.date_from);
+      if (args.date_to) q = q.lte("activity_date", args.date_to);
+      if (args.booking_id) q = q.eq("booking_id", args.booking_id);
+      if (args.city) q = q.ilike("city", `%${args.city}%`);
+      if (args.status) q = q.eq("status", args.status);
+      if (args.query) q = q.or(`description.ilike.%${args.query}%,pax_name.ilike.%${args.query}%,invoice_code.ilike.%${args.query}%`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return { count: data?.length ?? 0, activities: data };
+    }
+    case "search_tasks": {
+      let q = supabase
+        .from("tasks")
+        .select("id, title, description, category, priority, due_date, completed, assigned_to, lead_id, customer_id")
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .limit(args.limit ?? 30);
+      if (args.assigned_to_me) q = q.eq("assigned_to", userId);
+      if (typeof args.completed === "boolean") q = q.eq("completed", args.completed);
+      if (args.overdue) q = q.lt("due_date", new Date().toISOString()).eq("completed", false);
+      if (args.lead_id) q = q.eq("lead_id", args.lead_id);
+      if (args.query) q = q.ilike("title", `%${args.query}%`);
+      const { data, error } = await q;
+      if (error) throw error;
+      return { count: data?.length ?? 0, tasks: data };
     }
     default:
       throw new Error(`Tool desconhecida: ${name}`);

@@ -117,7 +117,7 @@ export const Route = createFileRoute("/api/assistant/chat")({
           .eq("id", conversationId)
           .maybeSingle();
         if (!conv) return new Response("conversation not found", { status: 404 });
-        const model = conv.model || "google/gemini-2.5-flash";
+        // Model is fixed to Claude (see src/lib/claude.server.ts)
 
         // Persist user message
         await supabase.from("ai_messages").insert({
@@ -154,78 +154,33 @@ export const Route = createFileRoute("/api/assistant/chat")({
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
             try {
+              const { streamClaude, openAiToClaude } = await import("@/lib/claude.server");
+              const claudeTools = ASSISTANT_TOOLS.map((t) => ({
+                name: t.function.name,
+                description: t.function.description,
+                input_schema: t.function.parameters,
+              }));
               for (let round = 0; round < 6; round++) {
-                const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-                  method: "POST",
-                  headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    model,
-                    messages,
-                    tools: ASSISTANT_TOOLS,
-                    stream: true,
-                  }),
-                });
-                if (resp.status === 429) {
-                  send({ type: "error", message: "Limite de requisições atingido. Aguarde um momento." });
+                const { system, messages: cMsgs } = openAiToClaude(messages);
+                let result;
+                try {
+                  result = await streamClaude({
+                    system,
+                    messages: cMsgs,
+                    tools: claudeTools,
+                    onText: (t) => send({ type: "delta", content: t }),
+                  });
+                } catch (e: any) {
+                  send({ type: "error", message: String(e?.message ?? e) });
                   break;
                 }
-                if (resp.status === 402) {
-                  send({ type: "error", message: "Créditos do Lovable AI esgotados. Adicione fundos no workspace." });
-                  break;
-                }
-                if (!resp.ok || !resp.body) {
-                  const t = await resp.text();
-                  send({ type: "error", message: `Erro IA: ${resp.status} ${t.slice(0, 200)}` });
-                  break;
-                }
+                const assistantText = result.text;
+                const toolCalls = result.toolUses.map((tu) => ({
+                  id: tu.id,
+                  type: "function",
+                  function: { name: tu.name, arguments: JSON.stringify(tu.input ?? {}) },
+                }));
 
-                const reader = resp.body.getReader();
-                const decoder = new TextDecoder();
-                let buffer = "";
-                let assistantText = "";
-                const toolCallsAcc: Record<number, any> = {};
-                let finishReason: string | null = null;
-
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  buffer += decoder.decode(value, { stream: true });
-                  let nl: number;
-                  while ((nl = buffer.indexOf("\n")) !== -1) {
-                    let line = buffer.slice(0, nl);
-                    buffer = buffer.slice(nl + 1);
-                    if (line.endsWith("\r")) line = line.slice(0, -1);
-                    if (!line.startsWith("data: ")) continue;
-                    const json = line.slice(6).trim();
-                    if (json === "[DONE]") continue;
-                    try {
-                      const parsed = JSON.parse(json);
-                      const choice = parsed.choices?.[0];
-                      const delta = choice?.delta;
-                      if (delta?.content) {
-                        assistantText += delta.content;
-                        send({ type: "delta", content: delta.content });
-                      }
-                      if (delta?.tool_calls) {
-                        for (const tc of delta.tool_calls) {
-                          const idx = tc.index ?? 0;
-                          if (!toolCallsAcc[idx]) {
-                            toolCallsAcc[idx] = { id: tc.id, type: "function", function: { name: "", arguments: "" } };
-                          }
-                          if (tc.id) toolCallsAcc[idx].id = tc.id;
-                          if (tc.function?.name) toolCallsAcc[idx].function.name += tc.function.name;
-                          if (tc.function?.arguments) toolCallsAcc[idx].function.arguments += tc.function.arguments;
-                        }
-                      }
-                      if (choice?.finish_reason) finishReason = choice.finish_reason;
-                    } catch {
-                      buffer = line + "\n" + buffer;
-                      break;
-                    }
-                  }
-                }
-
-                const toolCalls = Object.values(toolCallsAcc);
                 // Save assistant message
                 const { data: assistantMsg } = await supabase
                   .from("ai_messages")
@@ -244,9 +199,10 @@ export const Route = createFileRoute("/api/assistant/chat")({
                   tool_calls: toolCalls.length ? toolCalls : undefined,
                 });
 
-                if (finishReason !== "tool_calls" || toolCalls.length === 0) {
+                if (result.stopReason !== "tool_use" || toolCalls.length === 0) {
                   break;
                 }
+
 
                 // Execute tools
                 for (const tc of toolCalls) {

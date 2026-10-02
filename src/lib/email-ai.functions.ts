@@ -74,34 +74,13 @@ Regras:
 }
 
 async function callGateway(prompt: string): Promise<EmailAiResult> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY não configurada");
-
-  const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
-      messages: [
-        { role: "system", content: "Você responde APENAS com JSON válido." },
-        { role: "user", content: prompt },
-      ],
-      response_format: { type: "json_object" },
-    }),
+  const { streamClaude } = await import("./claude.server");
+  const { text } = await streamClaude({
+    system: "Você responde APENAS com JSON válido, sem markdown.",
+    messages: [{ role: "user", content: prompt }],
+    maxTokens: 2000,
   });
-
-  if (resp.status === 429) throw new Error("Limite de uso da IA atingido. Tente novamente em instantes.");
-  if (resp.status === 402) throw new Error("Créditos de IA esgotados. Adicione créditos em Settings → Workspace → Usage.");
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`Falha na IA: ${resp.status} ${text.slice(0, 200)}`);
-  }
-
-  const json: any = await resp.json();
-  const content: string = json?.choices?.[0]?.message?.content ?? "{}";
+  const content: string = text || "{}";
   let parsed: any;
   try {
     parsed = JSON.parse(content);

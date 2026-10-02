@@ -1,0 +1,1 @@
+- Text AI (email triage, assistant chat) uses Claude via src/lib/claude.server.ts on the gateway's native /v1/messages (streamed); keeps one place to change model/protocol.

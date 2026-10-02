@@ -52,7 +52,7 @@ export function EmailMailbox({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
-  const [viewLimit, setViewLimit] = useState(100);
+  const [viewLimit, setViewLimit] = useState(5000);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [selectedUid, setSelectedUid] = useState<number | null>(null);
   const [selected, setSelected] = useState<any | null>(null);
@@ -169,7 +169,7 @@ export function EmailMailbox({
 
   const loadOlder = async () => {
     setLoadingOlder(true);
-    const nextLimit = viewLimit + 100;
+    const nextLimit = 5000;
     try {
       const r: any = await syncFn({ data: { targetUserId, folder, search, limit: nextLimit, older: true } });
       setViewLimit(nextLimit);

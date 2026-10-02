@@ -1,0 +1,1 @@
+UPDATE public.subscriptions SET status='active', trial_end=NULL, grace_until=NULL, current_period_end='2126-12-31 23:59:59+00' WHERE tenant_id='a8dddc56-e272-43e6-986f-3dc8641d6a90';

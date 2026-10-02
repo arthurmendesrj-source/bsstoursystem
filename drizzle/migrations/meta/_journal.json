@@ -8,6 +8,13 @@
       "when": 1790975407348,
       "tag": "0000_password_reset_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790976952096,
+      "tag": "0001_lifetime_access_diretor1",
+      "breakpoints": true
     }
   ]
 }

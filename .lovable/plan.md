@@ -1,25 +1,23 @@
-## Objetivo
-Remover o item "Inbox IA" do menu lateral e manter apenas "Triagem Email" — criando a rota que hoje está faltando (gera 404).
+# Pacote completo do código-fonte para auditoria externa
 
-## Mudanças
+## O que será entregue
+Um arquivo ZIP com todo o código do aplicativo, pronto para enviar ao auditor, salvo em Arquivos (Files).
 
-### 1. Menu lateral (`src/components/AppShell.tsx`)
-- Remover a linha `{ to: "/inbox-ia", label: "Inbox IA", ... }`.
-- Manter `{ to: "/inbox-ia/email", label: "Triagem Email", ... }`.
-- Remover o mapeamento `"/inbox-ia": "inbox-ia"` (manter o `/inbox-ia/email`).
+## Conteúdo do pacote
+- Todo o código das telas e funções do app (pasta `src/`)
+- Funções do servidor e todas as migrações do banco de dados (pasta `supabase/`), incluindo regras de segurança (RLS)
+- Arquivos de configuração (package.json, vite.config.ts, tsconfig.json, wrangler.jsonc, etc.)
+- Documentação existente (pasta `docs/`, incluindo os relatórios de auditoria anteriores) e AGENTS.md
+- Arquivos públicos (pasta `public/`)
+- Um arquivo LEIAME-AUDITORIA.md explicando a estrutura do sistema, tecnologias usadas e onde fica cada módulo (CRM, propostas, reservas, e-mail, assistente IA, cobrança, permissões)
 
-### 2. Criar a rota faltante `src/routes/inbox-ia_.email.tsx`
-Tela dedicada de triagem (hoje não existe — por isso fica em branco):
-- Reaproveita o componente `EmailMailbox` já existente, que possui o botão "Triagem IA" e roda análise em lote dos não lidos.
-- Filtros pré-aplicados: pasta `INBOX` + apenas **não lidos** + período (Hoje / 7d / 30d / 90d) + seleção de conta de email.
-- Cabeçalho com título "Triagem Email" e botão "Triagem IA em lote" (já existente no mailbox).
-- Resultados de triagem persistem em `email_ai_cache` (já implementado).
+## O que NÃO entra (por segurança e tamanho)
+- Arquivo `.env` com chaves (substituído por um `.env.example` sem valores)
+- Pastas de dependências instaladas e arquivos gerados de build
+- Metadados internos de versionamento (.git) e da plataforma (.lovable)
+- Dados reais dos clientes (o banco não é exportado, apenas a estrutura)
 
-### 3. Limpeza
-- Remover referências a `inbox-ia` (sem `/email`) em `src/routes/workspace.tsx` (linha 1137) e `AppShell.tsx` (linha 73).
-- Manter o toast em `ProposalEditor.tsx` ("Ação enfileirada no Inbox IA") — trocar texto para "Ação enfileirada na Triagem Email".
-
-## Resultado
-- Menu lateral mostra apenas **Triagem Email**.
-- Clicar abre tela funcional de triagem em lote dos e-mails não lidos, com IA persistida.
-- Nada da funcionalidade de IA do mailbox normal é alterado.
+## Etapas técnicas
+1. Montar uma pasta limpa em /tmp copiando somente os itens acima.
+2. Listar todo o conteúdo (incluindo arquivos ocultos) e conferir que não há chaves/segredos.
+3. Gerar o ZIP em /tmp, inspecionar a lista de arquivos e copiar para /mnt/documents como `codigo-fonte-auditoria-2026-11.zip`.

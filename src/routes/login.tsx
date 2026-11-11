@@ -31,7 +31,7 @@ export const Route = createFileRoute("/login")({
       <div className="flex min-h-screen items-center justify-center bg-background p-6 text-center">
         <div className="max-w-sm">
           <h1 className="text-xl font-semibold">Restaurando sessão...</h1>
-          <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
+          <p className="mt-2 text-sm text-muted-foreground">{(error as Error)?.message}</p>
         </div>
       </div>
     );
